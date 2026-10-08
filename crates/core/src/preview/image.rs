@@ -196,6 +196,35 @@ fn fonts() -> Arc<resvg::usvg::fontdb::Database> {
         .clone()
 }
 
+/// Pictures with transparency (PNG logos, every SVG) are drawn over a discreet light
+/// checkerboard, so that a black shape stays visible on a dark terminal.
+fn on_checkerboard(img: DynamicImage) -> DynamicImage {
+    if !img.color().has_alpha() {
+        return img;
+    }
+    let mut rgba = img.into_rgba8();
+    if rgba.pixels().all(|p| p.0[3] == 255) {
+        return DynamicImage::ImageRgba8(rgba);
+    }
+    let tile = (rgba.width().max(rgba.height()) / 48).max(8);
+    for (x, y, p) in rgba.enumerate_pixels_mut() {
+        let a = p.0[3] as u32;
+        if a == 255 {
+            continue;
+        }
+        let back: u32 = if ((x / tile) + (y / tile)) % 2 == 0 {
+            232
+        } else {
+            206
+        };
+        for c in &mut p.0[..3] {
+            *c = ((*c as u32 * a + back * (255 - a)) / 255) as u8;
+        }
+        p.0[3] = 255;
+    }
+    DynamicImage::ImageRgba8(rgba)
+}
+
 fn downscale(img: DynamicImage, max_edge: u32) -> DynamicImage {
     if img.width().max(img.height()) <= max_edge {
         img
@@ -276,7 +305,7 @@ pub fn load(path: &Path, mut info: ImageInfo, limits: &ImageLimits) -> ImagePrev
         load_raster(path, limits, &mut info)
     };
     let state = match result {
-        Ok(img) => ImageState::Ready(Arc::new(img)),
+        Ok(img) => ImageState::Ready(Arc::new(on_checkerboard(img))),
         Err(e) => ImageState::Failed(format!("cannot decode the image: {e}")),
     };
     // Lenient decoders happily draw half a JPEG; say so instead of pretending.

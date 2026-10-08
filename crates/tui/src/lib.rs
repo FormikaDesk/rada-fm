@@ -5,8 +5,10 @@
 
 pub mod app;
 pub mod fmt;
+pub mod fuzzy;
 pub mod icons;
 pub mod images;
+pub mod palette;
 pub mod run;
 pub mod services;
 pub mod theme;

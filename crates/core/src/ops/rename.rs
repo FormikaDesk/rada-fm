@@ -313,6 +313,19 @@ impl Engine {
             pairs.len(),
             if pairs.len() == 1 { "" } else { "s" }
         );
+        plan.items = pairs
+            .iter()
+            .map(|(from, to)| ItemSummary {
+                path: from.clone(),
+                kind: crate::fs::FileKind::File,
+                action: ItemAction::Rename,
+                files: 0,
+                dirs: 0,
+                symlinks: 0,
+                bytes: 0,
+                target: Some(to.clone()),
+            })
+            .collect();
         plan.renames = pairs;
         plan.warnings = ws.finish();
         plan

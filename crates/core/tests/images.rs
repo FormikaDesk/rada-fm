@@ -465,3 +465,57 @@ fn with_rendering_off_nothing_is_decoded() {
         "no decode may follow"
     );
 }
+
+#[test]
+fn transparent_pictures_and_svgs_are_drawn_on_a_light_checkerboard() {
+    let sb = Sandbox::new();
+    // A black disc on a transparent PNG: invisible on a dark terminal without a backdrop.
+    let mut img = RgbaImage::from_pixel(96, 96, Rgba([0, 0, 0, 0]));
+    for y in 30..66 {
+        for x in 30..66 {
+            img.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+        }
+    }
+    let png = sb.path("disc.png");
+    DynamicImage::ImageRgba8(img).save(&png).unwrap();
+    let svg = sb.write("disc.svg", r#"<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><circle cx="48" cy="48" r="30"/></svg>"#);
+    let (w, rx) = worker();
+    for (g, p) in [(1, &png), (2, &svg)] {
+        request(&w, p, g, Limits::default());
+        let ImageState::Ready(px) = settled(&rx, g).state else {
+            panic!()
+        };
+        let rgba = px.to_rgba8();
+        let (cx, cy) = (rgba.width() / 2, rgba.height() / 2);
+        let centre = rgba.get_pixel(cx, cy).0;
+        assert!(
+            centre[0] < 30 && centre[3] == 255,
+            "the shape itself stays black: {centre:?}"
+        );
+        let corner = rgba.get_pixel(1, 1).0;
+        assert!(
+            corner[0] >= 200 && corner[0] == corner[1] && corner[3] == 255,
+            "corner is a light grey tile: {corner:?}"
+        );
+        // Two different tile shades somewhere along the top row.
+        let shades: std::collections::HashSet<u8> = (0..rgba.width())
+            .map(|x| rgba.get_pixel(x, 1).0[0])
+            .collect();
+        assert!(
+            shades.len() >= 2,
+            "a checkerboard, not a flat colour: {shades:?}"
+        );
+    }
+}
+
+#[test]
+fn opaque_pictures_are_left_untouched() {
+    let sb = Sandbox::new();
+    let p = save(&sb, "solid.png", &gradient(40, 40), ImageFormat::Png);
+    let (w, rx) = worker();
+    request(&w, &p, 1, Limits::default());
+    let ImageState::Ready(px) = settled(&rx, 1).state else {
+        panic!()
+    };
+    assert_eq!(px.to_rgba8().get_pixel(0, 0).0, [0, 0, 128, 255]);
+}

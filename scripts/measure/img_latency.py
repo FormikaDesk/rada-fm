@@ -12,7 +12,7 @@ FOLDER = f"{S}/imgfolder"
 def sh(*a): return subprocess.run(list(a), capture_output=True, text=True)
 def snap(): return sh("tmux", "capture-pane", "-t", "il", "-p").stdout
 def counter(t):
-    m = re.findall(r"(\d+)/(\d+) ╯", t)
+    m = re.findall(r"(\d+)/(\d+) items", t)
     return m[-1][0] if m else None
 def run(mode, n=200):
     sh("tmux", "kill-session", "-t", "il")

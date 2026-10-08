@@ -1,6 +1,8 @@
 //! vela: a terminal file manager you can trust.
 
 mod config;
+mod demo;
+mod fonts;
 mod shell;
 
 use std::path::PathBuf;
@@ -23,13 +25,21 @@ struct Cli {
     /// Folder to open (default: the current folder).
     path: Option<PathBuf>,
 
-    /// Icons: `nerd` (needs a Nerd Font), `unicode` (default) or `none`.
+    /// Icons: `auto` (default: Nerd Font if the terminal uses one), `nerd`, `unicode` or `none`.
     #[arg(long, value_name = "SET")]
     icons: Option<String>,
 
     /// Image previews: `auto` (default), `halfblocks`, `kitty`, `sixel`, `iterm2` or `off`.
     #[arg(long, value_name = "MODE")]
     images: Option<String>,
+
+    /// Colour theme: vela, catppuccin or tokyo-night.
+    #[arg(long, value_name = "NAME")]
+    theme: Option<String>,
+
+    /// Developer: start in a ready-made scene (palette[:query], plan, progress).
+    #[arg(long, value_name = "SCENE", hide = true)]
+    demo: Option<String>,
 
     /// Show hidden files at startup.
     #[arg(long)]
@@ -74,11 +84,34 @@ fn main() -> Result<()> {
         .clone()
         .or_else(|| std::env::var("VELA_ICONS").ok())
         .or(cfg_file.icons.clone());
-    let icons = match icons_name {
-        Some(n) => vela_tui::IconSet::parse(&n)
-            .with_context(|| format!("unknown icon set {n:?} (use nerd, unicode or none)"))?,
-        None => vela_tui::IconSet::Unicode,
+    let icons = match icons_name.as_deref() {
+        None | Some("auto") => {
+            if fonts::terminal_uses_nerd_font(&dirs.home) {
+                vela_tui::IconSet::Nerd
+            } else {
+                vela_tui::IconSet::Unicode
+            }
+        }
+        Some(n) => vela_tui::IconSet::parse(n)
+            .with_context(|| format!("unknown icon set {n:?} (use auto, nerd, unicode or none)"))?,
     };
+
+    let depth = vela_tui::theme::ColorDepth::detect();
+    let theme_name = cli
+        .theme
+        .clone()
+        .or_else(|| std::env::var("VELA_THEME").ok())
+        .or(cfg_file.theme.clone());
+    let theme = match theme_name {
+        Some(n) => Theme::named(&n, depth)
+            .with_context(|| format!("unknown theme {n:?} (use {})", Theme::NAMES.join(", ")))?,
+        None => Theme::named("vela", depth).expect("built-in theme"),
+    };
+    let bookmarks = cfg_file
+        .bookmarks
+        .iter()
+        .map(|b| vela_tui::palette::expand(b, &dirs.home))
+        .collect();
 
     let images_name = cli
         .images
@@ -100,13 +133,23 @@ fn main() -> Result<()> {
             None
         }
     };
-    let services = Services::start(Arc::new(LocalFs), platform, journal);
+    let slow = demo::slow_fs_from_env();
+    let fs: Arc<dyn vela_core::fs::FsEngine> = match slow {
+        Some(s) => Arc::new(s),
+        None => Arc::new(LocalFs),
+    };
+    let services = Services::start(fs, platform, journal);
     let cfg = Config {
         start_dir: start,
         icons,
         show_hidden: cli.hidden || cfg_file.show_hidden,
         sort: cfg_file.sort,
-        theme: Theme::detect(),
+        theme,
+        bookmarks,
+        demo: cli.demo.clone().map(|scene| vela_tui::app::Demo {
+            scene,
+            dest: std::env::var_os("VELA_DEMO_DEST").map(PathBuf::from),
+        }),
         image_mode,
         select,
         limits: vela_core::preview::Limits {

@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -26,6 +26,7 @@ use vela_core::preview::{ImageInfo, ImageState, Limits, Preview};
 use crate::fmt;
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
+use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 use crate::services::Services;
 use crate::theme::Theme;
 
@@ -129,6 +130,8 @@ pub struct PlanView {
     pub typed: String,
     /// A new plan (other conflict policy) is being computed.
     pub replanning: Option<JobId>,
+    /// Show every step instead of the per-item summary.
+    pub details: bool,
 }
 
 impl PlanView {
@@ -209,17 +212,6 @@ pub struct HistoryView {
     pub loading: bool,
 }
 
-pub struct Place {
-    pub label: String,
-    pub detail: String,
-    pub path: PathBuf,
-}
-
-pub struct PlacesView {
-    pub items: Vec<Place>,
-    pub selected: usize,
-}
-
 pub struct ResultView {
     pub title: String,
     pub lines: Vec<(ToastKind, String)>,
@@ -244,7 +236,7 @@ pub enum Modal {
     },
     Input(InputView),
     History(HistoryView),
-    Places(PlacesView),
+    Palette(Box<PaletteView>),
     Result(ResultView),
     ConfirmQuit,
     Help,
@@ -260,6 +252,15 @@ pub struct Config {
     pub limits: Limits,
     /// Put the cursor on this entry of `start_dir` (when started with a file path).
     pub select: Option<OsString>,
+    /// Bookmarks from the configuration file.
+    pub bookmarks: Vec<PathBuf>,
+    pub demo: Option<Demo>,
+}
+
+/// Developer hook: put the interface in a ready-made state (for screenshots).
+pub struct Demo {
+    pub scene: String,
+    pub dest: Option<PathBuf>,
 }
 
 pub struct App {
@@ -286,6 +287,11 @@ pub struct App {
     previewed: Option<PathBuf>,
 
     pub volumes: Vec<Volume>,
+    /// Recent folders, state bookmarks and standard places (from the places worker).
+    pub paths: vela_core::places::PathLists,
+    cfg_bookmarks: Vec<PathBuf>,
+    demo: Option<Demo>,
+    demo_auto_run: bool,
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
     pub running: Option<Running>,
@@ -334,6 +340,10 @@ impl App {
             preview_gen: 0,
             previewed: None,
             volumes: Vec::new(),
+            paths: Default::default(),
+            cfg_bookmarks: cfg.bookmarks,
+            demo: cfg.demo,
+            demo_auto_run: false,
             clipboard: None,
             modal: None,
             running: None,
@@ -356,9 +366,15 @@ impl App {
         if let Some(name) = cfg.select {
             app.remembered.insert(cfg.start_dir.clone(), name);
         }
+        app.svc.places.load();
+        app.svc.places.visit(cfg.start_dir.clone());
         app.svc.watcher.watch(cfg.start_dir.clone());
         app.request_dir(cfg.start_dir);
         app
+    }
+
+    pub fn home(&self) -> &Path {
+        &self.svc.home
     }
 
     pub fn events(&self) -> crossbeam_channel::Receiver<CoreEvent> {
@@ -553,7 +569,14 @@ impl App {
             CoreEvent::Dir(d) => self.on_dir(d),
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),
-            CoreEvent::Volumes(v) => self.volumes = v,
+            CoreEvent::Volumes(v) => {
+                self.volumes = v;
+                self.refresh_palette();
+            }
+            CoreEvent::Paths(p) => {
+                self.paths = p;
+                self.refresh_palette();
+            }
             CoreEvent::Job(j) => self.on_job(j),
         }
     }
@@ -585,6 +608,7 @@ impl App {
                             self.marked.clear();
                             self.cursor = 0;
                             self.scroll = 0;
+                            self.svc.places.visit(path.clone());
                             self.svc.watcher.watch(path);
                             self.previewed = None;
                         } else {
@@ -596,6 +620,7 @@ impl App {
                         self.restore_cursor(keep);
                         self.load = LoadState::Ready;
                         self.request_preview();
+                        self.run_demo();
                     }
                     Err(msg) => {
                         self.load = LoadState::Ready;
@@ -884,6 +909,22 @@ impl App {
             },
             _ => Replan::None,
         };
+        if self.demo_auto_run {
+            self.demo_auto_run = false;
+            self.modal = None;
+            let pv = Box::new(PlanView {
+                plan,
+                scan,
+                undo,
+                replan,
+                scroll: 0,
+                typed: String::new(),
+                replanning: None,
+                details: false,
+            });
+            self.run_plan(pv);
+            return;
+        }
         self.modal = Some(Modal::Plan(Box::new(PlanView {
             plan,
             scan,
@@ -892,6 +933,7 @@ impl App {
             scroll: 0,
             typed: String::new(),
             replanning: None,
+            details: false,
         })));
     }
 
@@ -1041,6 +1083,7 @@ impl App {
         let page = self.view_rows.saturating_sub(1).max(1);
         match key.code {
             KeyCode::Char('c') if ctrl => self.quit(),
+            KeyCode::Char('p') | KeyCode::Char('l') if ctrl => self.open_palette(),
             KeyCode::Char('q') => self.quit(),
             KeyCode::Char('j') | KeyCode::Down => self.set_cursor(self.cursor + 1),
             KeyCode::Char('k') | KeyCode::Up => self.set_cursor(self.cursor.saturating_sub(1)),
@@ -1113,7 +1156,8 @@ impl App {
                 }));
                 self.svc.jobs.load_history();
             }
-            KeyCode::Char('m') => self.open_places(),
+            KeyCode::Char('m') => self.open_palette(),
+            KeyCode::Char('B') => self.toggle_bookmark(),
             KeyCode::Char('~') => {
                 let home = self.svc.home.clone();
                 self.open_dir(home);
@@ -1218,19 +1262,58 @@ impl App {
         )));
     }
 
-    fn open_places(&mut self) {
-        let mut items = vec![
-            Place {
-                label: "Home".into(),
-                detail: String::new(),
-                path: self.svc.home.clone(),
-            },
-            Place {
-                label: "Root".into(),
-                detail: String::new(),
-                path: PathBuf::from(std::path::MAIN_SEPARATOR.to_string()),
-            },
-        ];
+    fn palette_items(&self) -> Vec<PaletteItem> {
+        let mut items: Vec<PaletteItem> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let home = self.svc.home.clone();
+        let cwd = self.cwd.clone();
+        let mut add = |items: &mut Vec<PaletteItem>,
+                       path: &Path,
+                       kind: PaletteKind,
+                       label: Option<String>,
+                       detail: Option<String>| {
+            if !seen.insert((path.to_path_buf(), kind == PaletteKind::Disk)) {
+                return;
+            }
+            let label = label.unwrap_or_else(|| {
+                if path == home {
+                    "Home".to_string()
+                } else {
+                    path.file_name()
+                        .map(vela_core::display::name)
+                        .unwrap_or_else(|| vela_core::display::path(path))
+                }
+            });
+            let detail = detail.unwrap_or_else(|| fmt::short_path(path, &home));
+            items.push(PaletteItem {
+                label,
+                detail,
+                path: path.to_path_buf(),
+                kind,
+            });
+        };
+        let bookmarks: Vec<PathBuf> = self
+            .cfg_bookmarks
+            .iter()
+            .chain(self.paths.bookmarks.iter())
+            .cloned()
+            .collect();
+        for p in &bookmarks {
+            add(&mut items, p, PaletteKind::Bookmark, None, None);
+        }
+        for p in self.paths.recents.iter().filter(|p| **p != cwd) {
+            add(&mut items, p, PaletteKind::Recent, None, None);
+        }
+        for p in &self.paths.places {
+            add(&mut items, p, PaletteKind::Place, None, None);
+        }
+        add(
+            &mut items,
+            Path::new(std::path::MAIN_SEPARATOR_STR),
+            PaletteKind::Place,
+            Some("Root".into()),
+            Some(std::path::MAIN_SEPARATOR_STR.into()),
+        );
         for v in &self.volumes {
             let label = v
                 .label
@@ -1238,21 +1321,119 @@ impl App {
                 .unwrap_or_else(|| vela_core::display::path(&v.mount_point));
             let free = v
                 .available
-                .map(|a| format!("{} free", fmt::size(a)))
+                .map(|a| format!(" · {} free", fmt::size(a)))
                 .unwrap_or_else(|| {
                     if v.responsive {
                         String::new()
                     } else {
-                        "not responding".into()
+                        " · not responding".into()
                     }
                 });
-            items.push(Place {
-                label,
-                detail: format!("{} {free}", v.fs_type).trim().to_string(),
-                path: v.mount_point.clone(),
-            });
+            let detail = format!("{}{free}", vela_core::display::path(&v.mount_point));
+            add(
+                &mut items,
+                &v.mount_point,
+                PaletteKind::Disk,
+                Some(label),
+                Some(detail),
+            );
         }
-        self.modal = Some(Modal::Places(PlacesView { items, selected: 0 }));
+        for anc in cwd.ancestors().skip(1).take(4) {
+            add(&mut items, anc, PaletteKind::Parent, None, None);
+        }
+        let dirs: Vec<PathBuf> = self
+            .listing
+            .all()
+            .iter()
+            .filter(|e| e.is_dir())
+            .take(400)
+            .map(|e| e.path.clone())
+            .collect();
+        for p in &dirs {
+            add(&mut items, p, PaletteKind::Folder, None, None);
+        }
+        items
+    }
+
+    fn open_palette(&mut self) {
+        let items = self.palette_items();
+        self.modal = Some(Modal::Palette(Box::new(PaletteView::new(
+            items,
+            self.svc.home.clone(),
+        ))));
+    }
+
+    /// New recents/volumes arrived while the palette is open: refresh its list, keep the query.
+    fn refresh_palette(&mut self) {
+        if matches!(self.modal, Some(Modal::Palette(_))) {
+            let items = self.palette_items();
+            if let Some(Modal::Palette(p)) = &mut self.modal {
+                p.set_items(items);
+            }
+        }
+    }
+
+    /// Developer hook (`--demo`): put the interface in a ready-made state, once.
+    fn run_demo(&mut self) {
+        let Some(d) = self.demo.take() else { return };
+        let (scene, arg) = d
+            .scene
+            .split_once(':')
+            .map_or((d.scene.as_str(), None), |(a, b)| (a, Some(b)));
+        match scene {
+            "palette" => {
+                self.open_palette();
+                if let (Some(Modal::Palette(p)), Some(q)) = (&mut self.modal, arg) {
+                    for c in q.chars() {
+                        p.insert(c);
+                    }
+                }
+            }
+            "plan" | "progress" => {
+                let paths: Vec<PathBuf> = self
+                    .visible
+                    .iter()
+                    .filter_map(|&i| self.listing.all().get(i))
+                    .map(|e| e.path.clone())
+                    .collect();
+                self.marked = self
+                    .visible
+                    .iter()
+                    .filter_map(|&i| self.listing.all().get(i))
+                    .map(|e| e.name.clone())
+                    .collect();
+                let Some(dest) = d.dest else { return };
+                self.demo_auto_run = scene == "progress";
+                let opts = TransferOptions::copy(ConflictPolicy::Skip);
+                let h = self.svc.jobs.plan_transfer(paths, dest, opts);
+                self.begin_plan("Planning copy", h);
+            }
+            "history" => {
+                self.modal = Some(Modal::History(HistoryView {
+                    entries: Vec::new(),
+                    selected: 0,
+                    loading: true,
+                }));
+                self.svc.jobs.load_history();
+            }
+            "help" => self.modal = Some(Modal::Help),
+            _ => {}
+        }
+    }
+
+    fn toggle_bookmark(&mut self) {
+        let cwd = self.cwd.clone();
+        let was = self.paths.bookmarks.contains(&cwd);
+        self.svc.places.toggle_bookmark(cwd);
+        self.toast(
+            ToastKind::Ok,
+            if was {
+                "bookmark removed"
+            } else {
+                "folder bookmarked: Ctrl+P to jump back"
+            },
+            3,
+        );
     }
 
     // ------------------------------------------------------------------ modal keys
@@ -1316,6 +1497,11 @@ impl App {
                         );
                         pv.replanning = Some(h.id);
                     }
+                    self.modal = Some(Modal::Plan(pv));
+                }
+                KeyCode::Tab => {
+                    pv.details = !pv.details;
+                    pv.scroll = 0;
                     self.modal = Some(Modal::Plan(pv));
                 }
                 KeyCode::Down | KeyCode::Char('j') if !pv.needs_typed_confirmation() => {
@@ -1427,23 +1613,51 @@ impl App {
                 }
                 _ => self.modal = Some(Modal::History(h)),
             },
-            Modal::Places(mut p) => match key.code {
-                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('m') => {}
-                KeyCode::Down | KeyCode::Char('j') => {
-                    p.selected = (p.selected + 1).min(p.items.len().saturating_sub(1));
-                    self.modal = Some(Modal::Places(p));
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    p.selected = p.selected.saturating_sub(1);
-                    self.modal = Some(Modal::Places(p));
-                }
+            Modal::Palette(mut p) => match key.code {
+                KeyCode::Esc => {}
                 KeyCode::Enter => {
-                    if let Some(place) = p.items.get(p.selected) {
-                        let path = place.path.clone();
+                    if let Some(item) = p.current() {
+                        let path = item.path.clone();
                         self.open_dir(path);
                     }
                 }
-                _ => self.modal = Some(Modal::Places(p)),
+                KeyCode::Down => {
+                    p.move_by(1);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Up => {
+                    p.move_by(-1);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Char('n') | KeyCode::Char('j') if ctrl => {
+                    p.move_by(1);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Char('p') | KeyCode::Char('k') if ctrl => {
+                    p.move_by(-1);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::PageDown => {
+                    p.move_by(8);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::PageUp => {
+                    p.move_by(-8);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Char('u') if ctrl => {
+                    p.clear();
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Backspace => {
+                    p.backspace();
+                    self.modal = Some(Modal::Palette(p));
+                }
+                KeyCode::Char(c) if !ctrl => {
+                    p.insert(c);
+                    self.modal = Some(Modal::Palette(p));
+                }
+                _ => self.modal = Some(Modal::Palette(p)),
             },
             Modal::Result(mut r) => match key.code {
                 KeyCode::Char('u') => self.start_undo(None),

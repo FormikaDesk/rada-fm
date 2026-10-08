@@ -43,6 +43,20 @@ impl TransferOptions {
     }
 }
 
+fn summary_of(r: &ScanNode, action: ItemAction) -> ItemSummary {
+    let st = r.stats();
+    ItemSummary {
+        path: r.path.clone(),
+        kind: r.meta.kind,
+        action,
+        files: st.files,
+        dirs: st.dirs,
+        symlinks: st.symlinks,
+        bytes: st.bytes,
+        target: None,
+    }
+}
+
 fn items_label(n: u64) -> String {
     if n == 1 {
         "1 item".into()
@@ -101,6 +115,8 @@ impl Engine {
             case_insensitive: self.platform.path_rules().case_insensitive,
             cross_device: false,
             same_location: false,
+            items: Vec::new(),
+            merged_root: false,
         };
         scan_problems(scan, &mut t.ws);
 
@@ -147,7 +163,11 @@ impl Engine {
         }
         if !blocked && !t.ws_has_blocking() {
             for root in &scan.roots {
+                let start = t.steps.len();
+                t.merged_root = false;
                 t.visit(root, dest_dir);
+                let item = t.summarise(root, start, dest_dir);
+                t.items.push(item);
             }
         }
 
@@ -174,6 +194,7 @@ impl Engine {
         }
 
         plan.steps = t.steps;
+        plan.items = t.items;
         plan.totals = t.totals;
         plan.warnings = t.ws.finish();
         plan
@@ -209,6 +230,7 @@ impl Engine {
             plan.steps.push(Step::TrashItem {
                 path: r.path.clone(),
             });
+            plan.items.push(summary_of(r, ItemAction::Trash));
         }
         plan.warnings = ws.finish();
         plan
@@ -273,6 +295,7 @@ impl Engine {
                 continue;
             }
             walk(r, &mut plan.steps, &mut ws);
+            plan.items.push(summary_of(r, ItemAction::Delete));
         }
         plan.warnings = ws.finish();
         plan
@@ -347,6 +370,20 @@ impl Engine {
                 }
             }
         }
+        plan.items.push(ItemSummary {
+            path: from.to_path_buf(),
+            kind: self
+                .fs
+                .lstat(from)
+                .map(|m| m.kind)
+                .unwrap_or(crate::fs::FileKind::File),
+            action: ItemAction::Rename,
+            files: 0,
+            dirs: 0,
+            symlinks: 0,
+            bytes: 0,
+            target: Some(to.clone()),
+        });
         plan.renames.push((from.to_path_buf(), to));
         plan.warnings = ws.finish();
         plan
@@ -374,6 +411,16 @@ impl Engine {
         } else if !self.fs.can_write(parent) {
             ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
         } else {
+            plan.items.push(ItemSummary {
+                path: path.clone(),
+                kind: crate::fs::FileKind::Dir,
+                action: ItemAction::Create,
+                files: 0,
+                dirs: 1,
+                symlinks: 0,
+                bytes: 0,
+                target: None,
+            });
             plan.steps.push(Step::MakeDir { path, mode: None });
         }
         plan.warnings = ws.finish();
@@ -394,6 +441,9 @@ struct Transfer<'a> {
     case_insensitive: bool,
     cross_device: bool,
     same_location: bool,
+    items: Vec<ItemSummary>,
+    /// The root being planned was merged into an existing folder.
+    merged_root: bool,
 }
 
 impl Transfer<'_> {
@@ -462,7 +512,60 @@ impl Transfer<'_> {
         }
     }
 
+    /// What became of `root`, from the steps its planning appended (from `start`).
+    fn summarise(&self, root: &ScanNode, start: usize, dest_dir: &Path) -> ItemSummary {
+        let added = &self.steps[start..];
+        let target = added
+            .iter()
+            .find_map(|s| s.destination().map(Path::to_path_buf));
+        let renamed = added.iter().any(|s| matches!(s, Step::Rename { .. }));
+        let (mut files, mut dirs, mut symlinks, mut bytes) = (0, 0, 0, 0);
+        // A whole-tree rename, or an item left alone, is described by the source itself.
+        if (renamed && !self.merged_root) || added.is_empty() {
+            let st = root.stats();
+            (files, dirs, symlinks, bytes) = (st.files, st.dirs, st.symlinks, st.bytes);
+        } else {
+            for s in added {
+                match s {
+                    Step::CopyFile { size, .. } => {
+                        files += 1;
+                        bytes += size;
+                    }
+                    Step::CopySymlink { .. } => symlinks += 1,
+                    Step::MakeDir { .. } => dirs += 1,
+                    _ => {}
+                }
+            }
+        }
+        let overwrote = matches!(added.first(), Some(Step::TrashItem { .. }));
+        let natural = dest_dir.join(&root.name);
+        let action = if added.is_empty() {
+            ItemAction::Skip
+        } else if self.merged_root {
+            ItemAction::Merge
+        } else if overwrote {
+            ItemAction::Overwrite
+        } else if target.as_ref().is_some_and(|t| *t != natural) {
+            ItemAction::KeepBoth
+        } else if self.opts.mode == TransferMode::Move {
+            ItemAction::Move
+        } else {
+            ItemAction::Copy
+        };
+        ItemSummary {
+            path: root.path.clone(),
+            kind: root.meta.kind,
+            action,
+            files,
+            dirs,
+            symlinks,
+            bytes,
+            target: if added.is_empty() { None } else { target },
+        }
+    }
+
     fn merge(&mut self, node: &ScanNode, dst: PathBuf) {
+        self.merged_root = true;
         self.ws.add(WarningKind::Merge, Severity::Info, Some(&dst));
         self.taken.insert(self.key(&dst));
         self.note_unreadable_dir(node);

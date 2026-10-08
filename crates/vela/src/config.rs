@@ -5,6 +5,8 @@
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
+//! theme = "vela"            # vela | catppuccin | tokyo-night
+//! bookmarks = ["~/projects", "/mnt/data"]
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
 //! image_max_file_mb = 128
@@ -21,6 +23,8 @@ pub struct FileConfig {
     pub show_hidden: bool,
     pub sort: SortSpec,
     pub images: Option<String>,
+    pub theme: Option<String>,
+    pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
 }
 
@@ -31,6 +35,8 @@ struct Raw {
     sort: Option<String>,
     reverse: Option<bool>,
     images: Option<String>,
+    theme: Option<String>,
+    bookmarks: Option<Vec<String>>,
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
 }
@@ -58,6 +64,8 @@ pub fn load(dirs: &Dirs) -> FileConfig {
             dirs_first: true,
         },
         images: raw.images,
+        theme: raw.theme,
+        bookmarks: raw.bookmarks.unwrap_or_default(),
         image_limits: {
             let d = ImageLimits::default();
             ImageLimits {

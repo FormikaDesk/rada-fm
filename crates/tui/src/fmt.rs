@@ -15,6 +15,53 @@ pub fn date(t: Option<SystemTime>) -> String {
     }
 }
 
+/// `~/projects/vela` instead of `/home/user/projects/vela`.
+pub fn short_path(p: &std::path::Path, home: &std::path::Path) -> String {
+    match p.strip_prefix(home) {
+        Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Ok(rest) => format!("~/{}", vela_core::display::path(rest)),
+        Err(_) => vela_core::display::path(p),
+    }
+}
+
+/// "2 h ago", "yesterday", "Sep 17": a date read at a glance.
+pub fn relative(t: Option<SystemTime>, now: SystemTime) -> String {
+    let Some(t) = t else { return "—".into() };
+    let Ok(age) = now.duration_since(t) else {
+        return "just now".into();
+    };
+    let s = age.as_secs();
+    let (m, h, d) = (s / 60, s / 3600, s / 86400);
+    if s < 45 {
+        "just now".into()
+    } else if m < 2 {
+        "1 min ago".into()
+    } else if m < 60 {
+        format!("{m} min ago")
+    } else if h < 24 {
+        format!("{h} h ago")
+    } else if h < 48 {
+        "yesterday".into()
+    } else if d < 14 {
+        format!("{d} days ago")
+    } else if d < 60 {
+        format!("{} weeks ago", d / 7)
+    } else {
+        match jiff::Timestamp::try_from(t) {
+            Ok(ts) => {
+                let z = ts.to_zoned(jiff::tz::TimeZone::system());
+                let this_year = jiff::Timestamp::try_from(now)
+                    .map(|n| n.to_zoned(jiff::tz::TimeZone::system()).year())
+                    .ok()
+                    == Some(z.year());
+                z.strftime(if this_year { "%b %d" } else { "%b %Y" })
+                    .to_string()
+            }
+            Err(_) => "—".into(),
+        }
+    }
+}
+
 pub fn clock(unix_secs: i64) -> String {
     match jiff::Timestamp::from_second(unix_secs) {
         Ok(ts) => ts
@@ -98,6 +145,22 @@ pub fn wrap(text: &str, width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    #[test]
+    fn relative_dates() {
+        let now = std::time::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let ago = |s: u64| super::relative(Some(now - Duration::from_secs(s)), now);
+        assert_eq!(ago(5), "just now");
+        assert_eq!(ago(60), "1 min ago");
+        assert_eq!(ago(600), "10 min ago");
+        assert_eq!(ago(2 * 3600), "2 h ago");
+        assert_eq!(ago(30 * 3600), "yesterday");
+        assert_eq!(ago(3 * 86400), "3 days ago");
+        assert_eq!(ago(21 * 86400), "3 weeks ago");
+        assert_eq!(super::relative(None, now), "—");
+    }
+
     use super::*;
 
     #[test]

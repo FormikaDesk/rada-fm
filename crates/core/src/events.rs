@@ -109,5 +109,7 @@ pub enum CoreEvent {
     Watch(WatchEvent),
     Preview(PreviewEvent),
     Volumes(Vec<Volume>),
+    /// Recent folders, bookmarks and standard places (from the places worker).
+    Paths(crate::places::PathLists),
     Job(JobEvent),
 }

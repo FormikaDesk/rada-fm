@@ -1,5 +1,7 @@
-//! File icons. Nerd Font glyphs are optional: without a patched font they render as
-//! boxes, so the default is a small set of plain Unicode markers.
+//! File categories, their icons and badges. Colours come from the theme's tokens.
+//!
+//! Nerd Font glyphs need a patched font: without one they render as boxes, so the
+//! fallback is a small set of plain Unicode markers.
 
 use ratatui::style::Color;
 use vela_core::fs::FileKind;
@@ -19,7 +21,7 @@ impl IconSet {
     pub fn parse(s: &str) -> Option<IconSet> {
         match s.to_ascii_lowercase().as_str() {
             "nerd" | "nerdfont" | "nerd-font" | "on" | "true" | "1" => Some(IconSet::Nerd),
-            "unicode" | "plain" | "auto" => Some(IconSet::Unicode),
+            "unicode" | "plain" => Some(IconSet::Unicode),
             "none" | "off" | "ascii" | "false" | "0" => Some(IconSet::None),
             _ => None,
         }
@@ -34,6 +36,133 @@ impl IconSet {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Code,
+    Markup,
+    Text,
+    Doc,
+    Image,
+    Vector,
+    Audio,
+    Video,
+    Archive,
+    Data,
+    Config,
+    Binary,
+    Folder,
+    Link,
+    Other,
+}
+
+impl Category {
+    /// Short word shown in the Type column.
+    pub fn label(self) -> &'static str {
+        match self {
+            Category::Code => "code",
+            Category::Markup => "md",
+            Category::Text => "text",
+            Category::Doc => "doc",
+            Category::Image => "image",
+            Category::Vector => "vector",
+            Category::Audio => "audio",
+            Category::Video => "video",
+            Category::Archive => "archive",
+            Category::Data => "data",
+            Category::Config => "config",
+            Category::Binary => "binary",
+            Category::Folder => "Folder",
+            Category::Link => "link",
+            Category::Other => "file",
+        }
+    }
+
+    pub fn color(self, th: &Theme) -> Color {
+        let k = &th.kinds;
+        match self {
+            Category::Code => k.code,
+            Category::Markup => k.markup,
+            Category::Text => k.text,
+            Category::Doc => k.doc,
+            Category::Image => k.image,
+            Category::Vector => k.vector,
+            Category::Audio => k.audio,
+            Category::Video => k.video,
+            Category::Archive => k.archive,
+            Category::Data => k.data,
+            Category::Config => k.config,
+            Category::Binary => k.binary,
+            Category::Folder => k.folder,
+            Category::Link => k.link,
+            Category::Other => k.other,
+        }
+    }
+}
+
+fn by_extension(ext: &str) -> Option<Category> {
+    Some(match ext {
+        "rs" | "py" | "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx" | "go" | "c" | "h" | "cpp"
+        | "cc" | "hpp" | "java" | "kt" | "swift" | "rb" | "php" | "sh" | "bash" | "zsh"
+        | "fish" | "lua" | "zig" | "cs" | "scala" | "hs" | "ex" | "exs" | "sql" | "css"
+        | "scss" | "html" | "htm" | "vue" | "svelte" | "nix" | "pl" | "r" | "dart" => {
+            Category::Code
+        }
+        "md" | "markdown" | "mdx" => Category::Markup,
+        "txt" | "log" | "rst" | "org" | "tex" => Category::Text,
+        "pdf" | "doc" | "docx" | "odt" | "rtf" | "epub" | "ppt" | "pptx" | "xls" | "xlsx"
+        | "ods" => Category::Doc,
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "tif" | "tiff" | "avif"
+        | "heic" => Category::Image,
+        "svg" | "ai" | "eps" => Category::Vector,
+        "mp3" | "flac" | "ogg" | "wav" | "m4a" | "opus" | "aac" => Category::Audio,
+        "mp4" | "mkv" | "webm" | "mov" | "avi" | "m4v" => Category::Video,
+        "zip" | "tar" | "gz" | "xz" | "bz2" | "zst" | "7z" | "rar" | "tgz" | "txz" | "iso"
+        | "deb" | "rpm" => Category::Archive,
+        "json" | "jsonc" | "csv" | "tsv" | "xml" | "yaml" | "yml" | "db" | "sqlite" | "ndjson"
+        | "parquet" => Category::Data,
+        "toml" | "ini" | "conf" | "cfg" | "env" | "lock" | "properties" => Category::Config,
+        "exe" | "dll" | "so" | "o" | "a" | "bin" | "elf" | "appimage" | "wasm" => Category::Binary,
+        _ => return None,
+    })
+}
+
+pub fn categorize(e: &Entry) -> Category {
+    if e.link.is_some() {
+        return Category::Link;
+    }
+    match e.kind {
+        FileKind::Dir => Category::Folder,
+        FileKind::Other => Category::Other,
+        _ => {
+            let lower = e.display.to_lowercase();
+            if matches!(
+                lower.as_str(),
+                "makefile" | "dockerfile" | "cmakelists.txt" | "justfile"
+            ) {
+                return Category::Code;
+            }
+            if matches!(
+                lower.as_str(),
+                "license" | "readme" | "authors" | "copying" | "changelog"
+            ) {
+                return Category::Text;
+            }
+            match lower.rsplit_once('.') {
+                Some((stem, ext)) if !stem.is_empty() => {
+                    by_extension(ext).unwrap_or(if e.executable {
+                        Category::Binary
+                    } else {
+                        Category::Other
+                    })
+                }
+                _ if e.executable => Category::Binary,
+                _ => Category::Other,
+            }
+        }
+    }
+}
+
+// Nerd Font (v3) code points.
 const FOLDER: &str = "\u{f07b}";
 const FILE: &str = "\u{f15b}";
 const TEXT: &str = "\u{f15c}";
@@ -60,87 +189,81 @@ const GO: &str = "\u{e627}";
 const C: &str = "\u{e61e}";
 const CPP: &str = "\u{e61d}";
 const JAVA: &str = "\u{e738}";
+const DB: &str = "\u{f1c0}";
+const CODE: &str = "\u{f121}";
+const VECTOR: &str = "\u{f0e7}";
+const BIN: &str = "\u{f471}";
 
-fn by_extension(ext: &str) -> Option<(&'static str, Color)> {
-    let c = |r, g, b| Color::Rgb(r, g, b);
-    Some(match ext {
-        "rs" => (RUST, c(250, 179, 135)),
-        "py" => (PYTHON, c(249, 226, 175)),
-        "js" | "mjs" | "cjs" => (JS, c(249, 226, 175)),
-        "ts" | "tsx" => (TS, c(137, 180, 250)),
-        "json" | "jsonc" => (JSON, c(249, 226, 175)),
-        "md" | "markdown" => (MD, c(116, 199, 236)),
-        "html" | "htm" => (HTML, c(250, 179, 135)),
-        "css" | "scss" => (CSS, c(137, 180, 250)),
-        "go" => (GO, c(116, 199, 236)),
-        "c" | "h" => (C, c(137, 180, 250)),
-        "cpp" | "cc" | "hpp" => (CPP, c(137, 180, 250)),
-        "java" => (JAVA, c(243, 139, 168)),
-        "sh" | "bash" | "zsh" | "fish" => (TERM, c(166, 227, 161)),
-        "toml" | "yaml" | "yml" | "ini" | "conf" | "cfg" => (CONFIG, c(166, 173, 200)),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico" | "avif" => {
-            (IMAGE, c(203, 166, 247))
-        }
-        "zip" | "tar" | "gz" | "xz" | "bz2" | "zst" | "7z" | "rar" | "tgz" => {
-            (ARCHIVE, c(249, 226, 175))
-        }
-        "pdf" => (PDF, c(243, 139, 168)),
-        "mp3" | "flac" | "ogg" | "wav" | "m4a" | "opus" => (AUDIO, c(245, 194, 231)),
-        "mp4" | "mkv" | "webm" | "mov" | "avi" => (VIDEO, c(245, 194, 231)),
-        "txt" | "log" | "rtf" => (TEXT, c(166, 173, 200)),
-        "lock" => (LOCK, c(108, 112, 134)),
-        _ => return None,
-    })
+fn nerd_glyph(e: &Entry, cat: Category) -> &'static str {
+    let lower = e.display.to_lowercase();
+    if matches!(
+        lower.as_str(),
+        ".gitignore" | ".git" | ".gitattributes" | ".gitmodules"
+    ) {
+        return GIT;
+    }
+    let ext = lower.rsplit_once('.').map(|(_, x)| x).unwrap_or("");
+    match ext {
+        "rs" => RUST,
+        "py" => PYTHON,
+        "js" | "mjs" | "cjs" | "jsx" => JS,
+        "ts" | "tsx" => TS,
+        "json" | "jsonc" => JSON,
+        "md" | "markdown" | "mdx" => MD,
+        "html" | "htm" => HTML,
+        "css" | "scss" => CSS,
+        "go" => GO,
+        "c" | "h" => C,
+        "cpp" | "cc" | "hpp" => CPP,
+        "java" => JAVA,
+        "sh" | "bash" | "zsh" | "fish" => TERM,
+        "pdf" => PDF,
+        "lock" => LOCK,
+        _ => match cat {
+            Category::Folder => FOLDER,
+            Category::Link => LINK,
+            Category::Code => CODE,
+            Category::Text | Category::Markup => TEXT,
+            Category::Doc => PDF,
+            Category::Image => IMAGE,
+            Category::Vector => VECTOR,
+            Category::Audio => AUDIO,
+            Category::Video => VIDEO,
+            Category::Archive => ARCHIVE,
+            Category::Data => DB,
+            Category::Config => CONFIG,
+            Category::Binary => BIN,
+            Category::Other => {
+                if e.kind == FileKind::Other {
+                    GEAR
+                } else {
+                    FILE
+                }
+            }
+        },
+    }
 }
 
-/// Glyph and color for an entry.
+/// Glyph and colour for an entry.
 pub fn icon(e: &Entry, set: IconSet, th: &Theme) -> (&'static str, Color) {
-    let rgb = th.truecolor;
-    let tint = |c: Color| if rgb { c } else { th.subtle };
     if e.error.is_some() {
-        return match set {
-            IconSet::Nerd => (FILE, th.danger),
-            _ => ("!", th.danger),
-        };
+        return (if set == IconSet::Nerd { FILE } else { "!" }, th.error);
     }
-    if let Some(l) = &e.link {
-        let color = if l.state == LinkState::Broken || l.state == LinkState::Circular {
-            th.danger
-        } else {
-            th.link
-        };
-        return match set {
-            IconSet::Nerd => (LINK, color),
-            _ => ("↪", color),
-        };
-    }
-    match (e.kind, set) {
-        (FileKind::Dir, IconSet::Nerd) => (FOLDER, th.dir),
-        (FileKind::Dir, _) => ("▸", th.dir),
-        (FileKind::Other, IconSet::Nerd) => (GEAR, th.warn),
-        (FileKind::Other, _) => ("◆", th.warn),
-        (_, IconSet::Nerd) => {
-            let lower = e.display.to_lowercase();
-            if lower == ".gitignore" || lower == ".git" || lower == ".gitattributes" {
-                return (GIT, tint(Color::Rgb(250, 179, 135)));
-            }
-            if e.executable {
-                return (TERM, th.exec);
-            }
-            match lower
-                .rsplit_once('.')
-                .and_then(|(_, ext)| by_extension(ext))
-            {
-                Some((g, c)) => (g, tint(c)),
-                None => (FILE, th.subtle),
-            }
-        }
-        (_, _) => {
-            if e.executable {
-                ("*", th.exec)
-            } else {
-                ("·", th.muted)
-            }
-        }
-    }
+    let cat = categorize(e);
+    let broken = e
+        .link
+        .as_ref()
+        .is_some_and(|l| matches!(l.state, LinkState::Broken | LinkState::Circular));
+    let color = if broken { th.error } else { cat.color(th) };
+    let glyph = match set {
+        IconSet::Nerd => nerd_glyph(e, cat),
+        _ => match cat {
+            Category::Folder => "▸",
+            Category::Link => "↪",
+            Category::Binary => "*",
+            Category::Other if e.kind == FileKind::Other => "◆",
+            _ => "·",
+        },
+    };
+    (glyph, color)
 }

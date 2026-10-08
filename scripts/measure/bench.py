@@ -108,7 +108,7 @@ def startup(name, n=10):
 
 
 COUNTER = {
-    "vela": re.compile(r"(\d+)/10000 ╯"),
+    "vela": re.compile(r"(\d+)/10000 items"),
     "yazi": re.compile(r"(\d+)/10000"),
 }
 

@@ -46,10 +46,12 @@ impl H {
             icons: IconSet::Unicode,
             show_hidden: false,
             sort: SortSpec::default(),
-            theme: Theme::truecolor(),
+            theme: Theme::azure(),
             image_mode: vela_tui::ImageMode::Halfblocks,
             limits,
             select: None,
+            bookmarks: Vec::new(),
+            demo: None,
         };
         let app = App::new(cfg, svc, images);
         let mut h = H {
@@ -170,7 +172,7 @@ fn lists_sorted_hides_dotfiles_and_previews_the_selection() {
     h.wait("preview of b.txt", |a| a.preview.name == "b.txt");
     let s = h.screen();
     assert!(s.contains("second line"), "{s}");
-    assert!(s.contains("3/3"), "position counter: {s}");
+    assert!(s.contains("3/3 items"), "position counter: {s}");
 }
 
 #[test]
@@ -282,7 +284,16 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     plan_modal(&mut h);
     let s = h.screen();
     assert!(s.contains("Copy 1 item"), "{s}");
-    assert!(s.contains("1 file"), "{s}");
+    // The totals stack a number over its label.
+    let lines: Vec<&str> = s.lines().collect();
+    let i = lines
+        .iter()
+        .position(|l| l.contains(" file "))
+        .unwrap_or_else(|| panic!("no 'file' label: {s}"));
+    assert!(
+        lines[i - 1].trim_start_matches([' ', '│']).starts_with('1'),
+        "{s}"
+    );
     assert!(s.contains("What will happen"), "{s}");
     assert!(
         !dest.join("a.txt").exists(),

@@ -526,6 +526,56 @@ pub struct Totals {
     pub bytes: u64,
 }
 
+/// What happens to one top-level item of an operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ItemAction {
+    Copy,
+    Move,
+    /// A folder merged into an existing folder of the same name.
+    Merge,
+    KeepBoth,
+    /// Replaces an existing item (the old one goes to the trash first).
+    Overwrite,
+    /// Left alone: the name already exists, or it is already where it should be.
+    Skip,
+    Trash,
+    Delete,
+    Rename,
+    Create,
+}
+
+impl ItemAction {
+    pub fn verb(self) -> &'static str {
+        match self {
+            ItemAction::Copy => "copy",
+            ItemAction::Move => "move",
+            ItemAction::Merge => "merge",
+            ItemAction::KeepBoth => "keep both",
+            ItemAction::Overwrite => "replace",
+            ItemAction::Skip => "skip",
+            ItemAction::Trash => "trash",
+            ItemAction::Delete => "delete",
+            ItemAction::Rename => "rename",
+            ItemAction::Create => "create",
+        }
+    }
+}
+
+/// One selected item and what the plan does with it: the unit the plan window lists.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemSummary {
+    /// The source item (or the new folder for `Create`).
+    pub path: PathBuf,
+    pub kind: crate::fs::FileKind,
+    pub action: ItemAction,
+    pub files: u64,
+    pub dirs: u64,
+    pub symlinks: u64,
+    pub bytes: u64,
+    /// Where it ends up, when that differs from where it is.
+    pub target: Option<PathBuf>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Plan {
     pub kind: OpKind,
@@ -539,6 +589,8 @@ pub struct Plan {
     pub reversible: bool,
     /// Old name -> new name, for rename previews.
     pub renames: Vec<(PathBuf, PathBuf)>,
+    /// One entry per selected item, for a readable overview.
+    pub items: Vec<ItemSummary>,
 }
 
 impl Plan {
@@ -553,6 +605,7 @@ impl Plan {
             policy: ConflictPolicy::Skip,
             reversible: true,
             renames: Vec::new(),
+            items: Vec::new(),
         }
     }
 

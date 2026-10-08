@@ -10,6 +10,7 @@ use vela_core::fs::FsEngine;
 use vela_core::jobs::Jobs;
 use vela_core::journal::Journal;
 use vela_core::ops::Engine;
+use vela_core::places::PlacesStore;
 use vela_core::platform::Platform;
 use vela_core::watch::DirWatcher;
 use vela_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
@@ -20,6 +21,7 @@ pub struct Services {
     pub previewer: PreviewWorker,
     pub watcher: DirWatcher,
     pub volumes: VolumesWorker,
+    pub places: PlacesStore,
     pub platform: Arc<dyn Platform>,
     pub events: Receiver<CoreEvent>,
     pub home: PathBuf,
@@ -40,6 +42,11 @@ impl Services {
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn(fs, tx.clone()),
             watcher: DirWatcher::spawn(tx.clone()),
+            places: PlacesStore::spawn(
+                platform.dirs().vela_state(),
+                platform.dirs().home.clone(),
+                tx.clone(),
+            ),
             volumes: VolumesWorker::spawn(platform.clone(), Duration::from_secs(5), tx),
             home: platform.dirs().home.clone(),
             platform,

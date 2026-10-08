@@ -10,6 +10,7 @@ pub mod journal;
 pub mod model;
 pub mod ops;
 pub mod pathcodec;
+pub mod places;
 pub mod platform;
 pub mod preview;
 pub mod watch;
