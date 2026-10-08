@@ -676,6 +676,10 @@ fn a_destination_that_appears_after_planning_is_never_overwritten() {
 }
 
 #[test]
+#[cfg_attr(
+    not(unix),
+    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+)]
 fn error_messages_use_display_escapes_for_hostile_names() {
     let sb = Sandbox::new();
     let weird = sb.write("a\nb\u{1b}[31m.txt", "x");

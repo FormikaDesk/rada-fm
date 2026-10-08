@@ -40,6 +40,10 @@ fn wait_for<T>(
 // ----------------------------------------------------------------------------- folders
 
 #[test]
+#[cfg_attr(
+    not(unix),
+    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+)]
 fn directory_loading_reports_the_real_error_for_unreadable_folders() {
     // superfile B9: "No such file or directory" instead of "Permission denied".
     if is_root() {
@@ -117,6 +121,10 @@ fn changed(rx: &Receiver<CoreEvent>, secs: u64) -> (PathBuf, Vec<PathBuf>, bool)
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
+)]
 fn files_created_removed_and_renamed_from_outside_show_up_without_any_key() {
     // superfile B6/#928: an externally created file was invisible for >12 s.
     let sb = Sandbox::new();
@@ -155,6 +163,10 @@ fn files_created_removed_and_renamed_from_outside_show_up_without_any_key() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
+)]
 fn a_burst_of_changes_is_coalesced_into_few_events() {
     let sb = Sandbox::new();
     let dir = sb.mkdir("burst");
@@ -179,6 +191,10 @@ fn a_burst_of_changes_is_coalesced_into_few_events() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
+)]
 fn live_patches_update_a_sorted_listing() {
     let sb = Sandbox::new();
     let dir = sb.mkdir("live");
@@ -408,6 +424,10 @@ fn plan_then_confirm_then_run_then_undo_through_the_job_api() {
 }
 
 #[test]
+#[cfg_attr(
+    not(unix),
+    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+)]
 fn a_failure_blocks_only_the_worker_until_the_user_answers() {
     if is_root() {
         return;
