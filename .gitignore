@@ -1,4 +1,21 @@
-/target
-/.cargo-home
-/.scratch
+# build output and local tooling
+target/
+/.cargo-home/
+.scratch/
+
+# logs and temporary files
 *.log
+*.tmp
+*.swp
+*.orig
+*~
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+.vscode/
+
+# review leftovers of snapshot tests
+*.snap.new
+*.pending-snap

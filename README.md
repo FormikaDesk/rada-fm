@@ -10,7 +10,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ![rada: the folder list with an image preview](docs/screenshots/main.png)
 
-> **Status:** early (phase 1). Linux is fully supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
+> **Status:** version 0.1.0, the first release. Linux is supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
 
 ## Why it is different
 
@@ -41,21 +41,35 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Install
 
-Requires a recent stable Rust toolchain.
+From source. You need Linux and a Rust toolchain of version 1.90 or newer ([rustup](https://rustup.rs)).
 
 ```sh
-git clone <this repository> rada
+git clone https://github.com/formikadesk/rada-fm rada
 cd rada
 cargo install --path crates/rada
 ```
 
 Or just build it: `cargo build --release` and use `target/release/rada`.
 
+A [Nerd Font](https://www.nerdfonts.com/) in your terminal is recommended: rada then shows file-type icons. It looks for the font in the configuration of Ghostty, kitty, WezTerm, Alacritty and foot; otherwise it uses plain Unicode markers (`--icons nerd|unicode|none` overrides).
+
 Optional: make your shell follow rada's last folder (`v` instead of `rada`):
 
 ```sh
 eval "$(rada --init bash)"        # also: zsh, fish, nushell, powershell
 ```
+
+Optional: add rada to your application menu, see [Desktop integration](#desktop-integration).
+
+## First steps
+
+```sh
+rada                 # open the current folder
+rada ~/Pictures      # open a folder
+rada photo.png       # open its folder with the cursor on the file
+```
+
+Move with `j` `k` or the arrow keys, open with `Enter`, go up with `Backspace`. Press `?` (or `F1`) for the full list of keys, `Ctrl+P` to jump to any folder, bookmark or disk. Select with `Space`, then copy (`Ctrl+C`), move to another folder and paste (`Ctrl+V`): a **plan** appears first, and nothing happens until you press `Enter`. Changed your mind afterwards? `Ctrl+Z` undoes it.
 
 ## Usage
 
@@ -141,7 +155,7 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 ### Mouse
 
-Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range; click a folder in the path to go there, a column title to sort (again to reverse), an item of the hint bar to run it, a row of the palette to jump, and the buttons of any window. A right click opens a context menu with each action's shortcut. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. Drag and drop between windows is planned for a later phase.
+Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range; click a folder in the path to go there, a column title to sort (again to reverse), an item of the hint bar to run it, a row of the palette to jump, and the buttons of any window. A right click opens a context menu with each action's shortcut. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. Drag and drop between windows is planned for a later release.
 
 ### Keys that terminals take for themselves
 
@@ -174,6 +188,18 @@ rada --request job.json          # plan it and open the usual confirmation windo
 
 Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `trash`, `delete`, `undo`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
 
+## Desktop integration
+
+Linux only. Everything is installed for your user, nothing needs root, and nothing is done unless you ask.
+
+```sh
+rada setup desktop                        # launcher entry and icons for this user
+rada setup desktop --default-file-manager # also make rada the program that opens folders
+rada setup desktop --remove               # take away exactly what was installed
+```
+
+`setup desktop` writes `rada.desktop` to `~/.local/share/applications` and the icon to `~/.local/share/icons/hicolor` (SVG, and PNG at 48, 128 and 256 px), updates the desktop database when `update-desktop-database` is available, and prints each file it wrote. With `--default-file-manager` it uses `xdg-mime` to set rada as the handler of `inode/directory`; the previous handler is remembered and `--remove` puts it back. The launcher entry runs `rada --spawn-terminal`, which opens rada in a new terminal window, choosing in this order `xdg-terminal-exec`, `$TERMINAL`, then the first one found of ghostty, kitty, foot, alacritty, wezterm, konsole, gnome-terminal, xterm. The files to install by hand (for packagers) are in `packaging/linux/`.
+
 ## How it is built
 
 A Cargo workspace:
@@ -200,7 +226,9 @@ CI (GitHub Actions) builds and runs the core tests on Linux, Windows and macOS. 
 
 ## Roadmap
 
-Phase 2 and beyond (not in phase 1):
+Planned, roughly in this order of interest:
+
+- **Storage insights**: find what takes up space and get cleanup suggestions, with an optional AI assistant that runs locally (e.g. Ollama), is off by default, and only sees file names and sizes — never file contents. Every suggestion goes through the usual plan and undo.
 
 - Dual pane, tabs, layout restore
 - Archives (browse and extract safely, all common formats)
@@ -216,6 +244,12 @@ Phase 2 and beyond (not in phase 1):
 - Preserve extended attributes, ACLs, hard links and sparse files when copying
 - Full Windows and macOS support (Recycle Bin, Trash, volumes, drive letters, junctions)
 - Signed binaries and distribution packages
+
+## Contributing
+
+Bug reports and ideas are welcome as issues; the templates ask for what helps most (version, terminal, steps). If rada ever loses or damages a file, say so first: that is the one kind of bug that matters most, and the journal (`U`) may still be able to undo it.
+
+For code: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` must pass. Changes to the look of the interface come with updated screen snapshots (`INSTA_UPDATE=always cargo test -p rada-tui --test snapshots`) whose diff you have reviewed. New operations must be expressed as plan steps that know their own inverse. Tests never touch your real folders and must keep it that way.
 
 ## License
 

@@ -31,13 +31,12 @@ impl ExecHandler for Recording<'_> {
     }
 
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
-        if self.reversible {
-            if let Some(inv) = step.inverse(result) {
-                if let Err(e) = self.journal.record_undo(self.id, inv) {
-                    tracing::error!("journal: {e}");
-                    self.errors += 1;
-                }
-            }
+        if self.reversible
+            && let Some(inv) = step.inverse(result)
+            && let Err(e) = self.journal.record_undo(self.id, inv)
+        {
+            tracing::error!("journal: {e}");
+            self.errors += 1;
         }
         self.inner.step_finished(index, step, result);
     }

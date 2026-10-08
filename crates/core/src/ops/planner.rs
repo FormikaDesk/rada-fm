@@ -145,19 +145,19 @@ impl Engine {
         let dest_canon = std::fs::canonicalize(dest_dir).ok();
         let mut blocked = false;
         for root in &scan.roots {
-            if root.meta.is_dir() {
-                if let (Some(dc), Some(parent)) = (&dest_canon, root.path.parent()) {
-                    let src_canon = std::fs::canonicalize(parent)
-                        .unwrap_or_else(|_| parent.to_path_buf())
-                        .join(&root.name);
-                    if dc.starts_with(&src_canon) {
-                        t.ws.add(
-                            WarningKind::InsideItself,
-                            Severity::Blocking,
-                            Some(&root.path),
-                        );
-                        blocked = true;
-                    }
+            if root.meta.is_dir()
+                && let (Some(dc), Some(parent)) = (&dest_canon, root.path.parent())
+            {
+                let src_canon = std::fs::canonicalize(parent)
+                    .unwrap_or_else(|_| parent.to_path_buf())
+                    .join(&root.name);
+                if dc.starts_with(&src_canon) {
+                    t.ws.add(
+                        WarningKind::InsideItself,
+                        Severity::Blocking,
+                        Some(&root.path),
+                    );
+                    blocked = true;
                 }
             }
         }
@@ -173,21 +173,21 @@ impl Engine {
 
         // Free space: only data that is actually written needs room.
         let need: u64 = t.steps.iter().map(Step::bytes).sum();
-        if need > 0 && !t.ws_has_blocking() {
-            if let Ok(avail) = self.fs.available_space(dest_dir) {
-                if need > avail {
-                    t.ws.add_with(
-                        WarningKind::LowSpace,
-                        Severity::Warning,
-                        Some(dest_dir),
-                        Some(format!(
-                            "need {}, {} free",
-                            display::bytes(need),
-                            display::bytes(avail)
-                        )),
-                    );
-                }
-            }
+        if need > 0
+            && !t.ws_has_blocking()
+            && let Ok(avail) = self.fs.available_space(dest_dir)
+            && need > avail
+        {
+            t.ws.add_with(
+                WarningKind::LowSpace,
+                Severity::Warning,
+                Some(dest_dir),
+                Some(format!(
+                    "need {}, {} free",
+                    display::bytes(need),
+                    display::bytes(avail)
+                )),
+            );
         }
         if t.cross_device {
             t.ws.add(WarningKind::CrossDevice, Severity::Info, None);

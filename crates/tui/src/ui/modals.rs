@@ -544,16 +544,16 @@ fn draw_plan(
                 ),
                 Span::styled(pad_left(&size, size_w), th.base()),
             ];
-            if let Some(tg) = &it.target {
-                if it.action == ItemAction::KeepBoth {
-                    spans.push(Span::styled(
-                        format!(
-                            "  as {}",
-                            tg.file_name().map(display::name).unwrap_or_default()
-                        ),
-                        th.faint(),
-                    ));
-                }
+            if let Some(tg) = &it.target
+                && it.action == ItemAction::KeepBoth
+            {
+                spans.push(Span::styled(
+                    format!(
+                        "  as {}",
+                        tg.file_name().map(display::name).unwrap_or_default()
+                    ),
+                    th.faint(),
+                ));
             }
             body.push(Line::from(spans));
         }
@@ -664,16 +664,17 @@ fn draw_plan(
     );
     // Clickable: the buttons (last line of the footer) and the conflict control.
     hit_spans(hits, inner.x, foot_y + foot_h - 1, &buttons, &button_hits);
-    if let Some(line) = seg_line {
-        if line >= scroll && line < scroll + content_h {
-            hit_spans(
-                hits,
-                inner.x,
-                inner.y + (line - scroll) as u16,
-                &seg_spans,
-                &seg_hits,
-            );
-        }
+    if let Some(line) = seg_line
+        && line >= scroll
+        && line < scroll + content_h
+    {
+        hit_spans(
+            hits,
+            inner.x,
+            inner.y + (line - scroll) as u16,
+            &seg_spans,
+            &seg_hits,
+        );
     }
 }
 

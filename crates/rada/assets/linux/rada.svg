@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>rada</title>
+  <!-- A boat sheltered in a bay: rada is an old word for a roadstead, a safe anchorage. -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#141b30"/>
+  <path d="M33 12 V31 H47 Z" fill="#d6dcf0"/>
+  <path d="M19 34 H47 L42 41 H24 Z" fill="#569cff"/>
+  <path d="M9 30 A23 23 0 0 0 55 30" fill="none" stroke="#569cff" stroke-width="5" stroke-linecap="round"/>
+</svg>

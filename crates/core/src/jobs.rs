@@ -113,11 +113,11 @@ impl Jobs {
                 },
             };
             // "Nothing to undo" is an answer, not an error.
-            if let (OpRequest::Undo { entry: None }, Some(j)) = (&req, &journal) {
-                if matches!(j.last_undoable(), Ok(None)) {
-                    let _ = out.send(CoreEvent::Job(JobEvent::NothingToUndo { job: id }));
-                    return;
-                }
+            if let (OpRequest::Undo { entry: None }, Some(j)) = (&req, &journal)
+                && matches!(j.last_undoable(), Ok(None))
+            {
+                let _ = out.send(CoreEvent::Job(JobEvent::NothingToUndo { job: id }));
+                return;
             }
             let mut progress = |p: &crate::ops::ScanProgress| {
                 let _ = out.send(CoreEvent::Job(JobEvent::Scanning {

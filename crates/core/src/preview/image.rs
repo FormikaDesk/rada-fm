@@ -212,7 +212,7 @@ fn on_checkerboard(img: DynamicImage) -> DynamicImage {
         if a == 255 {
             continue;
         }
-        let back: u32 = if ((x / tile) + (y / tile)) % 2 == 0 {
+        let back: u32 = if ((x / tile) + (y / tile)).is_multiple_of(2) {
             232
         } else {
             206

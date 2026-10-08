@@ -9,11 +9,11 @@ use anyhow::{Context, Result, bail};
 use rada_core::platform::Dirs;
 use serde::{Deserialize, Serialize};
 
-const DESKTOP_ENTRY: &str = include_str!("../../../packaging/linux/rada.desktop");
-const ICON_SVG: &[u8] = include_bytes!("../../../packaging/linux/rada.svg");
-const ICON_48: &[u8] = include_bytes!("../../../packaging/linux/rada-48.png");
-const ICON_128: &[u8] = include_bytes!("../../../packaging/linux/rada-128.png");
-const ICON_256: &[u8] = include_bytes!("../../../packaging/linux/rada-256.png");
+const DESKTOP_ENTRY: &str = include_str!("../assets/linux/rada.desktop");
+const ICON_SVG: &[u8] = include_bytes!("../assets/linux/rada.svg");
+const ICON_48: &[u8] = include_bytes!("../assets/linux/rada-48.png");
+const ICON_128: &[u8] = include_bytes!("../assets/linux/rada-128.png");
+const ICON_256: &[u8] = include_bytes!("../assets/linux/rada-256.png");
 
 const DESKTOP_FILE: &str = "rada.desktop";
 const DIR_MIME: &str = "inode/directory";
@@ -340,15 +340,15 @@ pub fn terminal_command(
     }
     if let Some(t) = terminal_var {
         let mut words = t.split_whitespace().map(str::to_string);
-        if let Some(prog) = words.next() {
-            if installed(&prog) {
-                // The usual convention: `-e COMMAND…` (kitty and foot take it bare, but
-                // also accept `-e`).
-                let mut prefix = vec![prog];
-                prefix.extend(words);
-                prefix.push("-e".into());
-                return Some(with(prefix));
-            }
+        if let Some(prog) = words.next()
+            && installed(&prog)
+        {
+            // The usual convention: `-e COMMAND…` (kitty and foot take it bare, but
+            // also accept `-e`).
+            let mut prefix = vec![prog];
+            prefix.extend(words);
+            prefix.push("-e".into());
+            return Some(with(prefix));
         }
     }
     TERMINALS.iter().find(|t| installed(t.program)).map(|t| {
@@ -499,6 +499,32 @@ mod tests {
             "Keywords[it]=",
         ] {
             assert!(DESKTOP_ENTRY.contains(needle), "{needle}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod asset_tests {
+    use std::path::Path;
+
+    /// `packaging/linux/` is what distribution packagers look at; the same files are kept
+    /// inside the crate so that it builds on its own. They must never drift apart.
+    #[test]
+    fn the_crate_assets_are_the_packaging_files() {
+        let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+        for name in [
+            "rada.desktop",
+            "rada.svg",
+            "rada-48.png",
+            "rada-128.png",
+            "rada-256.png",
+        ] {
+            let a = std::fs::read(here.join("assets/linux").join(name)).unwrap();
+            let b = std::fs::read(here.join("../../packaging/linux").join(name)).unwrap();
+            assert!(
+                a == b,
+                "{name} differs between crates/rada/assets/linux and packaging/linux"
+            );
         }
     }
 }

@@ -135,14 +135,13 @@ fn run(ctl: Receiver<Ctl>, out: Sender<CoreEvent>) {
                     if let Err(e) = backend.watch(&dir) {
                         // inotify limit reached, or the path vanished: fall back to polling.
                         tracing::warn!("watch {}: {e}", dir.display());
-                        if let Ok(mut p) = polling(raw_tx.clone()) {
-                            if p.watch(&dir).is_ok() {
+                        if let Ok(mut p) = polling(raw_tx.clone())
+                            && p.watch(&dir).is_ok() {
                                 let _ = out.send(CoreEvent::Watch(WatchEvent::Degraded(format!("watching {} by polling ({e})", dir.display()))));
                                 backend = p;
                                 current = Some(dir);
                                 continue;
                             }
-                        }
                         let _ = out.send(CoreEvent::Watch(WatchEvent::Failed(format!("cannot watch {}: {e}", dir.display()))));
                     } else {
                         current = Some(dir);

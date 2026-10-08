@@ -107,11 +107,12 @@ fn walk(p: &Path, out: &mut BTreeMap<String, String>, depth: usize) {
         format!("{kind} {} {:?}", m.len(), m.modified().ok())
     };
     out.insert(p.display().to_string(), fp);
-    if m.is_dir() && depth < 8 {
-        if let Ok(rd) = std::fs::read_dir(p) {
-            for e in rd.flatten() {
-                walk(&e.path(), out, depth + 1);
-            }
+    if m.is_dir()
+        && depth < 8
+        && let Ok(rd) = std::fs::read_dir(p)
+    {
+        for e in rd.flatten() {
+            walk(&e.path(), out, depth + 1);
         }
     }
 }

@@ -443,11 +443,11 @@ impl App {
 
     pub fn tick(&mut self) {
         self.spinner = self.spinner.wrapping_add(1);
-        if let Some(t) = &self.toast {
-            if Instant::now() >= t.until {
-                self.toast = None;
-                self.dirty = true;
-            }
+        if let Some(t) = &self.toast
+            && Instant::now() >= t.until
+        {
+            self.toast = None;
+            self.dirty = true;
         }
         if self.running.is_some()
             || matches!(self.modal, Some(Modal::Scanning { .. }))
@@ -818,10 +818,9 @@ impl App {
                     current: c,
                     ..
                 }) = &mut self.modal
+                    && *j == job
                 {
-                    if *j == job {
-                        (*f, *d, *b, *c) = (files, dirs, bytes, current);
-                    }
+                    (*f, *d, *b, *c) = (files, dirs, bytes, current);
                 }
             }
             JobEvent::Planned {
@@ -971,14 +970,14 @@ impl App {
         undo: Option<Box<UndoPlan>>,
     ) {
         // Re-plan of an open plan window?
-        if let Some(Modal::Plan(pv)) = &mut self.modal {
-            if pv.replanning == Some(job) {
-                pv.plan = plan;
-                pv.scan = scan.or(pv.scan.take());
-                pv.replanning = None;
-                pv.scroll = 0;
-                return;
-            }
+        if let Some(Modal::Plan(pv)) = &mut self.modal
+            && pv.replanning == Some(job)
+        {
+            pv.plan = plan;
+            pv.scan = scan.or(pv.scan.take());
+            pv.replanning = None;
+            pv.scroll = 0;
+            return;
         }
         if self.plan_job != Some(job) {
             return; // the user cancelled while it was being planned

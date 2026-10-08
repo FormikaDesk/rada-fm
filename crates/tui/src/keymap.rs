@@ -588,15 +588,15 @@ impl Keymap {
             km.unbind_action(action);
             for c in chords {
                 // Taking a key from another action is allowed, and said out loud.
-                if let Some(prev) = km.by_chord.get(&c).copied() {
-                    if prev != action {
-                        km.warnings.push(format!(
-                            "[keys]: {c} now means “{}” (it was “{}”)",
-                            action.label(),
-                            prev.label()
-                        ));
-                        km.unbind_chord(c);
-                    }
+                if let Some(prev) = km.by_chord.get(&c).copied()
+                    && prev != action
+                {
+                    km.warnings.push(format!(
+                        "[keys]: {c} now means “{}” (it was “{}”)",
+                        action.label(),
+                        prev.label()
+                    ));
+                    km.unbind_chord(c);
                 }
                 let scheme = if is_vim_like(c) {
                     Scheme::Vim
@@ -614,15 +614,14 @@ impl Keymap {
         // as belonging to both schemes.
         let (vim, classic) = (scheme == Scheme::Vim, scheme == Scheme::Classic);
         if let Some(existing) = self.by_chord.get(&chord) {
-            if *existing == action {
-                if let Some(b) = self
+            if *existing == action
+                && let Some(b) = self
                     .by_action
                     .get_mut(&action)
                     .and_then(|l| l.iter_mut().find(|b| b.chord == chord))
-                {
-                    b.vim |= vim;
-                    b.classic |= classic;
-                }
+            {
+                b.vim |= vim;
+                b.classic |= classic;
             }
             return;
         }
@@ -644,10 +643,10 @@ impl Keymap {
     }
 
     fn unbind_chord(&mut self, chord: Chord) {
-        if let Some(action) = self.by_chord.remove(&chord) {
-            if let Some(list) = self.by_action.get_mut(&action) {
-                list.retain(|b| b.chord != chord);
-            }
+        if let Some(action) = self.by_chord.remove(&chord)
+            && let Some(list) = self.by_action.get_mut(&action)
+        {
+            list.retain(|b| b.chord != chord);
         }
     }
 

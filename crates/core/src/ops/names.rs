@@ -59,18 +59,18 @@ pub fn split_ext(name: &OsStr) -> (OsString, OsString) {
     ext_full.push(ext);
     let mut stem = stem.to_os_string();
     // archive.tar.gz -> ("archive", ".tar.gz")
-    if let Some(inner) = Path::new(&stem).extension() {
-        if inner.eq_ignore_ascii_case("tar") {
-            let base = Path::new(&stem)
-                .file_stem()
-                .map(OsStr::to_os_string)
-                .unwrap_or_default();
-            let mut full = OsString::from(".");
-            full.push(inner);
-            full.push(&ext_full);
-            stem = base;
-            ext_full = full;
-        }
+    if let Some(inner) = Path::new(&stem).extension()
+        && inner.eq_ignore_ascii_case("tar")
+    {
+        let base = Path::new(&stem)
+            .file_stem()
+            .map(OsStr::to_os_string)
+            .unwrap_or_default();
+        let mut full = OsString::from(".");
+        full.push(inner);
+        full.push(&ext_full);
+        stem = base;
+        ext_full = full;
     }
     (stem, ext_full)
 }

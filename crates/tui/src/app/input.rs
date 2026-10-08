@@ -386,10 +386,10 @@ impl App {
         if mods.contains(KeyModifiers::CONTROL) {
             // Ctrl+click adds or removes one item and becomes the new anchor.
             self.set_cursor(i);
-            if let Some(name) = self.entry_at(i).map(|e| e.name.clone()) {
-                if !self.marked.remove(&name) {
-                    self.marked.insert(name);
-                }
+            if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
+                && !self.marked.remove(&name)
+            {
+                self.marked.insert(name);
             }
             self.sel_anchor = Some((i, self.marked.clone()));
         } else if mods.contains(KeyModifiers::SHIFT) {

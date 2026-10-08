@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. If rada **lost or damaged a file**, please say so first and do not run anything else on that folder: the journal may still be able to undo it (`U` shows the history).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a folder with …
+        2. Press …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rada version
+      description: Output of `rada --version`
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and system
+      description: Terminal emulator, whether you use tmux/zellij, distribution or OS.
+      placeholder: Ghostty 1.x on Arch Linux, no multiplexer
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (optional)
+      description: Start with `RADA_LOG=debug rada`, reproduce, then paste the relevant lines of the newest file in `$XDG_STATE_HOME/rada/log/`. Remove anything private.
+      render: text

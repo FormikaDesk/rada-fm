@@ -257,12 +257,14 @@ fn unescape_label(s: &str) -> String {
     let mut out = Vec::new();
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'\\' && i + 4 <= b.len() && b[i + 1] == b'x' {
-            if let Ok(v) = u8::from_str_radix(&s[i + 2..i + 4], 16) {
-                out.push(v);
-                i += 4;
-                continue;
-            }
+        if b[i] == b'\\'
+            && i + 4 <= b.len()
+            && b[i + 1] == b'x'
+            && let Ok(v) = u8::from_str_radix(&s[i + 2..i + 4], 16)
+        {
+            out.push(v);
+            i += 4;
+            continue;
         }
         out.push(b[i]);
         i += 1;

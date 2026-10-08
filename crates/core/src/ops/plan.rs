@@ -388,10 +388,10 @@ impl WarningSet {
     ) {
         let e = self.by_kind.entry((kind, severity)).or_default();
         e.0 += 1;
-        if let Some(p) = path {
-            if e.1.len() < MAX_EXAMPLES {
-                e.1.push(p.to_path_buf());
-            }
+        if let Some(p) = path
+            && e.1.len() < MAX_EXAMPLES
+        {
+            e.1.push(p.to_path_buf());
         }
         if e.2.is_none() {
             e.2 = detail;

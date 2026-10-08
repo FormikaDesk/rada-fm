@@ -395,12 +395,10 @@ impl Engine {
                     });
                 }
                 let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
-                if *remove_source {
-                    if let Err(e) = fs.remove_file(src) {
-                        // Never leave the item in two places: undo the copy.
-                        let _ = fs.remove_file(dst);
-                        return Err(Error::io("remove source after copy", src, e));
-                    }
+                if *remove_source && let Err(e) = fs.remove_file(src) {
+                    // Never leave the item in two places: undo the copy.
+                    let _ = fs.remove_file(dst);
+                    return Err(Error::io("remove source after copy", src, e));
                 }
                 Ok(StepResult {
                     after,
@@ -427,11 +425,9 @@ impl Engine {
                     }
                 })?;
                 let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
-                if *remove_source {
-                    if let Err(e) = fs.remove_file(src) {
-                        let _ = fs.remove_file(dst);
-                        return Err(Error::io("remove source link", src, e));
-                    }
+                if *remove_source && let Err(e) = fs.remove_file(src) {
+                    let _ = fs.remove_file(dst);
+                    return Err(Error::io("remove source link", src, e));
                 }
                 Ok(StepResult {
                     after,
@@ -466,13 +462,13 @@ impl Engine {
                     }
                     Err(e) => return Err(Error::io("inspect", path, e)),
                 };
-                if let Some(exp) = expect {
-                    if let Some(reason) = exp.diff(&meta.fingerprint()) {
-                        return Err(Error::Modified {
-                            path: path.clone(),
-                            reason,
-                        });
-                    }
+                if let Some(exp) = expect
+                    && let Some(reason) = exp.diff(&meta.fingerprint())
+                {
+                    return Err(Error::Modified {
+                        path: path.clone(),
+                        reason,
+                    });
                 }
                 fs.remove_file(path)
                     .map_err(|e| Error::io("delete", path, e))?;

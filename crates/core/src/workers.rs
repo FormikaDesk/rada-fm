@@ -164,15 +164,15 @@ impl PreviewWorker {
                     images.newest(req.generation);
                     let preview = preview::generate(fs.as_ref(), &req.path, &req.limits);
                     // Decoding is slow: the header-only answer goes out now, the pixels follow.
-                    if let Preview::Image(img) = &preview {
-                        if matches!(img.state, ImageState::Loading) {
-                            images.submit(
-                                req.path.clone(),
-                                req.generation,
-                                img.info.clone(),
-                                req.limits.image.clone(),
-                            );
-                        }
+                    if let Preview::Image(img) = &preview
+                        && matches!(img.state, ImageState::Loading)
+                    {
+                        images.submit(
+                            req.path.clone(),
+                            req.generation,
+                            img.info.clone(),
+                            req.limits.image.clone(),
+                        );
                     }
                     let name = req
                         .path

@@ -1,18 +1,23 @@
 [package]
 name = "rada"
-description = "A terminal file manager you can trust: plan first, undo always, robust operations"
+description = "A safe harbor for your files: a terminal file manager with plan-first operations, permanent undo and robust copying"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
 
 [dependencies]
-rada-core = { path = "../core" }
-rada-tui = { path = "../tui" }
+rada-core = { path = "../core", version = "0.1.0" }
+rada-tui = { path = "../tui", version = "0.1.0" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"

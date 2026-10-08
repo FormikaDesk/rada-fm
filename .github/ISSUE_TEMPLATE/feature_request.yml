@@ -1,0 +1,27 @@
+name: Feature request
+description: An idea to make rada better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the problem or the workflow, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like rada to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Fits the principles
+      options:
+        - label: If it changes files, it can show a plan first and be undone.

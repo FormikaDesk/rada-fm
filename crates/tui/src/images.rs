@@ -91,10 +91,10 @@ impl ImageUi {
         if !env("TMUX").is_empty() {
             return ImageUi::halfblocks();
         }
-        if let Some(proto) = known_protocol(&term, &prog) {
-            if let Some(ui) = ImageUi::forced(proto) {
-                return ui;
-            }
+        if let Some(proto) = known_protocol(&term, &prog)
+            && let Some(ui) = ImageUi::forced(proto)
+        {
+            return ui;
         }
         if matches!(term.as_str(), "" | "dumb" | "linux") {
             return ImageUi::halfblocks();

@@ -7,7 +7,12 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Alessandro Formica"]
-rust-version = "1.86"
+rust-version = "1.90"
+repository = "https://github.com/formikadesk/rada-fm"
+homepage = "https://github.com/formikadesk/rada-fm"
+readme = "README.md"
+keywords = ["file-manager", "tui", "terminal", "undo", "rust"]
+categories = ["command-line-utilities", "filesystem"]
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

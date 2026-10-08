@@ -383,10 +383,9 @@ fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .filter(|v| app.cwd.starts_with(&v.mount_point))
         .max_by_key(|v| v.mount_point.as_os_str().len())
+        && let Some(a) = v.available
     {
-        if let Some(a) = v.available {
-            right.push(Span::styled(format!("{} free", fmt::size(a)), th.dim()));
-        }
+        right.push(Span::styled(format!("{} free", fmt::size(a)), th.dim()));
     }
     let right_w: usize = right.iter().map(|s| s.content.width()).sum();
 

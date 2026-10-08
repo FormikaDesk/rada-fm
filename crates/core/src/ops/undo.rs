@@ -89,15 +89,14 @@ impl Sim<'_> {
                 if !self.exists(path) {
                     return Ok(()); // already gone: nothing to do
                 }
-                if !self.touched(path) {
-                    if let (Some(exp), Ok(now)) = (expect, self.engine.fs.lstat(path)) {
-                        if let Some(why) = exp.diff(&now.fingerprint()) {
-                            return Err(format!(
-                                "{} was modified after the operation ({why})",
-                                display::path(path)
-                            ));
-                        }
-                    }
+                if !self.touched(path)
+                    && let (Some(exp), Ok(now)) = (expect, self.engine.fs.lstat(path))
+                    && let Some(why) = exp.diff(&now.fingerprint())
+                {
+                    return Err(format!(
+                        "{} was modified after the operation ({why})",
+                        display::path(path)
+                    ));
                 }
                 Ok(())
             }
