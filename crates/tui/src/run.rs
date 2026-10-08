@@ -69,43 +69,45 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
         })?;
 
     let tick = Duration::from_millis(100);
-    let mut last_draw = std::time::Instant::now();
     loop {
-        if app.dirty && last_draw.elapsed() >= Duration::from_millis(12) {
+        // Draw as soon as something changed: no artificial frame limit, the batching
+        // below already folds a burst of events into a single frame.
+        if app.dirty {
             terminal.draw(|f| ui::draw(f, &mut app))?;
             app.dirty = false;
-            last_draw = std::time::Instant::now();
         }
         if app.should_quit {
             break;
         }
-        let wait = if app.dirty {
-            Duration::from_millis(12)
-        } else {
-            tick
-        };
         select! {
-            recv(key_rx) -> ev => {
-                match ev {
-                    Ok(Event::Key(k)) => app.on_key(k),
-                    Ok(Event::Resize(_, _)) => app.dirty = true,
-                    Ok(_) => {}
-                    Err(_) => break,
-                }
-            }
+            recv(key_rx) -> ev => match ev {
+                Ok(ev) => handle_input(&mut app, ev),
+                Err(_) => break,
+            },
             recv(core_rx) -> ev => {
                 if let Ok(ev) = ev {
                     app.on_core_event(ev);
-                    // Drain what piled up so one frame covers many events.
-                    while let Ok(more) = core_rx.try_recv() {
-                        app.on_core_event(more);
-                    }
                 }
             }
-            default(wait) => app.tick(),
+            default(tick) => app.tick(),
+        }
+        // Whatever piled up meanwhile belongs to the same frame.
+        while let Ok(ev) = key_rx.try_recv() {
+            handle_input(&mut app, ev);
+        }
+        while let Ok(ev) = core_rx.try_recv() {
+            app.on_core_event(ev);
         }
     }
     Ok(Outcome {
         last_dir: app.cwd.clone(),
     })
+}
+
+fn handle_input(app: &mut App, ev: Event) {
+    match ev {
+        Event::Key(k) => app.on_key(k),
+        Event::Resize(_, _) => app.dirty = true,
+        _ => {}
+    }
 }
