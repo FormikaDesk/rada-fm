@@ -393,6 +393,45 @@ impl Theme {
         }
     }
 
+    /// Every colour the interface may put on screen with this theme: the tokens, and the
+    /// tints derived from them. Tests use it to prove nothing is hand-coloured.
+    pub fn all_colors(&self) -> Vec<Color> {
+        let k = &self.kinds;
+        let mut v = vec![
+            self.text,
+            self.text_dim,
+            self.muted,
+            self.accent,
+            self.on_accent,
+            self.selection,
+            self.mark,
+            self.track,
+            self.success,
+            self.warn,
+            self.error,
+            k.code,
+            k.markup,
+            k.text,
+            k.doc,
+            k.image,
+            k.vector,
+            k.audio,
+            k.video,
+            k.archive,
+            k.data,
+            k.config,
+            k.binary,
+            k.other,
+            k.folder,
+            k.link,
+        ];
+        v.extend(self.bg);
+        for c in [self.accent, self.success, self.warn, self.error] {
+            v.push(self.tint(c));
+        }
+        v
+    }
+
     /// A tinted background for a badge of colour `c`.
     pub fn tint(&self, c: Color) -> Color {
         match (self.depth, c) {

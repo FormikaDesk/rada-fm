@@ -221,8 +221,16 @@ impl H {
         let buf = self.term.backend().buffer().clone();
         let mut out = String::new();
         for y in 0..buf.area.height {
+            // A wide glyph (CJK, emoji) covers two cells; the second one is not text.
+            let mut skip = 0;
             for x in 0..buf.area.width {
-                out.push_str(buf[(x, y)].symbol());
+                if skip > 0 {
+                    skip -= 1;
+                    continue;
+                }
+                let sym = buf[(x, y)].symbol();
+                skip = unicode_width::UnicodeWidthStr::width(sym).saturating_sub(1);
+                out.push_str(sym);
             }
             out.push('\n');
         }

@@ -1,8 +1,6 @@
 //! The preview pane: no frame, just a title and the content, in the same calm style as
 //! the list. Images are drawn by the terminal graphics protocol; everything else is text.
 
-use std::time::SystemTime;
-
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -52,8 +50,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     );
 
     let modified = app.current().and_then(|e| e.mtime);
-    let now = SystemTime::now();
-    let ago = fmt::relative(modified, now);
+    let ago = fmt::relative(modified, app.now());
     // One or two lines of facts under the name (wrapped, never cut); then the content.
     let summary = summary_of(&app.preview.content, app.preview.hex, &ago);
     let mut sum_lines = fmt::wrap(&summary, w);

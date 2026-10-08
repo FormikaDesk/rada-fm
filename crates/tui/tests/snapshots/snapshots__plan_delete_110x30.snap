@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/snapshots.rs
+expression: shot(&mut h)
+---
+   ▍ ~ › demo › projects                                                    8/12 items   ⌕ Ctrl+P   F1 help
+
+       Name ↑                         Size  Type          Modified   │   · notes.txt
+   ───────────────────────────────────────────────────────────────── │   UTF-8 · 3.52 KiB · 5 weeks ago
+     ▸ data/                             —  Folder      6 days ago   │
+     ▸ src/                              —  Folder      6 days ago   │     1  remember the milk
+   ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   │                                                                                                      │
+   │   Delete                                                                                             │
+   │  Permanently delete 1 item                                                                           │
+   │  In    ~/demo/projects                                                                               │
+   │                                                                                                      │
+   │  1             3.52 KiB                                                                              │
+   │  file          freed                                                                                 │
+   │                                                                                                      │
+   │  ▲ PERMANENT: this cannot be undone                                                                  │
+   │                                                                                                      │
+   │  What will happen                                                                                    │
+   │  · notes.txt                                 delete                                      3.52 KiB    │
+   │  This cannot be undone.  Type yes to confirm: ▏                                                      │
+   │                                                                                                      │
+   │   Enter  Run    Esc  Cancel                                                                          │
+   │                                                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                     │    20  remember the milk
+                                                                     │    21  remember the milk
+                                                                     │    22  remember the milk
+                                                                     │    23  remember the milk
+                                                                     │    24  remember the milk
+   Enter open   Space mark   Ctrl+C copy   Ctrl+X cut   Ctrl+V paste   Del trash   F2 rename

@@ -937,7 +937,10 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
         Span::styled(" go   ", th.dim()),
         Span::styled("Esc", th.key()),
         Span::styled(" close   ", th.dim()),
-        Span::styled(format!("{} results", p.hits.len()), th.faint()),
+        Span::styled(
+            fmt::count(p.hits.len() as u64, "result", "results"),
+            th.faint(),
+        ),
     ]);
     f.render_widget(
         Paragraph::new(foot),
@@ -1224,8 +1227,8 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
         lines.push(Line::from(Span::styled(l, th.dim())));
     }
 
-    let rows = inner.height.saturating_sub(3) as usize;
-    let max_scroll = lines.len().saturating_sub(rows);
+    let rows = inner.height as usize;
+    let max_scroll = lines.len().saturating_sub(rows.saturating_sub(2));
     let scroll = scroll.min(max_scroll);
     let mut out: Vec<Line> = vec![
         Line::from(vec![

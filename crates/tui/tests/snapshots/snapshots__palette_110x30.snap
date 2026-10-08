@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/snapshots.rs
+expression: shot(&mut h)
+---
+   ▍ ~ › demo › projects                                                    1/12 items   ⌕ Ctrl+P   F1 help
+
+       Name ↑                         Size  Type          Modified   │   ▸
+   ───────────────────────────────────────────────────────────────── │
+   ▎ ▸ data/                             —  Folder      6 days ago   │
+     ▸ src/                              —  Folder      6 days ago   │
+     ▸ 目录/    ╭────────────────────────────────────────────────────────────────────────────╮
+     · a-very-lo│                                                                            │
+     · backup.im│  ⌕  pro                                                                    │
+     · Cargo.tom│  ────────────────────────────────────────────────────────────────────────  │
+     · main.rs  │  ▎ ↑ proc-282299               …arget/vela-test-tmp/proc-282299    parent  │
+     · notes.txt│    ▸ data                      ~/demo/projects/data                folder  │
+     · README.md│    ▸ src                       ~/demo/projects/src                 folder  │
+     · тест-файл│    ▸ 目录                      ~/demo/projects/目录                folder  │
+     · 日本語のフ                                                                            │
+     · 📷 holida│  ↑↓ move   Enter go   Esc close   5 results                                │
+                │                                                                            │
+                ╰────────────────────────────────────────────────────────────────────────────╯
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+   Enter open   Space mark   Ctrl+C copy   Ctrl+X cut   Ctrl+V paste   Del trash   F2 rename

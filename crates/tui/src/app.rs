@@ -330,6 +330,8 @@ pub struct App {
     sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
     pub help_scroll: usize,
+    /// Replaces the system clock when drawing relative dates (tests, screenshots).
+    pub clock: Option<std::time::SystemTime>,
 }
 
 impl App {
@@ -388,6 +390,7 @@ impl App {
             sel_anchor: None,
             last_click: None,
             help_scroll: 0,
+            clock: None,
             svc,
         };
         for w in std::mem::take(&mut app.keymap.warnings) {
@@ -412,6 +415,11 @@ impl App {
             app.begin_plan("Planning", h);
         }
         app
+    }
+
+    /// "Now" for relative dates.
+    pub fn now(&self) -> std::time::SystemTime {
+        self.clock.unwrap_or_else(std::time::SystemTime::now)
     }
 
     pub fn home(&self) -> &Path {
@@ -1222,7 +1230,12 @@ impl App {
         };
         self.toast(
             ToastKind::Info,
-            format!("{n} item(s) {verb}; go to the destination and press p"),
+            format!(
+                "{} {verb} — go to the destination and press {}",
+                fmt::count(n as u64, "item", "items"),
+                self.key_for(Action::Paste)
+                    .unwrap_or_else(|| "paste".into()),
+            ),
             3,
         );
     }

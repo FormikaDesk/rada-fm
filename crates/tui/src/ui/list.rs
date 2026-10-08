@@ -180,7 +180,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .map(|e| e.size)
         .max()
         .unwrap_or(0);
-    let now = SystemTime::now();
+    let now = app.now();
 
     app.scroll = app.scroll.min(count.saturating_sub(1));
     let rows = body.height as usize;

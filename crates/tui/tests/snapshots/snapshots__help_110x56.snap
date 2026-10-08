@@ -1,0 +1,60 @@
+---
+source: crates/tui/tests/snapshots.rs
+expression: shot(&mut h)
+---
+   ▍ ~ › demo › projects                                                    1/12 items   ⌕ Ctrl+P   F1 help
+
+       Name ↑                         Size  Type          Modified   │   ▸
+   ───────────────────────────────────────────────────────────────── │
+   ▎ ▸ data/                             —  Folder      6 days ago   │
+     ▸ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+     ▸ │                                                                                              │
+     · │   Keys    ↑↓ scroll · Esc close                                                              │
+     · │                                                                                              │
+     · │                                Vim                           Classic                         │
+     · │                                                                                              │
+     · │  Moving around                                                                               │
+     · │  Move up                       k ↑                           ↑                               │
+     · │  Move down                     j ↓                           ↓                               │
+     · │  Parent folder                 h ← Backspace                 ← Backspace Alt+↑               │
+     · │  Open                          l → Enter                     → Enter                         │
+       │  First item                    g Home                        Home                            │
+       │  Last item                     G End                         End                             │
+       │  Page up                       PgUp                          PgUp                            │
+       │  Page down                     PgDn                          PgDn                            │
+       │  Half page up                  Ctrl+U                                                        │
+       │  Half page down                Ctrl+D                                                        │
+       │  Go to home                    ~                                                             │
+       │                                                                                              │
+       │  Selecting                                                                                   │
+       │  Select / unselect item        Space                         Space Ctrl+Space Ins            │
+       │  Select all                                                  Ctrl+A                          │
+       │  Extend selection up                                         Shift+↑                         │
+       │  Extend selection down                                       Shift+↓                         │
+       │  Extend selection to start                                   Shift+Home Ctrl+Shift+Home      │
+       │  Extend selection to end                                     Shift+End Ctrl+Shift+End        │
+       │  Clear selection / cancel      Esc                           Esc                             │
+       │                                                                                              │
+       │  Working with files                                                                          │
+       │  Copy                          y                             Ctrl+C                          │
+       │  Cut                           x                             Ctrl+X                          │
+       │  Paste                         p                             Ctrl+V                          │
+       │  Move to trash                 d                             Del                             │
+       │  Delete permanently            D                             Shift+Del                       │
+       │  Rename                        r                             F2                              │
+       │  Rename many                   R                                                             │
+       │  New folder                    n                             Ctrl+N F7                       │
+       │  Undo                          u                             Ctrl+Z                          │
+       │  Redo                          Ctrl+R                        Ctrl+Y Ctrl+Shift+Z             │
+       │  Operation history             U                             F3                              │
+       │                                                                                              │
+       │  Looking                                                                                     │
+       │  Filter this folder            /                             Ctrl+F                          │
+       │  Jump to…                      m                             Ctrl+P Ctrl+L                   │
+       │                                                                                              │
+       ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                     │
+                                                                     │
+                                                                     │
+                                                                     │
+   Enter open   Space mark   Ctrl+C copy   Ctrl+X cut   Ctrl+V paste   Del trash   F2 rename

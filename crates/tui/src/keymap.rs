@@ -668,8 +668,11 @@ impl Keymap {
         let list = self.bindings(action);
         list.iter()
             .find(|b| b.custom)
-            .or_else(|| list.iter().find(|b| b.classic && !is_plain_nav(b.chord)))
-            .or_else(|| list.iter().find(|b| b.classic))
+            .or_else(|| {
+                list.iter()
+                    .filter(|b| b.classic)
+                    .min_by_key(|b| nav_rank(b.chord))
+            })
             .or_else(|| list.first())
             .map(|b| b.chord.to_string())
     }
@@ -693,17 +696,19 @@ fn is_vim_like(c: Chord) -> bool {
         && !c.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
 }
 
-fn is_plain_nav(c: Chord) -> bool {
-    c.mods.is_empty()
-        && matches!(
-            c.code,
-            KeyCode::Up
-                | KeyCode::Down
-                | KeyCode::Left
-                | KeyCode::Right
-                | KeyCode::Enter
-                | KeyCode::Backspace
-        )
+/// Which of several shortcuts reads best in a hint: ordinary keys first, then Enter,
+/// Backspace and the arrows (an arrow alone says little about what it does).
+fn nav_rank(c: Chord) -> u8 {
+    if !c.mods.is_empty() {
+        return 0;
+    }
+    match c.code {
+        KeyCode::Enter => 1,
+        KeyCode::Backspace => 2,
+        KeyCode::Right => 3,
+        KeyCode::Left | KeyCode::Up | KeyCode::Down => 4,
+        _ => 0,
+    }
 }
 
 #[cfg(test)]

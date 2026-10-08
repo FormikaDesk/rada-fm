@@ -210,29 +210,33 @@ fn breadcrumb<'a>(app: &App, max: usize) -> Vec<(Span<'a>, Option<std::path::Pat
 fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let th = &th;
-    // Right side, as (text span, what a click does).
-    let mut right: Vec<Span> = Vec::new();
-    let mut right_hits: Vec<(usize, Target)> = Vec::new();
+    // The right side is a row of small groups. When the terminal is narrow the least
+    // important ones go first (help, then the jump button, then the rest), so the
+    // breadcrumb on the left always keeps some room.
+    type Group<'a> = (Vec<Span<'a>>, Vec<(usize, Target)>);
+    let mut groups: Vec<Group> = Vec::new();
+
+    let mut status: Vec<Span> = Vec::new();
     if app.is_loading() {
-        right.push(Span::styled(
+        status.push(Span::styled(
             format!("{} ", SPIN[app.spinner % SPIN.len()]),
             th.fg(th.warn),
         ));
     }
     if app.show_hidden {
-        right.push(Span::styled("hidden shown   ", th.fg(th.warn)));
+        status.push(Span::styled("hidden shown   ", th.fg(th.warn)));
     }
     if let Some(fl) = &app.filter {
-        right.push(Span::styled("▽ ", th.accent_style()));
-        right.push(Span::styled(
+        status.push(Span::styled("▽ ", th.accent_style()));
+        status.push(Span::styled(
             fl.text.clone(),
             th.base().add_modifier(Modifier::BOLD),
         ));
-        right.push(Span::styled(
+        status.push(Span::styled(
             if fl.editing { "▏" } else { "" },
             th.accent_style(),
         ));
-        right.push(Span::styled(
+        status.push(Span::styled(
             if fl.editing {
                 "  Enter keep · Esc clear"
             } else {
@@ -240,30 +244,60 @@ fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
             },
             th.faint(),
         ));
-        right.push(Span::raw("   "));
+        status.push(Span::raw("   "));
+    }
+    if !status.is_empty() {
+        groups.push((status, Vec::new()));
     }
     let position = if app.visible.is_empty() {
         "0 items".to_string()
     } else {
         format!("{}/{} items", app.cursor + 1, app.visible.len())
     };
-    right.push(Span::styled(position, th.dim()));
-    right.push(Span::styled("   ", th.dim()));
-    let jump_key = app.keymap.hint(Action::Palette);
-    if let Some(k) = jump_key {
-        right_hits.push((right.len(), Target::Act(Action::Palette)));
-        right_hits.push((right.len() + 1, Target::Act(Action::Palette)));
-        right.push(Span::styled("⌕ ", th.dim()));
-        right.push(Span::styled(k, th.key()));
+    groups.push((vec![Span::styled(position, th.dim())], Vec::new()));
+    if let Some(k) = app.keymap.hint(Action::Palette) {
+        let t = Target::Act(Action::Palette);
+        groups.push((
+            vec![
+                Span::styled("   ", th.dim()),
+                Span::styled("⌕ ", th.dim()),
+                Span::styled(k, th.key()),
+            ],
+            vec![(1, t.clone()), (2, t)],
+        ));
     }
     if let Some(k) = app.keymap.hint(Action::Help) {
-        right.push(Span::styled("   ", th.dim()));
-        right_hits.push((right.len(), Target::Act(Action::Help)));
-        right_hits.push((right.len() + 1, Target::Act(Action::Help)));
-        right.push(Span::styled(k, th.key()));
-        right.push(Span::styled(" help", th.dim()));
+        let t = Target::Act(Action::Help);
+        groups.push((
+            vec![
+                Span::styled("   ", th.dim()),
+                Span::styled(k, th.key()),
+                Span::styled(" help", th.dim()),
+            ],
+            vec![(1, t.clone()), (2, t)],
+        ));
+    }
+
+    let natural: usize = breadcrumb(app, usize::MAX / 4)
+        .iter()
+        .map(|(s, _)| s.content.width())
+        .sum();
+    let width_of = |g: &Group| g.0.iter().map(|s| s.content.width()).sum::<usize>();
+    let budget = (area.width as usize).saturating_sub(natural.min(28) + 6);
+    let mut kept = groups.len();
+    while kept > 1 && groups[..kept].iter().map(width_of).sum::<usize>() > budget {
+        kept -= 1;
+    }
+    groups.truncate(kept);
+    let mut right: Vec<Span> = Vec::new();
+    let mut right_hits: Vec<(usize, Target)> = Vec::new();
+    for (spans, hits) in groups {
+        let base = right.len();
+        right_hits.extend(hits.into_iter().map(|(i, t)| (base + i, t)));
+        right.extend(spans);
     }
     let right_w: usize = right.iter().map(|s| s.content.width()).sum();
+
     let mut spans = vec![Span::styled("▍", th.accent_style()), Span::raw(" ")];
     let mut hit_list: Vec<(usize, Target)> = Vec::new();
     for (span, path) in breadcrumb(app, (area.width as usize).saturating_sub(right_w + 6)) {
