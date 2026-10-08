@@ -6,6 +6,7 @@
 pub mod app;
 pub mod fmt;
 pub mod icons;
+pub mod images;
 pub mod run;
 pub mod services;
 pub mod theme;
@@ -13,5 +14,6 @@ pub mod ui;
 
 pub use app::Config;
 pub use icons::IconSet;
+pub use images::{ImageMode, ImageUi};
 pub use services::Services;
 pub use theme::Theme;

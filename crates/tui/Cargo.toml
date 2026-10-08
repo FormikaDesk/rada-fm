@@ -19,6 +19,7 @@ tracing = "0.1"
 unicode-width = "0.2"
 jiff = "0.2.38"
 ratatui-image = { version = "11.1", default-features = false, features = ["crossterm"] }
+image = { version = "0.25", default-features = false }
 
 [dev-dependencies]
 vela-core = { path = "../core", features = ["testutil"] }

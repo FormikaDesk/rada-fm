@@ -21,6 +21,8 @@ use crate::events::{CoreEvent, PreviewEvent};
 
 #[derive(Clone, Debug)]
 pub struct ImageLimits {
+    /// `false` when images are not drawn at all: nothing is decoded then.
+    pub decode: bool,
     /// Images with more pixels than this are not decoded (megapixels).
     pub max_megapixels: u32,
     /// Files bigger than this are not decoded.
@@ -31,7 +33,12 @@ pub struct ImageLimits {
 
 impl Default for ImageLimits {
     fn default() -> Self {
-        ImageLimits { max_megapixels: 50, max_file_bytes: 128 << 20, max_edge: 1600 }
+        ImageLimits {
+            decode: true,
+            max_megapixels: 50,
+            max_file_bytes: 128 << 20,
+            max_edge: 1600,
+        }
     }
 }
 
@@ -48,6 +55,8 @@ pub struct ImageInfo {
 pub enum ImageState {
     /// Decoding is in progress in the worker.
     Loading,
+    /// Image rendering is switched off: only the header information is available.
+    Disabled,
     /// Decoded and already downscaled to `ImageLimits::max_edge`.
     Ready(Arc<DynamicImage>),
     TooLarge(String),
@@ -83,22 +92,46 @@ fn looks_like_svg(head: &[u8]) -> bool {
     }
     let text = String::from_utf8_lossy(head);
     let t = text.trim_start_matches('\u{feff}').trim_start();
-    (t.starts_with("<svg") || t.starts_with("<?xml") || t.starts_with("<!--") || t.starts_with("<!DOCTYPE svg")) && text.contains("<svg")
+    (t.starts_with("<svg")
+        || t.starts_with("<?xml")
+        || t.starts_with("<!--")
+        || t.starts_with("<!DOCTYPE svg"))
+        && text.contains("<svg")
 }
 
 /// Is this an image we can show? Looks at the content, never the extension.
 /// Returns the cheap, header-only preview (state `Loading`, `TooLarge` or `Failed`).
-pub(super) fn detect(path: &Path, head: &[u8], size: u64, modified: Option<SystemTime>, limits: &ImageLimits) -> Option<ImagePreview> {
-    let mut info = ImageInfo { format: String::new(), width: None, height: None, size, modified };
+pub(super) fn detect(
+    path: &Path,
+    head: &[u8],
+    size: u64,
+    modified: Option<SystemTime>,
+    limits: &ImageLimits,
+) -> Option<ImagePreview> {
+    let mut info = ImageInfo {
+        format: String::new(),
+        width: None,
+        height: None,
+        size,
+        modified,
+    };
 
     if looks_like_svg(head) {
         info.format = "SVG".into();
         let state = if size > limits.max_file_bytes.min(32 << 20) {
-            ImageState::TooLarge(format!("SVG file is {} (limit {})", display::bytes(size), display::bytes(limits.max_file_bytes.min(32 << 20))))
+            ImageState::TooLarge(format!(
+                "SVG file is {} (limit {})",
+                display::bytes(size),
+                display::bytes(limits.max_file_bytes.min(32 << 20))
+            ))
         } else {
             ImageState::Loading
         };
-        return Some(ImagePreview { info, state, note: None });
+        return Some(ImagePreview {
+            info,
+            state: disable_if_off(state, limits),
+            note: None,
+        });
     }
 
     let fmt = image::guess_format(head).ok()?;
@@ -127,7 +160,19 @@ pub(super) fn detect(path: &Path, head: &[u8], size: u64, modified: Option<Syste
             }
         }
     };
-    Some(ImagePreview { info, state, note: None })
+    Some(ImagePreview {
+        info,
+        state: disable_if_off(state, limits),
+        note: None,
+    })
+}
+
+/// With image rendering off nothing may be decoded: report the header only.
+fn disable_if_off(state: ImageState, limits: &ImageLimits) -> ImageState {
+    match state {
+        ImageState::Loading if !limits.decode => ImageState::Disabled,
+        other => other,
+    }
 }
 
 fn header_dims(path: &Path, fmt: ImageFormat) -> Result<(u32, u32), String> {
@@ -159,9 +204,16 @@ fn downscale(img: DynamicImage, max_edge: u32) -> DynamicImage {
     }
 }
 
-fn load_svg(path: &Path, limits: &ImageLimits, info: &mut ImageInfo) -> Result<DynamicImage, String> {
+fn load_svg(
+    path: &Path,
+    limits: &ImageLimits,
+    info: &mut ImageInfo,
+) -> Result<DynamicImage, String> {
     let data = std::fs::read(path).map_err(|e| e.to_string())?;
-    let opt = resvg::usvg::Options { fontdb: fonts(), ..Default::default() };
+    let opt = resvg::usvg::Options {
+        fontdb: fonts(),
+        ..Default::default()
+    };
     let tree = resvg::usvg::Tree::from_data(&data, &opt).map_err(|e| e.to_string())?;
     let size = tree.size();
     let (sw, sh) = (size.width(), size.height());
@@ -173,20 +225,36 @@ fn load_svg(path: &Path, limits: &ImageLimits, info: &mut ImageInfo) -> Result<D
     // Vector art is rendered at a comfortable preview size, whatever its nominal size.
     let target = limits.max_edge.min(1024) as f32;
     let scale = target / sw.max(sh);
-    let (w, h) = (((sw * scale).round() as u32).max(1), ((sh * scale).round() as u32).max(1));
+    let (w, h) = (
+        ((sw * scale).round() as u32).max(1),
+        ((sh * scale).round() as u32).max(1),
+    );
     let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h).ok_or("cannot allocate the SVG canvas")?;
-    resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(scale, scale), &mut pixmap.as_mut());
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
     let mut raw = Vec::with_capacity((w * h * 4) as usize);
     for p in pixmap.pixels() {
         let c = p.demultiply();
         raw.extend_from_slice(&[c.red(), c.green(), c.blue(), c.alpha()]);
     }
-    RgbaImage::from_raw(w, h, raw).map(DynamicImage::ImageRgba8).ok_or_else(|| "bad SVG canvas".into())
+    RgbaImage::from_raw(w, h, raw)
+        .map(DynamicImage::ImageRgba8)
+        .ok_or_else(|| "bad SVG canvas".into())
 }
 
-fn load_raster(path: &Path, limits: &ImageLimits, info: &mut ImageInfo) -> Result<DynamicImage, String> {
+fn load_raster(
+    path: &Path,
+    limits: &ImageLimits,
+    info: &mut ImageInfo,
+) -> Result<DynamicImage, String> {
     let bytes_limit = (limits.max_megapixels as u64 * 1_000_000 * 4).saturating_mul(3);
-    let mut reader = ImageReader::open(path).map_err(|e| e.to_string())?.with_guessed_format().map_err(|e| e.to_string())?;
+    let mut reader = ImageReader::open(path)
+        .map_err(|e| e.to_string())?
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?;
     let mut lim = image::Limits::default();
     lim.max_alloc = Some(bytes_limit);
     reader.limits(lim);
@@ -202,22 +270,31 @@ fn load_raster(path: &Path, limits: &ImageLimits, info: &mut ImageInfo) -> Resul
 
 /// Decode and downscale. Runs in the image worker.
 pub fn load(path: &Path, mut info: ImageInfo, limits: &ImageLimits) -> ImagePreview {
-    let result = if info.format == "SVG" { load_svg(path, limits, &mut info) } else { load_raster(path, limits, &mut info) };
+    let result = if info.format == "SVG" {
+        load_svg(path, limits, &mut info)
+    } else {
+        load_raster(path, limits, &mut info)
+    };
     let state = match result {
         Ok(img) => ImageState::Ready(Arc::new(img)),
         Err(e) => ImageState::Failed(format!("cannot decode the image: {e}")),
     };
     // Lenient decoders happily draw half a JPEG; say so instead of pretending.
-    let note = (matches!(state, ImageState::Ready(_)) && info.format == "JPEG" && !jpeg_is_complete(path))
-        .then(|| "the file is truncated or damaged: showing what could be decoded".to_string());
+    let note =
+        (matches!(state, ImageState::Ready(_)) && info.format == "JPEG" && !jpeg_is_complete(path))
+            .then(|| "the file is truncated or damaged: showing what could be decoded".to_string());
     ImagePreview { info, state, note }
 }
 
 /// A complete JPEG ends with the End-Of-Image marker (trailing padding is tolerated).
 fn jpeg_is_complete(path: &Path) -> bool {
     use std::io::{Read, Seek, SeekFrom};
-    let Ok(mut f) = std::fs::File::open(path) else { return true };
-    let Ok(len) = f.seek(SeekFrom::End(0)) else { return true };
+    let Ok(mut f) = std::fs::File::open(path) else {
+        return true;
+    };
+    let Ok(len) = f.seek(SeekFrom::End(0)) else {
+        return true;
+    };
     let from = len.saturating_sub(64);
     let mut tail = Vec::new();
     if f.seek(SeekFrom::Start(from)).is_err() || f.read_to_end(&mut tail).is_err() {
@@ -229,7 +306,11 @@ fn jpeg_is_complete(path: &Path) -> bool {
 /// Decode a file already in memory (used by tests).
 #[doc(hidden)]
 pub fn dimensions_of(bytes: &[u8]) -> Option<(u32, u32)> {
-    ImageReader::new(Cursor::new(bytes)).with_guessed_format().ok()?.into_dimensions().ok()
+    ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()
 }
 
 // --------------------------------------------------------------------------- worker
@@ -265,8 +346,17 @@ impl ImageWorker {
                         continue; // the user has moved on
                     }
                     let preview = load(&job.path, job.info, &job.limits);
-                    let name = job.path.file_name().map(|s| s.to_os_string()).unwrap_or_default();
-                    let ev = PreviewEvent { generation: job.generation, path: job.path, name, preview: Preview::Image(preview) };
+                    let name = job
+                        .path
+                        .file_name()
+                        .map(|s| s.to_os_string())
+                        .unwrap_or_default();
+                    let ev = PreviewEvent {
+                        generation: job.generation,
+                        path: job.path,
+                        name,
+                        preview: Preview::Image(preview),
+                    };
                     if out.send(CoreEvent::Preview(ev)).is_err() {
                         return;
                     }
@@ -282,6 +372,11 @@ impl ImageWorker {
     }
 
     pub fn submit(&self, path: PathBuf, generation: u64, info: ImageInfo, limits: ImageLimits) {
-        let _ = self.tx.send(Job { path, generation, info, limits });
+        let _ = self.tx.send(Job {
+            path,
+            generation,
+            info,
+            limits,
+        });
     }
 }

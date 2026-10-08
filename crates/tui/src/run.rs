@@ -13,6 +13,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use crate::app::{App, Config};
+use crate::images::{ImageMode, ImageUi};
 use crate::services::Services;
 use crate::ui;
 
@@ -53,8 +54,38 @@ pub fn run(cfg: Config, svc: Services) -> io::Result<Outcome> {
 }
 
 fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Outcome> {
-    let mut app = App::new(cfg, svc);
+    // Terminal graphics are detected now: the query needs raw mode and must finish
+    // before the keyboard reader starts.
+    let image_ui = match cfg.image_mode {
+        ImageMode::Auto => {
+            let t = std::time::Instant::now();
+            let ui = ImageUi::detect();
+            tracing::info!(
+                "terminal graphics: {} (detected in {:?})",
+                ui.protocol_name(),
+                t.elapsed()
+            );
+            Some(ui)
+        }
+        ImageMode::Halfblocks => Some(ImageUi::halfblocks()),
+        ImageMode::Kitty => Some(ImageUi::with_protocol(
+            ratatui_image::picker::ProtocolType::Kitty,
+        )),
+        ImageMode::Sixel => Some(ImageUi::with_protocol(
+            ratatui_image::picker::ProtocolType::Sixel,
+        )),
+        ImageMode::Iterm2 => Some(ImageUi::with_protocol(
+            ratatui_image::picker::ProtocolType::Iterm2,
+        )),
+        ImageMode::Off => None,
+    };
+    let mut app = App::new(cfg, svc, image_ui);
     let core_rx = app.events();
+    let resize_rx = app
+        .image_ui
+        .as_ref()
+        .map(|u| u.results())
+        .unwrap_or_else(crossbeam_channel::never);
 
     // Keyboard on its own thread, so slow drawing can never lose a key press.
     let (key_tx, key_rx) = unbounded::<Event>();
@@ -84,6 +115,11 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
                 Ok(ev) => handle_input(&mut app, ev),
                 Err(_) => break,
             },
+            recv(resize_rx) -> r => {
+                if let Ok(r) = r {
+                    app.on_image_resized(r);
+                }
+            }
             recv(core_rx) -> ev => {
                 if let Ok(ev) = ev {
                     app.on_core_event(ev);

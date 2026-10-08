@@ -78,15 +78,27 @@ struct Rd<'a> {
 impl Rd<'_> {
     fn u16(&self, o: usize) -> Option<u16> {
         let v: [u8; 2] = self.b.get(o..o + 2)?.try_into().ok()?;
-        Some(if self.le { u16::from_le_bytes(v) } else { u16::from_be_bytes(v) })
+        Some(if self.le {
+            u16::from_le_bytes(v)
+        } else {
+            u16::from_be_bytes(v)
+        })
     }
     fn u32(&self, o: usize) -> Option<u32> {
         let v: [u8; 4] = self.b.get(o..o + 4)?.try_into().ok()?;
-        Some(if self.le { u32::from_le_bytes(v) } else { u32::from_be_bytes(v) })
+        Some(if self.le {
+            u32::from_le_bytes(v)
+        } else {
+            u32::from_be_bytes(v)
+        })
     }
     fn u64(&self, o: usize) -> Option<u64> {
         let v: [u8; 8] = self.b.get(o..o + 8)?.try_into().ok()?;
-        Some(if self.le { u64::from_le_bytes(v) } else { u64::from_be_bytes(v) })
+        Some(if self.le {
+            u64::from_le_bytes(v)
+        } else {
+            u64::from_be_bytes(v)
+        })
     }
 }
 
@@ -120,9 +132,17 @@ fn elf(b: &[u8]) -> Option<ExecInfo> {
 
     // PT_INTERP tells a PIE executable from a plain shared library.
     let (phoff, phentsize, phnum) = if is64 {
-        (r.u64(32)? as usize, r.u16(54)? as usize, r.u16(56)? as usize)
+        (
+            r.u64(32)? as usize,
+            r.u16(54)? as usize,
+            r.u16(56)? as usize,
+        )
     } else {
-        (r.u32(28)? as usize, r.u16(42)? as usize, r.u16(44)? as usize)
+        (
+            r.u32(28)? as usize,
+            r.u16(42)? as usize,
+            r.u16(44)? as usize,
+        )
     };
     let mut interpreter = None;
     for i in 0..phnum.min(64) {
@@ -180,7 +200,12 @@ fn pe(b: &[u8]) -> Option<ExecInfo> {
         _ => "unknown architecture",
     }
     .to_string();
-    let kind = if characteristics & 0x2000 != 0 { "DLL" } else { "executable" }.to_string();
+    let kind = if characteristics & 0x2000 != 0 {
+        "DLL"
+    } else {
+        "executable"
+    }
+    .to_string();
     Some(ExecInfo {
         format: "PE (Windows)",
         arch,
@@ -213,7 +238,10 @@ fn macho(b: &[u8]) -> Option<ExecInfo> {
         if !(1..30).contains(&n) {
             return None; // a Java class file has the same magic
         }
-        let archs: Vec<&str> = (0..n).filter_map(|i| r.u32(8 + i * 20)).map(macho_arch).collect();
+        let archs: Vec<&str> = (0..n)
+            .filter_map(|i| r.u32(8 + i * 20))
+            .map(macho_arch)
+            .collect();
         return Some(ExecInfo {
             format: "Mach-O (macOS)",
             arch: archs.join(" + "),
@@ -266,12 +294,20 @@ mod tests {
     #[test]
     fn elf_headers_of_real_system_binaries() {
         // /bin/sh exists on every Linux machine this runs on; the header is read, not run.
-        let Ok(bytes) = std::fs::read("/bin/sh") else { return };
+        let Ok(bytes) = std::fs::read("/bin/sh") else {
+            return;
+        };
         let info = parse_exec(&bytes[..bytes.len().min(256 * 1024)]).expect("ELF");
         assert_eq!(info.format, "ELF");
-        assert!(["x86-64", "AArch64", "x86", "ARM", "RISC-V"].contains(&info.arch.as_str()), "{info:?}");
+        assert!(
+            ["x86-64", "AArch64", "x86", "ARM", "RISC-V"].contains(&info.arch.as_str()),
+            "{info:?}"
+        );
         assert_eq!(info.endian, Some("little-endian"));
-        assert!(info.interpreter.as_deref().is_none_or(|i| i.contains("ld")), "{info:?}");
+        assert!(
+            info.interpreter.as_deref().is_none_or(|i| i.contains("ld")),
+            "{info:?}"
+        );
     }
 
     #[test]
@@ -284,7 +320,10 @@ mod tests {
         elf[16] = 3;
         elf[18] = 62;
         let i = parse_exec(&elf).unwrap();
-        assert_eq!((i.arch.as_str(), i.bits, i.kind.as_str()), ("x86-64", Some(64), "shared library"));
+        assert_eq!(
+            (i.arch.as_str(), i.bits, i.kind.as_str()),
+            ("x86-64", Some(64), "shared library")
+        );
 
         // PE32+ DLL for ARM64.
         let mut pe = vec![0u8; 0x100];
@@ -295,7 +334,10 @@ mod tests {
         pe[0x80 + 22..0x80 + 24].copy_from_slice(&0x2000u16.to_le_bytes());
         pe[0x80 + 24..0x80 + 26].copy_from_slice(&0x20bu16.to_le_bytes());
         let i = parse_exec(&pe).unwrap();
-        assert_eq!((i.arch.as_str(), i.bits, i.kind.as_str()), ("ARM64", Some(64), "DLL"));
+        assert_eq!(
+            (i.arch.as_str(), i.bits, i.kind.as_str()),
+            ("ARM64", Some(64), "DLL")
+        );
 
         // Mach-O 64 little-endian x86-64 executable.
         let mut m = vec![0u8; 32];

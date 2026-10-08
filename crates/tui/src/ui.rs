@@ -365,8 +365,19 @@ fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
     let mut note = String::new();
 
+    if app.preview.image.is_some() {
+        let proto = app.image_ui.as_ref().map(|u| u.protocol_name());
+        if let Some(p) = proto {
+            blk = blk.title_bottom(Line::from(Span::styled(format!(" {p} "), th.dim())));
+        }
+        f.render_widget(blk, area);
+        draw_image_pane(f, app, inner);
+        return;
+    }
+
     match &content {
         None => lines.push(Line::from(Span::styled("", th.dim()))),
+        Some(Preview::Image(_)) => {}
         Some(Preview::Empty) => lines.push(Line::from(Span::styled("empty file", th.dim()))),
         Some(Preview::Error(m)) => {
             for l in fmt::wrap(m, w) {
@@ -399,12 +410,15 @@ fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 note.push_str(&format!(" · {} long line(s) cut", t.long_lines));
             }
         }
-        Some(Preview::Binary(b)) => {
+        Some(Preview::Binary(b)) if app.preview.hex => {
             lines.push(Line::from(vec![
-                Span::styled("binary file", th.fg(th.warn)),
-                Span::styled(format!(" · {} · {}", b.kind, fmt::size(b.size)), th.dim()),
+                Span::styled("hex dump", th.fg(th.warn)),
+                Span::styled(format!(" · first {} bytes · ", b.hex.len() * 16), th.dim()),
+                Span::styled("H", th.key()),
+                Span::styled(" back to the summary", th.dim()),
             ]));
             lines.push(Line::raw(""));
+            app.preview.scroll = app.preview.scroll.min(b.hex.len().saturating_sub(1));
             for l in b
                 .hex
                 .iter()
@@ -413,6 +427,69 @@ fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             {
                 lines.push(Line::from(Span::styled(display::truncate(l, w), th.dim())));
             }
+        }
+        Some(Preview::Binary(b)) => {
+            let c = &b.card;
+            lines.push(Line::from(Span::styled(c.kind.to_string(), th.title())));
+            lines.push(Line::raw(""));
+            let label = |k: &str| Span::styled(format!("{k:<12}"), th.dim());
+            if let Some(e) = &c.exec {
+                let mut what = vec![e.kind.clone()];
+                what.push(e.arch.clone());
+                if let Some(bits) = e.bits {
+                    what.push(format!("{bits}-bit"));
+                }
+                if let Some(en) = e.endian {
+                    what.push(en.to_string());
+                }
+                lines.push(Line::from(vec![
+                    label("Executable"),
+                    Span::styled(e.format.to_string(), th.fg(th.exec)),
+                ]));
+                for l in fmt::wrap(&what.join(" · "), w.saturating_sub(12)) {
+                    lines.push(Line::from(vec![label(""), Span::styled(l, th.base())]));
+                }
+                if let Some(i) = &e.interpreter {
+                    lines.push(Line::from(vec![
+                        label("Interpreter"),
+                        Span::styled(display::truncate(i, w.saturating_sub(12)), th.base()),
+                    ]));
+                }
+                lines.push(Line::raw(""));
+            }
+            lines.push(Line::from(vec![
+                label("Size"),
+                Span::styled(
+                    format!("{} ({} bytes)", fmt::size(c.size), fmt::thousands(c.size)),
+                    th.base(),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                label("Modified"),
+                Span::styled(fmt::date(c.modified), th.base()),
+            ]));
+            if c.created.is_some() {
+                lines.push(Line::from(vec![
+                    label("Created"),
+                    Span::styled(fmt::date(c.created), th.base()),
+                ]));
+            }
+            lines.push(Line::from(vec![
+                label("Accessed"),
+                Span::styled(fmt::date(c.accessed), th.base()),
+            ]));
+            if let Some(m) = c.mode {
+                lines.push(Line::from(vec![
+                    label("Permissions"),
+                    Span::styled(vela_core::preview::mode_string(m), th.base()),
+                    Span::styled(format!("  {:04o}", m & 0o7777), th.dim()),
+                ]));
+            }
+            lines.push(Line::raw(""));
+            lines.push(Line::from(vec![
+                Span::styled("H", th.key()),
+                Span::styled("  show the hex dump", th.dim()),
+            ]));
         }
         Some(Preview::Dir(d)) => {
             app.preview.scroll = app.preview.scroll.min(d.entries.len().saturating_sub(1));
@@ -480,6 +557,155 @@ fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     }
     f.render_widget(blk, area);
     f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
+    use ratatui_image::{Resize, StatefulImage};
+    let th = app.th.clone();
+    let Some(view) = &app.preview.image else {
+        return;
+    };
+    let info = view.info.clone();
+    let note = view.note.clone();
+    enum Kind {
+        Decoding,
+        Shown,
+        Plain,
+        Warn(String),
+        Err(String),
+    }
+    let kind = match &view.status {
+        ImageStatus::Decoding => Kind::Decoding,
+        ImageStatus::Shown => Kind::Shown,
+        ImageStatus::NoGraphics => Kind::Plain,
+        ImageStatus::TooLarge(m) => Kind::Warn(m.clone()),
+        ImageStatus::Failed(m) => Kind::Err(m.clone()),
+    };
+    let w = inner.width as usize;
+    // Under the picture: format, pixels, weight, date.
+    let mut facts = vec![format!(
+        "{} · {} · {}",
+        info.format,
+        match (info.width, info.height) {
+            (Some(a), Some(b)) => format!("{a} × {b} px"),
+            _ => "size unknown".to_string(),
+        },
+        fmt::size(info.size)
+    )];
+    facts.push(format!("modified {}", fmt::date(info.modified)));
+    let mut fact_lines: Vec<Line> = facts
+        .iter()
+        .map(|l| Line::from(Span::styled(display::truncate(l, w), th.base())))
+        .collect();
+    if let Some(n) = &note {
+        for l in fmt::wrap(n, w) {
+            fact_lines.push(Line::from(Span::styled(l, th.fg(th.warn))));
+        }
+    }
+    let facts_h = fact_lines.len() as u16;
+    // Where the facts go when the picture is not what fills the pane.
+    let bottom = Rect {
+        y: inner.y + inner.height.saturating_sub(facts_h),
+        height: facts_h.min(inner.height),
+        ..inner
+    };
+    let pic = Rect {
+        height: inner.height.saturating_sub(facts_h + 1),
+        ..inner
+    };
+
+    match kind {
+        Kind::Shown => {
+            let mut facts_at = bottom;
+            if let Some(ui) = app.image_ui.as_mut() {
+                let target = ratatui::layout::Size::new(pic.width, pic.height);
+                match ui.proto.size_for(Resize::Fit(None), target) {
+                    Some(sz) => {
+                        // Picture and facts form one block, centred in the pane.
+                        let group = (sz.height + 1 + facts_h).min(inner.height);
+                        let y0 = inner.y + (inner.height - group) / 2;
+                        let r = Rect {
+                            x: pic.x + (pic.width.saturating_sub(sz.width)) / 2,
+                            y: y0,
+                            width: sz.width.min(pic.width),
+                            height: sz.height.min(pic.height),
+                        };
+                        f.render_stateful_widget(StatefulImage::default(), r, &mut ui.proto);
+                        facts_at = Rect {
+                            x: inner.x,
+                            y: r.y + r.height + 1,
+                            width: inner.width,
+                            height: facts_h,
+                        };
+                    }
+                    None => {
+                        // Being resized/encoded on its thread right now.
+                        f.render_widget(
+                            Paragraph::new(Span::styled("…", th.dim()))
+                                .alignment(Alignment::Center),
+                            Rect {
+                                y: pic.y + pic.height / 2,
+                                height: 1,
+                                ..pic
+                            },
+                        );
+                    }
+                }
+            }
+            if facts_at.y + facts_at.height <= inner.y + inner.height {
+                f.render_widget(Paragraph::new(fact_lines), facts_at);
+            }
+        }
+        Kind::Decoding => {
+            let spin = SPIN[app.spinner % SPIN.len()];
+            f.render_widget(
+                Paragraph::new(Span::styled(format!("{spin} decoding…"), th.dim()))
+                    .alignment(Alignment::Center),
+                Rect {
+                    y: pic.y + pic.height / 3,
+                    height: 1,
+                    ..pic
+                },
+            );
+            f.render_widget(Paragraph::new(fact_lines), bottom);
+        }
+        Kind::Plain => {
+            f.render_widget(
+                Paragraph::new(Span::styled("image rendering is off (--images)", th.dim())),
+                pic,
+            );
+            f.render_widget(Paragraph::new(fact_lines), bottom);
+        }
+        Kind::Warn(m) => {
+            message(f, &th, pic, "image too large to preview", &m, th.warn);
+            f.render_widget(Paragraph::new(fact_lines), bottom);
+        }
+        Kind::Err(m) => {
+            message(f, &th, pic, "cannot show this image", &m, th.danger);
+            f.render_widget(Paragraph::new(fact_lines), bottom);
+        }
+    }
+}
+
+fn message(
+    f: &mut Frame,
+    th: &crate::theme::Theme,
+    area: Rect,
+    head: &str,
+    text: &str,
+    color: ratatui::style::Color,
+) {
+    let mut lines = vec![
+        Line::from(Span::styled(
+            head.to_string(),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        )),
+        Line::raw(""),
+    ];
+    for l in fmt::wrap(text, area.width as usize) {
+        lines.push(Line::from(Span::styled(l, th.fg(color))));
+    }
+    f.render_widget(Paragraph::new(lines), area);
 }
 
 // ------------------------------------------------------------------------------ progress & footer
@@ -1322,6 +1548,7 @@ fn draw_help(f: &mut Frame, th: &crate::theme::Theme, area: Rect) {
         ("g  G", "top / bottom"),
         ("PgUp PgDn", "page"),
         ("J K", "scroll the preview"),
+        ("H", "hex dump of a binary file (the card is the default)"),
         ("Space", "mark and move down"),
         ("Ctrl-a", "mark / unmark all"),
         ("y  x  p", "copy · cut · paste (always shows a plan first)"),

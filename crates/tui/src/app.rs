@@ -21,10 +21,11 @@ use vela_core::ops::{
     TransferOptions, UndoPlan,
 };
 use vela_core::platform::Volume;
-use vela_core::preview::{Limits, Preview};
+use vela_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
 use crate::fmt;
 use crate::icons::IconSet;
+use crate::images::{ImageMode, ImageUi, ResizeResult};
 use crate::services::Services;
 use crate::theme::Theme;
 
@@ -58,6 +59,28 @@ pub struct PreviewState {
     pub name: String,
     pub content: Option<Preview>,
     pub scroll: usize,
+    /// For image files: what to show besides the picture itself.
+    pub image: Option<ImageView>,
+    /// Binary files show a card; the hex dump only on request (`H`).
+    pub hex: bool,
+    path: Option<PathBuf>,
+}
+
+pub struct ImageView {
+    pub info: ImageInfo,
+    pub status: ImageStatus,
+    pub note: Option<String>,
+}
+
+pub enum ImageStatus {
+    /// Header read, pixels being decoded in the worker.
+    Decoding,
+    /// The picture is in the graphics protocol and drawn by the renderer.
+    Shown,
+    /// Image rendering is off (`--images off`): information only.
+    NoGraphics,
+    TooLarge(String),
+    Failed(String),
 }
 
 pub struct Running {
@@ -233,6 +256,10 @@ pub struct Config {
     pub show_hidden: bool,
     pub sort: SortSpec,
     pub theme: Theme,
+    pub image_mode: ImageMode,
+    pub limits: Limits,
+    /// Put the cursor on this entry of `start_dir` (when started with a file path).
+    pub select: Option<OsString>,
 }
 
 pub struct App {
@@ -253,6 +280,8 @@ pub struct App {
     remembered: HashMap<PathBuf, OsString>,
 
     pub preview: PreviewState,
+    pub image_ui: Option<ImageUi>,
+    limits: Limits,
     preview_gen: u64,
     previewed: Option<PathBuf>,
 
@@ -271,7 +300,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cfg: Config, svc: Services) -> App {
+    pub fn new(cfg: Config, svc: Services, image_ui: Option<ImageUi>) -> App {
+        let decode_images = image_ui.is_some();
         let mut app = App {
             th: cfg.theme,
             icons: cfg.icons,
@@ -290,6 +320,16 @@ impl App {
                 name: String::new(),
                 content: None,
                 scroll: 0,
+                image: None,
+                hex: false,
+                path: None,
+            },
+            image_ui,
+            limits: {
+                let mut l = cfg.limits;
+                // No graphics, no point in decoding pictures.
+                l.image.decode = l.image.decode && decode_images;
+                l
             },
             preview_gen: 0,
             previewed: None,
@@ -312,6 +352,9 @@ impl App {
                 "journal unavailable: operations cannot be undone this session",
                 8,
             );
+        }
+        if let Some(name) = cfg.select {
+            app.remembered.insert(cfg.start_dir.clone(), name);
         }
         app.svc.watcher.watch(cfg.start_dir.clone());
         app.request_dir(cfg.start_dir);
@@ -452,7 +495,7 @@ impl App {
         self.preview_gen += 1;
         self.svc
             .previewer
-            .request(path, self.preview_gen, Limits::default());
+            .request(path, self.preview_gen, self.limits.clone());
     }
 
     // ------------------------------------------------------------------ navigation
@@ -529,7 +572,10 @@ impl App {
                     Ok(entries) => {
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
+                            // Before the first listing there is no cursor yet: use the
+                            // remembered entry (the file given on the command line).
                             self.cursor_name()
+                                .or_else(|| self.remembered.get(&path).cloned())
                         } else {
                             self.remembered.get(&path).cloned()
                         };
@@ -599,9 +645,71 @@ impl App {
         if ev.generation != self.preview_gen {
             return;
         }
+        if self.preview.path.as_ref() != Some(&ev.path) {
+            self.preview.hex = false;
+            self.preview.scroll = 0;
+            self.preview.path = Some(ev.path.clone());
+        }
         self.preview.name = vela_core::display::name(&ev.name);
-        self.preview.content = Some(ev.preview);
-        self.preview.scroll = 0;
+        match ev.preview {
+            Preview::Image(ip) => {
+                let status = match ip.state {
+                    ImageState::Disabled => {
+                        self.clear_image();
+                        ImageStatus::NoGraphics
+                    }
+                    ImageState::Loading => {
+                        if let Some(ui) = &mut self.image_ui {
+                            ui.clear();
+                        }
+                        ImageStatus::Decoding
+                    }
+                    ImageState::Ready(px) => match &mut self.image_ui {
+                        Some(ui) => {
+                            // The event owns the only reference: no pixel copy.
+                            let img = std::sync::Arc::try_unwrap(px)
+                                .unwrap_or_else(|shared| (*shared).clone());
+                            ui.show(img);
+                            ImageStatus::Shown
+                        }
+                        None => ImageStatus::NoGraphics,
+                    },
+                    ImageState::TooLarge(m) => {
+                        self.clear_image();
+                        ImageStatus::TooLarge(m)
+                    }
+                    ImageState::Failed(m) => {
+                        self.clear_image();
+                        ImageStatus::Failed(m)
+                    }
+                };
+                self.preview.image = Some(ImageView {
+                    info: ip.info,
+                    status,
+                    note: ip.note,
+                });
+                self.preview.content = None;
+            }
+            other => {
+                self.clear_image();
+                self.preview.image = None;
+                self.preview.content = Some(other);
+            }
+        }
+    }
+
+    fn clear_image(&mut self) {
+        if let Some(ui) = &mut self.image_ui {
+            ui.clear();
+        }
+    }
+
+    /// The encoder thread finished resizing/encoding the picture for the current area.
+    pub fn on_image_resized(&mut self, r: ResizeResult) {
+        if let Some(ui) = &mut self.image_ui {
+            ui.on_resized(r);
+        }
+        self.dirty = true;
     }
 
     fn on_job(&mut self, ev: JobEvent) {
@@ -944,6 +1052,18 @@ impl App {
             KeyCode::PageUp => self.set_cursor(self.cursor.saturating_sub(page)),
             KeyCode::Char('d') if ctrl => self.set_cursor(self.cursor + page / 2),
             KeyCode::Char('u') if ctrl => self.set_cursor(self.cursor.saturating_sub(page / 2)),
+            KeyCode::Char('H') => {
+                if matches!(self.preview.content, Some(Preview::Binary(_))) {
+                    self.preview.hex = !self.preview.hex;
+                    self.preview.scroll = 0;
+                } else {
+                    self.toast(
+                        ToastKind::Info,
+                        "the hex dump is available for binary files",
+                        2,
+                    );
+                }
+            }
             KeyCode::Char('J') => self.preview.scroll = self.preview.scroll.saturating_add(5),
             KeyCode::Char('K') => self.preview.scroll = self.preview.scroll.saturating_sub(5),
             KeyCode::Char(' ') => self.toggle_mark(),

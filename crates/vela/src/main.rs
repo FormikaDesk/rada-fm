@@ -27,6 +27,10 @@ struct Cli {
     #[arg(long, value_name = "SET")]
     icons: Option<String>,
 
+    /// Image previews: `auto` (default), `halfblocks`, `kitty`, `sixel`, `iterm2` or `off`.
+    #[arg(long, value_name = "MODE")]
+    images: Option<String>,
+
     /// Show hidden files at startup.
     #[arg(long)]
     hidden: bool,
@@ -57,10 +61,12 @@ fn main() -> Result<()> {
     };
     let start = std::fs::canonicalize(&start)
         .with_context(|| format!("cannot open {}", start.display()))?;
-    let start = if start.is_dir() {
-        start
+    // Given a file, open its folder with the cursor on it.
+    let (start, select) = if start.is_dir() {
+        (start, None)
     } else {
-        start.parent().map(PathBuf::from).unwrap_or(start)
+        let name = start.file_name().map(|n| n.to_os_string());
+        (start.parent().map(PathBuf::from).unwrap_or(start), name)
     };
 
     let icons_name = cli
@@ -72,6 +78,18 @@ fn main() -> Result<()> {
         Some(n) => vela_tui::IconSet::parse(&n)
             .with_context(|| format!("unknown icon set {n:?} (use nerd, unicode or none)"))?,
         None => vela_tui::IconSet::Unicode,
+    };
+
+    let images_name = cli
+        .images
+        .clone()
+        .or_else(|| std::env::var("VELA_IMAGES").ok())
+        .or(cfg_file.images.clone());
+    let image_mode = match images_name {
+        Some(n) => vela_tui::ImageMode::parse(&n).with_context(|| {
+            format!("unknown image mode {n:?} (use auto, halfblocks, kitty, sixel, iterm2 or off)")
+        })?,
+        None => vela_tui::ImageMode::Auto,
     };
 
     let platform = platform::current(dirs.clone());
@@ -89,6 +107,12 @@ fn main() -> Result<()> {
         show_hidden: cli.hidden || cfg_file.show_hidden,
         sort: cfg_file.sort,
         theme: Theme::detect(),
+        image_mode,
+        select,
+        limits: vela_core::preview::Limits {
+            image: cfg_file.image_limits.clone(),
+            ..Default::default()
+        },
     };
 
     let outcome = vela_tui::run::run(cfg, services).context("terminal error")?;

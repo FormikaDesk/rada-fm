@@ -21,6 +21,8 @@ vela is a fast, keyboard-driven file manager for the terminal, written in Rust. 
 | **Safe across filesystems** | Moves between filesystems are copy → verify (checksum of what was written) → remove source, file by file; the source is never deleted for something that failed to copy. Trashing follows the freedesktop.org specification, including per-device trash directories. |
 | **Live** | The folder view updates by itself (inotify via `notify`), with debouncing. Sorting is stable and deterministic and applies instantly. |
 | **Nothing blocks the UI** | All I/O happens in worker threads; the interface thread only draws and handles keys. Volumes are listed by a worker, never on a keypress, with a timeout per mount so a hung network share cannot freeze anything. |
+| **Real image previews** | PNG, JPEG (with EXIF rotation), GIF (first frame), WebP, BMP and SVG are drawn with the best protocol the terminal offers: Kitty graphics (Ghostty, kitty), iTerm2 images (WezTerm, iTerm2), Sixel (foot), or coloured half blocks everywhere else. Decoding and resizing run in worker threads, so browsing a folder of photos never delays a keypress. Below the picture: format, pixel size, weight and date. Images that are too big are refused from the header alone, with a clear message. |
+| **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
 | **Hostile names are harmless** | Newlines, escape sequences, bidi controls and invalid UTF-8 in file names are shown as visible escapes. Paths are `Path`/`OsString` everywhere, never text. |
 
 ## Install
@@ -49,6 +51,14 @@ vela [PATH] [--icons nerd|unicode|none] [--hidden]
 
 Icons default to plain Unicode markers. With a [Nerd Font](https://www.nerdfonts.com/) installed, use `--icons nerd` (or `icons = "nerd"` in the config file).
 
+Open a file instead of a folder (`vela photo.png`) and vela starts in its folder with the cursor on it.
+
+### Images
+
+`--images auto` (the default) picks the protocol like this: under tmux, half blocks (graphics queries are only answered with `allow-passthrough`, and waiting for them would be slow); in a terminal that identifies itself (Ghostty, kitty, WezTerm, iTerm2, foot), the matching protocol with no query at all; otherwise the terminal is asked, with a bounded wait. Force a protocol with `--images kitty|sixel|iterm2|halfblocks`, or switch image drawing off with `--images off` (then nothing is decoded). Under tmux with passthrough enabled, `--images kitty` works too.
+
+Large images: anything above 50 megapixels or 128 MiB is not decoded (a 12000×12000 PNG is refused instantly, from its header). Both limits are configurable.
+
 Optional config: `$XDG_CONFIG_HOME/vela/config.toml`
 
 ```toml
@@ -56,6 +66,9 @@ icons = "nerd"        # nerd | unicode | none
 show_hidden = false
 sort = "name"         # name | size | date
 reverse = false
+images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
+image_max_megapixels = 50
+image_max_file_mb = 128
 ```
 
 State lives in `$XDG_STATE_HOME/vela/` (`journal.jsonl`, `log/`). Set `VELA_LOG=debug` for more logging (written to a file, never to the screen).
@@ -69,6 +82,7 @@ State lives in `$XDG_STATE_HOME/vela/` (`journal.jsonl`, `log/`). Set `VELA_LOG=
 | `h` `←` `Backspace` | parent folder (the cursor returns to where you were) |
 | `g` `G` · `PgUp` `PgDn` | top / bottom · page |
 | `J` `K` | scroll the preview |
+| `H` | hex dump of the selected binary file (the summary card is the default) |
 | `Space` | mark and move down · `Ctrl-a` marks everything |
 | `y` `x` `p` | copy · cut · paste (shows a plan first) |
 | `d` | move to trash |
@@ -116,7 +130,7 @@ Phase 2 and beyond (not in phase 1):
 - Dual pane, tabs, layout restore
 - Archives (browse and extract safely, all common formats)
 - Git integration
-- Image preview (Kitty / iTerm2 / Sixel, terminal capability detection)
+- Animated GIF playback, image zoom, EXIF details
 - Syntax-highlighted preview, scrollable preview focus
 - Mouse support
 - Search and filter, recursive sizes

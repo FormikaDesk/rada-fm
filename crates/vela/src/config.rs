@@ -5,17 +5,23 @@
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
+//! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
+//! image_max_megapixels = 50   # larger images are not decoded
+//! image_max_file_mb = 128
 //! ```
 
 use serde::Deserialize;
 use vela_core::model::{SortKey, SortSpec};
 use vela_core::platform::Dirs;
+use vela_core::preview::ImageLimits;
 
 #[derive(Debug)]
 pub struct FileConfig {
     pub icons: Option<String>,
     pub show_hidden: bool,
     pub sort: SortSpec,
+    pub images: Option<String>,
+    pub image_limits: ImageLimits,
 }
 
 #[derive(Deserialize, Default)]
@@ -24,6 +30,9 @@ struct Raw {
     show_hidden: Option<bool>,
     sort: Option<String>,
     reverse: Option<bool>,
+    images: Option<String>,
+    image_max_megapixels: Option<u32>,
+    image_max_file_mb: Option<u64>,
 }
 
 pub fn load(dirs: &Dirs) -> FileConfig {
@@ -47,6 +56,18 @@ pub fn load(dirs: &Dirs) -> FileConfig {
             key,
             reverse: raw.reverse.unwrap_or(false),
             dirs_first: true,
+        },
+        images: raw.images,
+        image_limits: {
+            let d = ImageLimits::default();
+            ImageLimits {
+                max_megapixels: raw.image_max_megapixels.unwrap_or(d.max_megapixels).max(1),
+                max_file_bytes: raw
+                    .image_max_file_mb
+                    .map(|m| m.saturating_mul(1 << 20))
+                    .unwrap_or(d.max_file_bytes),
+                ..d
+            }
         },
     }
 }
