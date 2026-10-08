@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::SystemTime;
 
 use crate::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
+use crate::ops::{Cancel, Engine, ExecReport, Plan, Scan, ScanControl, SkipErrors};
 use crate::platform::{self, Dirs, Platform};
 
 // ---------------------------------------------------------------------------------
@@ -216,6 +217,16 @@ impl Sandbox {
         self.platform.clone()
     }
 
+    /// Engine over the real local filesystem with the sandboxed platform.
+    pub fn engine(&self) -> Engine {
+        Engine::local(self.platform())
+    }
+
+    /// Engine over a custom filesystem (fault injection).
+    pub fn engine_with(&self, fs: Arc<dyn FsEngine>) -> Engine {
+        Engine::new(fs, self.platform())
+    }
+
     pub fn path(&self, rel: impl AsRef<Path>) -> PathBuf {
         self.work.join(rel)
     }
@@ -257,6 +268,16 @@ impl Drop for Sandbox {
             assert_real_paths_untouched();
         }
     }
+}
+
+pub fn scan(engine: &Engine, paths: &[PathBuf]) -> Scan {
+    let cancel = Cancel::new();
+    engine.scan(paths, ScanControl { cancel: cancel.flag(), progress: &mut |_| {} })
+}
+
+/// Execute a plan, skipping (and recording) every failure.
+pub fn run(engine: &Engine, plan: &Plan) -> ExecReport {
+    engine.execute(plan, &mut SkipErrors, &Cancel::new())
 }
 
 /// A scratch directory on a *different* filesystem from the sandbox (tmpfs vs disk),

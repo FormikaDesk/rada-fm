@@ -4,6 +4,7 @@
 pub mod display;
 pub mod error;
 pub mod fs;
+pub mod ops;
 pub mod pathcodec;
 pub mod platform;
 
