@@ -466,7 +466,7 @@ impl App {
         self.modal = Some(Modal::Menu(self.context_menu(on_item, (x, y))));
     }
 
-    fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
+    pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
         use Action::*;
         let has_clip = self.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();

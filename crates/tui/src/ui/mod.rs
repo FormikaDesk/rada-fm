@@ -519,7 +519,10 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
         ));
     }
     let head_right = format!("{pct:>3}%   {right}   Esc cancel");
-    let title = display::truncate(&r.title, w.saturating_sub(head_right.width() + 6));
+    // The title names a folder with its full path; show it the way the rest of the
+    // interface does.
+    let full_title = r.title.replace(&display::path(app.home()), "~");
+    let title = display::truncate(&full_title, w.saturating_sub(head_right.width() + 6));
     let gap = w.saturating_sub(title.width() + head_right.width() + 3);
     let line1 = Line::from(vec![
         Span::styled(

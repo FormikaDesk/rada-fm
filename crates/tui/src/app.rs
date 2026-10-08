@@ -1446,6 +1446,7 @@ impl App {
                 self.svc.jobs.load_history();
             }
             "help" => self.modal = Some(Modal::Help),
+            "menu" => self.modal = Some(Modal::Menu(self.context_menu(true, (30, 11)))),
             _ => {}
         }
     }

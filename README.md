@@ -33,6 +33,10 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ![The jump palette](docs/screenshots/palette.png)
 
+![The context menu opened with the right mouse button, with each action's shortcut](docs/screenshots/menu.png)
+
+![The help: every action with its vim and classic keys side by side](docs/screenshots/help.png)
+
 ![Progress counted in bytes, with throughput and time left](docs/screenshots/progress.png)
 
 ## Install
