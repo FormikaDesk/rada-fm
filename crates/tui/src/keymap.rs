@@ -257,25 +257,27 @@ impl Chord {
     pub fn new(code: KeyCode, mods: KeyModifiers) -> Chord {
         let mut mods = mods & (KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SHIFT);
         let code = match code {
-            KeyCode::Char(c) => {
-                // Shifted letters arrive as the capital letter (some terminals also set
-                // SHIFT, some do not): the capital is the whole story.
-                if c.is_alphabetic() || !c.is_ascii() {
-                    let up = c.to_uppercase().next().unwrap_or(c);
-                    if mods.contains(KeyModifiers::SHIFT) && !mods.contains(KeyModifiers::CONTROL) {
-                        mods.remove(KeyModifiers::SHIFT);
-                        KeyCode::Char(up)
-                    } else if c.is_uppercase() {
-                        mods.remove(KeyModifiers::SHIFT);
-                        KeyCode::Char(c)
-                    } else {
-                        KeyCode::Char(c)
-                    }
-                } else {
-                    // Symbols already carry their shift (`?`, `~`): SHIFT adds nothing.
+            KeyCode::Char(c) if c.is_alphabetic() => {
+                // Terminals disagree on shifted letters: `G`, `G`+SHIFT and `g`+SHIFT all
+                // mean the same key. With Ctrl held the letter stays lower case and
+                // Shift stays a modifier (Ctrl+Shift+Z).
+                let shifted = mods.contains(KeyModifiers::SHIFT) || c.is_uppercase();
+                let lower = c.to_lowercase().next().unwrap_or(c);
+                let upper = c.to_uppercase().next().unwrap_or(c);
+                if mods.contains(KeyModifiers::CONTROL) {
+                    mods.set(KeyModifiers::SHIFT, shifted);
+                    KeyCode::Char(lower)
+                } else if shifted {
                     mods.remove(KeyModifiers::SHIFT);
+                    KeyCode::Char(upper)
+                } else {
                     KeyCode::Char(c)
                 }
+            }
+            KeyCode::Char(c) => {
+                // Symbols already carry their shift (`?`, `~`): SHIFT adds nothing.
+                mods.remove(KeyModifiers::SHIFT);
+                KeyCode::Char(c)
             }
             // BackTab is Shift+Tab.
             KeyCode::BackTab => {
@@ -478,8 +480,8 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::SelectAll, &["ctrl+a"]),
     (Action::SelectUp, &["shift+up"]),
     (Action::SelectDown, &["shift+down"]),
-    (Action::SelectToFirst, &["shift+home"]),
-    (Action::SelectToLast, &["shift+end"]),
+    (Action::SelectToFirst, &["shift+home", "ctrl+shift+home"]),
+    (Action::SelectToLast, &["shift+end", "ctrl+shift+end"]),
     (Action::ClearSelection, &["esc"]),
     (Action::Copy, &["ctrl+c"]),
     (Action::Cut, &["ctrl+x"]),
@@ -489,7 +491,7 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::Rename, &["f2"]),
     (Action::NewFolder, &["ctrl+n", "f7"]),
     (Action::Undo, &["ctrl+z"]),
-    (Action::Redo, &["ctrl+y"]),
+    (Action::Redo, &["ctrl+y", "ctrl+shift+z"]),
     (Action::History, &["f3"]),
     (Action::Filter, &["ctrl+f"]),
     (Action::Palette, &["ctrl+p", "ctrl+l"]),
@@ -750,6 +752,29 @@ mod tests {
         assert_eq!(
             km.action_for(&ev(KeyCode::BackTab, KeyModifiers::SHIFT)),
             None
+        );
+    }
+
+    #[test]
+    fn ctrl_shift_letters_are_recognised_however_the_terminal_reports_them() {
+        let km = Keymap::default();
+        for e in [
+            ev(
+                KeyCode::Char('z'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            ev(
+                KeyCode::Char('Z'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+            ev(KeyCode::Char('Z'), KeyModifiers::CONTROL),
+        ] {
+            assert_eq!(km.action_for(&e), Some(Action::Redo), "{e:?}");
+        }
+        // Plain Ctrl+Z stays undo.
+        assert_eq!(
+            km.action_for(&ev(KeyCode::Char('z'), KeyModifiers::CONTROL)),
+            Some(Action::Undo)
         );
     }
 

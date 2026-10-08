@@ -1,36 +1,132 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plan",
+  "type": "object",
+  "properties": {
+    "destination": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "items": {
+      "description": "One entry per selected item, for a readable overview.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ItemSummary"
+      }
+    },
+    "kind": {
+      "$ref": "#/$defs/OpKind"
+    },
+    "policy": {
+      "$ref": "#/$defs/ConflictPolicy"
+    },
+    "redo_of": {
+      "description": "Set when this plan re-does an operation that was undone.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "renames": {
+      "description": "Old name -> new name, for rename previews.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "request": {
+      "description": "The request this plan answers, kept in the journal so the operation can be\nplanned again later (redo).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OpRequest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "reversible": {
+      "description": "False for permanent deletion: the journal records it but cannot undo it.",
+      "type": "boolean"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Step"
+      }
+    },
+    "title": {
+      "type": "string"
+    },
+    "totals": {
+      "$ref": "#/$defs/Totals"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Warning"
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "title",
+    "steps",
+    "totals",
+    "warnings",
+    "policy",
+    "reversible",
+    "renames",
+    "items"
+  ],
   "$defs": {
     "ConflictPolicy": {
       "description": "How to resolve a destination that already exists.",
       "oneOf": [
         {
-          "const": "skip",
           "description": "Leave existing items alone, do not copy the clashing source.",
-          "type": "string"
+          "type": "string",
+          "const": "skip"
         },
         {
-          "const": "keep_both",
           "description": "Copy under a new name (`name (1).ext`).",
-          "type": "string"
+          "type": "string",
+          "const": "keep_both"
         },
         {
-          "const": "overwrite",
           "description": "Replace; the old item is moved to the trash first so that undo can bring it back.",
-          "type": "string"
+          "type": "string",
+          "const": "overwrite"
         }
       ]
     },
     "FileKind": {
+      "type": "string",
       "enum": [
         "File",
         "Dir",
         "Symlink",
         "Other"
-      ],
-      "type": "string"
+      ]
     },
     "Fingerprint": {
       "description": "Identity of a file at a moment in time, used to detect modifications after the fact.",
+      "type": "object",
       "properties": {
         "ctime": {
           "anyOf": [
@@ -56,21 +152,21 @@
           ]
         },
         "size": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         }
       },
       "required": [
         "kind",
         "size"
-      ],
-      "type": "object"
+      ]
     },
     "ItemAction": {
       "description": "What happens to one top-level item of an operation.",
       "oneOf": [
         {
+          "type": "string",
           "enum": [
             "Copy",
             "Move",
@@ -79,46 +175,46 @@
             "Delete",
             "Rename",
             "Create"
-          ],
-          "type": "string"
+          ]
         },
         {
-          "const": "Merge",
           "description": "A folder merged into an existing folder of the same name.",
-          "type": "string"
+          "type": "string",
+          "const": "Merge"
         },
         {
-          "const": "Overwrite",
           "description": "Replaces an existing item (the old one goes to the trash first).",
-          "type": "string"
+          "type": "string",
+          "const": "Overwrite"
         },
         {
-          "const": "Skip",
           "description": "Left alone: the name already exists, or it is already where it should be.",
-          "type": "string"
+          "type": "string",
+          "const": "Skip"
         }
       ]
     },
     "ItemSummary": {
       "description": "One selected item and what the plan does with it: the unit the plan window lists.",
+      "type": "object",
       "properties": {
         "action": {
           "$ref": "#/$defs/ItemAction"
         },
         "bytes": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "dirs": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "files": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "kind": {
           "$ref": "#/$defs/FileKind"
@@ -128,17 +224,17 @@
           "type": "string"
         },
         "symlinks": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "target": {
-          "default": null,
           "description": "Where it ends up, when that differs from where it is.",
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "default": null
         }
       },
       "required": [
@@ -149,10 +245,10 @@
         "dirs",
         "symlinks",
         "bytes"
-      ],
-      "type": "object"
+      ]
     },
     "OpKind": {
+      "type": "string",
       "enum": [
         "copy",
         "move",
@@ -162,50 +258,49 @@
         "trash",
         "delete",
         "undo"
-      ],
-      "type": "string"
+      ]
     },
     "OpRequest": {
       "description": "A request to do something to files. All paths must be absolute.",
       "oneOf": [
         {
-          "additionalProperties": false,
           "description": "Copy items into a folder. Symlinks are copied as symlinks.",
+          "type": "object",
           "properties": {
             "conflict": {
+              "description": "What to do when a name already exists in the destination.",
               "$ref": "#/$defs/ConflictPolicy",
-              "default": "skip",
-              "description": "What to do when a name already exists in the destination."
+              "default": "skip"
             },
             "destination": {
               "type": "string"
             },
             "op": {
-              "const": "copy",
-              "type": "string"
+              "type": "string",
+              "const": "copy"
             },
             "sources": {
+              "type": "array",
               "items": {
                 "type": "string"
-              },
-              "type": "array"
+              }
             },
             "verify": {
-              "default": false,
               "description": "Re-read and compare every copy.",
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "sources",
             "destination"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Move items into a folder (a rename on the same filesystem, copy + verify + remove across filesystems).",
+          "type": "object",
           "properties": {
             "conflict": {
               "$ref": "#/$defs/ConflictPolicy",
@@ -215,254 +310,255 @@
               "type": "string"
             },
             "op": {
-              "const": "move",
-              "type": "string"
+              "type": "string",
+              "const": "move"
             },
             "sources": {
+              "type": "array",
               "items": {
                 "type": "string"
-              },
-              "type": "array"
+              }
             },
             "verify": {
-              "default": false,
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "sources",
             "destination"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Rename one item inside its folder.",
+          "type": "object",
           "properties": {
             "new_name": {
               "description": "The new file name (a single name, no folder separators).",
               "type": "string"
             },
             "op": {
-              "const": "rename",
-              "type": "string"
+              "type": "string",
+              "const": "rename"
             },
             "path": {
               "type": "string"
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "path",
             "new_name"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Rename several items with a pattern such as `{name}_{n:3}.{ext}` or `s/old/new/`.",
+          "type": "object",
           "properties": {
             "counter_start": {
-              "default": null,
               "description": "First value of `{n}` (default 1).",
-              "format": "uint64",
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"
-              ]
+              ],
+              "format": "uint64",
+              "default": null,
+              "minimum": 0
             },
             "counter_step": {
-              "default": null,
               "description": "Increment of `{n}` (default 1).",
-              "format": "uint64",
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"
-              ]
+              ],
+              "format": "uint64",
+              "default": null,
+              "minimum": 0
             },
             "items": {
+              "type": "array",
               "items": {
                 "type": "string"
-              },
-              "type": "array"
+              }
             },
             "op": {
-              "const": "bulk_rename",
-              "type": "string"
+              "type": "string",
+              "const": "bulk_rename"
             },
             "pattern": {
               "type": "string"
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "items",
             "pattern"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Create a folder.",
+          "type": "object",
           "properties": {
             "name": {
               "type": "string"
             },
             "op": {
-              "const": "make_dir",
-              "type": "string"
+              "type": "string",
+              "const": "make_dir"
             },
             "parent": {
               "type": "string"
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "parent",
             "name"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Move items to the trash (recoverable).",
+          "type": "object",
           "properties": {
             "op": {
-              "const": "trash",
-              "type": "string"
+              "type": "string",
+              "const": "trash"
             },
             "sources": {
+              "type": "array",
               "items": {
                 "type": "string"
-              },
-              "type": "array"
+              }
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "sources"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Delete items permanently. Cannot be undone; the plan says so and asks for explicit confirmation.",
+          "type": "object",
           "properties": {
             "op": {
-              "const": "delete",
-              "type": "string"
+              "type": "string",
+              "const": "delete"
             },
             "sources": {
+              "type": "array",
               "items": {
                 "type": "string"
-              },
-              "type": "array"
+              }
             }
           },
+          "additionalProperties": false,
           "required": [
             "op",
             "sources"
-          ],
-          "type": "object"
+          ]
         },
         {
-          "additionalProperties": false,
           "description": "Undo a journal entry (the most recent undoable one when `entry` is omitted).",
+          "type": "object",
           "properties": {
             "entry": {
-              "default": null,
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "default": null
             },
             "op": {
-              "const": "undo",
-              "type": "string"
+              "type": "string",
+              "const": "undo"
             }
           },
+          "additionalProperties": false,
           "required": [
             "op"
-          ],
-          "type": "object"
+          ]
         }
       ]
     },
     "Severity": {
       "oneOf": [
         {
+          "type": "string",
           "enum": [
             "Info",
             "Warning"
-          ],
-          "type": "string"
+          ]
         },
         {
-          "const": "Blocking",
           "description": "The plan cannot be executed.",
-          "type": "string"
+          "type": "string",
+          "const": "Blocking"
         }
       ]
     },
     "Stamp": {
       "description": "A point in time that survives JSON round trips without precision loss.",
+      "type": "object",
       "properties": {
         "nanos": {
+          "type": "integer",
           "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "secs": {
-          "format": "int64",
-          "type": "integer"
+          "type": "integer",
+          "format": "int64"
         }
       },
       "required": [
         "secs",
         "nanos"
-      ],
-      "type": "object"
+      ]
     },
     "Step": {
       "description": "One atomic action. The whole engine (planning, execution, journal, undo) speaks\nonly this vocabulary, which is what makes \"every operation is undoable\" tractable:\neach step knows its own inverse (see [`Step::inverse`]).",
       "oneOf": [
         {
+          "type": "object",
           "properties": {
             "mode": {
-              "format": "uint32",
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"
-              ]
+              ],
+              "format": "uint32",
+              "minimum": 0
             },
             "path": {
               "type": "string"
             },
             "step": {
-              "const": "make_dir",
-              "type": "string"
+              "type": "string",
+              "const": "make_dir"
             }
           },
           "required": [
             "step",
             "path"
-          ],
-          "type": "object"
+          ]
         },
         {
           "description": "Apply the final permissions/time of a directory created earlier in the same run\n(after its children exist, so a read-only source dir stays writable meanwhile).",
+          "type": "object",
           "properties": {
             "mode": {
-              "format": "uint32",
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"
-              ]
+              ],
+              "format": "uint32",
+              "minimum": 0
             },
             "mtime": {
               "anyOf": [
@@ -478,17 +574,17 @@
               "type": "string"
             },
             "step": {
-              "const": "finish_dir",
-              "type": "string"
+              "type": "string",
+              "const": "finish_dir"
             }
           },
           "required": [
             "step",
             "path"
-          ],
-          "type": "object"
+          ]
         },
         {
+          "type": "object",
           "properties": {
             "atime": {
               "anyOf": [
@@ -504,12 +600,12 @@
               "type": "string"
             },
             "mode": {
-              "format": "uint32",
-              "minimum": 0,
               "type": [
                 "integer",
                 "null"
-              ]
+              ],
+              "format": "uint32",
+              "minimum": 0
             },
             "mtime": {
               "anyOf": [
@@ -526,16 +622,16 @@
               "type": "boolean"
             },
             "size": {
+              "type": "integer",
               "format": "uint64",
-              "minimum": 0,
-              "type": "integer"
+              "minimum": 0
             },
             "src": {
               "type": "string"
             },
             "step": {
-              "const": "copy_file",
-              "type": "string"
+              "type": "string",
+              "const": "copy_file"
             },
             "verify": {
               "description": "Re-read and compare the copy.",
@@ -549,10 +645,10 @@
             "size",
             "verify",
             "remove_source"
-          ],
-          "type": "object"
+          ]
         },
         {
+          "type": "object",
           "properties": {
             "dst": {
               "type": "string"
@@ -564,8 +660,8 @@
               "type": "string"
             },
             "step": {
-              "const": "copy_symlink",
-              "type": "string"
+              "type": "string",
+              "const": "copy_symlink"
             },
             "target": {
               "type": "string"
@@ -577,17 +673,17 @@
             "dst",
             "target",
             "remove_source"
-          ],
-          "type": "object"
+          ]
         },
         {
+          "type": "object",
           "properties": {
             "from": {
               "type": "string"
             },
             "step": {
-              "const": "rename",
-              "type": "string"
+              "type": "string",
+              "const": "rename"
             },
             "to": {
               "type": "string"
@@ -597,27 +693,27 @@
             "step",
             "from",
             "to"
-          ],
-          "type": "object"
+          ]
         },
         {
+          "type": "object",
           "properties": {
             "path": {
               "type": "string"
             },
             "step": {
-              "const": "trash_item",
-              "type": "string"
+              "type": "string",
+              "const": "trash_item"
             }
           },
           "required": [
             "step",
             "path"
-          ],
-          "type": "object"
+          ]
         },
         {
           "description": "Permanent removal of a file or symlink. With `expect`, refuses to remove a\nfile that changed since it was recorded (used by undo).",
+          "type": "object",
           "properties": {
             "expect": {
               "anyOf": [
@@ -633,78 +729,78 @@
               "type": "string"
             },
             "step": {
-              "const": "remove_file",
-              "type": "string"
+              "type": "string",
+              "const": "remove_file"
             }
           },
           "required": [
             "step",
             "path"
-          ],
-          "type": "object"
+          ]
         },
         {
           "description": "Removal of an *empty* directory.",
+          "type": "object",
           "properties": {
             "path": {
               "type": "string"
             },
             "step": {
-              "const": "remove_dir",
-              "type": "string"
+              "type": "string",
+              "const": "remove_dir"
             }
           },
           "required": [
             "step",
             "path"
-          ],
-          "type": "object"
+          ]
         },
         {
+          "type": "object",
           "properties": {
             "item": {
               "$ref": "#/$defs/TrashedItem"
             },
             "step": {
-              "const": "restore",
-              "type": "string"
+              "type": "string",
+              "const": "restore"
             }
           },
           "required": [
             "step",
             "item"
-          ],
-          "type": "object"
+          ]
         }
       ]
     },
     "Totals": {
+      "type": "object",
       "properties": {
         "bytes": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "dirs": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "files": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "items": {
           "description": "Top-level items the user selected.",
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "symlinks": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         }
       },
       "required": [
@@ -713,18 +809,18 @@
         "dirs",
         "symlinks",
         "bytes"
-      ],
-      "type": "object"
+      ]
     },
     "TrashHandle": {
       "description": "Where a trashed item lives, in a backend-specific way.",
       "oneOf": [
         {
           "description": "freedesktop.org Trash specification: the stored file and its `.trashinfo`.",
+          "type": "object",
           "properties": {
             "backend": {
-              "const": "freedesktop",
-              "type": "string"
+              "type": "string",
+              "const": "freedesktop"
             },
             "info": {
               "type": "string"
@@ -737,15 +833,15 @@
             "backend",
             "stored",
             "info"
-          ],
-          "type": "object"
+          ]
         },
         {
           "description": "Windows Recycle Bin / macOS: an opaque identifier owned by the backend.",
+          "type": "object",
           "properties": {
             "backend": {
-              "const": "opaque",
-              "type": "string"
+              "type": "string",
+              "const": "opaque"
             },
             "id": {
               "type": "string"
@@ -754,12 +850,12 @@
           "required": [
             "backend",
             "id"
-          ],
-          "type": "object"
+          ]
         }
       ]
     },
     "TrashedItem": {
+      "type": "object",
       "properties": {
         "handle": {
           "$ref": "#/$defs/TrashHandle"
@@ -771,22 +867,22 @@
       "required": [
         "original",
         "handle"
-      ],
-      "type": "object"
+      ]
     },
     "Warning": {
+      "type": "object",
       "properties": {
         "count": {
+          "type": "integer",
           "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "examples": {
           "description": "A few representative paths (never all of them: plans can be huge).",
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         },
         "kind": {
           "$ref": "#/$defs/WarningKind"
@@ -804,12 +900,12 @@
         "message",
         "count",
         "examples"
-      ],
-      "type": "object"
+      ]
     },
     "WarningKind": {
       "oneOf": [
         {
+          "type": "string",
           "enum": [
             "Irreversible",
             "InsideItself",
@@ -830,115 +926,19 @@
             "Missing",
             "Merge",
             "Other"
-          ],
-          "type": "string"
+          ]
         },
         {
-          "const": "ModifiedSince",
           "description": "An undo step was refused because the item changed since the operation.",
-          "type": "string"
+          "type": "string",
+          "const": "ModifiedSince"
         },
         {
-          "const": "CannotUndo",
           "description": "An undo step cannot be carried out (target occupied, source gone, ...).",
-          "type": "string"
+          "type": "string",
+          "const": "CannotUndo"
         }
       ]
     }
-  },
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "properties": {
-    "destination": {
-      "default": null,
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "items": {
-      "description": "One entry per selected item, for a readable overview.",
-      "items": {
-        "$ref": "#/$defs/ItemSummary"
-      },
-      "type": "array"
-    },
-    "kind": {
-      "$ref": "#/$defs/OpKind"
-    },
-    "policy": {
-      "$ref": "#/$defs/ConflictPolicy"
-    },
-    "redo_of": {
-      "default": null,
-      "description": "Set when this plan re-does an operation that was undone.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "renames": {
-      "description": "Old name -> new name, for rename previews.",
-      "items": {
-        "maxItems": 2,
-        "minItems": 2,
-        "prefixItems": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "string"
-          }
-        ],
-        "type": "array"
-      },
-      "type": "array"
-    },
-    "request": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/OpRequest"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "The request this plan answers, kept in the journal so the operation can be\nplanned again later (redo)."
-    },
-    "reversible": {
-      "description": "False for permanent deletion: the journal records it but cannot undo it.",
-      "type": "boolean"
-    },
-    "steps": {
-      "items": {
-        "$ref": "#/$defs/Step"
-      },
-      "type": "array"
-    },
-    "title": {
-      "type": "string"
-    },
-    "totals": {
-      "$ref": "#/$defs/Totals"
-    },
-    "warnings": {
-      "items": {
-        "$ref": "#/$defs/Warning"
-      },
-      "type": "array"
-    }
-  },
-  "required": [
-    "kind",
-    "title",
-    "steps",
-    "totals",
-    "warnings",
-    "policy",
-    "reversible",
-    "renames",
-    "items"
-  ],
-  "title": "Plan",
-  "type": "object"
+  }
 }

@@ -266,6 +266,9 @@ pub struct Config {
     pub keymap: Keymap,
     /// Mouse capture on/off (`mouse = false` in the configuration).
     pub mouse: bool,
+    /// An operation handed in as data (`--request`): planned at start and shown in the
+    /// usual confirmation window.
+    pub request: Option<vela_core::ops::OpRequest>,
 }
 
 /// Developer hook: put the interface in a ready-made state (for screenshots).
@@ -404,6 +407,10 @@ impl App {
         app.svc.places.visit(cfg.start_dir.clone());
         app.svc.watcher.watch(cfg.start_dir.clone());
         app.request_dir(cfg.start_dir);
+        if let Some(req) = cfg.request {
+            let h = app.svc.jobs.plan_request(req);
+            app.begin_plan("Planning", h);
+        }
         app
     }
 

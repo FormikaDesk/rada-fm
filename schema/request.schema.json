@@ -1,67 +1,46 @@
 {
-  "$defs": {
-    "ConflictPolicy": {
-      "description": "How to resolve a destination that already exists.",
-      "oneOf": [
-        {
-          "const": "skip",
-          "description": "Leave existing items alone, do not copy the clashing source.",
-          "type": "string"
-        },
-        {
-          "const": "keep_both",
-          "description": "Copy under a new name (`name (1).ext`).",
-          "type": "string"
-        },
-        {
-          "const": "overwrite",
-          "description": "Replace; the old item is moved to the trash first so that undo can bring it back.",
-          "type": "string"
-        }
-      ]
-    }
-  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpRequest",
   "description": "A request to do something to files. All paths must be absolute.",
   "oneOf": [
     {
-      "additionalProperties": false,
       "description": "Copy items into a folder. Symlinks are copied as symlinks.",
+      "type": "object",
       "properties": {
         "conflict": {
+          "description": "What to do when a name already exists in the destination.",
           "$ref": "#/$defs/ConflictPolicy",
-          "default": "skip",
-          "description": "What to do when a name already exists in the destination."
+          "default": "skip"
         },
         "destination": {
           "type": "string"
         },
         "op": {
-          "const": "copy",
-          "type": "string"
+          "type": "string",
+          "const": "copy"
         },
         "sources": {
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         },
         "verify": {
-          "default": false,
           "description": "Re-read and compare every copy.",
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "sources",
         "destination"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Move items into a folder (a rename on the same filesystem, copy + verify + remove across filesystems).",
+      "type": "object",
       "properties": {
         "conflict": {
           "$ref": "#/$defs/ConflictPolicy",
@@ -71,180 +50,201 @@
           "type": "string"
         },
         "op": {
-          "const": "move",
-          "type": "string"
+          "type": "string",
+          "const": "move"
         },
         "sources": {
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         },
         "verify": {
-          "default": false,
-          "type": "boolean"
+          "type": "boolean",
+          "default": false
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "sources",
         "destination"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Rename one item inside its folder.",
+      "type": "object",
       "properties": {
         "new_name": {
           "description": "The new file name (a single name, no folder separators).",
           "type": "string"
         },
         "op": {
-          "const": "rename",
-          "type": "string"
+          "type": "string",
+          "const": "rename"
         },
         "path": {
           "type": "string"
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "path",
         "new_name"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Rename several items with a pattern such as `{name}_{n:3}.{ext}` or `s/old/new/`.",
+      "type": "object",
       "properties": {
         "counter_start": {
-          "default": null,
           "description": "First value of `{n}` (default 1).",
-          "format": "uint64",
-          "minimum": 0,
           "type": [
             "integer",
             "null"
-          ]
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
         },
         "counter_step": {
-          "default": null,
           "description": "Increment of `{n}` (default 1).",
-          "format": "uint64",
-          "minimum": 0,
           "type": [
             "integer",
             "null"
-          ]
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
         },
         "items": {
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         },
         "op": {
-          "const": "bulk_rename",
-          "type": "string"
+          "type": "string",
+          "const": "bulk_rename"
         },
         "pattern": {
           "type": "string"
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "items",
         "pattern"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Create a folder.",
+      "type": "object",
       "properties": {
         "name": {
           "type": "string"
         },
         "op": {
-          "const": "make_dir",
-          "type": "string"
+          "type": "string",
+          "const": "make_dir"
         },
         "parent": {
           "type": "string"
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "parent",
         "name"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Move items to the trash (recoverable).",
+      "type": "object",
       "properties": {
         "op": {
-          "const": "trash",
-          "type": "string"
+          "type": "string",
+          "const": "trash"
         },
         "sources": {
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "sources"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Delete items permanently. Cannot be undone; the plan says so and asks for explicit confirmation.",
+      "type": "object",
       "properties": {
         "op": {
-          "const": "delete",
-          "type": "string"
+          "type": "string",
+          "const": "delete"
         },
         "sources": {
+          "type": "array",
           "items": {
             "type": "string"
-          },
-          "type": "array"
+          }
         }
       },
+      "additionalProperties": false,
       "required": [
         "op",
         "sources"
-      ],
-      "type": "object"
+      ]
     },
     {
-      "additionalProperties": false,
       "description": "Undo a journal entry (the most recent undoable one when `entry` is omitted).",
+      "type": "object",
       "properties": {
         "entry": {
-          "default": null,
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "default": null
         },
         "op": {
-          "const": "undo",
-          "type": "string"
+          "type": "string",
+          "const": "undo"
         }
       },
+      "additionalProperties": false,
       "required": [
         "op"
-      ],
-      "type": "object"
+      ]
     }
   ],
-  "title": "OpRequest"
+  "$defs": {
+    "ConflictPolicy": {
+      "description": "How to resolve a destination that already exists.",
+      "oneOf": [
+        {
+          "description": "Leave existing items alone, do not copy the clashing source.",
+          "type": "string",
+          "const": "skip"
+        },
+        {
+          "description": "Copy under a new name (`name (1).ext`).",
+          "type": "string",
+          "const": "keep_both"
+        },
+        {
+          "description": "Replace; the old item is moved to the trash first so that undo can bring it back.",
+          "type": "string",
+          "const": "overwrite"
+        }
+      ]
+    }
+  }
 }

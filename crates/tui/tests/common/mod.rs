@@ -42,6 +42,37 @@ impl H {
         images: Option<vela_tui::ImageUi>,
         limits: vela_core::preview::Limits,
     ) -> H {
+        H::build(sb, start, w, h, images, limits, None)
+    }
+
+    /// An operation handed in as data, as `vela --request` does.
+    pub fn with_request(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        req: vela_core::ops::OpRequest,
+    ) -> H {
+        H::build(
+            sb,
+            start,
+            w,
+            h,
+            Some(vela_tui::ImageUi::halfblocks()),
+            Default::default(),
+            Some(req),
+        )
+    }
+
+    fn build(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        images: Option<vela_tui::ImageUi>,
+        limits: vela_core::preview::Limits,
+        request: Option<vela_core::ops::OpRequest>,
+    ) -> H {
         let svc = Services::start(Arc::new(LocalFs), sb.platform(), Some(sb.journal()));
         let cfg = Config {
             start_dir: start,
@@ -55,6 +86,7 @@ impl H {
             bookmarks: Vec::new(),
             demo: None,
             keymap: Default::default(),
+            request,
             mouse: true,
         };
         let app = App::new(cfg, svc, images);

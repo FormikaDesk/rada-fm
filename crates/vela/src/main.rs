@@ -49,6 +49,15 @@ struct Cli {
     #[arg(long, value_name = "PRESET")]
     keymap: Option<String>,
 
+    /// Plan an operation given as JSON (a file, or `-` for stdin) and show it in the usual
+    /// confirmation window. See `vela --schema request`.
+    #[arg(long, value_name = "FILE")]
+    request: Option<String>,
+
+    /// Print the JSON Schema of `request` (what `--request` accepts) or `plan`, then quit.
+    #[arg(long, value_name = "WHAT", value_parser = ["request", "plan"])]
+    schema: Option<String>,
+
     /// Show hidden files at startup.
     #[arg(long)]
     hidden: bool,
@@ -69,6 +78,32 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    if let Some(what) = &cli.schema {
+        print!(
+            "{}",
+            if what == "plan" {
+                vela_core::schema::plan()
+            } else {
+                vela_core::schema::request()
+            }
+        );
+        return Ok(());
+    }
+    let request = match &cli.request {
+        Some(src) => {
+            let text = if src == "-" {
+                std::io::read_to_string(std::io::stdin())
+                    .context("cannot read the request from stdin")?
+            } else {
+                std::fs::read_to_string(src).with_context(|| format!("cannot read {src}"))?
+            };
+            let req: vela_core::ops::OpRequest = serde_json::from_str(&text)
+                .context("the request is not valid (see `vela --schema request`)")?;
+            req.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
+            Some(req)
+        }
+        None => None,
+    };
     let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
@@ -178,6 +213,7 @@ fn main() -> Result<()> {
         image_mode,
         keymap,
         mouse,
+        request,
         select,
         limits: vela_core::preview::Limits {
             image: cfg_file.image_limits.clone(),

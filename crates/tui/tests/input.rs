@@ -641,3 +641,79 @@ fn help_shows_both_schemes_side_by_side_and_scrolls() {
     assert!(end.contains("Shift+drag selects text"), "{end}");
     assert!(end.contains("never quits"), "{end}");
 }
+
+// ---------------------------------------------------------------------------------- requests as data
+
+#[test]
+fn a_request_given_as_data_goes_through_the_same_plan_window_and_journal() {
+    use vela_core::ops::OpRequest;
+    let (sb, dir) = files();
+    let dest = sb.mkdir("dest");
+    let req: OpRequest = serde_json::from_str(&format!(
+        r#"{{"op":"copy","sources":[{:?}],"destination":{:?}}}"#,
+        dir.join("a.txt").to_string_lossy(),
+        dest.to_string_lossy()
+    ))
+    .unwrap();
+    let mut h = H::with_request(sb, dir, 120, 30, req);
+    plan_modal(&mut h);
+    let s = h.screen();
+    assert!(s.contains("Copy 1 item"), "{s}");
+    assert!(
+        !dest.join("a.txt").exists(),
+        "the plan is shown first, nothing happened yet"
+    );
+    run_plan_and_wait(&mut h);
+    assert!(dest.join("a.txt").exists());
+    // It is in the journal like any other operation, so it can be undone.
+    h.press("u");
+    plan_modal(&mut h);
+    assert!(h.screen().contains("Undo: Copy"));
+    run_plan_and_wait(&mut h);
+    assert!(!dest.join("a.txt").exists());
+}
+
+#[test]
+fn a_destructive_request_still_needs_the_typed_confirmation() {
+    use vela_core::ops::OpRequest;
+    let (sb, dir) = files();
+    let victim = dir.join("a.txt");
+    let mut h = H::with_request(
+        sb,
+        dir,
+        120,
+        30,
+        OpRequest::Delete {
+            sources: vec![victim.clone()],
+        },
+    );
+    plan_modal(&mut h);
+    h.press("enter");
+    assert!(victim.exists(), "Enter alone does not delete");
+    h.keys("yes");
+    h.press("enter");
+    h.wait("done", |a| {
+        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+    });
+    assert!(!victim.exists());
+}
+
+#[test]
+fn a_bad_request_is_reported_and_the_browser_still_works() {
+    use vela_core::ops::OpRequest;
+    let (sb, dir) = files();
+    let mut h = H::with_request(
+        sb,
+        dir,
+        120,
+        30,
+        OpRequest::Trash {
+            sources: vec!["relative/path".into()],
+        },
+    );
+    h.wait("an error", |a| a.toast.is_some());
+    assert!(h.app.toast.as_ref().unwrap().text.contains("absolute"));
+    assert!(h.app.modal.is_none());
+    h.keys("j");
+    assert_eq!(h.cursor_name(), "a.txt");
+}

@@ -4,15 +4,11 @@
 
 use std::path::PathBuf;
 
-use schemars::schema_for;
-use vela_core::ops::{OpRequest, Plan};
-
 fn dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema")
 }
 
-fn check(name: &str, generated: serde_json::Value) {
-    let text = serde_json::to_string_pretty(&generated).unwrap() + "\n";
+fn check(name: &str, text: String) {
     let file = dir().join(name);
     if std::env::var_os("VELA_UPDATE_SCHEMA").is_some() {
         std::fs::create_dir_all(dir()).unwrap();
@@ -33,24 +29,17 @@ fn check(name: &str, generated: serde_json::Value) {
 
 #[test]
 fn the_plan_schema_is_up_to_date() {
-    check(
-        "plan.schema.json",
-        serde_json::to_value(schema_for!(Plan)).unwrap(),
-    );
+    check("plan.schema.json", vela_core::schema::plan());
 }
 
 #[test]
 fn the_request_schema_is_up_to_date() {
-    check(
-        "request.schema.json",
-        serde_json::to_value(schema_for!(OpRequest)).unwrap(),
-    );
+    check("request.schema.json", vela_core::schema::request());
 }
 
 #[test]
 fn the_request_schema_describes_every_operation() {
-    let v = serde_json::to_value(schema_for!(OpRequest)).unwrap();
-    let text = v.to_string();
+    let text = vela_core::schema::request();
     for op in [
         "copy",
         "move",
