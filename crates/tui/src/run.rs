@@ -4,7 +4,7 @@ use std::io::{self, Stdout};
 use std::time::Duration;
 
 use crossbeam_channel::{select, unbounded};
-use crossterm::event::{self, Event};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -19,16 +19,45 @@ use crate::ui;
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
-fn enter() -> io::Result<Term> {
+fn enter(mouse: bool) -> io::Result<Term> {
+    // Raw mode: Ctrl+C, Ctrl+Z, Ctrl+Q and Ctrl+S reach the program as ordinary keys
+    // instead of signals or flow control.
     enable_raw_mode()?;
     let mut out = io::stdout();
     execute!(out, EnterAlternateScreen)?;
+    if mouse {
+        execute!(out, EnableMouseCapture)?;
+    }
     Terminal::new(CrosstermBackend::new(out))
 }
 
 fn leave() {
+    let _ = execute!(io::stdout(), DisableMouseCapture);
     let _ = disable_raw_mode();
     let _ = execute!(io::stdout(), LeaveAlternateScreen);
+}
+
+/// Termination requests from outside (`kill`, closing the terminal) end the program
+/// the orderly way: the running operation is cancelled, the terminal is restored.
+/// `SIGINT` is deliberately absorbed: nothing a stray signal does should stop a copy.
+#[cfg(unix)]
+fn shutdown_flag() -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+    let flag = Arc::new(AtomicBool::new(false));
+    for sig in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGHUP] {
+        if let Err(e) = signal_hook::flag::register(sig, flag.clone()) {
+            tracing::warn!("cannot watch signal {sig}: {e}");
+        }
+    }
+    let ignored = Arc::new(AtomicBool::new(false));
+    let _ = signal_hook::flag::register(signal_hook::consts::SIGINT, ignored);
+    flag
+}
+
+#[cfg(not(unix))]
+fn shutdown_flag() -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false))
 }
 
 /// What the caller wants to know after the UI closes.
@@ -46,7 +75,8 @@ pub fn run(cfg: Config, svc: Services) -> io::Result<Outcome> {
         default_hook(info);
     }));
 
-    let mut terminal = enter()?;
+    let mouse = cfg.mouse;
+    let mut terminal = enter(mouse)?;
     let result = event_loop(&mut terminal, cfg, svc);
     leave();
     let _ = std::panic::take_hook();
@@ -79,7 +109,11 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
         )),
         ImageMode::Off => None,
     };
+    if let Some(u) = &image_ui {
+        tracing::debug!("image protocol in use: {}", u.protocol_name());
+    }
     let mut app = App::new(cfg, svc, image_ui);
+    let shutdown = shutdown_flag();
     let core_rx = app.events();
     let resize_rx = app
         .image_ui
@@ -106,6 +140,9 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
         if app.dirty {
             terminal.draw(|f| ui::draw(f, &mut app))?;
             app.dirty = false;
+        }
+        if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
+            app.shutdown();
         }
         if app.should_quit {
             break;
@@ -143,6 +180,7 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
 fn handle_input(app: &mut App, ev: Event) {
     match ev {
         Event::Key(k) => app.on_key(k),
+        Event::Mouse(m) => app.on_mouse(m),
         Event::Resize(_, _) => app.dirty = true,
         _ => {}
     }

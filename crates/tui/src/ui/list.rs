@@ -13,9 +13,10 @@ use vela_core::fs::FileKind;
 use vela_core::model::{Entry, SortKey};
 use vela_core::ops::LinkState;
 
-use super::widgets::{SPIN, badge, bar_spans, pad_left};
+use super::widgets::{SPIN, badge, bar_spans, hit_spans, pad_left};
 use crate::app::App;
 use crate::fmt;
+use crate::hits::Target;
 use crate::icons::{self, Category};
 use crate::theme::Density;
 
@@ -95,7 +96,9 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let gap = " ".repeat(cols.gap);
     let mut head: Vec<Span> = vec![Span::raw(" ".repeat(2 + cols.icon))];
+    let mut head_hits: Vec<(usize, Target)> = Vec::new();
     let (t, st) = label("Name", SortKey::Name);
+    head_hits.push((head.len(), Target::SortBy(SortKey::Name)));
     head.push(Span::styled(super::widgets::pad(&t, cols.name), st));
     if cols.bar > 0 {
         head.push(Span::raw(gap.clone()));
@@ -108,6 +111,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
             gap.clone()
         }));
         let (t, st) = label("Size", SortKey::Size);
+        head_hits.push((head.len(), Target::SortBy(SortKey::Size)));
         head.push(Span::styled(pad_left(&t, cols.size), st));
     }
     if cols.kind > 0 {
@@ -120,11 +124,13 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     if cols.modified > 0 {
         head.push(Span::raw(gap.clone()));
         let (t, st) = label("Modified", SortKey::Modified);
+        head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
         head.push(Span::styled(pad_left(&t, cols.modified), st));
     }
     if area.height < 3 {
         return;
     }
+    hit_spans(&mut app.hits, area.x, area.y, &head, &head_hits);
     f.render_widget(Paragraph::new(Line::from(head)), Rect { height: 1, ..area });
     f.render_widget(
         Paragraph::new(Span::styled("─".repeat(area.width as usize), th.faint())),
@@ -144,6 +150,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     if body.height == 0 {
         return;
     }
+    app.hits.add(body, Target::List);
 
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
@@ -191,6 +198,16 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         ));
     }
     f.render_widget(Paragraph::new(lines), body);
+    for vis in app.scroll..(app.scroll + rows).min(count) {
+        app.hits.add(
+            Rect {
+                y: body.y + (vis - app.scroll) as u16,
+                height: 1,
+                ..body
+            },
+            Target::Row(vis),
+        );
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

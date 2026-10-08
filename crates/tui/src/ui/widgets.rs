@@ -6,6 +6,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
 use unicode_width::UnicodeWidthStr;
 
+use crate::hits::{Hits, Target};
 use crate::theme::{BadgeStyle, BarStyle, ColorDepth, Theme};
 
 pub const SPIN: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -244,5 +245,26 @@ pub fn button<'a>(
             }
             Span::styled(text, st)
         }
+    }
+}
+
+/// Register the clickable spans of one rendered line. `targets` pairs a span index with
+/// what a click on it does; the x positions come from the widths of the spans before it.
+pub fn hit_spans(hits: &mut Hits, x: u16, y: u16, spans: &[Span], targets: &[(usize, Target)]) {
+    let mut cx = x;
+    for (i, s) in spans.iter().enumerate() {
+        let w = s.content.width() as u16;
+        if let Some((_, t)) = targets.iter().find(|(idx, _)| *idx == i) {
+            hits.add(
+                Rect {
+                    x: cx,
+                    y,
+                    width: w,
+                    height: 1,
+                },
+                t.clone(),
+            );
+        }
+        cx = cx.saturating_add(w);
     }
 }

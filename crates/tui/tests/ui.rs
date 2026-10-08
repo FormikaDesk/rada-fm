@@ -1,159 +1,17 @@
 //! The interface, driven headlessly: real workers, real (sandboxed) filesystem, a virtual
 //! terminal. Keys go in, the screen and the disk are inspected.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+mod common;
+
+use std::path::Path;
 use std::time::{Duration, Instant};
 
+use common::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use vela_core::fs::LocalFs;
-use vela_core::model::SortSpec;
 use vela_core::testutil::*;
-use vela_tui::app::{App, Config, Modal};
-use vela_tui::{IconSet, Services, Theme, ui};
-
-struct H {
-    app: App,
-    term: Terminal<TestBackend>,
-    _sb: Sandbox,
-}
-
-impl H {
-    fn new(sb: Sandbox, start: PathBuf, w: u16, h: u16) -> H {
-        H::with_images(
-            sb,
-            start,
-            w,
-            h,
-            Some(vela_tui::ImageUi::halfblocks()),
-            Default::default(),
-        )
-    }
-
-    fn with_images(
-        sb: Sandbox,
-        start: PathBuf,
-        w: u16,
-        h: u16,
-        images: Option<vela_tui::ImageUi>,
-        limits: vela_core::preview::Limits,
-    ) -> H {
-        let svc = Services::start(Arc::new(LocalFs), sb.platform(), Some(sb.journal()));
-        let cfg = Config {
-            start_dir: start,
-            icons: IconSet::Unicode,
-            show_hidden: false,
-            sort: SortSpec::default(),
-            theme: Theme::vela(),
-            image_mode: vela_tui::ImageMode::Halfblocks,
-            limits,
-            select: None,
-            bookmarks: Vec::new(),
-            demo: None,
-        };
-        let app = App::new(cfg, svc, images);
-        let mut h = H {
-            app,
-            term: Terminal::new(TestBackend::new(w, h)).unwrap(),
-            _sb: sb,
-        };
-        h.settle();
-        h
-    }
-
-    /// Process worker events until `done` holds (or fail after a few seconds).
-    fn wait(&mut self, what: &str, mut done: impl FnMut(&App) -> bool) {
-        let rx = self.app.events();
-        let resized = self.app.image_ui.as_ref().map(|u| u.results());
-        let end = Instant::now() + Duration::from_secs(8);
-        while !done(&self.app) {
-            assert!(
-                Instant::now() < end,
-                "timed out waiting for: {what}\n{}",
-                self.screen()
-            );
-            if let Ok(ev) = rx.recv_timeout(Duration::from_millis(20)) {
-                self.app.on_core_event(ev);
-            }
-            // The picture is resized and encoded by its own thread once it has been drawn.
-            if let Some(r) = &resized {
-                while let Ok(done) = r.try_recv() {
-                    self.app.on_image_resized(done);
-                }
-            }
-            self.app.tick();
-            let _ = self.screen(); // drawing is what asks for the resize
-        }
-    }
-
-    /// Let workers and the encoder thread deliver for a moment, drawing as the real loop does.
-    fn pump(&mut self, ms: u64) {
-        let rx = self.app.events();
-        let resized = self.app.image_ui.as_ref().map(|u| u.results());
-        let end = Instant::now() + Duration::from_millis(ms);
-        while Instant::now() < end {
-            if let Ok(ev) = rx.recv_timeout(Duration::from_millis(10)) {
-                self.app.on_core_event(ev);
-            }
-            if let Some(r) = &resized {
-                while let Ok(done) = r.try_recv() {
-                    self.app.on_image_resized(done);
-                }
-            }
-            let _ = self.screen();
-        }
-    }
-
-    fn settle(&mut self) {
-        self.wait("initial load", |a| !a.is_loading());
-    }
-
-    fn key(&mut self, c: KeyCode) {
-        self.app.on_key(KeyEvent::new(c, KeyModifiers::NONE));
-    }
-
-    fn keys(&mut self, s: &str) {
-        for c in s.chars() {
-            self.key(KeyCode::Char(c));
-        }
-    }
-
-    fn screen(&mut self) -> String {
-        self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
-        let buf = self.term.backend().buffer().clone();
-        let mut out = String::new();
-        for y in 0..buf.area.height {
-            for x in 0..buf.area.width {
-                out.push_str(buf[(x, y)].symbol());
-            }
-            out.push('\n');
-        }
-        out
-    }
-
-    fn names(&self) -> Vec<String> {
-        (0..self.app.visible.len())
-            .filter_map(|i| self.app.entry_at(i))
-            .map(|e| e.display.clone())
-            .collect()
-    }
-
-    fn modal_is_plan(&self) -> bool {
-        matches!(self.app.modal, Some(Modal::Plan(_)))
-    }
-}
-
-fn sandbox_with_files() -> (Sandbox, PathBuf) {
-    let sb = Sandbox::new();
-    sb.write("proj.v1/b.txt", "bee\nsecond line");
-    sb.write("proj.v1/a.txt", "ay");
-    sb.write("proj.v1/.hidden", "h");
-    sb.write("proj.v1/sub/inner.txt", "inner");
-    let dir = sb.path("proj.v1");
-    (sb, dir)
-}
+use vela_tui::app::Modal;
 
 #[test]
 fn lists_sorted_hides_dotfiles_and_previews_the_selection() {
@@ -259,18 +117,6 @@ fn a_file_created_from_outside_appears_without_pressing_anything() {
     });
 }
 
-fn run_plan_and_wait(h: &mut H) {
-    assert!(h.modal_is_plan(), "{}", h.screen());
-    h.key(KeyCode::Enter);
-    h.wait("operation to finish", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
-    });
-}
-
-fn plan_modal(h: &mut H) {
-    h.wait("a plan window", |a| matches!(a.modal, Some(Modal::Plan(_))));
-}
-
 #[test]
 fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     let (sb, dir) = sandbox_with_files();
@@ -303,7 +149,9 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     run_plan_and_wait(&mut h);
     assert_eq!(std::fs::read_to_string(dest.join("a.txt")).unwrap(), "ay");
     h.wait("toast", |a| a.toast.is_some());
-    assert!(h.screen().contains("done"));
+    let toast = h.app.toast.as_ref().unwrap().text.clone();
+    assert_eq!(toast, "Copied 1 file — press u to undo");
+    assert!(h.screen().contains("Copied 1 file"));
 
     h.keys("u");
     plan_modal(&mut h);

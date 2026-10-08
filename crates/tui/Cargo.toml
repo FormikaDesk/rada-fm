@@ -23,3 +23,6 @@ image = { version = "0.25", default-features = false }
 
 [dev-dependencies]
 vela-core = { path = "../core", features = ["testutil"] }
+
+[target."cfg(unix)".dependencies]
+signal-hook = "0.4.5"

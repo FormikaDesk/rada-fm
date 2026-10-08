@@ -10,7 +10,15 @@
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
 //! image_max_file_mb = 128
+//! mouse = true                # false: no mouse capture at all
+//! keymap = "vim+classic"      # vim+classic (default) | vim | classic
+//!
+//! [keys]                      # per action: replaces all its keys; [] unbinds
+//! copy = ["y", "ctrl+c"]
+//! quit = ["q", "ctrl+q"]
 //! ```
+
+use std::collections::HashMap;
 
 use serde::Deserialize;
 use vela_core::model::{SortKey, SortSpec};
@@ -26,6 +34,17 @@ pub struct FileConfig {
     pub theme: Option<String>,
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
+    pub mouse: bool,
+    pub keymap: Option<String>,
+    pub keys: HashMap<String, Vec<String>>,
+}
+
+/// A key list may be written as one string or as an array.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Keys {
+    One(String),
+    Many(Vec<String>),
 }
 
 #[derive(Deserialize, Default)]
@@ -39,6 +58,9 @@ struct Raw {
     bookmarks: Option<Vec<String>>,
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
+    mouse: Option<bool>,
+    keymap: Option<String>,
+    keys: Option<HashMap<String, Keys>>,
 }
 
 pub fn load(dirs: &Dirs) -> FileConfig {
@@ -66,6 +88,22 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         images: raw.images,
         theme: raw.theme,
         bookmarks: raw.bookmarks.unwrap_or_default(),
+        mouse: raw.mouse.unwrap_or(true),
+        keymap: raw.keymap,
+        keys: raw
+            .keys
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    k,
+                    match v {
+                        Keys::One(s) => vec![s],
+                        Keys::Many(v) => v,
+                    },
+                )
+            })
+            .collect(),
         image_limits: {
             let d = ImageLimits::default();
             ImageLimits {

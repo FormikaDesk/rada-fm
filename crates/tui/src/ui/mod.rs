@@ -22,8 +22,10 @@ use vela_core::display;
 
 use crate::app::*;
 use crate::fmt;
+use crate::hits::Target;
+use crate::keymap::Action;
 use crate::theme::Density;
-use widgets::{SPIN, dim_backdrop, pad, progress_spans};
+use widgets::{SPIN, dim_backdrop, hit_spans, pad, progress_spans};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -32,6 +34,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         return;
     }
     let th = app.th.clone();
+    app.hits.clear();
     if let Some(bg) = th.bg {
         f.render_widget(Block::default().style(Style::default().bg(bg)), area);
     }
@@ -82,6 +85,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             .map(|_| Line::from(Span::styled("│", th.faint())))
             .collect();
         f.render_widget(Paragraph::new(rule), divider);
+        app.hits.add(right, Target::Preview);
         preview::draw_preview(f, app, right);
     } else {
         list::draw_list(f, app, body);
@@ -109,33 +113,60 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_toast(f, app, area, footer);
 
     if app.modal.is_some() {
-        dim_backdrop(f.buffer_mut(), area);
+        // Only the window is clickable while it is open.
+        app.hits.clear();
+        if !matches!(app.modal, Some(Modal::Menu(_))) {
+            dim_backdrop(f.buffer_mut(), area);
+        }
         modals::draw_modal(f, app, area);
     }
 }
 
 // ----------------------------------------------------------------------------- header
 
-/// `~ › projects › vela`, the current folder in the accent colour.
-fn breadcrumb<'a>(app: &App, max: usize) -> Vec<Span<'a>> {
+/// `~ › projects › vela`, the current folder in the accent colour. Each segment comes
+/// with the folder it stands for, so a click can go there.
+fn breadcrumb<'a>(app: &App, max: usize) -> Vec<(Span<'a>, Option<std::path::PathBuf>)> {
     let th = &app.th;
     let home = app.home();
+    let mut acc: std::path::PathBuf;
     let (root, rest): (String, Vec<String>) = match app.cwd.strip_prefix(home) {
-        Ok(r) => (
-            "~".to_string(),
-            r.components()
-                .map(|c| display::name(c.as_os_str()))
-                .collect(),
-        ),
-        Err(_) => (
-            std::path::MAIN_SEPARATOR.to_string(),
-            app.cwd
-                .components()
-                .filter(|c| matches!(c, std::path::Component::Normal(_)))
-                .map(|c| display::name(c.as_os_str()))
-                .collect(),
-        ),
+        Ok(r) => {
+            acc = home.to_path_buf();
+            (
+                "~".to_string(),
+                r.components()
+                    .map(|c| display::name(c.as_os_str()))
+                    .collect(),
+            )
+        }
+        Err(_) => {
+            acc = std::path::PathBuf::from(std::path::MAIN_SEPARATOR_STR);
+            (
+                std::path::MAIN_SEPARATOR.to_string(),
+                app.cwd
+                    .components()
+                    .filter(|c| matches!(c, std::path::Component::Normal(_)))
+                    .map(|c| display::name(c.as_os_str()))
+                    .collect(),
+            )
+        }
     };
+    // The real path of every segment (names are shown lossy, paths are exact).
+    let mut paths = vec![acc.clone()];
+    let tail_components: Vec<std::ffi::OsString> = app
+        .cwd
+        .strip_prefix(&acc)
+        .map(|r| {
+            r.components()
+                .map(|c| c.as_os_str().to_os_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    for c in tail_components {
+        acc.push(c);
+        paths.push(acc.clone());
+    }
     let mut segs: Vec<String> = vec![root];
     segs.extend(rest);
     // Drop from the left until it fits.
@@ -148,36 +179,40 @@ fn breadcrumb<'a>(app: &App, max: usize) -> Vec<Span<'a>> {
     while start + 1 < segs.len() && width(&segs[start..], start > 0) > max {
         start += 1;
     }
-    let mut spans: Vec<Span> = Vec::new();
+    let mut spans: Vec<(Span, Option<std::path::PathBuf>)> = Vec::new();
     if start > 0 {
-        spans.push(Span::styled("…", th.faint()));
-        spans.push(Span::styled(" › ", th.faint()));
+        spans.push((Span::styled("…", th.faint()), None));
+        spans.push((Span::styled(" › ", th.faint()), None));
     }
     let last = segs.len() - 1;
     for (i, s) in segs.iter().enumerate().skip(start) {
         if i > start {
-            spans.push(Span::styled(" › ", th.faint()));
+            spans.push((Span::styled(" › ", th.faint()), None));
         }
         let text = if i == last {
             display::truncate(s, max.saturating_sub(2).max(8))
         } else {
             s.clone()
         };
+        let path = paths.get(i).cloned();
         if i == last {
-            spans.push(Span::styled(
-                text,
-                th.accent_style().add_modifier(Modifier::BOLD),
+            spans.push((
+                Span::styled(text, th.accent_style().add_modifier(Modifier::BOLD)),
+                path,
             ));
         } else {
-            spans.push(Span::styled(text, th.dim()));
+            spans.push((Span::styled(text, th.dim()), path));
         }
     }
     spans
 }
 
-fn draw_header(f: &mut Frame, app: &App, area: Rect) {
-    let th = &app.th;
+fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
+    let th = app.th.clone();
+    let th = &th;
+    // Right side, as (text span, what a click does).
     let mut right: Vec<Span> = Vec::new();
+    let mut right_hits: Vec<(usize, Target)> = Vec::new();
     if app.is_loading() {
         right.push(Span::styled(
             format!("{} ", SPIN[app.spinner % SPIN.len()]),
@@ -187,6 +222,26 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     if app.show_hidden {
         right.push(Span::styled("hidden shown   ", th.fg(th.warn)));
     }
+    if let Some(fl) = &app.filter {
+        right.push(Span::styled("▽ ", th.accent_style()));
+        right.push(Span::styled(
+            fl.text.clone(),
+            th.base().add_modifier(Modifier::BOLD),
+        ));
+        right.push(Span::styled(
+            if fl.editing { "▏" } else { "" },
+            th.accent_style(),
+        ));
+        right.push(Span::styled(
+            if fl.editing {
+                "  Enter keep · Esc clear"
+            } else {
+                "  Esc clear"
+            },
+            th.faint(),
+        ));
+        right.push(Span::raw("   "));
+    }
     let position = if app.visible.is_empty() {
         "0 items".to_string()
     } else {
@@ -194,49 +249,72 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     };
     right.push(Span::styled(position, th.dim()));
     right.push(Span::styled("   ", th.dim()));
-    right.push(Span::styled("⌕ ", th.dim()));
-    right.push(Span::styled("Ctrl+P", th.key()));
+    let jump_key = app.keymap.hint(Action::Palette);
+    if let Some(k) = jump_key {
+        right_hits.push((right.len(), Target::Act(Action::Palette)));
+        right_hits.push((right.len() + 1, Target::Act(Action::Palette)));
+        right.push(Span::styled("⌕ ", th.dim()));
+        right.push(Span::styled(k, th.key()));
+    }
+    if let Some(k) = app.keymap.hint(Action::Help) {
+        right.push(Span::styled("   ", th.dim()));
+        right_hits.push((right.len(), Target::Act(Action::Help)));
+        right_hits.push((right.len() + 1, Target::Act(Action::Help)));
+        right.push(Span::styled(k, th.key()));
+        right.push(Span::styled(" help", th.dim()));
+    }
     let right_w: usize = right.iter().map(|s| s.content.width()).sum();
     let mut spans = vec![Span::styled("▍", th.accent_style()), Span::raw(" ")];
-    spans.extend(breadcrumb(
-        app,
-        (area.width as usize).saturating_sub(right_w + 6),
-    ));
+    let mut hit_list: Vec<(usize, Target)> = Vec::new();
+    for (span, path) in breadcrumb(app, (area.width as usize).saturating_sub(right_w + 6)) {
+        if let Some(p) = path {
+            hit_list.push((spans.len(), Target::Crumb(p)));
+        }
+        spans.push(span);
+    }
+    hit_spans(&mut app.hits, area.x, area.y, &spans, &hit_list);
     let used: usize = spans.iter().map(|s| s.content.width()).sum();
-    spans.push(Span::raw(
-        " ".repeat((area.width as usize).saturating_sub(used + right_w)),
-    ));
+    let gap = (area.width as usize).saturating_sub(used + right_w);
+    spans.push(Span::raw(" ".repeat(gap)));
+    let right_x = area.x + (used + gap) as u16;
+    hit_spans(&mut app.hits, right_x, area.y, &right, &right_hits);
     spans.extend(right);
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 // ----------------------------------------------------------------------------- footer
 
-fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
-    let th = &app.th;
+fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
+    let th = app.th.clone();
+    let th = &th;
     let w = area.width as usize;
-    let hints: &[(&str, &str)] = if app.marked.is_empty() {
+    // What is worth reminding, in order of importance; each is clickable.
+    let wanted: &[(Action, &str)] = if app.marked.is_empty() {
         &[
-            ("Enter", "open"),
-            ("Space", "mark"),
-            ("y x p", "copy · cut · paste"),
-            ("d", "trash"),
-            ("r", "rename"),
-            ("u", "undo"),
-            ("Ctrl+P", "jump"),
-            ("?", "help"),
+            (Action::Open, "open"),
+            (Action::ToggleMark, "mark"),
+            (Action::Copy, "copy"),
+            (Action::Cut, "cut"),
+            (Action::Paste, "paste"),
+            (Action::Trash, "trash"),
+            (Action::Rename, "rename"),
+            (Action::Undo, "undo"),
         ]
     } else {
         &[
-            ("Space", "mark"),
-            ("y", "copy"),
-            ("x", "cut"),
-            ("d", "trash"),
-            ("D", "delete"),
-            ("R", "bulk rename"),
-            ("Esc", "clear"),
+            (Action::ToggleMark, "mark"),
+            (Action::Copy, "copy"),
+            (Action::Cut, "cut"),
+            (Action::Trash, "trash"),
+            (Action::DeletePermanently, "delete"),
+            (Action::BulkRename, "bulk rename"),
+            (Action::ClearSelection, "clear"),
         ]
     };
+    let hints: Vec<(Action, String, &str)> = wanted
+        .iter()
+        .filter_map(|(a, d)| app.keymap.hint(*a).map(|k| (*a, k, *d)))
+        .collect();
 
     // Right side: what is selected, what is on the clipboard, how much room is left.
     let mut right: Vec<Span> = Vec::new();
@@ -280,15 +358,19 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 
     let mut left: Vec<Span> = Vec::new();
     let mut used = 0;
-    for (k, d) in hints {
+    let mut foot_hits: Vec<(usize, Target)> = Vec::new();
+    for (action, k, d) in &hints {
         let chunk = k.width() + 1 + d.width() + 3;
         if used + chunk + right_w + 2 > w {
             break;
         }
-        left.push(Span::styled((*k).to_string(), th.key()));
+        foot_hits.push((left.len(), Target::Act(*action)));
+        foot_hits.push((left.len() + 1, Target::Act(*action)));
+        left.push(Span::styled(k.clone(), th.key()));
         left.push(Span::styled(format!(" {d}   "), th.dim()));
         used += chunk;
     }
+    hit_spans(&mut app.hits, area.x, area.y, &left, &foot_hits);
     let mut spans = left;
     spans.push(Span::raw(" ".repeat(w.saturating_sub(used + right_w))));
     spans.extend(right);

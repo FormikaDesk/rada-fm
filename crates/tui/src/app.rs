@@ -20,12 +20,15 @@ use vela_core::ops::{
     Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Progress, Scan, TransferMode,
     TransferOptions, UndoPlan,
 };
+use vela_core::ops::{OpKind, Totals};
 use vela_core::platform::Volume;
 use vela_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
 use crate::fmt;
+use crate::hits::{Hits, Target};
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
+use crate::keymap::{Action, Keymap};
 use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 use crate::services::Services;
 use crate::theme::Theme;
@@ -92,6 +95,10 @@ pub struct Running {
     pub handle: JobHandle,
     /// (time, bytes) samples for a smoothed transfer rate.
     samples: Vec<(Instant, u64)>,
+    /// What it is doing, for the message when it ends.
+    pub kind: OpKind,
+    pub totals: Totals,
+    pub reversible: bool,
 }
 
 impl Running {
@@ -240,6 +247,7 @@ pub enum Modal {
     Result(ResultView),
     ConfirmQuit,
     Help,
+    Menu(MenuView),
 }
 
 pub struct Config {
@@ -255,6 +263,9 @@ pub struct Config {
     /// Bookmarks from the configuration file.
     pub bookmarks: Vec<PathBuf>,
     pub demo: Option<Demo>,
+    pub keymap: Keymap,
+    /// Mouse capture on/off (`mouse = false` in the configuration).
+    pub mouse: bool,
 }
 
 /// Developer hook: put the interface in a ready-made state (for screenshots).
@@ -262,6 +273,10 @@ pub struct Demo {
     pub scene: String,
     pub dest: Option<PathBuf>,
 }
+
+mod input;
+
+pub use input::{FilterState, MenuItem, MenuView};
 
 pub struct App {
     pub th: Theme,
@@ -303,6 +318,15 @@ pub struct App {
     pub dirty: bool,
     pub spinner: usize,
     plan_job: Option<JobId>,
+
+    pub keymap: Keymap,
+    pub mouse: bool,
+    /// Screen rectangles of everything clickable, rebuilt every frame.
+    pub hits: Hits,
+    pub filter: Option<FilterState>,
+    sel_anchor: Option<(usize, BTreeSet<OsString>)>,
+    last_click: Option<(Instant, usize)>,
+    pub help_scroll: usize,
 }
 
 impl App {
@@ -354,8 +378,18 @@ impl App {
             dirty: true,
             spinner: 0,
             plan_job: None,
+            keymap: cfg.keymap,
+            mouse: cfg.mouse,
+            hits: Hits::default(),
+            filter: None,
+            sel_anchor: None,
+            last_click: None,
+            help_scroll: 0,
             svc,
         };
+        for w in std::mem::take(&mut app.keymap.warnings) {
+            tracing::warn!("keymap: {w}");
+        }
         if !app.svc.journal_ok {
             app.toast(
                 ToastKind::Warn,
@@ -420,12 +454,23 @@ impl App {
 
     fn rebuild_visible(&mut self) {
         let show = self.show_hidden;
+        let terms: Vec<String> = self
+            .filter
+            .as_ref()
+            .map(|f| f.text.split_whitespace().map(str::to_lowercase).collect())
+            .unwrap_or_default();
         self.visible = self
             .listing
             .all()
             .iter()
             .enumerate()
             .filter(|(_, e)| show || !e.hidden)
+            .filter(|(_, e)| {
+                terms.is_empty() || {
+                    let name = e.display.to_lowercase();
+                    terms.iter().all(|t| name.contains(t))
+                }
+            })
             .map(|(i, _)| i)
             .collect();
     }
@@ -491,6 +536,10 @@ impl App {
     }
 
     fn request_dir(&mut self, path: PathBuf) {
+        if path != self.cwd {
+            self.filter = None;
+            self.sel_anchor = None;
+        }
         self.dir_gen += 1;
         self.load = LoadState::Loading(path.clone());
         self.svc.loader.load(path, self.dir_gen);
@@ -605,7 +654,7 @@ impl App {
                         self.listing = DirListing::new(path.clone(), entries, self.sort);
                         if !same_dir {
                             self.cwd = path.clone();
-                            self.marked.clear();
+                            self.clear_marks();
                             self.cursor = 0;
                             self.scroll = 0;
                             self.svc.places.visit(path.clone());
@@ -817,8 +866,8 @@ impl App {
                 ..
             } => {
                 if self.running.as_ref().is_some_and(|r| r.job == job) {
-                    self.running = None;
-                    self.finish(title, report, journal_errors);
+                    let done = self.running.take();
+                    self.finish(title, report, journal_errors, done);
                     // Refresh even if live updates are unavailable.
                     self.dir_gen += 1;
                     self.svc.loader.load(self.cwd.clone(), self.dir_gen);
@@ -834,7 +883,13 @@ impl App {
         }
     }
 
-    fn finish(&mut self, title: String, report: ExecReport, journal_errors: u64) {
+    fn finish(
+        &mut self,
+        title: String,
+        report: ExecReport,
+        journal_errors: u64,
+        done: Option<Running>,
+    ) {
         use vela_core::ops::RunStatus::*;
         let mut lines: Vec<(ToastKind, String)> = Vec::new();
         for f in &report.failed {
@@ -856,7 +911,12 @@ impl App {
             lines.push((ToastKind::Warn, format!("{journal_errors} steps could not be written to the journal and may not be undoable")));
         }
         let (kind, headline) = match report.status() {
-            Completed if report.kept.is_empty() => (ToastKind::Ok, format!("{title}: done")),
+            Completed if report.kept.is_empty() => (
+                ToastKind::Ok,
+                done.as_ref()
+                    .map(|r| self.done_message(r))
+                    .unwrap_or_else(|| format!("{title}: done")),
+            ),
             Completed => (
                 ToastKind::Warn,
                 format!("{title}: done, some items were kept"),
@@ -1027,9 +1087,30 @@ impl App {
         self.begin_plan("Planning undo", h);
     }
 
+    /// Ask for the same transfer again with another way of settling name clashes.
+    fn replan_with(&mut self, pv: &mut PlanView, policy: ConflictPolicy) {
+        if pv.needs_typed_confirmation() || pv.replanning.is_some() || pv.plan.policy == policy {
+            return;
+        }
+        if let (Some(scan), Replan::Transfer { dest, mode }) = (pv.scan.clone(), pv.replan.clone())
+        {
+            let h = self.svc.jobs.replan_transfer(
+                scan,
+                dest,
+                TransferOptions {
+                    mode,
+                    policy,
+                    verify: false,
+                },
+            );
+            pv.replanning = Some(h.id);
+        }
+    }
+
     fn run_plan(&mut self, pv: Box<PlanView>) {
         let title = pv.plan.title.clone();
         let total = pv.plan.total_bytes();
+        let (kind, totals, reversible) = (pv.plan.kind, pv.plan.totals, pv.plan.reversible);
         let handle = match pv.undo {
             Some(up) => self.svc.jobs.execute_undo(*up),
             None => self.svc.jobs.execute(pv.plan),
@@ -1044,8 +1125,11 @@ impl App {
             started: Instant::now(),
             handle,
             samples: Vec::new(),
+            kind,
+            totals,
+            reversible,
         });
-        self.marked.clear();
+        self.clear_marks();
     }
 
     fn submit_input(&mut self, iv: InputView) {
@@ -1080,112 +1164,17 @@ impl App {
 
     // ------------------------------------------------------------------ keys
 
-    pub fn on_key(&mut self, key: KeyEvent) {
-        self.dirty = true;
-        if key.kind == crossterm::event::KeyEventKind::Release {
-            return;
-        }
-        if self.modal.is_some() {
-            self.on_modal_key(key);
-            return;
-        }
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-        let page = self.view_rows.saturating_sub(1).max(1);
-        match key.code {
-            KeyCode::Char('c') if ctrl => self.quit(),
-            KeyCode::Char('p') | KeyCode::Char('l') if ctrl => self.open_palette(),
-            KeyCode::Char('q') => self.quit(),
-            KeyCode::Char('j') | KeyCode::Down => self.set_cursor(self.cursor + 1),
-            KeyCode::Char('k') | KeyCode::Up => self.set_cursor(self.cursor.saturating_sub(1)),
-            KeyCode::Char('h') | KeyCode::Left | KeyCode::Backspace => self.go_parent(),
-            KeyCode::Char('l') | KeyCode::Right | KeyCode::Enter => self.enter(),
-            KeyCode::Char('g') | KeyCode::Home => self.set_cursor(0),
-            KeyCode::Char('G') | KeyCode::End => self.set_cursor(usize::MAX),
-            KeyCode::PageDown => self.set_cursor(self.cursor + page),
-            KeyCode::PageUp => self.set_cursor(self.cursor.saturating_sub(page)),
-            KeyCode::Char('d') if ctrl => self.set_cursor(self.cursor + page / 2),
-            KeyCode::Char('u') if ctrl => self.set_cursor(self.cursor.saturating_sub(page / 2)),
-            KeyCode::Char('H') => {
-                if matches!(self.preview.content, Some(Preview::Binary(_))) {
-                    self.preview.hex = !self.preview.hex;
-                    self.preview.scroll = 0;
-                } else {
-                    self.toast(
-                        ToastKind::Info,
-                        "the hex dump is available for binary files",
-                        2,
-                    );
-                }
-            }
-            KeyCode::Char('J') => self.preview.scroll = self.preview.scroll.saturating_add(5),
-            KeyCode::Char('K') => self.preview.scroll = self.preview.scroll.saturating_sub(5),
-            KeyCode::Char(' ') => self.toggle_mark(),
-            KeyCode::Char('a') if ctrl => self.mark_all(),
-            KeyCode::Esc => {
-                if let Some(r) = &self.running {
-                    r.handle.cancel.cancel();
-                    self.toast(ToastKind::Info, "cancelling…", 3);
-                } else if !self.marked.is_empty() {
-                    self.marked.clear();
-                }
-            }
-            KeyCode::Char('y') => self.yank(TransferMode::Copy),
-            KeyCode::Char('x') => self.yank(TransferMode::Move),
-            KeyCode::Char('p') => self.start_paste(),
-            KeyCode::Char('d') => self.start_trash(false),
-            KeyCode::Char('D') => self.start_trash(true),
-            KeyCode::Char('r') | KeyCode::F(2) => self.start_rename(),
-            KeyCode::Char('R') => self.start_bulk_rename(),
-            KeyCode::Char('n') => {
-                self.modal = Some(Modal::Input(InputView::new(
-                    InputKind::NewDir,
-                    String::new(),
-                )))
-            }
-            KeyCode::Char('s') => self.set_sort(SortSpec {
-                key: self.sort.key.next(),
-                ..self.sort
-            }),
-            KeyCode::Char('S') => self.set_sort(SortSpec {
-                reverse: !self.sort.reverse,
-                ..self.sort
-            }),
-            KeyCode::Char('.') => {
-                let keep = self.cursor_name();
-                self.show_hidden = !self.show_hidden;
-                self.rebuild_visible();
-                self.restore_cursor(keep);
-                self.request_preview();
-            }
-            KeyCode::Char('u') => self.start_undo(None),
-            KeyCode::Char('U') => {
-                self.modal = Some(Modal::History(HistoryView {
-                    entries: Vec::new(),
-                    selected: 0,
-                    loading: true,
-                }));
-                self.svc.jobs.load_history();
-            }
-            KeyCode::Char('m') => self.open_palette(),
-            KeyCode::Char('B') => self.toggle_bookmark(),
-            KeyCode::Char('~') => {
-                let home = self.svc.home.clone();
-                self.open_dir(home);
-            }
-            KeyCode::Char('?') => self.modal = Some(Modal::Help),
-            _ => {
-                let _ = shift;
-            }
-        }
-    }
-
     fn quit(&mut self) {
         if self.is_busy() {
             self.modal = Some(Modal::ConfirmQuit);
         } else {
             self.should_quit = true;
         }
+    }
+
+    fn clear_marks(&mut self) {
+        self.marked.clear();
+        self.sel_anchor = None;
     }
 
     fn toggle_mark(&mut self) {
@@ -1205,7 +1194,7 @@ impl App {
             .map(|&i| self.listing.all()[i].name.clone())
             .collect();
         if self.marked.len() == all.len() {
-            self.marked.clear();
+            self.clear_marks();
         } else {
             self.marked = all.into_iter().collect();
         }
@@ -1218,7 +1207,7 @@ impl App {
         }
         let n = paths.len();
         self.clipboard = Some(Clip { mode, paths });
-        self.marked.clear();
+        self.clear_marks();
         let verb = if mode == TransferMode::Copy {
             "copied"
         } else {
@@ -1502,21 +1491,8 @@ impl App {
                     if !pv.needs_typed_confirmation()
                         && matches!(pv.replan, Replan::Transfer { .. }) =>
                 {
-                    if let (Some(scan), Replan::Transfer { dest, mode }) =
-                        (pv.scan.clone(), pv.replan.clone())
-                    {
-                        let policy = pv.plan.policy.next();
-                        let h = self.svc.jobs.replan_transfer(
-                            scan,
-                            dest,
-                            TransferOptions {
-                                mode,
-                                policy,
-                                verify: false,
-                            },
-                        );
-                        pv.replanning = Some(h.id);
-                    }
+                    let policy = pv.plan.policy.next();
+                    self.replan_with(&mut pv, policy);
                     self.modal = Some(Modal::Plan(pv));
                 }
                 KeyCode::Tab => {
@@ -1681,6 +1657,7 @@ impl App {
             },
             Modal::Result(mut r) => match key.code {
                 KeyCode::Char('u') => self.start_undo(None),
+                KeyCode::Char('z') if ctrl => self.start_undo(None),
                 KeyCode::Down | KeyCode::Char('j') => {
                     r.scroll += 1;
                     self.modal = Some(Modal::Result(r));
@@ -1700,7 +1677,32 @@ impl App {
                 }
                 _ => {}
             },
-            Modal::Help => {}
+            Modal::Help => match key.code {
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.help_scroll += 1;
+                    self.modal = Some(Modal::Help);
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.help_scroll = self.help_scroll.saturating_sub(1);
+                    self.modal = Some(Modal::Help);
+                }
+                KeyCode::PageDown => {
+                    self.help_scroll += 10;
+                    self.modal = Some(Modal::Help);
+                }
+                KeyCode::PageUp => {
+                    self.help_scroll = self.help_scroll.saturating_sub(10);
+                    self.modal = Some(Modal::Help);
+                }
+                KeyCode::Home => {
+                    self.help_scroll = 0;
+                    self.modal = Some(Modal::Help);
+                }
+                // Closing is deliberate: Esc, q, ? , F1, Enter or Space.
+                KeyCode::Esc | KeyCode::Char('q' | '?' | ' ') | KeyCode::F(1) | KeyCode::Enter => {}
+                _ => self.modal = Some(Modal::Help),
+            },
+            Modal::Menu(m) => self.on_menu_key(m, key),
         }
     }
 

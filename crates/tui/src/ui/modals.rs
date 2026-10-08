@@ -12,11 +12,14 @@ use vela_core::fs::FileKind;
 use vela_core::journal::{EntryStatus, UndoState};
 use vela_core::ops::{ConflictPolicy, ItemAction, OpKind, RunStatus, Severity, Step};
 
-use super::widgets::{SPIN, button, centered, pad, pad_left, tail};
+use super::widgets::{SPIN, button, centered, hit_spans, pad, pad_left, tail};
 use crate::app::*;
 use crate::fmt;
+use crate::hits::{Hits, Target};
+use crate::keymap::{Action, Keymap, Scheme};
 use crate::palette::{PaletteKind, PaletteView};
 use crate::theme::Theme;
+use crossterm::event::KeyCode;
 
 /// Frame of a window; returns the usable inner area.
 fn frame(f: &mut Frame, th: &Theme, r: Rect, border: Color) -> Rect {
@@ -84,8 +87,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             ];
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Plan(pv) => draw_plan(f, &th, pv, &home, area),
-        Modal::Palette(p) => draw_palette(f, &th, p, area),
+        Modal::Plan(pv) => draw_plan(f, &th, pv, &home, area, &mut app.hits),
+        Modal::Palette(p) => draw_palette(f, &th, p, area, &mut app.hits),
         Modal::Failure { info, .. } => {
             let w = 88.min(area.width.saturating_sub(4));
             let msg = fmt::wrap(&info.message, (w as usize).saturating_sub(6));
@@ -112,7 +115,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 )));
             }
             lines.push(Line::raw(""));
-            lines.push(Line::from(vec![
+            let btns = vec![
                 button(&th, "s", "Skip", Some(th.accent), true),
                 Span::raw("  "),
                 button(&th, "S", "Skip all", None, true),
@@ -120,7 +123,20 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 button(&th, "r", "Retry", None, true),
                 Span::raw("  "),
                 button(&th, "a", "Abort", None, true),
-            ]));
+            ];
+            hit_spans(
+                &mut app.hits,
+                inner.x,
+                inner.y + lines.len() as u16,
+                &btns,
+                &[
+                    (0, Target::Key(KeyCode::Char('s'))),
+                    (2, Target::Key(KeyCode::Char('S'))),
+                    (4, Target::Key(KeyCode::Char('r'))),
+                    (6, Target::Key(KeyCode::Char('a'))),
+                ],
+            );
+            lines.push(Line::from(btns));
             lines.push(Line::from(Span::styled(
                 "Abort keeps what is already done; u undoes it.",
                 th.faint(),
@@ -128,7 +144,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::Input(iv) => draw_input(f, &th, iv, area),
-        Modal::History(h) => draw_history(f, &th, h, area, spinner),
+        Modal::History(h) => draw_history(f, &th, h, area, spinner, &mut app.hits),
         Modal::Result(r) => {
             let w = 90.min(area.width.saturating_sub(4));
             let wrapped: Vec<(ToastKind, String, bool)> = r
@@ -165,11 +181,22 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 ]));
             }
             lines.push(Line::raw(""));
-            lines.push(Line::from(vec![
+            let btns = vec![
                 button(&th, "u", "Undo what was done", Some(th.accent), true),
                 Span::raw("  "),
                 button(&th, "Esc", "Close", None, true),
-            ]));
+            ];
+            hit_spans(
+                &mut app.hits,
+                inner.x,
+                inner.y + lines.len() as u16,
+                &btns,
+                &[
+                    (0, Target::Key(KeyCode::Char('u'))),
+                    (2, Target::Key(KeyCode::Esc)),
+                ],
+            );
+            lines.push(Line::from(btns));
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::ConfirmQuit => {
@@ -196,9 +223,25 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                     button(&th, "Esc", "Stay", None, true),
                 ]),
             ];
+            let btns = vec![
+                button(&th, "y", "Quit anyway", Some(th.warn), true),
+                Span::raw("  "),
+                button(&th, "Esc", "Stay", None, true),
+            ];
+            hit_spans(
+                &mut app.hits,
+                inner.x,
+                inner.y + 5,
+                &btns,
+                &[
+                    (0, Target::Key(KeyCode::Char('y'))),
+                    (2, Target::Key(KeyCode::Esc)),
+                ],
+            );
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Help => draw_help(f, &th, area),
+        Modal::Help => draw_help(f, &th, area, &app.keymap, app.mouse, app.help_scroll),
+        Modal::Menu(m) => draw_menu(f, &th, &app.keymap, m, area, &mut app.hits),
     }
 }
 
@@ -225,7 +268,14 @@ fn action_color(th: &Theme, a: ItemAction) -> Color {
     }
 }
 
-fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, area: Rect) {
+fn draw_plan(
+    f: &mut Frame,
+    th: &Theme,
+    pv: &PlanView,
+    home: &std::path::Path,
+    area: Rect,
+    hits: &mut Hits,
+) {
     let plan = &pv.plan;
     let blocked = !plan.is_executable() && plan.blocking().next().is_some();
     let delete = plan.kind == OpKind::Delete;
@@ -238,6 +288,9 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
     let inner_w = (w as usize).saturating_sub(6);
 
     let mut body: Vec<Line> = Vec::new();
+    let mut seg_line: Option<usize> = None;
+    let mut seg_hits: Vec<(usize, Target)> = Vec::new();
+    let mut seg_spans: Vec<Span> = Vec::new();
 
     // Heading: what kind of operation and how many items. Every path below is relative
     // to the bases named once here.
@@ -375,6 +428,7 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
 
     // How name clashes are settled: a segmented control.
     if matches!(pv.replan, Replan::Transfer { .. }) {
+        seg_line = Some(body.len());
         let mut seg: Vec<Span> = vec![Span::styled("If a name already exists   ", th.dim())];
         for p in [
             ConflictPolicy::Skip,
@@ -386,6 +440,7 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
                 ConflictPolicy::KeepBoth => "keep both",
                 ConflictPolicy::Overwrite => "overwrite",
             };
+            seg_hits.push((seg.len(), Target::Policy(p)));
             if plan.policy == p {
                 seg.push(Span::styled(
                     format!(" {label} "),
@@ -399,6 +454,7 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
             }
         }
         seg.push(Span::styled("   c to change", th.faint()));
+        seg_spans = seg.clone();
         body.push(Line::from(seg));
         if plan.policy == ConflictPolicy::Overwrite {
             body.push(Line::from(Span::styled(
@@ -557,6 +613,7 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
     }
     let can_run = pv.can_run();
     let mut buttons: Vec<Span> = Vec::new();
+    let mut button_hits: Vec<(usize, Target)> = Vec::new();
     if pv.replanning.is_some() {
         buttons.push(Span::styled("re-planning…   ", th.fg(th.warn)));
     }
@@ -566,15 +623,19 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
             th.fg(th.error),
         ));
     } else {
+        if can_run {
+            button_hits.push((buttons.len(), Target::Key(KeyCode::Enter)));
+        }
         buttons.push(button(th, "Enter", "Run", Some(tone), can_run));
         buttons.push(Span::raw("  "));
     }
+    button_hits.push((buttons.len(), Target::Key(KeyCode::Esc)));
     buttons.push(button(th, "Esc", "Cancel", None, true));
     if !delete {
         buttons.push(Span::styled("      ↑↓ scroll", th.faint()));
     }
     foot.push(Line::raw(""));
-    foot.push(Line::from(buttons));
+    foot.push(Line::from(buttons.clone()));
 
     let foot_h = foot.len() as u16;
     let want = body.len() as u16 + foot_h + 4;
@@ -592,14 +653,28 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
             ..inner
         },
     );
+    let foot_y = inner.y + content_h as u16;
     f.render_widget(
         Paragraph::new(foot),
         Rect {
-            y: inner.y + content_h as u16,
+            y: foot_y,
             height: foot_h,
             ..inner
         },
     );
+    // Clickable: the buttons (last line of the footer) and the conflict control.
+    hit_spans(hits, inner.x, foot_y + foot_h - 1, &buttons, &button_hits);
+    if let Some(line) = seg_line {
+        if line >= scroll && line < scroll + content_h {
+            hit_spans(
+                hits,
+                inner.x,
+                inner.y + (line - scroll) as u16,
+                &seg_spans,
+                &seg_hits,
+            );
+        }
+    }
 }
 
 /// The two folders a plan is about, named once at the top; everything else is shown
@@ -719,7 +794,7 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
 
 // -------------------------------------------------------------------------------- palette
 
-fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect) {
+fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &mut Hits) {
     let w = 78.min(area.width.saturating_sub(6));
     let rows_wanted = p.hits.len().clamp(3, 12) as u16;
     let h = (rows_wanted + 7).min(area.height.saturating_sub(2));
@@ -844,6 +919,14 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect) {
             spans.push(Span::styled(" ".repeat(iw - drawn), row));
         }
         lines.push(Line::from(spans));
+        hits.add(
+            Rect {
+                y: list.y + (i - start) as u16,
+                height: 1,
+                ..list
+            },
+            Target::PaletteRow(i),
+        );
     }
     f.render_widget(Paragraph::new(lines), list);
 
@@ -950,7 +1033,14 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-fn draw_history(f: &mut Frame, th: &Theme, h: &HistoryView, area: Rect, spinner: &str) {
+fn draw_history(
+    f: &mut Frame,
+    th: &Theme,
+    h: &HistoryView,
+    area: Rect,
+    spinner: &str,
+    hits: &mut Hits,
+) {
     let rows = h.entries.len().clamp(3, 16) as u16;
     let r = centered(area, 104, rows + 9);
     let inner = frame(f, th, r, th.accent);
@@ -1008,62 +1098,220 @@ fn draw_history(f: &mut Frame, th: &Theme, h: &HistoryView, area: Rect, spinner:
         if drawn < w {
             spans.push(Span::styled(" ".repeat(w - drawn), row));
         }
+        let row_y = inner.y + lines.len() as u16;
+        hits.add(
+            Rect {
+                y: row_y,
+                height: 1,
+                ..inner
+            },
+            Target::HistoryRow(i),
+        );
         lines.push(Line::from(spans));
     }
     while lines.len() < inner.height.saturating_sub(2) as usize {
         lines.push(Line::raw(""));
     }
-    lines.push(Line::from(vec![
+    let btns = vec![
         button(th, "Enter", "Undo selected", Some(th.accent), true),
         Span::raw("  "),
         button(th, "Esc", "Close", None, true),
-    ]));
+    ];
+    hit_spans(
+        hits,
+        inner.x,
+        inner.y + lines.len() as u16,
+        &btns,
+        &[
+            (0, Target::Key(KeyCode::Enter)),
+            (2, Target::Key(KeyCode::Esc)),
+        ],
+    );
+    lines.push(Line::from(btns));
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-fn draw_help(f: &mut Frame, th: &Theme, area: Rect) {
-    let rows: &[(&str, &str)] = &[
-        ("j k  ↑ ↓", "move"),
-        ("l → Enter", "open folder / file"),
-        ("h ← Backspace", "parent folder"),
-        ("g  G", "top / bottom"),
-        ("PgUp PgDn", "page"),
-        ("J K", "scroll the preview"),
-        ("H", "hex dump of a binary file"),
-        ("Space", "mark and move down"),
-        ("Ctrl-a", "mark / unmark all"),
-        ("y  x  p", "copy · cut · paste (a plan comes first)"),
-        ("d", "move to trash"),
-        ("D", "delete permanently (type yes)"),
-        ("r  F2", "rename"),
-        ("R", "bulk rename with a pattern"),
-        ("n", "new folder"),
-        ("u", "undo the last operation"),
-        ("U", "history of operations"),
-        ("s  S", "sort by name/size/date · reverse"),
-        (".", "show / hide hidden files"),
-        (
-            "Ctrl-p  Ctrl-l  m",
-            "jump palette: folders, recents, bookmarks, disks",
-        ),
-        ("B  ~", "bookmark this folder · home"),
-        ("Esc", "cancel the running operation · clear marks"),
-        ("q", "quit"),
-    ];
-    let h = rows.len() as u16 + 8;
-    let r = centered(area, 84, h);
+/// Every action with its keys in both schemes side by side, grouped, scrollable.
+fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, scroll: usize) {
+    use crate::keymap::Group;
+    let w = 96.min(area.width.saturating_sub(4));
+    let h = (area.height.saturating_sub(2)).min(46);
+    let r = centered(area, w, h);
     let inner = frame(f, th, r, th.accent);
-    let mut lines: Vec<Line> = vec![Line::from(vec![chip(th, "Keys", th.accent)]), Line::raw("")];
-    for (k, d) in rows {
-        lines.push(Line::from(vec![
-            Span::styled(pad(k, 20), th.key()),
-            Span::styled((*d).to_string(), th.base()),
-        ]));
+    let iw = inner.width as usize;
+    let label_w = 30usize;
+    let vim_w = ((iw.saturating_sub(label_w)) / 2).clamp(14, 30);
+
+    let mut lines: Vec<Line> = Vec::new();
+    let col = |on: bool, text: String| -> String {
+        if !on {
+            "—".to_string()
+        } else if text.is_empty() {
+            String::new()
+        } else {
+            text
+        }
+    };
+    let vim_on = matches!(
+        km.preset,
+        crate::keymap::Preset::VimClassic | crate::keymap::Preset::Vim
+    );
+    let classic_on = matches!(
+        km.preset,
+        crate::keymap::Preset::VimClassic | crate::keymap::Preset::Classic
+    );
+    lines.push(Line::from(vec![
+        Span::styled(pad("", label_w), th.dim()),
+        Span::styled(
+            pad("Vim", vim_w),
+            th.accent_style().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Classic", th.accent_style().add_modifier(Modifier::BOLD)),
+    ]));
+    for g in Group::ALL {
+        lines.push(Line::raw(""));
+        lines.push(Line::from(Span::styled(
+            g.title(),
+            th.dim().add_modifier(Modifier::BOLD),
+        )));
+        for a in Action::ALL.iter().filter(|a| a.group() == g) {
+            let vim = col(vim_on, km.keys_text(*a, Scheme::Vim));
+            let classic = col(classic_on, km.keys_text(*a, Scheme::Classic));
+            let style = |t: &str| {
+                if t == "—" || t.is_empty() {
+                    th.faint()
+                } else {
+                    th.key()
+                }
+            };
+            lines.push(Line::from(vec![
+                Span::styled(pad(a.label(), label_w), th.base()),
+                Span::styled(pad(&display::truncate(&vim, vim_w - 1), vim_w), style(&vim)),
+                Span::styled(
+                    display::truncate(&classic, iw.saturating_sub(label_w + vim_w)),
+                    style(&classic),
+                ),
+            ]));
+        }
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
-        "Every operation shows a plan first. Every finished operation can be undone with u.",
-        th.dim(),
+        "Mouse",
+        th.dim().add_modifier(Modifier::BOLD),
     )));
-    f.render_widget(Paragraph::new(lines), inner);
+    let mouse_lines: Vec<&str> = if mouse {
+        vec![
+            "Click selects · double-click opens · wheel scrolls the list or the preview.",
+            "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu.",
+            "Click a folder in the path, a hint at the bottom, or a column title to sort.",
+            "Shift+drag selects text in the terminal (the mouse belongs to vela while it runs).",
+        ]
+    } else {
+        vec!["The mouse is off (mouse = false in the configuration)."]
+    };
+    for l in mouse_lines {
+        lines.push(Line::from(Span::styled(l, th.base())));
+    }
+    lines.push(Line::raw(""));
+    let quit = km
+        .hint(Action::Quit)
+        .unwrap_or_else(|| "Ctrl+Q".to_string());
+    for l in [
+        format!("Ctrl+C copies; it never quits. Quit with {quit}."),
+        "Every operation shows a plan first. Every finished operation can be undone.".to_string(),
+        "Rebind keys in the [keys] section of the configuration file.".to_string(),
+    ] {
+        lines.push(Line::from(Span::styled(l, th.dim())));
+    }
+
+    let rows = inner.height.saturating_sub(3) as usize;
+    let max_scroll = lines.len().saturating_sub(rows);
+    let scroll = scroll.min(max_scroll);
+    let mut out: Vec<Line> = vec![
+        Line::from(vec![
+            chip(th, "Keys", th.accent),
+            Span::styled(
+                if max_scroll > 0 {
+                    "   ↑↓ scroll · Esc close"
+                } else {
+                    "   Esc close"
+                },
+                th.faint(),
+            ),
+        ]),
+        Line::raw(""),
+    ];
+    out.extend(lines.into_iter().skip(scroll).take(rows.saturating_sub(2)));
+    f.render_widget(Paragraph::new(out), inner);
+}
+
+fn draw_menu(f: &mut Frame, th: &Theme, km: &Keymap, m: &MenuView, area: Rect, hits: &mut Hits) {
+    let hint_of = |a: Action| km.hint(a).unwrap_or_default();
+    let label_w = m
+        .items
+        .iter()
+        .map(|i| i.action.label().width())
+        .max()
+        .unwrap_or(10);
+    let hint_w = m
+        .items
+        .iter()
+        .map(|i| hint_of(i.action).width())
+        .max()
+        .unwrap_or(0);
+    let inner_w = label_w + 3 + hint_w;
+    let w = (inner_w + 4) as u16;
+    let seps = m.items.iter().filter(|i| i.gap_before).count();
+    let h = (m.items.len() + seps + 2) as u16;
+    let x = m.at.0.min(area.x + area.width.saturating_sub(w));
+    let y = m.at.1.min(area.y + area.height.saturating_sub(h));
+    let r = Rect {
+        x,
+        y,
+        width: w.min(area.width),
+        height: h.min(area.height),
+    };
+    f.render_widget(Clear, r);
+    let blk = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(th.fg(th.accent));
+    let inside = blk.inner(r);
+    f.render_widget(blk, r);
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, it) in m.items.iter().enumerate() {
+        if it.gap_before && i > 0 {
+            lines.push(Line::from(Span::styled(
+                "─".repeat(inside.width as usize),
+                th.faint(),
+            )));
+        }
+        let sel = i == m.selected;
+        let row = if sel { th.selected() } else { Style::default() };
+        let text_style = if it.enabled { th.base() } else { th.faint() };
+        let hint = hint_of(it.action);
+        let gap = inner_w.saturating_sub(it.action.label().width() + hint.width());
+        lines.push(Line::from(vec![
+            Span::styled(" ", row),
+            Span::styled(it.action.label().to_string(), text_style.patch(row)),
+            Span::styled(" ".repeat(gap + 1), row),
+            Span::styled(
+                hint,
+                if it.enabled { th.dim() } else { th.faint() }.patch(row),
+            ),
+            Span::styled(" ", row),
+        ]));
+        let ly = inside.y + (lines.len() - 1) as u16;
+        if ly < inside.y + inside.height {
+            hits.add(
+                Rect {
+                    y: ly,
+                    height: 1,
+                    ..inside
+                },
+                Target::MenuItem(i),
+            );
+        }
+    }
+    f.render_widget(Paragraph::new(lines), inside);
 }

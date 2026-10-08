@@ -96,7 +96,7 @@ fn bad_requests_are_refused_before_anything_is_read() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let cancel = Cancel::new();
-    let mut try_plan = |req: OpRequest| {
+    let try_plan = |req: OpRequest| {
         e.plan_request(
             &req,
             None,

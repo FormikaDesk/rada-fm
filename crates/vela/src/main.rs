@@ -41,6 +41,14 @@ struct Cli {
     #[arg(long, value_name = "SCENE", hide = true)]
     demo: Option<String>,
 
+    /// Do not capture the mouse (the terminal keeps selecting text).
+    #[arg(long)]
+    no_mouse: bool,
+
+    /// Key bindings: `vim+classic` (default), `vim` or `classic`.
+    #[arg(long, value_name = "PRESET")]
+    keymap: Option<String>,
+
     /// Show hidden files at startup.
     #[arg(long)]
     hidden: bool,
@@ -125,6 +133,23 @@ fn main() -> Result<()> {
         None => vela_tui::ImageMode::Auto,
     };
 
+    let preset_name = cli
+        .keymap
+        .clone()
+        .or_else(|| std::env::var("VELA_KEYMAP").ok())
+        .or(cfg_file.keymap.clone());
+    let preset = match preset_name {
+        Some(n) => vela_tui::keymap::Preset::parse(&n).with_context(|| {
+            format!(
+                "unknown keymap {n:?} (use {})",
+                vela_tui::keymap::Preset::NAMES.join(", ")
+            )
+        })?,
+        None => vela_tui::keymap::Preset::VimClassic,
+    };
+    let keymap = vela_tui::keymap::Keymap::new(preset, &cfg_file.keys);
+    let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("VELA_NO_MOUSE").is_none();
+
     let platform = platform::current(dirs.clone());
     let journal = match Journal::open(dirs.journal_path()) {
         Ok(j) => Some(j),
@@ -151,6 +176,8 @@ fn main() -> Result<()> {
             dest: std::env::var_os("VELA_DEMO_DEST").map(PathBuf::from),
         }),
         image_mode,
+        keymap,
+        mouse,
         select,
         limits: vela_core::preview::Limits {
             image: cfg_file.image_limits.clone(),
