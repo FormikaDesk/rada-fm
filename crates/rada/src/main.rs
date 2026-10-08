@@ -2,6 +2,7 @@
 
 mod config;
 mod demo;
+mod desktop;
 mod fonts;
 mod shell;
 
@@ -9,21 +10,53 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use rada_core::fs::LocalFs;
 use rada_core::journal::Journal;
 use rada_core::platform::{self, Dirs};
 use rada_tui::{Config, Services, Theme};
 
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Install or remove things rada needs outside its own folders.
+    Setup {
+        #[command(subcommand)]
+        what: SetupWhat,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum SetupWhat {
+    /// Add rada to the application menu (launcher entry and icons), for this user only.
+    Desktop {
+        /// Take away exactly what a previous setup installed.
+        #[arg(long)]
+        remove: bool,
+        /// Also make rada the default program for folders (the previous one is
+        /// remembered, and `--remove` restores it).
+        #[arg(long)]
+        default_file_manager: bool,
+    },
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "rada",
     version,
-    about = "A terminal file manager you can trust: every operation shows a plan first, can be undone, and keeps going when one file fails."
+    about = "A safe harbor for your files: a terminal file manager where every operation shows a plan first, can be undone, and keeps going when one file fails.",
+    args_conflicts_with_subcommands = true
 )]
 struct Cli {
-    /// Folder to open (default: the current folder).
-    path: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Option<Command>,
+
+    /// Folder to open (default: the current folder). A folder named like a command
+    /// (`setup`) needs a leading `./`.
+    path: Vec<PathBuf>,
+
+    /// Open rada in a new terminal window (used by the desktop launcher entry).
+    #[arg(long)]
+    spawn_terminal: bool,
 
     /// Icons: `auto` (default: Nerd Font if the terminal uses one), `nerd`, `unicode` or `none`.
     #[arg(long, value_name = "SET")]
@@ -73,6 +106,31 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    if let Some(Command::Setup {
+        what: SetupWhat::Desktop {
+            remove,
+            default_file_manager,
+        },
+    }) = &cli.command
+    {
+        let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
+        let setup = desktop::Setup::from_env(&dirs)?;
+        if *remove && *default_file_manager {
+            anyhow::bail!("--remove and --default-file-manager cannot be used together");
+        }
+        let lines = if *remove {
+            setup.remove()?
+        } else {
+            setup.install(*default_file_manager)?
+        };
+        for l in lines {
+            println!("{l}");
+        }
+        return Ok(());
+    }
+    if cli.spawn_terminal {
+        return desktop::spawn_terminal(cli.path.first().map(PathBuf::as_path));
+    }
     if let Some(shell) = &cli.init {
         print!("{}", shell::snippet(shell));
         return Ok(());
@@ -108,7 +166,7 @@ fn main() -> Result<()> {
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
 
-    let start = match &cli.path {
+    let start = match cli.path.first() {
         Some(p) => p.clone(),
         None => std::env::current_dir().context("cannot read the current folder")?,
     };

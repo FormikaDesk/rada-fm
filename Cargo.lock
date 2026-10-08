@@ -1724,6 +1724,7 @@ dependencies = [
  "rada-tui",
  "serde",
  "serde_json",
+ "tempfile",
  "toml",
  "tracing",
  "tracing-appender",
