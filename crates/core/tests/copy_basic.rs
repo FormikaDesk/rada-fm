@@ -1,7 +1,12 @@
 use vela_core::ops::*;
 use vela_core::testutil::*;
 
-fn copy_all(sb: &Sandbox, srcs: &[std::path::PathBuf], dest: &std::path::Path, policy: ConflictPolicy) -> (Plan, ExecReport) {
+fn copy_all(
+    sb: &Sandbox,
+    srcs: &[std::path::PathBuf],
+    dest: &std::path::Path,
+    policy: ConflictPolicy,
+) -> (Plan, ExecReport) {
     let e = sb.engine();
     let scan = scan(&e, srcs);
     let plan = e.plan_transfer(&scan, dest, &TransferOptions::copy(policy));
