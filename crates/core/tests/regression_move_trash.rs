@@ -172,10 +172,6 @@ fn moving_onto_an_existing_folder_merges_and_removes_the_emptied_source() {
     not(target_os = "linux"),
     ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
 )]
-#[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX symlinks; Windows support is in development"
-)]
 fn trashing_a_symlink_trashes_the_link_not_its_target() {
     let sb = Sandbox::new();
     let target = sb.write("real/keep.txt", "keep me");
