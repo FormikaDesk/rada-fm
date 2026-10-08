@@ -1,0 +1,570 @@
+//! Test support: an isolated sandbox and a tripwire on the user's real directories.
+//!
+//! Every test that touches the filesystem builds a [`Sandbox`]. On first use the
+//! process is re-pointed at a scratch area (`HOME` and all `XDG_*_HOME` variables),
+//! so even a bug that resolves a "default" location cannot reach the real one. On
+//! top of that a [`RealPathGuard`] fingerprints the *real* trash, config, state, cache
+//! and data directories (and the names in the real home directory) before the first
+//! test and re-checks them whenever a sandbox is dropped: if anything changed, the
+//! test fails.
+
+use std::collections::BTreeMap;
+use std::ffi::{OsStr, OsString};
+use std::io;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
+
+use crate::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
+use crate::platform::{self, Dirs, Platform};
+
+// ---------------------------------------------------------------------------------
+// Real-path tripwire
+// ---------------------------------------------------------------------------------
+
+/// A fingerprint of a set of paths: names, kinds, sizes and mtimes of everything below.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RealPathGuard {
+    paths: Vec<PathBuf>,
+    /// Directories whose *entry names* (not contents) are fingerprinted.
+    shallow: Vec<PathBuf>,
+    before: BTreeMap<String, String>,
+}
+
+impl RealPathGuard {
+    pub fn new(paths: Vec<PathBuf>, shallow: Vec<PathBuf>) -> Self {
+        let mut g = RealPathGuard {
+            paths,
+            shallow,
+            before: BTreeMap::new(),
+        };
+        g.before = g.capture();
+        g
+    }
+
+    fn capture(&self) -> BTreeMap<String, String> {
+        let mut out = BTreeMap::new();
+        for p in &self.paths {
+            walk(p, &mut out, 0);
+        }
+        for p in &self.shallow {
+            match std::fs::read_dir(p) {
+                Ok(rd) => {
+                    for e in rd.flatten() {
+                        out.insert(format!("{}", e.path().display()), "entry".into());
+                    }
+                }
+                Err(_) => {
+                    out.insert(format!("{}", p.display()), "unreadable".into());
+                }
+            }
+        }
+        out
+    }
+
+    /// `Err` with a readable diff if anything under the guarded paths changed.
+    pub fn check(&self) -> Result<(), String> {
+        let now = self.capture();
+        if now == self.before {
+            return Ok(());
+        }
+        let mut msg = String::from("a REAL user path was touched by a test:\n");
+        for (k, v) in &now {
+            match self.before.get(k) {
+                None => msg.push_str(&format!("  + {k} ({v})\n")),
+                Some(old) if old != v => msg.push_str(&format!("  ~ {k} ({old} -> {v})\n")),
+                _ => {}
+            }
+        }
+        for k in self.before.keys() {
+            if !now.contains_key(k) {
+                msg.push_str(&format!("  - {k}\n"));
+            }
+        }
+        Err(msg)
+    }
+}
+
+fn walk(p: &Path, out: &mut BTreeMap<String, String>, depth: usize) {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(m) = std::fs::symlink_metadata(p) else {
+        return;
+    };
+    let kind = if m.is_dir() {
+        "dir"
+    } else if m.file_type().is_symlink() {
+        "link"
+    } else {
+        "file"
+    };
+    let fp = if m.is_dir() {
+        kind.to_string()
+    } else {
+        format!("{kind} {} {}.{}", m.len(), m.mtime(), m.mtime_nsec())
+    };
+    out.insert(p.display().to_string(), fp);
+    if m.is_dir() && depth < 8 {
+        if let Ok(rd) = std::fs::read_dir(p) {
+            for e in rd.flatten() {
+                walk(&e.path(), out, depth + 1);
+            }
+        }
+    }
+}
+
+struct Process {
+    guard: RealPathGuard,
+    scratch: PathBuf,
+}
+
+static PROCESS: OnceLock<Process> = OnceLock::new();
+
+/// Base directory for test sandboxes: on the project's own disk, never in `/tmp`.
+pub fn disk_base() -> PathBuf {
+    let base = std::env::var_os("VELA_TEST_TMP")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/vela-test-tmp")
+        });
+    let _ = std::fs::create_dir_all(&base);
+    base.canonicalize().unwrap_or(base)
+}
+
+fn process() -> &'static Process {
+    PROCESS.get_or_init(|| {
+        // Capture the REAL locations before re-pointing the environment.
+        let real = Dirs::from_env().ok();
+        let mut paths = Vec::new();
+        let mut shallow = Vec::new();
+        if let Some(r) = &real {
+            paths.push(r.home_trash());
+            paths.push(r.vela_state());
+            paths.push(r.vela_config());
+            paths.push(r.vela_cache());
+            paths.push(r.data.join("vela"));
+            shallow.push(r.home.clone());
+        }
+        let guard = RealPathGuard::new(paths, shallow);
+
+        let scratch = disk_base().join(format!("proc-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&scratch);
+        let d = Dirs::under(&scratch);
+        // SAFETY: executed once, before any sandbox exists; the engine itself never
+        // reads the environment (all locations are passed explicitly).
+        unsafe {
+            std::env::set_var("HOME", &d.home);
+            std::env::set_var("XDG_CONFIG_HOME", &d.config);
+            std::env::set_var("XDG_DATA_HOME", &d.data);
+            std::env::set_var("XDG_STATE_HOME", &d.state);
+            std::env::set_var("XDG_CACHE_HOME", &d.cache);
+        }
+        Process { guard, scratch }
+    })
+}
+
+/// Fail (panic) if a real user path changed since the process started its tests.
+pub fn assert_real_paths_untouched() {
+    if let Err(msg) = process().guard.check() {
+        panic!("{msg}");
+    }
+}
+
+// ---------------------------------------------------------------------------------
+// Sandbox
+// ---------------------------------------------------------------------------------
+
+pub struct Sandbox {
+    _tmp: tempfile::TempDir,
+    pub root: PathBuf,
+    /// Scratch area for fixture trees.
+    pub work: PathBuf,
+    pub dirs: Dirs,
+    platform: Arc<dyn Platform>,
+}
+
+impl Sandbox {
+    pub fn new() -> Sandbox {
+        let p = process();
+        let tmp = tempfile::Builder::new()
+            .prefix("sb-")
+            .tempdir_in(&p.scratch)
+            .expect("create sandbox");
+        let root = tmp.path().canonicalize().expect("canonicalize sandbox");
+        let dirs = Dirs::under(&root);
+        let work = root.join("work");
+        for d in [
+            &dirs.home,
+            &dirs.config,
+            &dirs.data,
+            &dirs.state,
+            &dirs.cache,
+            &work,
+        ] {
+            std::fs::create_dir_all(d).expect("create sandbox dir");
+        }
+        let platform = platform::current(dirs.clone());
+        Sandbox {
+            _tmp: tmp,
+            root,
+            work,
+            dirs,
+            platform,
+        }
+    }
+
+    pub fn platform(&self) -> Arc<dyn Platform> {
+        self.platform.clone()
+    }
+
+    pub fn path(&self, rel: impl AsRef<Path>) -> PathBuf {
+        self.work.join(rel)
+    }
+
+    pub fn mkdir(&self, rel: impl AsRef<Path>) -> PathBuf {
+        let p = self.path(rel);
+        std::fs::create_dir_all(&p).expect("mkdir");
+        p
+    }
+
+    pub fn write(&self, rel: impl AsRef<Path>, content: impl AsRef<[u8]>) -> PathBuf {
+        let p = self.path(rel);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).expect("mkdir parent");
+        }
+        std::fs::write(&p, content).expect("write");
+        p
+    }
+
+    pub fn symlink(&self, target: impl AsRef<Path>, rel: impl AsRef<Path>) -> PathBuf {
+        let p = self.path(rel);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).expect("mkdir parent");
+        }
+        symlink(target.as_ref(), &p).expect("symlink");
+        p
+    }
+}
+
+impl Default for Sandbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for Sandbox {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            assert_real_paths_untouched();
+        }
+    }
+}
+
+/// A scratch directory on a *different* filesystem from the sandbox (tmpfs vs disk),
+/// or `None` when this machine has no such location (the test then skips itself).
+pub fn other_filesystem_dir(sb: &Sandbox) -> Option<tempfile::TempDir> {
+    use std::os::unix::fs::MetadataExt;
+    let mine = std::fs::metadata(&sb.root).ok()?.dev();
+    for cand in ["/dev/shm", "/tmp", "/run/user"] {
+        let p = Path::new(cand);
+        if !p.is_dir() {
+            continue;
+        }
+        if std::fs::metadata(p).map(|m| m.dev()).ok() == Some(mine) {
+            continue;
+        }
+        if let Ok(t) = tempfile::Builder::new().prefix("vela-xfs-").tempdir_in(p) {
+            return Some(t);
+        }
+    }
+    None
+}
+
+pub fn symlink(target: &Path, link: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link)
+    }
+    #[cfg(windows)]
+    {
+        if target.is_dir() {
+            std::os::windows::fs::symlink_dir(target, link)
+        } else {
+            std::os::windows::fs::symlink_file(target, link)
+        }
+    }
+}
+
+pub fn chmod(p: &Path, mode: u32) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(p, std::fs::Permissions::from_mode(mode)).expect("chmod");
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (p, mode);
+    }
+}
+
+/// True when running as root (permission-denied fixtures do not work then).
+pub fn is_root() -> bool {
+    #[cfg(unix)]
+    {
+        // SAFETY: getuid cannot fail.
+        unsafe { libc::geteuid() == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------------
+// Tree snapshots
+// ---------------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Snap {
+    Dir { mode: u32 },
+    File { mode: u32, content: Vec<u8> },
+    Link { target: PathBuf },
+    Other,
+}
+
+/// Everything below `root`, relative, without following symlinks.
+pub fn snapshot(root: &Path) -> BTreeMap<PathBuf, Snap> {
+    let mut out = BTreeMap::new();
+    fn go(root: &Path, dir: &Path, out: &mut BTreeMap<PathBuf, Snap>) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for e in rd.flatten() {
+            let p = e.path();
+            let rel = p.strip_prefix(root).unwrap().to_path_buf();
+            let m = std::fs::symlink_metadata(&p).unwrap();
+            #[cfg(unix)]
+            let mode = {
+                use std::os::unix::fs::PermissionsExt;
+                m.permissions().mode() & 0o7777
+            };
+            #[cfg(not(unix))]
+            let mode = 0;
+            if m.file_type().is_symlink() {
+                out.insert(
+                    rel,
+                    Snap::Link {
+                        target: std::fs::read_link(&p).unwrap(),
+                    },
+                );
+            } else if m.is_dir() {
+                out.insert(rel, Snap::Dir { mode });
+                go(root, &p, out);
+            } else if m.is_file() {
+                out.insert(
+                    rel,
+                    Snap::File {
+                        mode,
+                        content: std::fs::read(&p).unwrap_or_default(),
+                    },
+                );
+            } else {
+                out.insert(rel, Snap::Other);
+            }
+        }
+    }
+    go(root, root, &mut out);
+    out
+}
+
+// ---------------------------------------------------------------------------------
+// Fault injection
+// ---------------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Op {
+    Any,
+    Lstat,
+    ReadDir,
+    CopyFile,
+    Rename,
+    RemoveFile,
+    RemoveDir,
+    CreateDir,
+    CreateSymlink,
+}
+
+struct Rule {
+    op: Op,
+    /// Matches when the operation's path ends with this.
+    suffix: PathBuf,
+    errno: i32,
+    remaining: Option<usize>,
+}
+
+/// A [`LocalFs`] that fails on demand: unreadable files, `EXDEV`, `ENOSPC`...
+pub struct FaultFs {
+    inner: LocalFs,
+    rules: Mutex<Vec<Rule>>,
+    pub hits: Mutex<Vec<(Op, PathBuf)>>,
+}
+
+impl FaultFs {
+    pub fn new() -> Arc<FaultFs> {
+        Arc::new(FaultFs {
+            inner: LocalFs,
+            rules: Mutex::new(Vec::new()),
+            hits: Mutex::new(Vec::new()),
+        })
+    }
+
+    /// Fail `op` on paths ending with `suffix`, forever.
+    pub fn fail(&self, op: Op, suffix: impl Into<PathBuf>, errno: i32) {
+        self.rules.lock().unwrap().push(Rule {
+            op,
+            suffix: suffix.into(),
+            errno,
+            remaining: None,
+        });
+    }
+
+    /// Fail only the next `times` matching calls (to test "retry").
+    pub fn fail_times(&self, op: Op, suffix: impl Into<PathBuf>, errno: i32, times: usize) {
+        self.rules.lock().unwrap().push(Rule {
+            op,
+            suffix: suffix.into(),
+            errno,
+            remaining: Some(times),
+        });
+    }
+
+    pub fn clear(&self) {
+        self.rules.lock().unwrap().clear();
+    }
+
+    fn check(&self, op: Op, p: &Path) -> io::Result<()> {
+        let mut rules = self.rules.lock().unwrap();
+        for r in rules.iter_mut() {
+            if (r.op == op || r.op == Op::Any) && p.ends_with(&r.suffix) {
+                if let Some(n) = r.remaining.as_mut() {
+                    if *n == 0 {
+                        continue;
+                    }
+                    *n -= 1;
+                }
+                self.hits.lock().unwrap().push((op, p.to_path_buf()));
+                return Err(io::Error::from_raw_os_error(r.errno));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl FsEngine for FaultFs {
+    fn lstat(&self, p: &Path) -> io::Result<FsMeta> {
+        self.check(Op::Lstat, p)?;
+        self.inner.lstat(p)
+    }
+    fn stat(&self, p: &Path) -> io::Result<FsMeta> {
+        self.inner.stat(p)
+    }
+    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {
+        self.check(Op::ReadDir, p)?;
+        self.inner.read_dir(p)
+    }
+    fn read_link(&self, p: &Path) -> io::Result<PathBuf> {
+        self.inner.read_link(p)
+    }
+    fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()> {
+        self.check(Op::CreateDir, p)?;
+        self.inner.create_dir(p, mode)
+    }
+    fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
+        self.check(Op::CreateSymlink, l)?;
+        self.inner.create_symlink(t, l)
+    }
+    fn rename(&self, a: &Path, b: &Path) -> io::Result<()> {
+        self.check(Op::Rename, a)?;
+        self.inner.rename(a, b)
+    }
+    fn rename_noreplace(&self, a: &Path, b: &Path) -> io::Result<()> {
+        self.check(Op::Rename, a)?;
+        self.inner.rename_noreplace(a, b)
+    }
+    fn remove_file(&self, p: &Path) -> io::Result<()> {
+        self.check(Op::RemoveFile, p)?;
+        self.inner.remove_file(p)
+    }
+    fn remove_dir(&self, p: &Path) -> io::Result<()> {
+        self.check(Op::RemoveDir, p)?;
+        self.inner.remove_dir(p)
+    }
+    fn set_mode(&self, p: &Path, m: u32) -> io::Result<()> {
+        self.inner.set_mode(p, m)
+    }
+    fn set_mtime(&self, p: &Path, m: SystemTime, a: Option<SystemTime>) -> io::Result<()> {
+        self.inner.set_mtime(p, m, a)
+    }
+    fn copy_file(&self, req: &CopyRequest, ctl: &mut dyn CopyControl) -> io::Result<CopyOutcome> {
+        self.check(Op::CopyFile, &req.src)?;
+        self.inner.copy_file(req, ctl)
+    }
+    fn available_space(&self, p: &Path) -> io::Result<u64> {
+        self.inner.available_space(p)
+    }
+    fn can_read(&self, p: &Path) -> bool {
+        self.inner.can_read(p)
+    }
+    fn can_write(&self, p: &Path) -> bool {
+        self.inner.can_write(p)
+    }
+}
+
+/// `OsString` from raw bytes (non-UTF-8 name fixtures).
+pub fn os_from_bytes(b: &[u8]) -> OsString {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        OsString::from_vec(b.to_vec())
+    }
+    #[cfg(not(unix))]
+    {
+        OsString::from(String::from_utf8_lossy(b).into_owned())
+    }
+}
+
+pub fn os(s: &str) -> &OsStr {
+    OsStr::new(s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_tripwire_really_trips() {
+        // Uses a fake "real" directory inside a sandbox, never a real user path.
+        let sb = Sandbox::new();
+        let fake_real = sb.mkdir("fake-real-home/Trash");
+        let guard = RealPathGuard::new(vec![fake_real.clone()], vec![]);
+        assert!(guard.check().is_ok());
+        std::fs::write(fake_real.join("stray.txt"), b"x").unwrap();
+        let err = guard.check().unwrap_err();
+        assert!(err.contains("stray.txt"), "{err}");
+    }
+
+    #[test]
+    fn the_process_is_repointed_at_the_scratch_area() {
+        let sb = Sandbox::new();
+        let _ = &sb;
+        let home = std::env::var_os("HOME").unwrap();
+        assert!(Path::new(&home).starts_with(disk_base()));
+        let st = std::env::var_os("XDG_STATE_HOME").unwrap();
+        assert!(Path::new(&st).starts_with(disk_base()));
+    }
+
+    #[test]
+    fn sandbox_drop_checks_real_paths() {
+        let sb = Sandbox::new();
+        drop(sb); // would panic if a real path had been modified
+    }
+}
