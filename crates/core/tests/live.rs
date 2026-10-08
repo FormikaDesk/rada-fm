@@ -45,7 +45,7 @@ fn wait_for<T>(
     ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
 )]
 fn directory_loading_reports_the_real_error_for_unreadable_folders() {
-    // superfile B9: "No such file or directory" instead of "Permission denied".
+    // Regression: "No such file or directory" instead of "Permission denied".
     if is_root() {
         return;
     }
@@ -126,7 +126,7 @@ fn changed(rx: &Receiver<CoreEvent>, secs: u64) -> (PathBuf, Vec<PathBuf>, bool)
     ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
 )]
 fn files_created_removed_and_renamed_from_outside_show_up_without_any_key() {
-    // superfile B6/#928: an externally created file was invisible for >12 s.
+    // Regression: an externally created file was invisible for >12 s.
     let sb = Sandbox::new();
     let dir = sb.mkdir("watched");
     let (tx, rx) = unbounded();
@@ -278,7 +278,7 @@ impl Platform for WithSlowVolumes {
 
 #[test]
 fn a_slow_volume_listing_never_blocks_the_caller() {
-    // superfile #1669 / #727: a slow mount froze every keypress.
+    // Regression: a slow mount froze every keypress.
     let sb = Sandbox::new();
     let p: Arc<dyn Platform> = Arc::new(WithSlowVolumes(sb.platform(), SlowVolumes));
     let (tx, rx) = unbounded();

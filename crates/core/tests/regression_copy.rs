@@ -1,4 +1,4 @@
-//! Regression tests for the bugs found in superfile (B1, B2, B3, B10) plus the
+//! Regression tests for bugs found in other terminal file managers, plus the
 //! behaviours the plan/execute engine promises.
 
 use std::path::{Path, PathBuf};
@@ -8,7 +8,7 @@ use rada_core::testutil::*;
 
 const UNIX_ONLY: &str = "needs POSIX symlinks/permissions; Windows support is in development";
 
-// ------------------------------------------------------------------------------ B1
+// ------------------------------------------------------------------------------ dots in folder names
 
 #[test]
 fn folder_names_with_dots_do_not_misplace_the_destination() {
@@ -41,7 +41,7 @@ fn folder_names_with_dots_do_not_misplace_the_destination() {
     assert!(sb.path("v1.2/sub/archive (1).tar.gz").exists());
 }
 
-// ------------------------------------------------------------------------------ B2
+// ------------------------------------------------------------------------------ symlinks inside copied trees
 
 fn links_fixture(sb: &Sandbox) -> PathBuf {
     sb.write("box/real.txt", "data");
@@ -95,14 +95,14 @@ fn symlinks_are_preserved_as_symlinks_including_broken_and_circular() {
         assert!(md.file_type().is_symlink(), "{name} must stay a symlink");
         assert_eq!(std::fs::read_link(&p).unwrap(), Path::new(target), "{name}");
     }
-    // The link to a file must NOT have become an executable regular file (superfile: 755).
+    // The link to a file must NOT have become an executable regular file (it used to become mode 755).
     assert!(
         std::fs::symlink_metadata(dest.join("box/a_link_to_file"))
             .unwrap()
             .file_type()
             .is_symlink()
     );
-    // ...and the real data was copied as well (superfile aborted before it).
+    // ...and the real data was copied as well (another file manager aborted before it).
     assert_eq!(
         std::fs::read_to_string(dest.join("box/real.txt")).unwrap(),
         "data"
@@ -165,7 +165,7 @@ fn copying_a_folder_into_itself_or_a_descendant_is_blocked() {
     assert!(!plan.is_executable());
 }
 
-// ------------------------------------------------------------------------------ B3
+// ------------------------------------------------------------------------------ unreadable files
 
 #[test]
 #[cfg_attr(

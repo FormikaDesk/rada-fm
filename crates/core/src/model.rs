@@ -2,7 +2,7 @@
 //!
 //! Sorting is a *total* order (key, then natural name order, then raw bytes), so the
 //! result is deterministic: equal sizes or dates never shuffle between refreshes
-//! (superfile B6). Sorting happens immediately, in memory; it never waits for I/O.
+//! (a known failure of other file managers). Sorting happens immediately, in memory; it never waits for I/O.
 
 use std::cmp::Ordering;
 use std::ffi::OsString;
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn ties_are_broken_deterministically_whatever_the_input_order() {
-        // superfile B6: equal sizes shuffled between refreshes.
+        // Regression: equal sizes used to be shuffled between refreshes.
         let base: Vec<Entry> = (0..50)
             .map(|i| e(&format!("f{i:02}"), FileKind::File, 7, 100))
             .collect();

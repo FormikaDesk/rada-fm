@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn a_300kb_single_line_is_cut_not_an_error() {
-        // superfile B7: "bufio.Scanner: token too long".
+        // Regression: a very long line made another file manager give up ("token too long").
         let sb = Sandbox::new();
         sb.write("min.json", format!("{{\"k\":\"{}\"}}", "x".repeat(300_000)));
         let t = text(pv(&sb, "min.json"));
@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn binary_with_a_code_extension_is_not_printed_as_text() {
-        // superfile B7: binary_named.go printed random bytes.
+        // Regression: a binary file with a source-code extension printed random bytes.
         let sb = Sandbox::new();
         let mut data = vec![0x7fu8, b'E', b'L', b'F'];
         data.extend((0..4000u32).map(|i| (i * 31 % 251) as u8));
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn utf16_with_and_without_bom_and_latin1_are_decoded() {
-        // superfile B7: utf16.txt and latin1.txt gave an empty panel.
+        // Regression: UTF-16 and Latin-1 text files gave an empty panel.
         let sb = Sandbox::new();
         let le: Vec<u8> = [0xFF, 0xFE]
             .into_iter()

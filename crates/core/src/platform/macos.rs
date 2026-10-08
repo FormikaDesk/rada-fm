@@ -1,7 +1,7 @@
 //! macOS: compilable stub (also used as the fallback for other Unix systems).
 //!
 //! Planned: `NSFileManager trashItem` for the trash (with "Put Back" metadata),
-//! `getfsstat` for volumes (always from a worker, with a timeout: superfile #1669),
+//! `getfsstat` for volumes (always from a worker, with a timeout),
 //! `clonefile`/`copyfile` for fast copies, NFD-insensitive and case-insensitive names.
 
 use std::path::Path;

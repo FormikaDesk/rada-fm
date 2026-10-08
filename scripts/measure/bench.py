@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Startup, key latency and memory of rada, superfile and yazi, measured the same way.
+"""Startup, key latency and memory of rada (and, if installed, superfile and yazi), measured the same way.
 
-Method (identical to the superfile/yazi analysis): each program runs inside a tmux
+Method: each program runs inside a tmux
 session (160x50, TERM=xterm-256color); "startup" is the time from launching the
 session until a known file name shows on screen (polling `tmux capture-pane`);
 "latency" is the time from sending `j`/`k` until the on-screen position counter
 changes (200 alternating keys, 30 ms apart); RSS comes from /proc.
 
 Everything runs against isolated XDG folders under <project>/.scratch/.
-The fixtures in ~/inventore/analisi/sandbox are only read.
+The fixture folders are only read. Point RADA_BENCH_FIXTURES at a folder holding
+`code/` (14 files, one named binary.dat), `many10k/` (file_00000…file_09999) and
+`dirs3k/` (dir_0000…); RADA_BENCH_SPF names the superfile binary (default: `spf` in PATH).
 
 usage: bench.py [startup|latency|all] [rada|spf|yazi ...]
 """
@@ -20,21 +22,22 @@ import sys
 import time
 
 HOME = os.path.expanduser("~")
-ANALISI = f"{HOME}/inventore/analisi"
 RADA = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # the project root
 SCR = f"{RADA}/.scratch"
+FIXTURES = os.environ.get("RADA_BENCH_FIXTURES", f"{SCR}/fixtures")
+SPF = os.environ.get("RADA_BENCH_SPF", "spf")
 SESS = "bench"
 
 PROGS = {
     "rada": dict(cmd=f"{RADA}/target/release/rada", exe="rada", xdg=f"{SCR}/xdg", env=""),
-    "spf": dict(cmd=f"{ANALISI}/superfile/bin/spf", exe="spf", xdg=f"{SCR}/xdg_cmp", env=f"_ZO_DATA_DIR={SCR}/xdg_cmp/zoxide"),
+    "spf": dict(cmd=SPF, exe="spf", xdg=f"{SCR}/xdg_cmp", env=f"_ZO_DATA_DIR={SCR}/xdg_cmp/zoxide"),
     "yazi": dict(cmd="yazi", exe="yazi", xdg=f"{SCR}/xdg_cmp", env=f"YAZI_CONFIG_HOME={SCR}/xdg_cmp/yazi_cfg"),
 }
 
 CASES = [
-    ("14 files", f"{ANALISI}/sandbox/code", "binary.dat"),
-    ("10,000 files", f"{ANALISI}/sandbox/many10k", "file_00000"),
-    ("3,000 folders", f"{ANALISI}/sandbox/dirs3k", "dir_0000"),
+    ("14 files", f"{FIXTURES}/code", "binary.dat"),
+    ("10,000 files", f"{FIXTURES}/many10k", "file_00000"),
+    ("3,000 folders", f"{FIXTURES}/dirs3k", "dir_0000"),
 ]
 
 
@@ -126,7 +129,7 @@ def counter(name, text):
 
 
 def latency(name, n=200):
-    start(name, f"{ANALISI}/sandbox/many10k")
+    start(name, f"{FIXTURES}/many10k")
     t0 = time.perf_counter()
     while "file_00000" not in snap() and time.perf_counter() - t0 < 20:
         pass

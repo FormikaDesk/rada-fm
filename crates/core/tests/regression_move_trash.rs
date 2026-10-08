@@ -1,5 +1,5 @@
 //! Move, trash and delete: same filesystem, across filesystems (tmpfs <-> disk),
-//! the freedesktop trash layout, and the failure modes superfile had (B8).
+//! the freedesktop trash layout, and failure modes seen in other file managers.
 
 use std::path::PathBuf;
 
@@ -529,7 +529,7 @@ mod linux_only {
 
     #[test]
     fn a_failed_trash_leaves_no_orphan_trashinfo() {
-        // superfile B8: "invalid cross-device link" left file1.txt.2.trashinfo behind.
+        // Regression: "invalid cross-device link" left file1.txt.2.trashinfo behind.
         let sb = Sandbox::new();
         let f = sb.write("will_fail.txt", "x");
         let fault = FaultFs::new();

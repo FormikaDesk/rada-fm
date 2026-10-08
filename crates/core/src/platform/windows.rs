@@ -2,7 +2,7 @@
 //!
 //! The *model* is complete so the rest of the core never needs an `if windows`:
 //! drive letters (`Volume::drive_letter`), NTFS junctions and reparse points
-//! (`ReparseKind`, superfile #927), hidden/system attributes and case-insensitive
+//! (`ReparseKind`), hidden/system attributes and case-insensitive
 //! names (`PathRules`). The operations that need the Win32 API
 //! (`IFileOperation` for the Recycle Bin, `GetLogicalDrives` for volumes,
 //! `ShellExecute` for opening) return [`Error::Unsupported`] for now.

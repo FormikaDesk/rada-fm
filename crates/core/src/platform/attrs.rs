@@ -5,7 +5,7 @@ use crate::fs::FsMeta;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReparseKind {
     Symlink,
-    /// NTFS directory junction (superfile #927).
+    /// NTFS directory junction.
     Junction,
     MountPoint,
     Other,

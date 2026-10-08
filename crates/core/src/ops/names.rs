@@ -1,6 +1,6 @@
 //! File-name rules. Everything here works on a single name component (`OsStr`), never
 //! on a whole path: splitting an extension off a path string is what broke
-//! superfile in folders like `v1.2/` (B1).
+//! other file managers in folders like `v1.2/`.
 
 use std::ffi::{OsStr, OsString};
 use std::path::Path;

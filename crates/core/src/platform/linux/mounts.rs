@@ -1,5 +1,5 @@
 //! Volume enumeration from `/proc/self/mountinfo`, with a per-mount probe timeout so a
-//! hung network share can never stall the caller (superfile #1669 / #727).
+//! hung network share can never stall the caller (a known failure of other file managers).
 
 use std::collections::HashMap;
 use std::ffi::OsString;
