@@ -8,18 +8,18 @@ expression: shot(&mut h)
    ───────────────────────────────────────────────────────────────── │
    ▎ ▸ data/                             —  Folder      6 days ago   │
      ▸ src/                              —  Folder      6 days ago   │
-     ▸ 目录/    ╭────────────────────────────────────────────────────────────────────────────╮
-     · a-very-lo│                                                                            │
-     · backup.im│  ⌕  pro                                                                    │
-     · Cargo.tom│  ────────────────────────────────────────────────────────────────────────  │
-     · main.rs  │  ▎ ↑ proc-282299               …arget/vela-test-tmp/proc-282299    parent  │
-     · notes.txt│    ▸ data                      ~/demo/projects/data                folder  │
+     ▸ 目录/                             —  Folder      6 days ago   │
+     · a-very-lo╭────────────────────────────────────────────────────────────────────────────╮
+     · backup.im│                                                                            │
+     · Cargo.tom│  ⌕  projec                                                                 │
+     · main.rs  │  ────────────────────────────────────────────────────────────────────────  │
+     · notes.txt│  ▎ ▸ data                      ~/demo/projects/data                folder  │
      · README.md│    ▸ src                       ~/demo/projects/src                 folder  │
-     · тест-файл│    ▸ 目录                      ~/demo/projects/目录                folder  │
-     · 日本語のフ                                                                            │
-     · 📷 holida│  ↑↓ move   Enter go   Esc close   5 results                                │
-                │                                                                            │
+     · тест-файл│                                                                            │
+     · 日本語のフ  ↑↓ move   Enter go   Esc close   3 results                                │
+     · 📷 holida│                                                                            │
                 ╰────────────────────────────────────────────────────────────────────────────╯
+                                                                     │
                                                                      │
                                                                      │
                                                                      │

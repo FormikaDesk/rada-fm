@@ -12,13 +12,13 @@ pub mod widgets;
 
 use std::path::Path;
 
+use rada_core::display;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
-use vela_core::display;
 
 use crate::app::*;
 use crate::fmt;
@@ -124,7 +124,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
 // ----------------------------------------------------------------------------- header
 
-/// `~ › projects › vela`, the current folder in the accent colour. Each segment comes
+/// `~ › projects › rada`, the current folder in the accent colour. Each segment comes
 /// with the folder it stands for, so a click can go there.
 fn breadcrumb<'a>(app: &App, max: usize) -> Vec<(Span<'a>, Option<std::path::PathBuf>)> {
     let th = &app.th;
@@ -367,7 +367,7 @@ fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
         right.push(Span::raw("   "));
     }
     if let Some(c) = &app.clipboard {
-        let verb = if c.mode == vela_core::ops::TransferMode::Copy {
+        let verb = if c.mode == rada_core::ops::TransferMode::Copy {
             "copied"
         } else {
             "cut"

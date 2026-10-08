@@ -10,19 +10,19 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use vela_core::events::{
+use rada_core::events::{
     CoreEvent, DirEvent, FailureInfo, JobEvent, JobId, PreviewEvent, WatchEvent,
 };
-use vela_core::jobs::JobHandle;
-use vela_core::journal::JournalEntry;
-use vela_core::model::{DirListing, Entry, SortKey, SortSpec};
-use vela_core::ops::{
+use rada_core::jobs::JobHandle;
+use rada_core::journal::JournalEntry;
+use rada_core::model::{DirListing, Entry, SortKey, SortSpec};
+use rada_core::ops::{
     Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Progress, Scan, TransferMode,
     TransferOptions, UndoPlan,
 };
-use vela_core::ops::{OpKind, Totals};
-use vela_core::platform::Volume;
-use vela_core::preview::{ImageInfo, ImageState, Limits, Preview};
+use rada_core::ops::{OpKind, Totals};
+use rada_core::platform::Volume;
+use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
 use crate::fmt;
 use crate::hits::{Hits, Target};
@@ -145,7 +145,7 @@ impl PlanView {
     /// Permanent deletion is the only operation that asks for a typed confirmation
     /// (undoing something is not "irreversible" in that sense).
     pub fn needs_typed_confirmation(&self) -> bool {
-        self.plan.kind == vela_core::ops::OpKind::Delete
+        self.plan.kind == rada_core::ops::OpKind::Delete
     }
 
     pub fn can_run(&self) -> bool {
@@ -268,7 +268,7 @@ pub struct Config {
     pub mouse: bool,
     /// An operation handed in as data (`--request`): planned at start and shown in the
     /// usual confirmation window.
-    pub request: Option<vela_core::ops::OpRequest>,
+    pub request: Option<rada_core::ops::OpRequest>,
 }
 
 /// Developer hook: put the interface in a ready-made state (for screenshots).
@@ -306,7 +306,7 @@ pub struct App {
 
     pub volumes: Vec<Volume>,
     /// Recent folders, state bookmarks and standard places (from the places worker).
-    pub paths: vela_core::places::PathLists,
+    pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
     demo: Option<Demo>,
     demo_auto_run: bool,
@@ -739,7 +739,7 @@ impl App {
             self.preview.scroll = 0;
             self.preview.path = Some(ev.path.clone());
         }
-        self.preview.name = vela_core::display::name(&ev.name);
+        self.preview.name = rada_core::display::name(&ev.name);
         match ev.preview {
             Preview::Image(ip) => {
                 let status = match ip.state {
@@ -905,7 +905,7 @@ impl App {
         journal_errors: u64,
         done: Option<Running>,
     ) {
-        use vela_core::ops::RunStatus::*;
+        use rada_core::ops::RunStatus::*;
         let mut lines: Vec<(ToastKind, String)> = Vec::new();
         for f in &report.failed {
             lines.push((ToastKind::Error, f.error.clone()));
@@ -985,11 +985,11 @@ impl App {
         }
         self.plan_job = None;
         let replan = match (&plan.kind, &plan.destination) {
-            (vela_core::ops::OpKind::Copy, Some(d)) => Replan::Transfer {
+            (rada_core::ops::OpKind::Copy, Some(d)) => Replan::Transfer {
                 dest: d.clone(),
                 mode: TransferMode::Copy,
             },
-            (vela_core::ops::OpKind::Move, Some(d)) => Replan::Transfer {
+            (rada_core::ops::OpKind::Move, Some(d)) => Replan::Transfer {
                 dest: d.clone(),
                 mode: TransferMode::Move,
             },
@@ -1306,8 +1306,8 @@ impl App {
                     "Home".to_string()
                 } else {
                     path.file_name()
-                        .map(vela_core::display::name)
-                        .unwrap_or_else(|| vela_core::display::path(path))
+                        .map(rada_core::display::name)
+                        .unwrap_or_else(|| rada_core::display::path(path))
                 }
             });
             let detail = detail.unwrap_or_else(|| fmt::short_path(path, &home));
@@ -1345,7 +1345,7 @@ impl App {
                 if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
                     "Root".to_string()
                 } else {
-                    vela_core::display::path(&v.mount_point)
+                    rada_core::display::path(&v.mount_point)
                 }
             });
             let free = v
@@ -1358,7 +1358,7 @@ impl App {
                         " · not responding".into()
                     }
                 });
-            let detail = format!("{}{free}", vela_core::display::path(&v.mount_point));
+            let detail = format!("{}{free}", rada_core::display::path(&v.mount_point));
             add(
                 &mut items,
                 &v.mount_point,

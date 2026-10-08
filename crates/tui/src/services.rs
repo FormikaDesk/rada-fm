@@ -5,15 +5,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, unbounded};
-use vela_core::events::CoreEvent;
-use vela_core::fs::FsEngine;
-use vela_core::jobs::Jobs;
-use vela_core::journal::Journal;
-use vela_core::ops::Engine;
-use vela_core::places::PlacesStore;
-use vela_core::platform::Platform;
-use vela_core::watch::DirWatcher;
-use vela_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
+use rada_core::events::CoreEvent;
+use rada_core::fs::FsEngine;
+use rada_core::jobs::Jobs;
+use rada_core::journal::Journal;
+use rada_core::ops::Engine;
+use rada_core::places::PlacesStore;
+use rada_core::platform::Platform;
+use rada_core::watch::DirWatcher;
+use rada_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
 
 pub struct Services {
     pub jobs: Jobs,
@@ -43,7 +43,7 @@ impl Services {
             previewer: PreviewWorker::spawn(fs, tx.clone()),
             watcher: DirWatcher::spawn(tx.clone()),
             places: PlacesStore::spawn(
-                platform.dirs().vela_state(),
+                platform.dirs().rada_state(),
                 platform.dirs().home.clone(),
                 tx.clone(),
             ),

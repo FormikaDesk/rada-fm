@@ -11,7 +11,7 @@ expression: shot(&mut h)
      ▸ 目录/                                   —  Folder      6 days ago   │   2
      · a-very-long-file-name…  ───────       1 B  ● archive  12 days ago   │   3  A few notes about what lives here.
      · backup.img              ━━━━━━━   420 MiB  file        9 days ago   │   4
-     · Cargo.toml              ───────      42 B  ● config    2 days ago   │   5  - vela
+     · Cargo.toml              ───────      42 B  ● config    2 days ago   │   5  - rada
      · main.rs                 ───────      37 B  ● code       yesterday   │   6  - site
      · notes.txt               ───────  3.52 KiB  ● text     5 weeks ago   │   7  - dotfiles
    ▎ · README.md               ───────      73 B  ● md           3 h ago   │

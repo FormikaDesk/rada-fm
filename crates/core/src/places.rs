@@ -38,11 +38,11 @@ pub struct PlacesStore {
 }
 
 impl PlacesStore {
-    /// `state_dir` is `$XDG_STATE_HOME/vela`; `home` is the user's home folder.
+    /// `state_dir` is `$XDG_STATE_HOME/rada`; `home` is the user's home folder.
     pub fn spawn(state_dir: PathBuf, home: PathBuf, out: Sender<CoreEvent>) -> PlacesStore {
         let (tx, rx) = mpsc::channel::<Req>();
         std::thread::Builder::new()
-            .name("vela-places".into())
+            .name("rada-places".into())
             .spawn(move || {
                 let recent_file = state_dir.join("recent.json");
                 let mark_file = state_dir.join("bookmarks.json");
@@ -160,7 +160,7 @@ mod tests {
         let sb = Sandbox::new();
         std::fs::create_dir_all(sb.dirs.home.join("Documents")).unwrap();
         let (tx, rx) = unbounded();
-        let dir = sb.dirs.vela_state();
+        let dir = sb.dirs.rada_state();
         let s = PlacesStore::spawn(dir.clone(), sb.dirs.home.clone(), tx);
         s.load();
         let p = next(&rx);

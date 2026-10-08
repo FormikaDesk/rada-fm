@@ -1,6 +1,6 @@
 //! Display-only string handling.
 //!
-//! Paths are never manipulated as text anywhere in vela; this module is the *only*
+//! Paths are never manipulated as text anywhere in rada; this module is the *only*
 //! place where an `OsStr` becomes a `String`, and the result is meant to be shown,
 //! not parsed. Control characters, escape sequences, bidi controls and invalid
 //! bytes are rendered as visible escapes so a hostile file name can neither break

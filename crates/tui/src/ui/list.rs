@@ -2,16 +2,16 @@
 
 use std::time::SystemTime;
 
+use rada_core::display;
+use rada_core::fs::FileKind;
+use rada_core::model::{Entry, SortKey};
+use rada_core::ops::LinkState;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
-use vela_core::display;
-use vela_core::fs::FileKind;
-use vela_core::model::{Entry, SortKey};
-use vela_core::ops::LinkState;
 
 use super::widgets::{SPIN, badge, bar_spans, hit_spans, pad_left};
 use crate::app::App;

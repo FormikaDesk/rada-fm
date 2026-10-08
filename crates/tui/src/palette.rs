@@ -228,7 +228,7 @@ mod tests {
         PaletteView::new(
             vec![
                 item("projects", "~/projects", PaletteKind::Bookmark),
-                item("vela", "~/projects/vela", PaletteKind::Recent),
+                item("rada", "~/projects/rada", PaletteKind::Recent),
                 item("Downloads", "~/Downloads", PaletteKind::Place),
                 item("Documents", "~/Documents", PaletteKind::Place),
                 item("backup", "/run/media/user/backup", PaletteKind::Disk),
@@ -259,10 +259,10 @@ mod tests {
         }
         assert_eq!(p.current().unwrap().label, "Documents");
         p.clear();
-        for c in "vel".chars() {
+        for c in "rad".chars() {
             p.insert(c);
         }
-        assert_eq!(p.current().unwrap().label, "vela");
+        assert_eq!(p.current().unwrap().label, "rada");
     }
 
     #[test]

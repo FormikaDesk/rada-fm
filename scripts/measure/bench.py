@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Startup, key latency and memory of vela, superfile and yazi, measured the same way.
+"""Startup, key latency and memory of rada, superfile and yazi, measured the same way.
 
 Method (identical to the superfile/yazi analysis): each program runs inside a tmux
 session (160x50, TERM=xterm-256color); "startup" is the time from launching the
@@ -7,10 +7,10 @@ session until a known file name shows on screen (polling `tmux capture-pane`);
 "latency" is the time from sending `j`/`k` until the on-screen position counter
 changes (200 alternating keys, 30 ms apart); RSS comes from /proc.
 
-Everything runs against isolated XDG folders under ~/inventore/vela/.scratch/.
+Everything runs against isolated XDG folders under <project>/.scratch/.
 The fixtures in ~/inventore/analisi/sandbox are only read.
 
-usage: bench.py [startup|latency|all] [vela|spf|yazi ...]
+usage: bench.py [startup|latency|all] [rada|spf|yazi ...]
 """
 import os
 import re
@@ -21,12 +21,12 @@ import time
 
 HOME = os.path.expanduser("~")
 ANALISI = f"{HOME}/inventore/analisi"
-VELA = f"{HOME}/inventore/vela"
-SCR = f"{VELA}/.scratch"
+RADA = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # the project root
+SCR = f"{RADA}/.scratch"
 SESS = "bench"
 
 PROGS = {
-    "vela": dict(cmd=f"{VELA}/target/release/vela", exe="vela", xdg=f"{SCR}/xdg", env=""),
+    "rada": dict(cmd=f"{RADA}/target/release/rada", exe="rada", xdg=f"{SCR}/xdg", env=""),
     "spf": dict(cmd=f"{ANALISI}/superfile/bin/spf", exe="spf", xdg=f"{SCR}/xdg_cmp", env=f"_ZO_DATA_DIR={SCR}/xdg_cmp/zoxide"),
     "yazi": dict(cmd="yazi", exe="yazi", xdg=f"{SCR}/xdg_cmp", env=f"YAZI_CONFIG_HOME={SCR}/xdg_cmp/yazi_cfg"),
 }
@@ -108,7 +108,7 @@ def startup(name, n=10):
 
 
 COUNTER = {
-    "vela": re.compile(r"(\d+)/10000 items"),
+    "rada": re.compile(r"(\d+)/10000 items"),
     "yazi": re.compile(r"(\d+)/10000"),
 }
 
@@ -154,7 +154,7 @@ def latency(name, n=200):
 
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
-    names = sys.argv[2:] or ["vela", "spf", "yazi"]
+    names = sys.argv[2:] or ["rada", "spf", "yazi"]
     for nm in names:
         if what in ("startup", "all"):
             startup(nm)

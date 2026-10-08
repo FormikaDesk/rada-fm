@@ -1,4 +1,4 @@
-//! Persistent journal: an append-only JSON-lines file in `$XDG_STATE_HOME/vela/`.
+//! Persistent journal: an append-only JSON-lines file in `$XDG_STATE_HOME/rada/`.
 //!
 //! Every operation writes `begin`, then one `undo` record per *completed* step (the
 //! inverse step, in execution order), then `end`. Records are flushed at least every

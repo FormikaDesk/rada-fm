@@ -61,7 +61,7 @@ impl Jobs {
         let engine = self.engine.clone();
         let out = self.out.clone();
         std::thread::Builder::new()
-            .name(format!("vela-job-{id}"))
+            .name(format!("rada-job-{id}"))
             // Deep trees recurse in the scanner.
             .stack_size(16 << 20)
             .spawn(move || f(id, cancel, &engine, &out))

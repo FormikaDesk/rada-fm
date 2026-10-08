@@ -1,14 +1,14 @@
-# vela
+# rada
 
-**A terminal file manager you can trust.**
+**A safe harbor for your files.**
 
-vela is a fast, keyboard-driven file manager for the terminal, written in Rust. It is built around three promises:
+rada is a fast file manager for the terminal, written in Rust, driven by keyboard or mouse. It is built around three promises:
 
 1. **Plan first.** Every operation on files shows a *plan* before anything is touched: what will be done, how many files and bytes, and warnings about symlinks, permissions and name conflicts. You confirm, or you don't.
 2. **Undo always.** Every operation that finishes is recorded in a persistent journal and can be undone, even after a restart or a crash. If a file was modified after the operation, undo leaves it alone and tells you, instead of overwriting it.
 3. **Robust by construction.** Progress is counted in bytes. A failure on one file never stops the rest: you choose to skip, retry or abort, and the message always carries the full path. Symlinks stay symlinks (even broken or circular ones), nothing follows a link out of the tree, and a half-written file never appears under its final name.
 
-![vela: the folder list with an image preview](docs/screenshots/main.png)
+![rada: the folder list with an image preview](docs/screenshots/main.png)
 
 > **Status:** early (phase 1). Linux is fully supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
 
@@ -40,28 +40,28 @@ vela is a fast, keyboard-driven file manager for the terminal, written in Rust. 
 Requires a recent stable Rust toolchain.
 
 ```sh
-git clone <this repository> vela
-cd vela
-cargo install --path crates/vela
+git clone <this repository> rada
+cd rada
+cargo install --path crates/rada
 ```
 
-Or just build it: `cargo build --release` and use `target/release/vela`.
+Or just build it: `cargo build --release` and use `target/release/rada`.
 
-Optional: make your shell follow vela's last folder (`v` instead of `vela`):
+Optional: make your shell follow rada's last folder (`v` instead of `rada`):
 
 ```sh
-eval "$(vela --init bash)"        # also: zsh, fish, nushell, powershell
+eval "$(rada --init bash)"        # also: zsh, fish, nushell, powershell
 ```
 
 ## Usage
 
 ```sh
-vela [PATH] [--icons nerd|unicode|none] [--theme NAME] [--keymap PRESET] [--no-mouse] [--hidden]
+rada [PATH] [--icons nerd|unicode|none] [--theme NAME] [--keymap PRESET] [--no-mouse] [--hidden]
 ```
 
 Icons default to plain Unicode markers. With a [Nerd Font](https://www.nerdfonts.com/) installed, use `--icons nerd` (or `icons = "nerd"` in the config file).
 
-Open a file instead of a folder (`vela photo.png`) and vela starts in its folder with the cursor on it.
+Open a file instead of a folder (`rada photo.png`) and rada starts in its folder with the cursor on it.
 
 ### Images
 
@@ -69,11 +69,11 @@ Open a file instead of a folder (`vela photo.png`) and vela starts in its folder
 
 Large images: anything above 50 megapixels or 128 MiB is not decoded (a 12000×12000 PNG is refused instantly, from its header). Both limits are configurable.
 
-Optional config: `$XDG_CONFIG_HOME/vela/config.toml`
+Optional config: `$XDG_CONFIG_HOME/rada/config.toml`
 
 ```toml
 icons = "nerd"        # nerd | unicode | none
-theme = "vela"        # vela | catppuccin | tokyo-night
+theme = "rada"        # rada | catppuccin | tokyo-night
 show_hidden = false
 sort = "name"         # name | size | date
 reverse = false
@@ -81,7 +81,7 @@ bookmarks = ["~/projects", "/mnt/data"]
 images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
 image_max_megapixels = 50
 image_max_file_mb = 128
-mouse = true          # false: vela never captures the mouse
+mouse = true          # false: rada never captures the mouse
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
 
 [keys]                # per action; replaces all of its keys, [] unbinds it
@@ -90,20 +90,20 @@ trash = ["d", "delete"]
 quit = "ctrl+q"
 ```
 
-State lives in `$XDG_STATE_HOME/vela/` (`journal.jsonl`, `log/`). Set `VELA_LOG=debug` for more logging (written to a file, never to the screen).
+State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`). Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
 
 ## Themes
 
 Every colour on screen comes from a small set of named tokens (text, dim text, accent, selection, one colour per file type, success/warning/error…). Nothing is coloured by hand elsewhere; a test reads the sources and fails if it finds a hand-written colour outside `theme.rs`, and another renders every theme and checks that each cell uses only that theme's tokens.
 
-| `vela` (default) | `catppuccin` | `tokyo-night` |
+| `rada` (default) | `catppuccin` | `tokyo-night` |
 |---|---|---|
 | calm azure on a cool neutral base | Catppuccin Mocha | Tokyo Night |
 
 ![Catppuccin](docs/screenshots/theme-catppuccin.png)
 ![Tokyo Night](docs/screenshots/theme-tokyo-night.png)
 
-Choose with `theme = "…"` in the config, `--theme NAME` or `VELA_THEME`. Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working.
+Choose with `theme = "…"` in the config, `--theme NAME` or `RADA_THEME`. Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working.
 
 ## Keys
 
@@ -129,7 +129,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | bookmark this folder · home | `B` · `~` | |
 | help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
-**`Ctrl+C` copies and never quits**: the terminal is in raw mode, so it arrives as an ordinary key, and a stray `SIGINT` is ignored. Quit with `q` or `Ctrl+Q`; `SIGTERM` and closing the terminal end vela in an orderly way (the running operation is cancelled, the terminal is restored).
+**`Ctrl+C` copies and never quits**: the terminal is in raw mode, so it arrives as an ordinary key, and a stray `SIGINT` is ignored. Quit with `q` or `Ctrl+Q`; `SIGTERM` and closing the terminal end rada in an orderly way (the running operation is cancelled, the terminal is restored).
 
 **Redo** (`Ctrl+Y`) plans the operation you just undid again, and shows the usual plan window: it is the same request run through the same engine and recorded in the same journal. Redo is available until another operation is run; permanent deletions are never redoable.
 
@@ -137,13 +137,13 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 ### Mouse
 
-Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range; click a folder in the path to go there, a column title to sort (again to reverse), an item of the hint bar to run it, a row of the palette to jump, and the buttons of any window. A right click opens a context menu with each action's shortcut. `mouse = false` (or `--no-mouse`) turns it all off. While vela owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. Drag and drop between windows is planned for a later phase.
+Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range; click a folder in the path to go there, a column title to sort (again to reverse), an item of the hint bar to run it, a row of the palette to jump, and the buttons of any window. A right click opens a context menu with each action's shortcut. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. Drag and drop between windows is planned for a later phase.
 
 ### Keys that terminals take for themselves
 
 Checked in Ghostty by sending each combination to a real window and reading what the program received (the probe is `cargo run --example keyprobe`):
 
-| Combination | What happens | In vela |
+| Combination | What happens | In rada |
 |---|---|---|
 | `Shift+Home`, `Shift+End` | Ghostty scrolls its own scrollback and the program never sees them | `Ctrl+Shift+Home/End` extend the selection to the ends instead |
 | `Shift+PgUp/PgDn`, `Ctrl+Shift+V/A/F/P/N/T/W`, `Ctrl+T`, `Ctrl+Enter`, `Ctrl+,`, `Ctrl+±/0` | Ghostty's own tabs, search, paste, fullscreen, font size | not used |
@@ -153,7 +153,7 @@ Checked in Ghostty by sending each combination to a real window and reading what
 | `Ctrl+S`, `Ctrl+Q`, `Ctrl+Z` | would be flow control and job control in a normal terminal | delivered as keys (raw mode); `Ctrl+Q` quits, `Ctrl+Z` undoes |
 | `Ctrl+Space` | passed on | extra mark key |
 
-Everything else vela uses (`Ctrl+C/X/V/Z/Y/A/F/L/P/N/Q`, `Shift+Del`, `F1`–`F3`, `F7`, `Alt+↑`, `Ctrl+Shift+Z`, …) arrived intact. The window manager's own bindings (Hyprland here) all use the Super key, except `Alt+Space`, `Ctrl+Alt+Del` and `Ctrl+Shift+R`, which vela does not use. Terminals that implement the kitty keyboard protocol can tell more combinations apart; vela works with what every terminal sends.
+Everything else rada uses (`Ctrl+C/X/V/Z/Y/A/F/L/P/N/Q`, `Shift+Del`, `F1`–`F3`, `F7`, `Alt+↑`, `Ctrl+Shift+Z`, …) arrived intact. The window manager's own bindings (Hyprland here) all use the Super key, except `Alt+Space`, `Ctrl+Alt+Del` and `Ctrl+Shift+R`, which rada does not use. Terminals that implement the kitty keyboard protocol can tell more combinations apart; rada works with what every terminal sends.
 
 ## Requests as data
 
@@ -164,8 +164,8 @@ Every operation can be described as data and handed to the engine, with no inter
 ```
 
 ```sh
-vela --schema request            # print the JSON Schema (also: plan)
-vela --request job.json          # plan it and open the usual confirmation window (`-` reads stdin)
+rada --schema request            # print the JSON Schema (also: plan)
+rada --request job.json          # plan it and open the usual confirmation window (`-` reads stdin)
 ```
 
 Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `trash`, `delete`, `undo`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
@@ -176,7 +176,7 @@ A Cargo workspace:
 
 - `crates/core` — filesystem model, the plan/execute/undo engine, journal, watcher, workers, platform layer. No dependency on any interface.
 - `crates/tui` — the interface (ratatui + crossterm).
-- `crates/vela` — the `vela` binary.
+- `crates/rada` — the `rada` binary.
 
 Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait already models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin), with a complete Linux implementation and compilable stubs for Windows and macOS.
 
@@ -186,7 +186,7 @@ Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile
 cargo test --workspace
 ```
 
-The interface is tested headlessly with real workers on a sandboxed filesystem: every action through both key schemes, simulated mouse events (click, double click, wheel, right click, modifiers), and committed text snapshots of the screens (`crates/tui/tests/snapshots/`, pinned clock and home folder; update with `INSTA_UPDATE=always cargo test -p vela-tui --test snapshots` and review the diff).
+The interface is tested headlessly with real workers on a sandboxed filesystem: every action through both key schemes, simulated mouse events (click, double click, wheel, right click, modifiers), and committed text snapshots of the screens (`crates/tui/tests/snapshots/`, pinned clock and home folder; update with `INSTA_UPDATE=always cargo test -p rada-tui --test snapshots` and review the diff).
 
 The suite includes regression tests for real bugs found in other terminal file managers: folders with dots in their names, symlinks (to files, to folders, broken, circular) inside copied trees, an unreadable file in a copied folder, moving and trashing across filesystems (tmpfs ↔ disk), Unicode/emoji/special/non-UTF-8 names, and undo of every kind of operation including "modified after the operation".
 

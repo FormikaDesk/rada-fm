@@ -7,11 +7,11 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, unbounded};
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 
-use vela_core::events::{CoreEvent, PreviewEvent};
-use vela_core::fs::LocalFs;
-use vela_core::preview::{ImageLimits, ImageState, Limits, Preview};
-use vela_core::testutil::*;
-use vela_core::workers::PreviewWorker;
+use rada_core::events::{CoreEvent, PreviewEvent};
+use rada_core::fs::LocalFs;
+use rada_core::preview::{ImageLimits, ImageState, Limits, Preview};
+use rada_core::testutil::*;
+use rada_core::workers::PreviewWorker;
 
 fn worker() -> (PreviewWorker, Receiver<CoreEvent>) {
     let (tx, rx) = unbounded();
@@ -30,7 +30,7 @@ fn next_for(rx: &Receiver<CoreEvent>, generation: u64, secs: u64) -> PreviewEven
 }
 
 /// Wait for the final state of an image preview (skipping the header-only `Loading`).
-fn settled(rx: &Receiver<CoreEvent>, generation: u64) -> vela_core::preview::ImagePreview {
+fn settled(rx: &Receiver<CoreEvent>, generation: u64) -> rada_core::preview::ImagePreview {
     loop {
         let ev = next_for(rx, generation, 20);
         match ev.preview {
@@ -267,7 +267,7 @@ fn the_limits_are_configurable() {
     assert!(matches!(settled(&rx, 3).state, ImageState::Ready(_)));
 }
 
-fn settled_or_first(rx: &Receiver<CoreEvent>, g: u64) -> vela_core::preview::ImagePreview {
+fn settled_or_first(rx: &Receiver<CoreEvent>, g: u64) -> rada_core::preview::ImagePreview {
     match next_for(rx, g, 10).preview {
         Preview::Image(i) => i,
         o => panic!("{o:?}"),

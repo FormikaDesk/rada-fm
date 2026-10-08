@@ -1,14 +1,14 @@
 //! The preview pane: no frame, just a title and the content, in the same calm style as
 //! the list. Images are drawn by the terminal graphics protocol; everything else is text.
 
+use rada_core::display;
+use rada_core::ops::LinkState;
+use rada_core::preview::Preview;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use vela_core::display;
-use vela_core::ops::LinkState;
-use vela_core::preview::Preview;
 
 use super::widgets::SPIN;
 use crate::app::{App, ImageStatus};
@@ -159,7 +159,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 kv(
                     &mut lines,
                     "Permissions",
-                    &format!("{}  {:04o}", vela_core::preview::mode_string(m), m & 0o7777),
+                    &format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
                     th.base(),
                 );
             }

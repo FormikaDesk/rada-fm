@@ -1,11 +1,11 @@
 //! Developer aid for screenshots: a filesystem that copies slowly, so that the progress
-//! bar can be photographed. Enabled only by `VELA_DEMO_SLOW_MBPS`.
+//! bar can be photographed. Enabled only by `RADA_DEMO_SLOW_MBPS`.
 
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use vela_core::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
+use rada_core::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
 
 pub struct SlowFs {
     inner: LocalFs,
@@ -13,7 +13,7 @@ pub struct SlowFs {
 }
 
 pub fn slow_fs_from_env() -> Option<SlowFs> {
-    let mbps: f64 = std::env::var("VELA_DEMO_SLOW_MBPS").ok()?.parse().ok()?;
+    let mbps: f64 = std::env::var("RADA_DEMO_SLOW_MBPS").ok()?.parse().ok()?;
     Some(SlowFs {
         inner: LocalFs,
         bytes_per_sec: mbps * 1_048_576.0,

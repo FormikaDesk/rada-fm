@@ -3,8 +3,8 @@
 
 use std::path::PathBuf;
 
-use vela_core::ops::*;
-use vela_core::testutil::*;
+use rada_core::ops::*;
+use rada_core::testutil::*;
 
 fn tree(sb: &Sandbox, root: &str) -> PathBuf {
     sb.write(format!("{root}/top.txt"), "top");
@@ -353,12 +353,12 @@ mod linux_only {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    use vela_core::fs::LocalFs;
-    use vela_core::ops::*;
-    use vela_core::platform::freedesktop::{FreedesktopTrash, percent_decode};
-    use vela_core::platform::linux::LinuxPlatform;
-    use vela_core::platform::{Platform, TrashHandle};
-    use vela_core::testutil::*;
+    use rada_core::fs::LocalFs;
+    use rada_core::ops::*;
+    use rada_core::platform::freedesktop::{FreedesktopTrash, percent_decode};
+    use rada_core::platform::linux::LinuxPlatform;
+    use rada_core::platform::{Platform, TrashHandle};
+    use rada_core::testutil::*;
 
     /// Remove `.Trash-<uid>` at a mount top if (and only if) this test created it.
     struct TrashCleanup(PathBuf, bool);
@@ -488,7 +488,7 @@ mod linux_only {
                 .unwrap()
                 .unwrap()
                 .path();
-            vela_core::platform::TrashedItem {
+            rada_core::platform::TrashedItem {
                 original: victim.clone(),
                 handle: TrashHandle::Freedesktop { stored: n, info },
             }

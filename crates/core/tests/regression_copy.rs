@@ -3,8 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
-use vela_core::ops::*;
-use vela_core::testutil::*;
+use rada_core::ops::*;
+use rada_core::testutil::*;
 
 const UNIX_ONLY: &str = "needs POSIX symlinks/permissions; Windows support is in development";
 
@@ -222,7 +222,7 @@ fn an_unreadable_file_does_not_stop_the_rest_and_the_error_has_the_full_path() {
     assert!(
         snapshot(&dest)
             .keys()
-            .all(|k| !k.to_string_lossy().contains("vela-part"))
+            .all(|k| !k.to_string_lossy().contains("rada-part"))
     );
 }
 
@@ -650,7 +650,7 @@ fn cancelling_stops_cleanly_and_leaves_no_partial_files() {
         .keys()
         .map(|k| k.to_string_lossy().into_owned())
         .collect();
-    assert!(names.iter().all(|n| !n.contains("vela-part")), "{names:?}");
+    assert!(names.iter().all(|n| !n.contains("rada-part")), "{names:?}");
     assert!(!names.contains(&"big/b.bin".to_string()));
 }
 

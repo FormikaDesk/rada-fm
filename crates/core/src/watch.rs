@@ -30,7 +30,7 @@ impl DirWatcher {
     pub fn spawn(out: Sender<CoreEvent>) -> DirWatcher {
         let (ctl_tx, ctl_rx) = unbounded();
         std::thread::Builder::new()
-            .name("vela-watch".into())
+            .name("rada-watch".into())
             .spawn(move || run(ctl_rx, out))
             .expect("spawn watcher thread");
         DirWatcher { ctl: ctl_tx }

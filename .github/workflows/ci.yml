@@ -26,7 +26,7 @@ jobs:
       - name: Build workspace
         run: cargo build --workspace --all-targets
       - name: Test core
-        run: cargo test -p vela-core
+        run: cargo test -p rada-core
 
   # Formatting, lints and the rest of the workspace (Linux).
   quality:

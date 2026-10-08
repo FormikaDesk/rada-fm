@@ -21,7 +21,7 @@ impl ColorDepth {
         let term = std::env::var("TERM").unwrap_or_default();
         if ct.contains("truecolor")
             || ct.contains("24bit")
-            || std::env::var_os("VELA_TRUECOLOR").is_some()
+            || std::env::var_os("RADA_TRUECOLOR").is_some()
             || term.contains("ghostty")
             || term.contains("kitty")
         {
@@ -114,12 +114,12 @@ const fn rgb(r: u8, g: u8, b: u8) -> Color {
 }
 
 impl Theme {
-    pub const NAMES: [&'static str; 3] = ["vela", "catppuccin", "tokyo-night"];
+    pub const NAMES: [&'static str; 3] = ["rada", "catppuccin", "tokyo-night"];
 
     /// A theme by name, adapted to the terminal's colour depth.
     pub fn named(name: &str, depth: ColorDepth) -> Option<Theme> {
         let t = match name.to_ascii_lowercase().as_str() {
-            "vela" | "default" => Theme::vela(),
+            "rada" | "default" => Theme::rada(),
             "catppuccin" | "catppuccin-mocha" | "mocha" => Theme::catppuccin(),
             "tokyo-night" | "tokyonight" | "tokyo" => Theme::tokyo_night(),
             _ => return None,
@@ -128,11 +128,11 @@ impl Theme {
     }
 
     pub fn detect() -> Theme {
-        Theme::named("vela", ColorDepth::detect()).expect("built-in theme")
+        Theme::named("rada", ColorDepth::detect()).expect("built-in theme")
     }
 
-    /// Base palette of the vela themes (cool neutrals, soft category colours).
-    fn vela_base(name: &'static str, accent: Color, selection: Color, mark: Color) -> Theme {
+    /// Base palette of the rada themes (cool neutrals, soft category colours).
+    fn rada_base(name: &'static str, accent: Color, selection: Color, mark: Color) -> Theme {
         Theme {
             name,
             bg: None,
@@ -172,13 +172,13 @@ impl Theme {
     }
 
     /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
-    pub fn vela() -> Theme {
-        Theme::vela_base("vela", rgb(86, 156, 255), rgb(36, 52, 86), rgb(30, 40, 66))
+    pub fn rada() -> Theme {
+        Theme::rada_base("rada", rgb(86, 156, 255), rgb(36, 52, 86), rgb(30, 40, 66))
     }
 
     pub fn catppuccin() -> Theme {
         // Catppuccin Mocha.
-        let mut t = Theme::vela_base(
+        let mut t = Theme::rada_base(
             "catppuccin",
             rgb(137, 180, 250),
             rgb(49, 50, 68),
@@ -212,7 +212,7 @@ impl Theme {
     }
 
     pub fn tokyo_night() -> Theme {
-        let mut t = Theme::vela_base(
+        let mut t = Theme::rada_base(
             "tokyo-night",
             rgb(122, 162, 247),
             rgb(41, 46, 66),

@@ -6,15 +6,15 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use rada_core::fs::LocalFs;
+use rada_core::model::SortSpec;
+use rada_core::testutil::*;
+use rada_tui::app::{App, Config, Modal};
+use rada_tui::hits::Target;
+use rada_tui::keymap::Chord;
+use rada_tui::{IconSet, Services, Theme, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use vela_core::fs::LocalFs;
-use vela_core::model::SortSpec;
-use vela_core::testutil::*;
-use vela_tui::app::{App, Config, Modal};
-use vela_tui::hits::Target;
-use vela_tui::keymap::Chord;
-use vela_tui::{IconSet, Services, Theme, ui};
 
 pub struct H {
     pub app: App,
@@ -29,7 +29,7 @@ impl H {
             start,
             w,
             h,
-            Some(vela_tui::ImageUi::halfblocks()),
+            Some(rada_tui::ImageUi::halfblocks()),
             Default::default(),
         )
     }
@@ -39,26 +39,26 @@ impl H {
         start: PathBuf,
         w: u16,
         h: u16,
-        images: Option<vela_tui::ImageUi>,
-        limits: vela_core::preview::Limits,
+        images: Option<rada_tui::ImageUi>,
+        limits: rada_core::preview::Limits,
     ) -> H {
         H::build(sb, start, w, h, images, limits, None)
     }
 
-    /// An operation handed in as data, as `vela --request` does.
+    /// An operation handed in as data, as `rada --request` does.
     pub fn with_request(
         sb: Sandbox,
         start: PathBuf,
         w: u16,
         h: u16,
-        req: vela_core::ops::OpRequest,
+        req: rada_core::ops::OpRequest,
     ) -> H {
         H::build(
             sb,
             start,
             w,
             h,
-            Some(vela_tui::ImageUi::halfblocks()),
+            Some(rada_tui::ImageUi::halfblocks()),
             Default::default(),
             Some(req),
         )
@@ -69,9 +69,9 @@ impl H {
         start: PathBuf,
         w: u16,
         h: u16,
-        images: Option<vela_tui::ImageUi>,
-        limits: vela_core::preview::Limits,
-        request: Option<vela_core::ops::OpRequest>,
+        images: Option<rada_tui::ImageUi>,
+        limits: rada_core::preview::Limits,
+        request: Option<rada_core::ops::OpRequest>,
     ) -> H {
         let svc = Services::start(Arc::new(LocalFs), sb.platform(), Some(sb.journal()));
         let cfg = Config {
@@ -79,8 +79,8 @@ impl H {
             icons: IconSet::Unicode,
             show_hidden: false,
             sort: SortSpec::default(),
-            theme: Theme::vela(),
-            image_mode: vela_tui::ImageMode::Halfblocks,
+            theme: Theme::rada(),
+            image_mode: rada_tui::ImageMode::Halfblocks,
             limits,
             select: None,
             bookmarks: Vec::new(),

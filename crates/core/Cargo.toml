@@ -1,6 +1,6 @@
 [package]
-name = "vela-core"
-description = "Filesystem model, plan/execute/undo engine, journal and platform layer for vela"
+name = "rada-core"
+description = "Filesystem model, plan/execute/undo engine, journal and platform layer for rada"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -36,4 +36,4 @@ libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
-vela-core = { path = ".", features = ["testutil"] }
+rada-core = { path = ".", features = ["testutil"] }

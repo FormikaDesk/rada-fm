@@ -285,7 +285,7 @@ impl Engine {
                 for (from, _) in &pairs {
                     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
                     let tmp =
-                        from.with_file_name(format!(".vela-rename-{}-{n}", std::process::id()));
+                        from.with_file_name(format!(".rada-rename-{}-{n}", std::process::id()));
                     plan.steps.push(Step::Rename {
                         from: from.clone(),
                         to: tmp.clone(),

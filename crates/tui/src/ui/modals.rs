@@ -1,16 +1,16 @@
 //! Windows in front of the interface: the plan, the jump palette, errors, prompts.
 //! One window at a time, centred, with everything behind it dimmed.
 
+use rada_core::display;
+use rada_core::fs::FileKind;
+use rada_core::journal::{EntryStatus, UndoState};
+use rada_core::ops::{ConflictPolicy, ItemAction, OpKind, RunStatus, Severity, Step};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph};
 use unicode_width::UnicodeWidthStr;
-use vela_core::display;
-use vela_core::fs::FileKind;
-use vela_core::journal::{EntryStatus, UndoState};
-use vela_core::ops::{ConflictPolicy, ItemAction, OpKind, RunStatus, Severity, Step};
 
 use super::widgets::{SPIN, button, centered, hit_spans, pad, pad_left, tail};
 use crate::app::*;
@@ -703,7 +703,7 @@ fn common_parent<'a>(
 }
 
 impl Bases {
-    fn of(plan: &vela_core::ops::Plan, home: &std::path::Path) -> Bases {
+    fn of(plan: &rada_core::ops::Plan, home: &std::path::Path) -> Bases {
         let from_items = common_parent(plan.items.iter().map(|i| i.path.as_path()));
         let from_steps = || {
             common_parent(
@@ -964,7 +964,7 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         ),
     };
     let preview: Vec<(String, String)> = match &iv.kind {
-        InputKind::BulkRename { items } => match vela_core::ops::Pattern::parse(&iv.text) {
+        InputKind::BulkRename { items } => match rada_core::ops::Pattern::parse(&iv.text) {
             Ok(p) => p
                 .preview(items)
                 .into_iter()
@@ -1009,7 +1009,7 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         Some(e) => lines.push(Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error)))),
         None => {
             if let InputKind::BulkRename { .. } = &iv.kind {
-                if let Err(e) = vela_core::ops::Pattern::parse(&iv.text) {
+                if let Err(e) = rada_core::ops::Pattern::parse(&iv.text) {
                     lines.push(Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error))));
                 } else {
                     lines.push(Line::raw(""));
@@ -1207,7 +1207,7 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
             "Click selects · double-click opens · wheel scrolls the list or the preview.",
             "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu.",
             "Click a folder in the path, a hint at the bottom, or a column title to sort.",
-            "Shift+drag selects text in the terminal (the mouse belongs to vela while it runs).",
+            "Shift+drag selects text in the terminal (the mouse belongs to rada while it runs).",
         ]
     } else {
         vec!["The mouse is off (mouse = false in the configuration)."]

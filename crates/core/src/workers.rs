@@ -42,7 +42,7 @@ impl DirLoader {
     ) -> DirLoader {
         let (tx, rx) = unbounded::<DirReq>();
         std::thread::Builder::new()
-            .name("vela-dir".into())
+            .name("rada-dir".into())
             .spawn(move || dir_loop(rx, fs, platform, out))
             .expect("spawn dir worker");
         DirLoader { tx }
@@ -153,7 +153,7 @@ impl PreviewWorker {
         let (tx, rx) = unbounded::<PreviewReq>();
         let images = ImageWorker::spawn(out.clone());
         std::thread::Builder::new()
-            .name("vela-preview".into())
+            .name("rada-preview".into())
             .spawn(move || {
                 while let Ok(mut req) = rx.recv() {
                     // Holding a key down moves through files faster than they can be read:
@@ -222,7 +222,7 @@ impl VolumesWorker {
         let refresh = Arc::new(AtomicBool::new(true));
         let (s, r) = (stop.clone(), refresh.clone());
         std::thread::Builder::new()
-            .name("vela-volumes".into())
+            .name("rada-volumes".into())
             .spawn(move || {
                 let mut last: Option<Vec<Volume>> = None;
                 let mut last_sent = Instant::now();

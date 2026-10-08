@@ -1,5 +1,5 @@
 [package]
-name = "vela"
+name = "rada"
 description = "A terminal file manager you can trust: plan first, undo always, robust operations"
 version.workspace = true
 edition.workspace = true
@@ -11,8 +11,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-vela-core = { path = "../core" }
-vela-tui = { path = "../tui" }
+rada-core = { path = "../core" }
+rada-tui = { path = "../tui" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"

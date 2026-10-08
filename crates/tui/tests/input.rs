@@ -7,10 +7,10 @@ use std::collections::HashMap;
 
 use common::*;
 use crossterm::event::{KeyModifiers, MouseButton, MouseEventKind};
-use vela_core::testutil::*;
-use vela_tui::app::Modal;
-use vela_tui::hits::Target;
-use vela_tui::keymap::{Action, Keymap, Preset};
+use rada_core::testutil::*;
+use rada_tui::app::Modal;
+use rada_tui::hits::Target;
+use rada_tui::keymap::{Action, Keymap, Preset};
 
 fn files() -> (Sandbox, std::path::PathBuf) {
     let sb = Sandbox::new();
@@ -432,9 +432,9 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
 #[test]
 fn clicking_a_column_title_sorts_and_clicking_again_reverses() {
     let mut h = harness();
-    h.click(&Target::SortBy(vela_core::model::SortKey::Size));
+    h.click(&Target::SortBy(rada_core::model::SortKey::Size));
     assert!(h.app.sort_label().starts_with("size"));
-    h.click(&Target::SortBy(vela_core::model::SortKey::Size));
+    h.click(&Target::SortBy(rada_core::model::SortKey::Size));
     assert!(h.app.sort_label().ends_with('↓'), "{}", h.app.sort_label());
 }
 
@@ -509,10 +509,10 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     let s = h.screen();
     assert!(s.contains("keep both"), "{s}");
     // Pick "keep both" with the mouse: the plan is recomputed.
-    h.click(&Target::Policy(vela_core::ops::ConflictPolicy::KeepBoth));
+    h.click(&Target::Policy(rada_core::ops::ConflictPolicy::KeepBoth));
     h.wait("replanned", |a| match &a.modal {
         Some(Modal::Plan(pv)) => {
-            pv.plan.policy == vela_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
+            pv.plan.policy == rada_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
         }
         _ => false,
     });
@@ -524,10 +524,10 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     // And confirm with the mouse.
     h.press("ctrl+v");
     plan_modal(&mut h);
-    h.click(&Target::Policy(vela_core::ops::ConflictPolicy::KeepBoth));
+    h.click(&Target::Policy(rada_core::ops::ConflictPolicy::KeepBoth));
     h.wait("replanned", |a| match &a.modal {
         Some(Modal::Plan(pv)) => {
-            pv.plan.policy == vela_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
+            pv.plan.policy == rada_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
         }
         _ => false,
     });
@@ -646,7 +646,7 @@ fn help_shows_both_schemes_side_by_side_and_scrolls() {
 
 #[test]
 fn a_request_given_as_data_goes_through_the_same_plan_window_and_journal() {
-    use vela_core::ops::OpRequest;
+    use rada_core::ops::OpRequest;
     let (sb, dir) = files();
     let dest = sb.mkdir("dest");
     let req: OpRequest = serde_json::from_str(&format!(
@@ -675,7 +675,7 @@ fn a_request_given_as_data_goes_through_the_same_plan_window_and_journal() {
 
 #[test]
 fn a_destructive_request_still_needs_the_typed_confirmation() {
-    use vela_core::ops::OpRequest;
+    use rada_core::ops::OpRequest;
     let (sb, dir) = files();
     let victim = dir.join("a.txt");
     let mut h = H::with_request(
@@ -700,7 +700,7 @@ fn a_destructive_request_still_needs_the_typed_confirmation() {
 
 #[test]
 fn a_bad_request_is_reported_and_the_browser_still_works() {
-    use vela_core::ops::OpRequest;
+    use rada_core::ops::OpRequest;
     let (sb, dir) = files();
     let mut h = H::with_request(
         sb,

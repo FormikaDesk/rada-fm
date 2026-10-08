@@ -137,7 +137,7 @@ static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 fn temp_sibling(dst: &Path) -> PathBuf {
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     // Short and independent of the target name, so a 255-byte name still fits.
-    dst.with_file_name(format!(".vela-part-{}-{n}", std::process::id()))
+    dst.with_file_name(format!(".rada-part-{}-{n}", std::process::id()))
 }
 
 struct RunState {

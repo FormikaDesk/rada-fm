@@ -6,16 +6,16 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, unbounded};
 
-use vela_core::events::*;
-use vela_core::jobs::Jobs;
-use vela_core::model::{DirListing, SortSpec};
-use vela_core::ops::*;
-use vela_core::platform::{
+use rada_core::events::*;
+use rada_core::jobs::Jobs;
+use rada_core::model::{DirListing, SortSpec};
+use rada_core::ops::*;
+use rada_core::platform::{
     Dirs, FileAttributes, Opener, PathRules, Platform, TrashBackend, Volume, VolumeLister,
 };
-use vela_core::testutil::*;
-use vela_core::watch::DirWatcher;
-use vela_core::workers::*;
+use rada_core::testutil::*;
+use rada_core::watch::DirWatcher;
+use rada_core::workers::*;
 
 /// Wait for an event matching `pick`; panic after `secs`.
 fn wait_for<T>(
@@ -53,7 +53,7 @@ fn directory_loading_reports_the_real_error_for_unreadable_folders() {
     sb.mkdir("locked");
     chmod(&sb.path("locked"), 0o000);
     let (tx, rx) = unbounded();
-    let loader = DirLoader::spawn(Arc::new(vela_core::fs::LocalFs), sb.platform(), tx);
+    let loader = DirLoader::spawn(Arc::new(rada_core::fs::LocalFs), sb.platform(), tx);
     loader.load(sb.path("locked"), 1);
     let result = wait_for(&rx, 5, |ev| match ev {
         CoreEvent::Dir(DirEvent::Loaded { result, .. }) => Some(result),
@@ -72,7 +72,7 @@ fn only_the_newest_load_request_is_answered_under_pressure() {
         sb.write(format!("d{i}/f.txt"), "x");
     }
     let (tx, rx) = unbounded();
-    let loader = DirLoader::spawn(Arc::new(vela_core::fs::LocalFs), sb.platform(), tx);
+    let loader = DirLoader::spawn(Arc::new(rada_core::fs::LocalFs), sb.platform(), tx);
     for i in 0..5 {
         loader.load(sb.path(format!("d{i}")), i);
     }
@@ -91,7 +91,7 @@ fn a_huge_folder_loads_quickly_and_sorts_deterministically() {
         std::fs::write(dir.join(format!("file{i:05}.txt")), "").unwrap();
     }
     let (tx, rx) = unbounded();
-    let loader = DirLoader::spawn(Arc::new(vela_core::fs::LocalFs), sb.platform(), tx);
+    let loader = DirLoader::spawn(Arc::new(rada_core::fs::LocalFs), sb.platform(), tx);
     let started = Instant::now();
     loader.load(dir.clone(), 1);
     let entries = wait_for(&rx, 10, |ev| match ev {
@@ -200,7 +200,7 @@ fn live_patches_update_a_sorted_listing() {
     let dir = sb.mkdir("live");
     sb.write("live/b.txt", "b");
     let (tx, rx) = unbounded();
-    let fs: Arc<dyn vela_core::fs::FsEngine> = Arc::new(vela_core::fs::LocalFs);
+    let fs: Arc<dyn rada_core::fs::FsEngine> = Arc::new(rada_core::fs::LocalFs);
     let loader = DirLoader::spawn(fs, sb.platform(), tx.clone());
     let watcher = DirWatcher::spawn(tx);
     let mut listing = DirListing::new(dir.clone(), vec![], SortSpec::default());
@@ -245,7 +245,7 @@ fn live_patches_update_a_sorted_listing() {
 
 struct SlowVolumes;
 impl VolumeLister for SlowVolumes {
-    fn list(&self) -> vela_core::Result<Vec<Volume>> {
+    fn list(&self) -> rada_core::Result<Vec<Volume>> {
         std::thread::sleep(Duration::from_secs(2)); // a hung network mount
         Ok(vec![])
     }

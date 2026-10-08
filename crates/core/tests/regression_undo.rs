@@ -3,9 +3,9 @@
 
 use std::path::PathBuf;
 
-use vela_core::journal::{EntryStatus, UndoState};
-use vela_core::ops::*;
-use vela_core::testutil::*;
+use rada_core::journal::{EntryStatus, UndoState};
+use rada_core::ops::*;
+use rada_core::testutil::*;
 
 fn modify(p: &std::path::Path, content: &str) {
     // Make sure size or mtime really differs even on coarse clocks.

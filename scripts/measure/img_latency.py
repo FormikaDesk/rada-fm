@@ -2,12 +2,12 @@
 """Key-to-screen latency with the cursor moving over a folder full of images.
 
 Same method as bench.py (tmux, 200 alternating j/k keys 30 ms apart, wait until the
-on-screen position counter changes). Runs vela twice on the same folder: image previews
+on-screen position counter changes). Runs rada twice on the same folder: image previews
 off, and image previews on (half blocks: tmux does not pass graphics protocols through).
-Expects ~/inventore/vela/.scratch/imgfolder (see the generator in the commit message).
+Expects <project>/.scratch/imgfolder (a folder of test images named img_000…).
 """
 import os, re, statistics, subprocess, sys, time
-H = os.path.expanduser("~/inventore/vela"); S = f"{H}/.scratch"; X = f"{S}/xdg"
+H = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); S = f"{H}/.scratch"; X = f"{S}/xdg"
 FOLDER = f"{S}/imgfolder"
 def sh(*a): return subprocess.run(list(a), capture_output=True, text=True)
 def snap(): return sh("tmux", "capture-pane", "-t", "il", "-p").stdout
@@ -17,7 +17,7 @@ def counter(t):
 def run(mode, n=200):
     sh("tmux", "kill-session", "-t", "il")
     env = f"XDG_CONFIG_HOME={X}/config XDG_DATA_HOME={X}/data XDG_STATE_HOME={X}/state XDG_CACHE_HOME={X}/cache TERM=xterm-256color COLORTERM=truecolor"
-    sh("tmux", "new-session", "-d", "-s", "il", "-x", "160", "-y", "50", "-c", FOLDER, f"env {env} {H}/target/release/vela --images {mode}; sleep 60")
+    sh("tmux", "new-session", "-d", "-s", "il", "-x", "160", "-y", "50", "-c", FOLDER, f"env {env} {H}/target/release/rada --images {mode}; sleep 60")
     t0 = time.perf_counter()
     while "img_000" not in snap() and time.perf_counter() - t0 < 20: pass
     time.sleep(1.0)
@@ -26,7 +26,7 @@ def run(mode, n=200):
     for c in sh("pgrep", "-P", pane).stdout.split() + [pane]:
         for k in [c] + sh("pgrep", "-P", c).stdout.split():
             try:
-                if os.path.basename(os.readlink(f"/proc/{k}/exe")) == "vela": pid = int(k)
+                if os.path.basename(os.readlink(f"/proc/{k}/exe")) == "rada": pid = int(k)
             except OSError: pass
     lat = []
     # cursor on the 4000x3000 JPEGs at the end of the folder: the heaviest decodes

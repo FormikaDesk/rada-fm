@@ -1,11 +1,11 @@
-//! Optional `config.toml` in the vela config folder.
+//! Optional `config.toml` in the rada config folder.
 //!
 //! ```toml
 //! icons = "nerd"      # nerd | unicode | none
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
-//! theme = "vela"            # vela | catppuccin | tokyo-night
+//! theme = "rada"            # rada | catppuccin | tokyo-night
 //! bookmarks = ["~/projects", "/mnt/data"]
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
@@ -20,10 +20,10 @@
 
 use std::collections::HashMap;
 
+use rada_core::model::{SortKey, SortSpec};
+use rada_core::platform::Dirs;
+use rada_core::preview::ImageLimits;
 use serde::Deserialize;
-use vela_core::model::{SortKey, SortSpec};
-use vela_core::platform::Dirs;
-use vela_core::preview::ImageLimits;
 
 #[derive(Debug)]
 pub struct FileConfig {
@@ -64,7 +64,7 @@ struct Raw {
 }
 
 pub fn load(dirs: &Dirs) -> FileConfig {
-    let path = dirs.vela_config().join("config.toml");
+    let path = dirs.rada_config().join("config.toml");
     let raw: Raw = match std::fs::read_to_string(&path) {
         Ok(text) => toml::from_str(&text).unwrap_or_else(|e| {
             tracing::warn!("{}: {e}", path.display());

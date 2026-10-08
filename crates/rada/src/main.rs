@@ -1,4 +1,4 @@
-//! vela: a terminal file manager you can trust.
+//! rada: a terminal file manager you can trust.
 
 mod config;
 mod demo;
@@ -10,14 +10,14 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use vela_core::fs::LocalFs;
-use vela_core::journal::Journal;
-use vela_core::platform::{self, Dirs};
-use vela_tui::{Config, Services, Theme};
+use rada_core::fs::LocalFs;
+use rada_core::journal::Journal;
+use rada_core::platform::{self, Dirs};
+use rada_tui::{Config, Services, Theme};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "vela",
+    name = "rada",
     version,
     about = "A terminal file manager you can trust: every operation shows a plan first, can be undone, and keeps going when one file fails."
 )]
@@ -33,7 +33,7 @@ struct Cli {
     #[arg(long, value_name = "MODE")]
     images: Option<String>,
 
-    /// Colour theme: vela, catppuccin or tokyo-night.
+    /// Colour theme: rada, catppuccin or tokyo-night.
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
 
@@ -50,7 +50,7 @@ struct Cli {
     keymap: Option<String>,
 
     /// Plan an operation given as JSON (a file, or `-` for stdin) and show it in the usual
-    /// confirmation window. See `vela --schema request`.
+    /// confirmation window. See `rada --schema request`.
     #[arg(long, value_name = "FILE")]
     request: Option<String>,
 
@@ -82,9 +82,9 @@ fn main() -> Result<()> {
         print!(
             "{}",
             if what == "plan" {
-                vela_core::schema::plan()
+                rada_core::schema::plan()
             } else {
-                vela_core::schema::request()
+                rada_core::schema::request()
             }
         );
         return Ok(());
@@ -97,8 +97,8 @@ fn main() -> Result<()> {
             } else {
                 std::fs::read_to_string(src).with_context(|| format!("cannot read {src}"))?
             };
-            let req: vela_core::ops::OpRequest = serde_json::from_str(&text)
-                .context("the request is not valid (see `vela --schema request`)")?;
+            let req: rada_core::ops::OpRequest = serde_json::from_str(&text)
+                .context("the request is not valid (see `rada --schema request`)")?;
             req.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
             Some(req)
         }
@@ -125,65 +125,65 @@ fn main() -> Result<()> {
     let icons_name = cli
         .icons
         .clone()
-        .or_else(|| std::env::var("VELA_ICONS").ok())
+        .or_else(|| std::env::var("RADA_ICONS").ok())
         .or(cfg_file.icons.clone());
     let icons = match icons_name.as_deref() {
         None | Some("auto") => {
             if fonts::terminal_uses_nerd_font(&dirs.home) {
-                vela_tui::IconSet::Nerd
+                rada_tui::IconSet::Nerd
             } else {
-                vela_tui::IconSet::Unicode
+                rada_tui::IconSet::Unicode
             }
         }
-        Some(n) => vela_tui::IconSet::parse(n)
+        Some(n) => rada_tui::IconSet::parse(n)
             .with_context(|| format!("unknown icon set {n:?} (use auto, nerd, unicode or none)"))?,
     };
 
-    let depth = vela_tui::theme::ColorDepth::detect();
+    let depth = rada_tui::theme::ColorDepth::detect();
     let theme_name = cli
         .theme
         .clone()
-        .or_else(|| std::env::var("VELA_THEME").ok())
+        .or_else(|| std::env::var("RADA_THEME").ok())
         .or(cfg_file.theme.clone());
     let theme = match theme_name {
         Some(n) => Theme::named(&n, depth)
             .with_context(|| format!("unknown theme {n:?} (use {})", Theme::NAMES.join(", ")))?,
-        None => Theme::named("vela", depth).expect("built-in theme"),
+        None => Theme::named("rada", depth).expect("built-in theme"),
     };
     let bookmarks = cfg_file
         .bookmarks
         .iter()
-        .map(|b| vela_tui::palette::expand(b, &dirs.home))
+        .map(|b| rada_tui::palette::expand(b, &dirs.home))
         .collect();
 
     let images_name = cli
         .images
         .clone()
-        .or_else(|| std::env::var("VELA_IMAGES").ok())
+        .or_else(|| std::env::var("RADA_IMAGES").ok())
         .or(cfg_file.images.clone());
     let image_mode = match images_name {
-        Some(n) => vela_tui::ImageMode::parse(&n).with_context(|| {
+        Some(n) => rada_tui::ImageMode::parse(&n).with_context(|| {
             format!("unknown image mode {n:?} (use auto, halfblocks, kitty, sixel, iterm2 or off)")
         })?,
-        None => vela_tui::ImageMode::Auto,
+        None => rada_tui::ImageMode::Auto,
     };
 
     let preset_name = cli
         .keymap
         .clone()
-        .or_else(|| std::env::var("VELA_KEYMAP").ok())
+        .or_else(|| std::env::var("RADA_KEYMAP").ok())
         .or(cfg_file.keymap.clone());
     let preset = match preset_name {
-        Some(n) => vela_tui::keymap::Preset::parse(&n).with_context(|| {
+        Some(n) => rada_tui::keymap::Preset::parse(&n).with_context(|| {
             format!(
                 "unknown keymap {n:?} (use {})",
-                vela_tui::keymap::Preset::NAMES.join(", ")
+                rada_tui::keymap::Preset::NAMES.join(", ")
             )
         })?,
-        None => vela_tui::keymap::Preset::VimClassic,
+        None => rada_tui::keymap::Preset::VimClassic,
     };
-    let keymap = vela_tui::keymap::Keymap::new(preset, &cfg_file.keys);
-    let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("VELA_NO_MOUSE").is_none();
+    let keymap = rada_tui::keymap::Keymap::new(preset, &cfg_file.keys);
+    let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("RADA_NO_MOUSE").is_none();
 
     let platform = platform::current(dirs.clone());
     let journal = match Journal::open(dirs.journal_path()) {
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
         }
     };
     let slow = demo::slow_fs_from_env();
-    let fs: Arc<dyn vela_core::fs::FsEngine> = match slow {
+    let fs: Arc<dyn rada_core::fs::FsEngine> = match slow {
         Some(s) => Arc::new(s),
         None => Arc::new(LocalFs),
     };
@@ -206,22 +206,22 @@ fn main() -> Result<()> {
         sort: cfg_file.sort,
         theme,
         bookmarks,
-        demo: cli.demo.clone().map(|scene| vela_tui::app::Demo {
+        demo: cli.demo.clone().map(|scene| rada_tui::app::Demo {
             scene,
-            dest: std::env::var_os("VELA_DEMO_DEST").map(PathBuf::from),
+            dest: std::env::var_os("RADA_DEMO_DEST").map(PathBuf::from),
         }),
         image_mode,
         keymap,
         mouse,
         request,
         select,
-        limits: vela_core::preview::Limits {
+        limits: rada_core::preview::Limits {
             image: cfg_file.image_limits.clone(),
             ..Default::default()
         },
     };
 
-    let outcome = vela_tui::run::run(cfg, services).context("terminal error")?;
+    let outcome = rada_tui::run::run(cfg, services).context("terminal error")?;
     if let Some(f) = &cli.cwd_file {
         write_cwd(f, &outcome.last_dir).with_context(|| format!("cannot write {}", f.display()))?;
     }
@@ -244,9 +244,9 @@ fn write_cwd(file: &std::path::Path, dir: &std::path::Path) -> std::io::Result<(
 fn init_logging(dirs: &Dirs) -> Option<tracing_appender::non_blocking::WorkerGuard> {
     let dir = dirs.log_dir();
     std::fs::create_dir_all(&dir).ok()?;
-    let appender = tracing_appender::rolling::daily(&dir, "vela.log");
+    let appender = tracing_appender::rolling::daily(&dir, "rada.log");
     let (writer, guard) = tracing_appender::non_blocking(appender);
-    let filter = tracing_subscriber::EnvFilter::try_from_env("VELA_LOG")
+    let filter = tracing_subscriber::EnvFilter::try_from_env("RADA_LOG")
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_writer(writer)

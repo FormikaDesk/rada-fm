@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 
 use crossterm::event::KeyCode;
+use rada_core::ops::ConflictPolicy;
 use ratatui::layout::Rect;
-use vela_core::ops::ConflictPolicy;
 
 use crate::keymap::Action;
 
@@ -19,7 +19,7 @@ pub enum Target {
     /// The list area (wheel scrolls it; a click on empty space clears the selection).
     List,
     /// A column label: sorts by it.
-    SortBy(vela_core::model::SortKey),
+    SortBy(rada_core::model::SortKey),
     /// A breadcrumb segment: go to that folder.
     Crumb(PathBuf),
     /// An item of the hint bar or a header button: runs the action.

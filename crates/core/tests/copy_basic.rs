@@ -1,5 +1,5 @@
-use vela_core::ops::*;
-use vela_core::testutil::*;
+use rada_core::ops::*;
+use rada_core::testutil::*;
 
 fn copy_all(
     sb: &Sandbox,

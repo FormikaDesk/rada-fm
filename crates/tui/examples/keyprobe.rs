@@ -1,16 +1,16 @@
 //! Developer tool: shows what a terminal really delivers for each key.
 //!
 //! Run it inside the terminal you want to test; every key press is decoded by crossterm
-//! (the same code vela uses) and appended to the log file given as the first argument:
+//! (the same code rada uses) and appended to the log file given as the first argument:
 //! the raw event, the chord, and the action the default keymap binds to it.
 //!
-//! `cargo run -p vela-tui --example keyprobe -- /path/to/log`   (Ctrl+Backslash stops it)
+//! `cargo run -p rada-tui --example keyprobe -- /path/to/log`   (Ctrl+Backslash stops it)
 
 use std::io::Write;
 
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use vela_tui::keymap::{Chord, Keymap};
+use rada_tui::keymap::{Chord, Keymap};
 
 fn main() -> std::io::Result<()> {
     let path = std::env::args().nth(1).expect("usage: keyprobe LOGFILE");

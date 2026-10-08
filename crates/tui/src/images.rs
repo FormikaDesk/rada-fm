@@ -55,7 +55,7 @@ impl ImageUi {
         let (req_tx, req_rx) = mpsc::channel::<ResizeRequest>();
         let (res_tx, res_rx) = crossbeam_channel::unbounded();
         std::thread::Builder::new()
-            .name("vela-image-encode".into())
+            .name("rada-image-encode".into())
             .spawn(move || {
                 while let Ok(mut req) = req_rx.recv() {
                     // Scrolling through photos queues requests for pictures already gone.

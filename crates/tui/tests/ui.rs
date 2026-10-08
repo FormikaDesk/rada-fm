@@ -8,10 +8,10 @@ use std::time::{Duration, Instant};
 
 use common::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rada_core::testutil::*;
+use rada_tui::app::Modal;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use vela_core::testutil::*;
-use vela_tui::app::Modal;
 
 #[test]
 fn lists_sorted_hides_dotfiles_and_previews_the_selection() {
@@ -370,7 +370,7 @@ fn an_image_is_drawn_with_its_facts_underneath() {
         a.preview.name == "photo.png"
             && matches!(
                 a.preview.image.as_ref().map(|i| &i.status),
-                Some(vela_tui::app::ImageStatus::Shown)
+                Some(rada_tui::app::ImageStatus::Shown)
             )
     });
     let mut s = h.screen();
@@ -408,7 +408,7 @@ fn a_huge_image_shows_a_clear_message_instead_of_a_picture() {
     h.wait("the message", |a| {
         matches!(
             a.preview.image.as_ref().map(|i| &i.status),
-            Some(vela_tui::app::ImageStatus::TooLarge(_))
+            Some(rada_tui::app::ImageStatus::TooLarge(_))
         )
     });
     let s = h.screen();
@@ -452,7 +452,7 @@ fn binary_files_show_a_card_and_the_hex_dump_only_on_request() {
     h.wait("card", |a| {
         matches!(
             a.preview.content,
-            Some(vela_core::preview::Preview::Binary(_))
+            Some(rada_core::preview::Preview::Binary(_))
         )
     });
     let s = h.screen();

@@ -113,7 +113,7 @@ mod tests {
         );
         assert!(s("src", "src") > s("src", "src-backup-old"));
         assert!(
-            s("vel", "/home/a/vela") > s("vel", "/home/a/very/elaborate"),
+            s("rad", "/home/a/rada") > s("rad", "/home/a/really/a/dir"),
             "word start and runs"
         );
     }
@@ -122,10 +122,10 @@ mod tests {
     fn positions_point_at_the_matched_characters() {
         let (_, pos) = score("dow", "Downloads").unwrap();
         assert_eq!(pos, vec![0, 1, 2]);
-        let (_, pos) = score("pv", "projects/vela").unwrap();
+        let (_, pos) = score("pa", "projects/rada").unwrap();
         assert_eq!(pos.len(), 2);
-        let text: Vec<char> = "projects/vela".chars().collect();
-        assert_eq!((text[pos[0]], text[pos[1]]), ('p', 'v'));
+        let text: Vec<char> = "projects/rada".chars().collect();
+        assert_eq!((text[pos[0]], text[pos[1]]), ('p', 'a'));
         assert!(pos[1] > pos[0]);
     }
 

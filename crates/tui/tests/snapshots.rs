@@ -1,6 +1,6 @@
 //! Screens as text, committed. A change to the look shows up as a reviewable diff of
 //! these files (`crates/tui/tests/snapshots/`). Update after an intended change with
-//! `INSTA_UPDATE=always cargo test -p vela-tui --test snapshots`.
+//! `INSTA_UPDATE=always cargo test -p rada-tui --test snapshots`.
 //!
 //! Everything that could vary is pinned: the clock, the file times, the home folder
 //! (paths show as `~/…`), the list of disks.
@@ -11,9 +11,9 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use common::*;
+use rada_core::testutil::*;
+use rada_tui::Theme;
 use unicode_width::UnicodeWidthStr;
-use vela_core::testutil::*;
-use vela_tui::Theme;
 
 /// 2030-01-01 12:00 UTC: far from "now", so a stray real clock would be obvious.
 fn fixed_now() -> SystemTime {
@@ -47,7 +47,7 @@ fn scene(w: u16, h: u16) -> H {
     };
     put(
         "README.md",
-        "# Projects\n\nA few notes about what lives here.\n\n- vela\n- site\n- dotfiles\n",
+        "# Projects\n\nA few notes about what lives here.\n\n- rada\n- site\n- dotfiles\n",
         3 * 3600,
     );
     put(
@@ -176,7 +176,7 @@ fn rename_prompt() {
 fn palette_modal() {
     let mut h = scene(110, 30);
     h.press("ctrl+p");
-    h.keys("pro");
+    h.keys("projec");
     insta::assert_snapshot!("palette_110x30", shot(&mut h));
 }
 
@@ -191,7 +191,7 @@ fn help_lists_both_schemes() {
 fn context_menu() {
     let mut h = scene(110, 30);
     on(&mut h, "main.rs");
-    let row = vela_tui::hits::Target::Row(h.app.cursor);
+    let row = rada_tui::hits::Target::Row(h.app.cursor);
     h.right_click(&row);
     insta::assert_snapshot!("menu_110x30", shot(&mut h));
 }
@@ -298,7 +298,7 @@ fn tokens_of(th: &Theme) -> Vec<ratatui::style::Color> {
 fn every_colour_on_screen_is_a_theme_token_in_every_theme() {
     use ratatui::style::Color;
     for name in Theme::NAMES {
-        let th = Theme::named(name, vela_tui::theme::ColorDepth::True).unwrap();
+        let th = Theme::named(name, rada_tui::theme::ColorDepth::True).unwrap();
         let allowed = tokens_of(&th);
         let mut h = scene(120, 30);
         h.app.th = th.clone();
@@ -325,8 +325,8 @@ fn every_colour_on_screen_is_a_theme_token_in_every_theme() {
 
 #[test]
 fn the_themes_really_differ_and_ansi_fallbacks_stay_in_range() {
-    use vela_tui::theme::ColorDepth;
-    let a = Theme::named("vela", ColorDepth::True).unwrap();
+    use rada_tui::theme::ColorDepth;
+    let a = Theme::named("rada", ColorDepth::True).unwrap();
     let b = Theme::named("catppuccin", ColorDepth::True).unwrap();
     let c = Theme::named("tokyo-night", ColorDepth::True).unwrap();
     assert_ne!(a.accent, b.accent);

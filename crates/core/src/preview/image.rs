@@ -365,7 +365,7 @@ impl ImageWorker {
         let newest = Arc::new(AtomicU64::new(0));
         let n = newest.clone();
         std::thread::Builder::new()
-            .name("vela-image".into())
+            .name("rada-image".into())
             .spawn(move || {
                 while let Ok(mut job) = rx.recv() {
                     while let Ok(newer) = rx.try_recv() {

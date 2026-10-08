@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Copy a 1.5 GB file with vela and watch the progress bar (byte-based) on screen.
-Expects ~/inventore/vela/.scratch/{src/random_1500M.bin,dst/}."""
+"""Copy a 1.5 GB file with rada and watch the progress bar (byte-based) on screen.
+Expects <project>/.scratch/{src/random_1500M.bin,dst/}."""
 import os, re, subprocess, time
-H = os.path.expanduser("~/inventore/vela")
+H = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 S = f"{H}/.scratch"
 X = f"{S}/xdg"
 def sh(*a): return subprocess.run(list(a), capture_output=True, text=True)
@@ -14,7 +14,7 @@ for run in (1, 2):
     sh("tmux", "kill-session", "-t", "cb")
     for f in os.listdir(f"{S}/dst"): os.remove(f"{S}/dst/{f}")
     sh("tmux", "new-session", "-d", "-s", "cb", "-x", "160", "-y", "50", "-c", f"{S}/src",
-       f"env XDG_CONFIG_HOME={X}/config XDG_DATA_HOME={X}/data XDG_STATE_HOME={X}/state XDG_CACHE_HOME={X}/cache TERM=xterm-256color COLORTERM=truecolor {H}/target/release/vela; sleep 60")
+       f"env XDG_CONFIG_HOME={X}/config XDG_DATA_HOME={X}/data XDG_STATE_HOME={X}/state XDG_CACHE_HOME={X}/cache TERM=xterm-256color COLORTERM=truecolor {H}/target/release/rada; sleep 60")
     time.sleep(1)
     keys("y", "h", "k", "k", "l", "p")
     time.sleep(1.0)

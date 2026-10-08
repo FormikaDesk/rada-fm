@@ -1,4 +1,4 @@
-//! Where vela keeps its own files. Passed around explicitly (never read from the
+//! Where rada keeps its own files. Passed around explicitly (never read from the
 //! environment deep inside the engine), which is what lets tests sandbox everything.
 
 use std::ffi::OsString;
@@ -68,24 +68,24 @@ impl Dirs {
         }
     }
 
-    pub fn vela_state(&self) -> PathBuf {
-        self.state.join("vela")
+    pub fn rada_state(&self) -> PathBuf {
+        self.state.join("rada")
     }
 
-    pub fn vela_config(&self) -> PathBuf {
-        self.config.join("vela")
+    pub fn rada_config(&self) -> PathBuf {
+        self.config.join("rada")
     }
 
-    pub fn vela_cache(&self) -> PathBuf {
-        self.cache.join("vela")
+    pub fn rada_cache(&self) -> PathBuf {
+        self.cache.join("rada")
     }
 
     pub fn journal_path(&self) -> PathBuf {
-        self.vela_state().join("journal.jsonl")
+        self.rada_state().join("journal.jsonl")
     }
 
     pub fn log_dir(&self) -> PathBuf {
-        self.vela_state().join("log")
+        self.rada_state().join("log")
     }
 
     /// The user's own trash directory (`$XDG_DATA_HOME/Trash` on Linux).
@@ -113,7 +113,7 @@ mod tests {
         let d = Dirs::from_vars(vars(&[("HOME", "/h"), ("XDG_STATE_HOME", "/s")])).unwrap();
         assert_eq!(d.state, PathBuf::from("/s"));
         assert_eq!(d.data, PathBuf::from("/h/.local/share"));
-        assert_eq!(d.journal_path(), PathBuf::from("/s/vela/journal.jsonl"));
+        assert_eq!(d.journal_path(), PathBuf::from("/s/rada/journal.jsonl"));
         assert_eq!(d.home_trash(), PathBuf::from("/h/.local/share/Trash"));
     }
 

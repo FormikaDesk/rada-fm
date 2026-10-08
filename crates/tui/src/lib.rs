@@ -1,7 +1,7 @@
-//! vela-tui: the terminal interface (ratatui + crossterm).
+//! rada-tui: the terminal interface (ratatui + crossterm).
 //!
 //! The UI thread never touches the filesystem: it draws state and forwards events from
-//! the keyboard and from the workers of `vela-core`.
+//! the keyboard and from the workers of `rada-core`.
 
 pub mod app;
 pub mod fmt;

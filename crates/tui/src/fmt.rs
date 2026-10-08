@@ -2,7 +2,7 @@
 
 use std::time::{Duration, SystemTime};
 
-pub use vela_core::display::bytes as size;
+pub use rada_core::display::bytes as size;
 
 pub fn date(t: Option<SystemTime>) -> String {
     let Some(t) = t else { return "—".into() };
@@ -15,12 +15,12 @@ pub fn date(t: Option<SystemTime>) -> String {
     }
 }
 
-/// `~/projects/vela` instead of `/home/user/projects/vela`.
+/// `~/projects/rada` instead of `/home/me/projects/rada`.
 pub fn short_path(p: &std::path::Path, home: &std::path::Path) -> String {
     match p.strip_prefix(home) {
         Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
-        Ok(rest) => format!("~/{}", vela_core::display::path(rest)),
-        Err(_) => vela_core::display::path(p),
+        Ok(rest) => format!("~/{}", rada_core::display::path(rest)),
+        Err(_) => rada_core::display::path(p),
     }
 }
 

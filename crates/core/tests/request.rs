@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-use vela_core::journal::UndoState;
-use vela_core::ops::*;
-use vela_core::testutil::*;
+use rada_core::journal::UndoState;
+use rada_core::ops::*;
+use rada_core::testutil::*;
 
-fn plan_of(e: &Engine, req: &OpRequest, j: Option<&vela_core::journal::Journal>) -> Plan {
+fn plan_of(e: &Engine, req: &OpRequest, j: Option<&rada_core::journal::Journal>) -> Plan {
     let cancel = Cancel::new();
     e.plan_request(
         req,

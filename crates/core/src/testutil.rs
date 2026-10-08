@@ -125,10 +125,10 @@ static PROCESS: OnceLock<Process> = OnceLock::new();
 
 /// Base directory for test sandboxes: on the project's own disk, never in `/tmp`.
 pub fn disk_base() -> PathBuf {
-    let base = std::env::var_os("VELA_TEST_TMP")
+    let base = std::env::var_os("RADA_TEST_TMP")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/vela-test-tmp")
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/rada-test-tmp")
         });
     let _ = std::fs::create_dir_all(&base);
     base.canonicalize().unwrap_or(base)
@@ -142,10 +142,10 @@ fn process() -> &'static Process {
         let mut shallow = Vec::new();
         if let Some(r) = &real {
             paths.push(r.home_trash());
-            paths.push(r.vela_state());
-            paths.push(r.vela_config());
-            paths.push(r.vela_cache());
-            paths.push(r.data.join("vela"));
+            paths.push(r.rada_state());
+            paths.push(r.rada_config());
+            paths.push(r.rada_cache());
+            paths.push(r.data.join("rada"));
             shallow.push(r.home.clone());
         }
         let guard = RealPathGuard::new(paths, shallow);
@@ -383,7 +383,7 @@ pub fn other_filesystem_dir(sb: &Sandbox) -> Option<tempfile::TempDir> {
         if std::fs::metadata(p).map(|m| m.dev()).ok() == Some(mine) {
             continue;
         }
-        if let Ok(t) = tempfile::Builder::new().prefix("vela-xfs-").tempdir_in(p) {
+        if let Ok(t) = tempfile::Builder::new().prefix("rada-xfs-").tempdir_in(p) {
             return Some(t);
         }
     }

@@ -1715,6 +1715,63 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "rada"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rada-core",
+ "rada-tui",
+ "serde",
+ "serde_json",
+ "toml",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "rada-core"
+version = "0.1.0"
+dependencies = [
+ "chardetng",
+ "crossbeam-channel",
+ "encoding_rs",
+ "image",
+ "jiff",
+ "libc",
+ "notify",
+ "rada-core",
+ "resvg",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "unicode-width",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "rada-tui"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "crossterm",
+ "image",
+ "insta",
+ "jiff",
+ "rada-core",
+ "ratatui",
+ "ratatui-image",
+ "serde_json",
+ "signal-hook 0.4.5",
+ "tracing",
+ "unicode-width",
+]
+
+[[package]]
 name = "radium"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2832,63 +2889,6 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
-
-[[package]]
-name = "vela"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde",
- "serde_json",
- "toml",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "vela-core",
- "vela-tui",
-]
-
-[[package]]
-name = "vela-core"
-version = "0.1.0"
-dependencies = [
- "chardetng",
- "crossbeam-channel",
- "encoding_rs",
- "image",
- "jiff",
- "libc",
- "notify",
- "resvg",
- "schemars",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
- "unicode-width",
- "vela-core",
- "xxhash-rust",
-]
-
-[[package]]
-name = "vela-tui"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "crossterm",
- "image",
- "insta",
- "jiff",
- "ratatui",
- "ratatui-image",
- "serde_json",
- "signal-hook 0.4.5",
- "tracing",
- "unicode-width",
- "vela-core",
-]
 
 [[package]]
 name = "version_check"

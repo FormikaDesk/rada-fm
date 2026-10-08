@@ -3,10 +3,10 @@
 //! Nerd Font glyphs need a patched font: without one they render as boxes, so the
 //! fallback is a small set of plain Unicode markers.
 
+use rada_core::fs::FileKind;
+use rada_core::model::Entry;
+use rada_core::ops::LinkState;
 use ratatui::style::Color;
-use vela_core::fs::FileKind;
-use vela_core::model::Entry;
-use vela_core::ops::LinkState;
 
 use crate::theme::Theme;
 

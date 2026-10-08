@@ -124,7 +124,7 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
     // Keyboard on its own thread, so slow drawing can never lose a key press.
     let (key_tx, key_rx) = unbounded::<Event>();
     std::thread::Builder::new()
-        .name("vela-input".into())
+        .name("rada-input".into())
         .spawn(move || {
             while let Ok(ev) = event::read() {
                 if key_tx.send(ev).is_err() {
