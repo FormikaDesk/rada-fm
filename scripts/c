@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Cargo wrapper: keeps the cargo registry/cache inside the project tree
+# (nothing is written to ~/.cargo) and gives every run an isolated XDG sandbox.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export CARGO_HOME="$ROOT/.cargo-home"
+export CARGO_TERM_COLOR=never
+exec cargo "$@"

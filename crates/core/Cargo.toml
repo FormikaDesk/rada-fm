@@ -1,0 +1,36 @@
+[package]
+name = "vela-core"
+description = "Filesystem model, plan/execute/undo engine, journal and platform layer for vela"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Test helpers (isolated XDG sandbox + real-path tripwire). Enabled by dev-dependency on itself.
+testutil = ["dep:tempfile"]
+
+[dependencies]
+thiserror = "2"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+crossbeam-channel = "0.5"
+notify = "8"
+unicode-width = "0.2"
+encoding_rs = "0.8"
+chardetng = "0.1"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+tempfile = { version = "3", optional = true }
+jiff = "0.2.38"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+vela-core = { path = ".", features = ["testutil"] }

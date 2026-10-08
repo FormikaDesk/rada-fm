@@ -1,0 +1,19 @@
+[package]
+name = "vela-tui"
+description = "Terminal user interface for vela (ratatui + crossterm)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+vela-core = { path = "../core" }
+ratatui = "0.30"
+crossterm = "0.29"
+crossbeam-channel = "0.5"
+tracing = "0.1"
+unicode-width = "0.2"
