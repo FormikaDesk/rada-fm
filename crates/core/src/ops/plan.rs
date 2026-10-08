@@ -143,19 +143,31 @@ impl Step {
         match self {
             Step::MakeDir { path, .. } => format!("create folder {}", display::path(path)),
             Step::FinishDir { path, .. } => format!("finish folder {}", display::path(path)),
-            Step::CopyFile { src, dst, remove_source, .. } => format!(
+            Step::CopyFile {
+                src,
+                dst,
+                remove_source,
+                ..
+            } => format!(
                 "{} {} -> {}",
                 if *remove_source { "move" } else { "copy" },
                 display::path(src),
                 display::path(dst)
             ),
-            Step::CopySymlink { src, dst, remove_source, .. } => format!(
+            Step::CopySymlink {
+                src,
+                dst,
+                remove_source,
+                ..
+            } => format!(
                 "{} link {} -> {}",
                 if *remove_source { "move" } else { "copy" },
                 display::path(src),
                 display::path(dst)
             ),
-            Step::Rename { from, to } => format!("rename {} -> {}", display::path(from), display::path(to)),
+            Step::Rename { from, to } => {
+                format!("rename {} -> {}", display::path(from), display::path(to))
+            }
             Step::TrashItem { path } => format!("trash {}", display::path(path)),
             Step::RemoveFile { path, .. } => format!("delete {}", display::path(path)),
             Step::RemoveDir { path } => format!("remove folder {}", display::path(path)),
@@ -170,9 +182,20 @@ impl Step {
             return None;
         }
         match self {
-            Step::MakeDir { path, .. } if result.created => Some(Step::RemoveDir { path: path.clone() }),
+            Step::MakeDir { path, .. } if result.created => {
+                Some(Step::RemoveDir { path: path.clone() })
+            }
             Step::MakeDir { .. } | Step::FinishDir { .. } => None,
-            Step::CopyFile { src, dst, remove_source, size, mode, mtime, atime, .. } => {
+            Step::CopyFile {
+                src,
+                dst,
+                remove_source,
+                size,
+                mode,
+                mtime,
+                atime,
+                ..
+            } => {
                 if *remove_source {
                     Some(Step::CopyFile {
                         src: dst.clone(),
@@ -191,7 +214,12 @@ impl Step {
                     })
                 }
             }
-            Step::CopySymlink { src, dst, target, remove_source } => {
+            Step::CopySymlink {
+                src,
+                dst,
+                target,
+                remove_source,
+            } => {
                 if *remove_source {
                     Some(Step::CopySymlink {
                         src: dst.clone(),
@@ -298,6 +326,10 @@ pub enum WarningKind {
     InvalidName,
     Missing,
     Merge,
+    /// An undo step was refused because the item changed since the operation.
+    ModifiedSince,
+    /// An undo step cannot be carried out (target occupied, source gone, ...).
+    CannotUndo,
     Other,
 }
 
@@ -325,7 +357,13 @@ impl WarningSet {
     }
 
     /// `detail` is appended to the example list's message the first time only.
-    pub fn add_with(&mut self, kind: WarningKind, severity: Severity, path: Option<&Path>, detail: Option<String>) {
+    pub fn add_with(
+        &mut self,
+        kind: WarningKind,
+        severity: Severity,
+        path: Option<&Path>,
+        detail: Option<String>,
+    ) {
         let e = self.by_kind.entry((kind, severity)).or_default();
         e.0 += 1;
         if let Some(p) = path {
@@ -365,30 +403,81 @@ impl WarningSet {
 }
 
 fn plural(n: u64, one: &str, many: &str) -> String {
-    if n == 1 { format!("1 {one}") } else { format!("{n} {many}") }
+    if n == 1 {
+        format!("1 {one}")
+    } else {
+        format!("{n} {many}")
+    }
 }
 
 fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
     let extra = detail.map(|d| format!(" ({d})")).unwrap_or_default();
     match kind {
         WarningKind::Irreversible => "PERMANENT: this cannot be undone".to_string(),
-        WarningKind::InsideItself => format!("{} is being copied or moved into itself", plural(n, "folder", "folders")),
+        WarningKind::InsideItself => format!(
+            "{} is being copied or moved into itself",
+            plural(n, "folder", "folders")
+        ),
         WarningKind::NotWritable => format!("destination is not writable{extra}"),
         WarningKind::LowSpace => format!("not enough free space{extra}"),
-        WarningKind::Conflict => format!("{} already exist{}", plural(n, "item", "items"), if n == 1 { "s" } else { "" }),
-        WarningKind::Overwrite => format!("{} will be replaced (the old version goes to the trash, so undo restores it)", plural(n, "item", "items")),
-        WarningKind::Unreadable => format!("{} cannot be read and will probably fail{extra}", plural(n, "item", "items")),
-        WarningKind::SpecialFile => format!("{} (device, socket or pipe) will be skipped", plural(n, "special file", "special files")),
-        WarningKind::BrokenSymlink => format!("{} point to nothing; they are kept as broken links", plural(n, "symlink", "symlinks")),
-        WarningKind::Symlink => format!("{} will be kept as links (not followed)", plural(n, "symlink", "symlinks")),
-        WarningKind::CircularLink => format!("{} form a loop; kept as links, not followed", plural(n, "symlink", "symlinks")),
-        WarningKind::MountLoop => format!("{} loop back to a parent (mount cycle) and will be skipped", plural(n, "folder", "folders")),
-        WarningKind::CrossDevice => "different filesystem: files are copied, verified, then removed from the source".to_string(),
-        WarningKind::SameLocation => format!("{} already in the destination folder", plural(n, "item is", "items are")),
-        WarningKind::HardLinks => format!("{} have several hard links; copies become independent files", plural(n, "file", "files")),
+        WarningKind::Conflict => format!(
+            "{} already exist{}",
+            plural(n, "item", "items"),
+            if n == 1 { "s" } else { "" }
+        ),
+        WarningKind::Overwrite => format!(
+            "{} will be replaced (the old version goes to the trash, so undo restores it)",
+            plural(n, "item", "items")
+        ),
+        WarningKind::Unreadable => format!(
+            "{} cannot be read and will probably fail{extra}",
+            plural(n, "item", "items")
+        ),
+        WarningKind::SpecialFile => format!(
+            "{} (device, socket or pipe) will be skipped",
+            plural(n, "special file", "special files")
+        ),
+        WarningKind::BrokenSymlink => format!(
+            "{} point to nothing; they are kept as broken links",
+            plural(n, "symlink", "symlinks")
+        ),
+        WarningKind::Symlink => format!(
+            "{} will be kept as links (not followed)",
+            plural(n, "symlink", "symlinks")
+        ),
+        WarningKind::CircularLink => format!(
+            "{} form a loop; kept as links, not followed",
+            plural(n, "symlink", "symlinks")
+        ),
+        WarningKind::MountLoop => format!(
+            "{} loop back to a parent (mount cycle) and will be skipped",
+            plural(n, "folder", "folders")
+        ),
+        WarningKind::CrossDevice => {
+            "different filesystem: files are copied, verified, then removed from the source"
+                .to_string()
+        }
+        WarningKind::SameLocation => format!(
+            "{} already in the destination folder",
+            plural(n, "item is", "items are")
+        ),
+        WarningKind::HardLinks => format!(
+            "{} have several hard links; copies become independent files",
+            plural(n, "file", "files")
+        ),
         WarningKind::InvalidName => format!("invalid name{extra}"),
         WarningKind::Missing => format!("{} no longer exist", plural(n, "item", "items")),
-        WarningKind::Merge => format!("{} will be merged with existing folders", plural(n, "folder", "folders")),
+        WarningKind::Merge => format!(
+            "{} will be merged with existing folders",
+            plural(n, "folder", "folders")
+        ),
+        WarningKind::ModifiedSince => format!(
+            "{} changed since the operation and will be left untouched",
+            plural(n, "item", "items")
+        ),
+        WarningKind::CannotUndo => {
+            format!("{} cannot be undone{extra}", plural(n, "step", "steps"))
+        }
         WarningKind::Other => detail.unwrap_or("see details").to_string(),
     }
 }
@@ -424,7 +513,7 @@ impl ConflictPolicy {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Totals {
     /// Top-level items the user selected.
     pub items: u64,
@@ -465,7 +554,9 @@ impl Plan {
     }
 
     pub fn blocking(&self) -> impl Iterator<Item = &Warning> {
-        self.warnings.iter().filter(|w| w.severity == Severity::Blocking)
+        self.warnings
+            .iter()
+            .filter(|w| w.severity == Severity::Blocking)
     }
 
     pub fn is_executable(&self) -> bool {
@@ -473,7 +564,9 @@ impl Plan {
     }
 
     pub fn has_conflicts(&self) -> bool {
-        self.warnings.iter().any(|w| matches!(w.kind, WarningKind::Conflict | WarningKind::Overwrite))
+        self.warnings
+            .iter()
+            .any(|w| matches!(w.kind, WarningKind::Conflict | WarningKind::Overwrite))
     }
 
     /// Bytes that will be moved through memory/IO.

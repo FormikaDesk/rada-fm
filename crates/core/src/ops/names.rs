@@ -31,7 +31,10 @@ pub fn validate(rules: &PathRules, name: &OsStr) -> Result<(), String> {
         return Err(format!("a name cannot contain {c:?}"));
     }
     if len > rules.max_name_bytes {
-        return Err(format!("the name is {len} bytes long (limit {})", rules.max_name_bytes));
+        return Err(format!(
+            "the name is {len} bytes long (limit {})",
+            rules.max_name_bytes
+        ));
     }
     if !rules.reserved_names.is_empty() {
         let stem = text.split('.').next().unwrap_or("").to_ascii_uppercase();
@@ -58,7 +61,10 @@ pub fn split_ext(name: &OsStr) -> (OsString, OsString) {
     // archive.tar.gz -> ("archive", ".tar.gz")
     if let Some(inner) = Path::new(&stem).extension() {
         if inner.eq_ignore_ascii_case("tar") {
-            let base = Path::new(&stem).file_stem().map(OsStr::to_os_string).unwrap_or_default();
+            let base = Path::new(&stem)
+                .file_stem()
+                .map(OsStr::to_os_string)
+                .unwrap_or_default();
             let mut full = OsString::from(".");
             full.push(inner);
             full.push(&ext_full);
@@ -87,7 +93,10 @@ mod tests {
     fn extension_splitting_works_on_names_only() {
         let s = |n: &str| {
             let (a, b) = split_ext(OsStr::new(n));
-            (a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned())
+            (
+                a.to_string_lossy().into_owned(),
+                b.to_string_lossy().into_owned(),
+            )
         };
         assert_eq!(s("a.txt"), ("a".into(), ".txt".into()));
         assert_eq!(s("archive.tar.gz"), ("archive".into(), ".tar.gz".into()));
@@ -98,7 +107,10 @@ mod tests {
 
     #[test]
     fn numbering() {
-        assert_eq!(numbered(OsStr::new("a.txt"), 2), OsString::from("a (2).txt"));
+        assert_eq!(
+            numbered(OsStr::new("a.txt"), 2),
+            OsString::from("a (2).txt")
+        );
         assert_eq!(numbered(OsStr::new("dir"), 1), OsString::from("dir (1)"));
     }
 

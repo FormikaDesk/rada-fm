@@ -16,7 +16,11 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::SystemTime;
 
 use crate::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
-use crate::ops::{Cancel, Engine, ExecReport, Plan, Scan, ScanControl, SkipErrors};
+use crate::journal::Journal;
+use crate::ops::{
+    Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, ExecReport, Failure, Plan, Progress,
+    RunOutcome, Scan, ScanControl, SkipErrors, TransferOptions, UndoPlan,
+};
 use crate::platform::{self, Dirs, Platform};
 
 // ---------------------------------------------------------------------------------
@@ -222,6 +226,11 @@ impl Sandbox {
         Engine::local(self.platform())
     }
 
+    /// A journal in this sandbox's (isolated) state directory.
+    pub fn journal(&self) -> Journal {
+        Journal::open(self.dirs.journal_path()).expect("open journal")
+    }
+
     /// Engine over a custom filesystem (fault injection).
     pub fn engine_with(&self, fs: Arc<dyn FsEngine>) -> Engine {
         Engine::new(fs, self.platform())
@@ -272,12 +281,88 @@ impl Drop for Sandbox {
 
 pub fn scan(engine: &Engine, paths: &[PathBuf]) -> Scan {
     let cancel = Cancel::new();
-    engine.scan(paths, ScanControl { cancel: cancel.flag(), progress: &mut |_| {} })
+    engine.scan(
+        paths,
+        ScanControl {
+            cancel: cancel.flag(),
+            progress: &mut |_| {},
+        },
+    )
 }
 
 /// Execute a plan, skipping (and recording) every failure.
 pub fn run(engine: &Engine, plan: &Plan) -> ExecReport {
     engine.execute(plan, &mut SkipErrors, &Cancel::new())
+}
+
+/// Records progress and answers failures from a script.
+pub struct Scripted {
+    pub choices: std::collections::VecDeque<ErrorChoice>,
+    pub default: ErrorChoice,
+    pub failures: Vec<String>,
+    pub progress: Vec<Progress>,
+}
+
+impl Scripted {
+    pub fn new(default: ErrorChoice) -> Self {
+        Scripted {
+            choices: Default::default(),
+            default,
+            failures: Vec::new(),
+            progress: Vec::new(),
+        }
+    }
+    pub fn with(mut self, c: ErrorChoice) -> Self {
+        self.choices.push_back(c);
+        self
+    }
+}
+
+impl ExecHandler for Scripted {
+    fn progress(&mut self, p: &Progress) {
+        self.progress.push(p.clone());
+    }
+    fn on_failure(&mut self, f: &Failure<'_>) -> ErrorChoice {
+        self.failures.push(f.error.to_string());
+        self.choices.pop_front().unwrap_or(self.default)
+    }
+}
+
+pub fn do_copy(
+    e: &Engine,
+    srcs: &[PathBuf],
+    dest: &Path,
+    policy: ConflictPolicy,
+) -> (Plan, ExecReport) {
+    let plan = e.plan_transfer(&scan(e, srcs), dest, &TransferOptions::copy(policy));
+    let rep = run(e, &plan);
+    (plan, rep)
+}
+
+pub fn do_move(
+    e: &Engine,
+    srcs: &[PathBuf],
+    dest: &Path,
+    policy: ConflictPolicy,
+) -> (Plan, ExecReport) {
+    let plan = e.plan_transfer(&scan(e, srcs), dest, &TransferOptions::mv(policy));
+    let rep = run(e, &plan);
+    (plan, rep)
+}
+
+/// Run a plan through the journal, skipping failures.
+pub fn run_journaled(e: &Engine, j: &Journal, plan: &Plan) -> RunOutcome {
+    e.run_operation(j, plan, &mut SkipErrors, &Cancel::new())
+        .expect("run operation")
+}
+
+/// Plan and run the undo of `id`.
+pub fn undo(e: &Engine, j: &Journal, id: &str) -> (UndoPlan, ExecReport) {
+    let up = e.plan_undo(j, id).expect("plan undo");
+    let rep = e
+        .run_undo(j, &up, &mut SkipErrors, &Cancel::new())
+        .expect("run undo");
+    (up, rep)
 }
 
 /// A scratch directory on a *different* filesystem from the sandbox (tmpfs vs disk),

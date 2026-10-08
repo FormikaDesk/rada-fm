@@ -97,7 +97,8 @@ pub struct FailedStep {
     pub path: PathBuf,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     Completed,
     CompletedWithProblems,
@@ -152,7 +153,10 @@ impl RunState {
             return false;
         }
         let paths = [step.destination(), Some(step.path())];
-        paths.into_iter().flatten().any(|p| p.ancestors().any(|a| self.blocked.contains(a)))
+        paths
+            .into_iter()
+            .flatten()
+            .any(|p| p.ancestors().any(|a| self.blocked.contains(a)))
     }
 }
 
@@ -187,7 +191,12 @@ impl CopyControl for Ctl<'_> {
 
 impl Engine {
     /// Run every step of `plan` in order.
-    pub fn execute(&self, plan: &Plan, handler: &mut dyn ExecHandler, cancel: &Cancel) -> ExecReport {
+    pub fn execute(
+        &self,
+        plan: &Plan,
+        handler: &mut dyn ExecHandler,
+        cancel: &Cancel,
+    ) -> ExecReport {
         let mut report = ExecReport::default();
         let mut st = RunState {
             created_dirs: HashSet::new(),
@@ -250,7 +259,10 @@ impl Engine {
                             }
                             StepStatus::NoOp => report.noop += 1,
                             StepStatus::Kept => {
-                                report.kept.push((step.path().to_path_buf(), res.note.clone().unwrap_or_default()));
+                                report.kept.push((
+                                    step.path().to_path_buf(),
+                                    res.note.clone().unwrap_or_default(),
+                                ));
                             }
                         }
                         handler.step_finished(index, step, &res);
@@ -264,7 +276,12 @@ impl Engine {
                         let choice = if st.skip_all {
                             ErrorChoice::Skip
                         } else {
-                            handler.on_failure(&Failure { index, step, error: &error, attempt })
+                            handler.on_failure(&Failure {
+                                index,
+                                step,
+                                error: &error,
+                                attempt,
+                            })
                         };
                         match choice {
                             ErrorChoice::Retry => continue,
@@ -304,11 +321,16 @@ impl Engine {
             Step::MakeDir { path, mode } => {
                 match fs.create_dir(path, *mode) {
                     Ok(()) => {}
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => return Err(Error::AlreadyExists(path.clone())),
+                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                        return Err(Error::AlreadyExists(path.clone()));
+                    }
                     Err(e) => return Err(Error::io("create folder", path, e)),
                 }
                 st.created_dirs.insert(path.clone());
-                Ok(StepResult { created: true, ..StepResult::done() })
+                Ok(StepResult {
+                    created: true,
+                    ..StepResult::done()
+                })
             }
 
             Step::FinishDir { path, mode, mtime } => {
@@ -316,7 +338,8 @@ impl Engine {
                     return Ok(StepResult::noop("folder was not created by this run"));
                 }
                 if let Some(m) = mode {
-                    fs.set_mode(path, *m).map_err(|e| Error::io("set permissions of", path, e))?;
+                    fs.set_mode(path, *m)
+                        .map_err(|e| Error::io("set permissions of", path, e))?;
                 }
                 if let Some(t) = mtime {
                     // Best effort: a wrong folder time must not fail the operation.
@@ -327,7 +350,16 @@ impl Engine {
                 Ok(StepResult::done())
             }
 
-            Step::CopyFile { src, dst, mode, mtime, atime, verify, remove_source, .. } => {
+            Step::CopyFile {
+                src,
+                dst,
+                mode,
+                mtime,
+                atime,
+                verify,
+                remove_source,
+                ..
+            } => {
                 match fs.lstat(dst) {
                     Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => {}
@@ -347,7 +379,10 @@ impl Engine {
                     return Err(match copy_fault(&e) {
                         Some(CopyFault::Cancelled) => Error::Cancelled,
                         Some(CopyFault::SourceChanged) => Error::SourceChanged(src.clone()),
-                        Some(CopyFault::VerifyMismatch(why)) => Error::VerifyFailed { path: dst.clone(), reason: why.clone() },
+                        Some(CopyFault::VerifyMismatch(why)) => Error::VerifyFailed {
+                            path: dst.clone(),
+                            reason: why.clone(),
+                        },
                         None => Error::io2("copy", src, dst, e),
                     });
                 }
@@ -367,10 +402,18 @@ impl Engine {
                         return Err(Error::io("remove source after copy", src, e));
                     }
                 }
-                Ok(StepResult { after, ..StepResult::done() })
+                Ok(StepResult {
+                    after,
+                    ..StepResult::done()
+                })
             }
 
-            Step::CopySymlink { src, dst, target, remove_source } => {
+            Step::CopySymlink {
+                src,
+                dst,
+                target,
+                remove_source,
+            } => {
                 match fs.lstat(dst) {
                     Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => {}
@@ -390,44 +433,65 @@ impl Engine {
                         return Err(Error::io("remove source link", src, e));
                     }
                 }
-                Ok(StepResult { after, ..StepResult::done() })
+                Ok(StepResult {
+                    after,
+                    ..StepResult::done()
+                })
             }
 
             Step::Rename { from, to } => match fs.rename_noreplace(from, to) {
                 Ok(()) => Ok(StepResult::done()),
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(Error::AlreadyExists(to.clone())),
-                Err(e) if crate::error::is_exdev(&e) => Err(Error::CrossDevice(from.clone(), to.clone())),
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                    Err(Error::AlreadyExists(to.clone()))
+                }
+                Err(e) if crate::error::is_exdev(&e) => {
+                    Err(Error::CrossDevice(from.clone(), to.clone()))
+                }
                 Err(e) => Err(Error::io2("rename", from, to, e)),
             },
 
             Step::TrashItem { path } => {
                 let item = self.platform.trash().trash(path)?;
-                Ok(StepResult { trashed: Some(item), ..StepResult::done() })
+                Ok(StepResult {
+                    trashed: Some(item),
+                    ..StepResult::done()
+                })
             }
 
             Step::RemoveFile { path, expect } => {
                 let meta = match fs.lstat(path) {
                     Ok(m) => m,
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(StepResult::noop("already gone")),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                        return Ok(StepResult::noop("already gone"));
+                    }
                     Err(e) => return Err(Error::io("inspect", path, e)),
                 };
                 if let Some(exp) = expect {
                     if let Some(reason) = exp.diff(&meta.fingerprint()) {
-                        return Err(Error::Modified { path: path.clone(), reason });
+                        return Err(Error::Modified {
+                            path: path.clone(),
+                            reason,
+                        });
                     }
                 }
-                fs.remove_file(path).map_err(|e| Error::io("delete", path, e))?;
+                fs.remove_file(path)
+                    .map_err(|e| Error::io("delete", path, e))?;
                 Ok(StepResult::done())
             }
 
             Step::RemoveDir { path } => {
                 let meta = match fs.lstat(path) {
                     Ok(m) => m,
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(StepResult::noop("already gone")),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                        return Ok(StepResult::noop("already gone"));
+                    }
                     Err(e) => return Err(Error::io("inspect", path, e)),
                 };
                 match fs.remove_dir(path) {
-                    Ok(()) => Ok(StepResult { removed_dir_mode: meta.mode, ..StepResult::done() }),
+                    Ok(()) => Ok(StepResult {
+                        removed_dir_mode: meta.mode,
+                        ..StepResult::done()
+                    }),
                     Err(e) if crate::error::is_not_empty(&e) => Ok(StepResult::kept(format!(
                         "{} was kept because it is not empty",
                         display::path(path)

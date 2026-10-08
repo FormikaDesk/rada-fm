@@ -121,14 +121,30 @@ impl Engine {
             if w.cancelled {
                 break;
             }
+            if src.parent().is_none() {
+                // A filesystem root (or drive root) is never a valid operand.
+                scan.errors.push((
+                    src.clone(),
+                    format!(
+                        "refusing to operate on the filesystem root {}",
+                        crate::display::path(src)
+                    ),
+                ));
+                continue;
+            }
             match self.fs.lstat(src) {
                 Ok(meta) => {
-                    let name = src.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+                    let name = src
+                        .file_name()
+                        .map(|n| n.to_os_string())
+                        .unwrap_or_default();
                     let mut anc = Vec::new();
                     let node = w.node(src, name, meta, &mut anc);
                     scan.roots.push(node);
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => scan.missing.push(src.clone()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    scan.missing.push(src.clone())
+                }
                 Err(e) => scan
                     .errors
                     .push((src.clone(), crate::Error::io("read", src, e).to_string())),
@@ -151,7 +167,13 @@ impl Walker<'_, '_> {
         }
     }
 
-    fn node(&mut self, path: &Path, name: OsString, meta: FsMeta, ancestors: &mut Vec<(u64, u64)>) -> ScanNode {
+    fn node(
+        &mut self,
+        path: &Path,
+        name: OsString,
+        meta: FsMeta,
+        ancestors: &mut Vec<(u64, u64)>,
+    ) -> ScanNode {
         self.tick(path);
         let mut node = ScanNode {
             path: path.to_path_buf(),
@@ -203,15 +225,15 @@ impl Walker<'_, '_> {
                                 }
                                 Err(e) => {
                                     // Keep the entry visible instead of silently dropping it.
-                                    node.unreadable = Some(
-                                        crate::Error::io("read", &item.path, e).to_string(),
-                                    );
+                                    node.unreadable =
+                                        Some(crate::Error::io("read", &item.path, e).to_string());
                                 }
                             }
                         }
                     }
                     Err(e) => {
-                        node.unreadable = Some(crate::Error::io("read folder", path, e).to_string());
+                        node.unreadable =
+                            Some(crate::Error::io("read folder", path, e).to_string());
                     }
                 }
                 if id.is_some() {

@@ -28,15 +28,27 @@ pub struct TransferOptions {
 
 impl TransferOptions {
     pub fn copy(policy: ConflictPolicy) -> Self {
-        TransferOptions { mode: TransferMode::Copy, policy, verify: false }
+        TransferOptions {
+            mode: TransferMode::Copy,
+            policy,
+            verify: false,
+        }
     }
     pub fn mv(policy: ConflictPolicy) -> Self {
-        TransferOptions { mode: TransferMode::Move, policy, verify: false }
+        TransferOptions {
+            mode: TransferMode::Move,
+            policy,
+            verify: false,
+        }
     }
 }
 
 fn items_label(n: u64) -> String {
-    if n == 1 { "1 item".into() } else { format!("{n} items") }
+    if n == 1 {
+        "1 item".into()
+    } else {
+        format!("{n} items")
+    }
 }
 
 fn not_found(e: &io::Error) -> bool {
@@ -48,7 +60,12 @@ fn scan_problems(scan: &Scan, ws: &mut WarningSet) {
         ws.add(WarningKind::Missing, Severity::Warning, Some(p));
     }
     for (p, msg) in &scan.errors {
-        ws.add_with(WarningKind::Unreadable, Severity::Warning, Some(p), Some(msg.clone()));
+        ws.add_with(
+            WarningKind::Unreadable,
+            Severity::Warning,
+            Some(p),
+            Some(msg.clone()),
+        );
     }
 }
 
@@ -60,7 +77,12 @@ impl Engine {
             TransferMode::Copy => OpKind::Copy,
             TransferMode::Move => OpKind::Move,
         };
-        let title = format!("{} {} to {}", kind.verb(), items_label(scan.roots.len() as u64), display::path(dest_dir));
+        let title = format!(
+            "{} {} to {}",
+            kind.verb(),
+            items_label(scan.roots.len() as u64),
+            display::path(dest_dir)
+        );
         let mut plan = Plan::empty(kind, title);
         plan.destination = Some(dest_dir.to_path_buf());
         plan.policy = opts.policy;
@@ -71,7 +93,10 @@ impl Engine {
             dest_dev: None,
             steps: Vec::new(),
             ws: WarningSet::default(),
-            totals: Totals { items: scan.roots.len() as u64, ..Default::default() },
+            totals: Totals {
+                items: scan.roots.len() as u64,
+                ..Default::default()
+            },
             taken: HashSet::new(),
             case_insensitive: self.platform.path_rules().case_insensitive,
             cross_device: false,
@@ -87,7 +112,12 @@ impl Engine {
                     t.ws.add(WarningKind::NotWritable, Severity::Blocking, Some(dest_dir));
                 }
             }
-            Ok(_) => t.ws.add_with(WarningKind::NotWritable, Severity::Blocking, Some(dest_dir), Some("not a folder".into())),
+            Ok(_) => t.ws.add_with(
+                WarningKind::NotWritable,
+                Severity::Blocking,
+                Some(dest_dir),
+                Some("not a folder".into()),
+            ),
             Err(e) => t.ws.add_with(
                 WarningKind::NotWritable,
                 Severity::Blocking,
@@ -101,9 +131,15 @@ impl Engine {
         for root in &scan.roots {
             if root.meta.is_dir() {
                 if let (Some(dc), Some(parent)) = (&dest_canon, root.path.parent()) {
-                    let src_canon = std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf()).join(&root.name);
+                    let src_canon = std::fs::canonicalize(parent)
+                        .unwrap_or_else(|_| parent.to_path_buf())
+                        .join(&root.name);
                     if dc.starts_with(&src_canon) {
-                        t.ws.add(WarningKind::InsideItself, Severity::Blocking, Some(&root.path));
+                        t.ws.add(
+                            WarningKind::InsideItself,
+                            Severity::Blocking,
+                            Some(&root.path),
+                        );
                         blocked = true;
                     }
                 }
@@ -124,7 +160,11 @@ impl Engine {
                         WarningKind::LowSpace,
                         Severity::Warning,
                         Some(dest_dir),
-                        Some(format!("need {}, {} free", display::bytes(need), display::bytes(avail))),
+                        Some(format!(
+                            "need {}, {} free",
+                            display::bytes(need),
+                            display::bytes(avail)
+                        )),
                     );
                 }
             }
@@ -142,17 +182,33 @@ impl Engine {
     // ------------------------------------------------------------------ trash / delete
 
     pub fn plan_trash(&self, scan: &Scan) -> Plan {
-        let mut plan = Plan::empty(OpKind::Trash, format!("Move {} to the trash", items_label(scan.roots.len() as u64)));
+        let mut plan = Plan::empty(
+            OpKind::Trash,
+            format!("Move {} to the trash", items_label(scan.roots.len() as u64)),
+        );
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
         let st = scan.stats();
-        plan.totals = Totals { items: scan.roots.len() as u64, files: st.files, dirs: st.dirs, symlinks: st.symlinks, bytes: st.bytes };
+        plan.totals = Totals {
+            items: scan.roots.len() as u64,
+            files: st.files,
+            dirs: st.dirs,
+            symlinks: st.symlinks,
+            bytes: st.bytes,
+        };
         for r in &scan.roots {
             if r.path.parent().is_none() {
-                ws.add_with(WarningKind::InvalidName, Severity::Blocking, Some(&r.path), Some("cannot trash the root".into()));
+                ws.add_with(
+                    WarningKind::InvalidName,
+                    Severity::Blocking,
+                    Some(&r.path),
+                    Some("cannot trash the root".into()),
+                );
                 continue;
             }
-            plan.steps.push(Step::TrashItem { path: r.path.clone() });
+            plan.steps.push(Step::TrashItem {
+                path: r.path.clone(),
+            });
         }
         plan.warnings = ws.finish();
         plan
@@ -161,14 +217,23 @@ impl Engine {
     pub fn plan_delete(&self, scan: &Scan) -> Plan {
         let mut plan = Plan::empty(
             OpKind::Delete,
-            format!("Permanently delete {}", items_label(scan.roots.len() as u64)),
+            format!(
+                "Permanently delete {}",
+                items_label(scan.roots.len() as u64)
+            ),
         );
         plan.reversible = false;
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
         ws.add(WarningKind::Irreversible, Severity::Warning, None);
         let st = scan.stats();
-        plan.totals = Totals { items: scan.roots.len() as u64, files: st.files, dirs: st.dirs, symlinks: st.symlinks, bytes: st.bytes };
+        plan.totals = Totals {
+            items: scan.roots.len() as u64,
+            files: st.files,
+            dirs: st.dirs,
+            symlinks: st.symlinks,
+            bytes: st.bytes,
+        };
         fn walk(n: &ScanNode, steps: &mut Vec<Step>, ws: &mut WarningSet) {
             match n.meta.kind {
                 FileKind::Dir => {
@@ -177,19 +242,34 @@ impl Engine {
                         return;
                     }
                     if let Some(msg) = &n.unreadable {
-                        ws.add_with(WarningKind::Unreadable, Severity::Warning, Some(&n.path), Some(msg.clone()));
+                        ws.add_with(
+                            WarningKind::Unreadable,
+                            Severity::Warning,
+                            Some(&n.path),
+                            Some(msg.clone()),
+                        );
                     }
                     for c in &n.children {
                         walk(c, steps, ws);
                     }
-                    steps.push(Step::RemoveDir { path: n.path.clone() });
+                    steps.push(Step::RemoveDir {
+                        path: n.path.clone(),
+                    });
                 }
-                _ => steps.push(Step::RemoveFile { path: n.path.clone(), expect: None }),
+                _ => steps.push(Step::RemoveFile {
+                    path: n.path.clone(),
+                    expect: None,
+                }),
             }
         }
         for r in &scan.roots {
             if r.path.parent().is_none() {
-                ws.add_with(WarningKind::InvalidName, Severity::Blocking, Some(&r.path), Some("cannot delete the root".into()));
+                ws.add_with(
+                    WarningKind::InvalidName,
+                    Severity::Blocking,
+                    Some(&r.path),
+                    Some("cannot delete the root".into()),
+                );
                 continue;
             }
             walk(r, &mut plan.steps, &mut ws);
@@ -203,7 +283,11 @@ impl Engine {
     pub fn plan_rename(&self, from: &Path, new_name: &OsStr) -> Plan {
         let mut plan = Plan::empty(
             OpKind::Rename,
-            format!("Rename {} to {}", display::path(from), display::name(new_name)),
+            format!(
+                "Rename {} to {}",
+                display::path(from),
+                display::name(new_name)
+            ),
         );
         let mut ws = WarningSet::default();
         plan.totals.items = 1;
@@ -214,16 +298,31 @@ impl Engine {
             Err(_) => ws.add(WarningKind::Missing, Severity::Blocking, Some(from)),
             Ok(src_meta) => {
                 if let Err(why) = names::validate(&rules, new_name) {
-                    ws.add_with(WarningKind::InvalidName, Severity::Blocking, Some(&to), Some(why));
+                    ws.add_with(
+                        WarningKind::InvalidName,
+                        Severity::Blocking,
+                        Some(&to),
+                        Some(why),
+                    );
                 } else if from.file_name() == Some(new_name) {
-                    ws.add_with(WarningKind::InvalidName, Severity::Blocking, Some(&to), Some("the name is unchanged".into()));
+                    ws.add_with(
+                        WarningKind::InvalidName,
+                        Severity::Blocking,
+                        Some(&to),
+                        Some("the name is unchanged".into()),
+                    );
                 } else {
                     match self.fs.lstat(&to) {
                         Ok(existing) => {
                             // On case-insensitive filesystems "a" -> "A" names the same file.
-                            let same_file = existing.ino.is_some() && existing.ino == src_meta.ino && existing.dev == src_meta.dev;
+                            let same_file = existing.ino.is_some()
+                                && existing.ino == src_meta.ino
+                                && existing.dev == src_meta.dev;
                             if same_file && rules.case_insensitive {
-                                plan.steps.push(Step::Rename { from: from.to_path_buf(), to: to.clone() });
+                                plan.steps.push(Step::Rename {
+                                    from: from.to_path_buf(),
+                                    to: to.clone(),
+                                });
                             } else {
                                 ws.add(WarningKind::Conflict, Severity::Blocking, Some(&to));
                             }
@@ -232,10 +331,18 @@ impl Engine {
                             if !self.fs.can_write(parent) {
                                 ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
                             } else {
-                                plan.steps.push(Step::Rename { from: from.to_path_buf(), to: to.clone() });
+                                plan.steps.push(Step::Rename {
+                                    from: from.to_path_buf(),
+                                    to: to.clone(),
+                                });
                             }
                         }
-                        Err(e) => ws.add_with(WarningKind::NotWritable, Severity::Blocking, Some(&to), Some(e.to_string())),
+                        Err(e) => ws.add_with(
+                            WarningKind::NotWritable,
+                            Severity::Blocking,
+                            Some(&to),
+                            Some(e.to_string()),
+                        ),
                     }
                 }
             }
@@ -247,13 +354,21 @@ impl Engine {
 
     pub fn plan_mkdir(&self, parent: &Path, name: &OsStr) -> Plan {
         let path = parent.join(name);
-        let mut plan = Plan::empty(OpKind::MakeDir, format!("Create folder {}", display::path(&path)));
+        let mut plan = Plan::empty(
+            OpKind::MakeDir,
+            format!("Create folder {}", display::path(&path)),
+        );
         let mut ws = WarningSet::default();
         plan.destination = Some(parent.to_path_buf());
         plan.totals.items = 1;
         plan.totals.dirs = 1;
         if let Err(why) = names::validate(&self.platform.path_rules(), name) {
-            ws.add_with(WarningKind::InvalidName, Severity::Blocking, Some(&path), Some(why));
+            ws.add_with(
+                WarningKind::InvalidName,
+                Severity::Blocking,
+                Some(&path),
+                Some(why),
+            );
         } else if self.fs.lstat(&path).is_ok() {
             ws.add(WarningKind::Conflict, Severity::Blocking, Some(&path));
         } else if !self.fs.can_write(parent) {
@@ -316,7 +431,8 @@ impl Transfer<'_> {
         if node.path == dst {
             // Pasting an item into the folder it already lives in.
             self.same_location = true;
-            self.ws.add(WarningKind::SameLocation, Severity::Info, Some(&node.path));
+            self.ws
+                .add(WarningKind::SameLocation, Severity::Info, Some(&node.path));
             if self.opts.mode == TransferMode::Copy {
                 let new = self.keep_both(parent, &node.name);
                 self.proceed(node, new);
@@ -355,12 +471,21 @@ impl Transfer<'_> {
         }
         if self.opts.mode == TransferMode::Move {
             // Source folder is removed only if every child really left it.
-            self.steps.push(Step::RemoveDir { path: node.path.clone() });
+            self.steps.push(Step::RemoveDir {
+                path: node.path.clone(),
+            });
         }
     }
 
-    fn resolve_conflict(&mut self, node: &ScanNode, parent: &Path, dst: PathBuf, exists_on_disk: bool) {
-        self.ws.add(WarningKind::Conflict, Severity::Warning, Some(&dst));
+    fn resolve_conflict(
+        &mut self,
+        node: &ScanNode,
+        parent: &Path,
+        dst: PathBuf,
+        exists_on_disk: bool,
+    ) {
+        self.ws
+            .add(WarningKind::Conflict, Severity::Warning, Some(&dst));
         match self.opts.policy {
             ConflictPolicy::Skip => {}
             ConflictPolicy::KeepBoth => {
@@ -368,7 +493,8 @@ impl Transfer<'_> {
                 self.proceed(node, new);
             }
             ConflictPolicy::Overwrite if exists_on_disk => {
-                self.ws.add(WarningKind::Overwrite, Severity::Warning, Some(&dst));
+                self.ws
+                    .add(WarningKind::Overwrite, Severity::Warning, Some(&dst));
                 self.steps.push(Step::TrashItem { path: dst.clone() });
                 self.proceed(node, dst);
             }
@@ -382,7 +508,12 @@ impl Transfer<'_> {
 
     fn note_unreadable_dir(&mut self, node: &ScanNode) {
         if let Some(msg) = &node.unreadable {
-            self.ws.add_with(WarningKind::Unreadable, Severity::Warning, Some(&node.path), Some(msg.clone()));
+            self.ws.add_with(
+                WarningKind::Unreadable,
+                Severity::Warning,
+                Some(&node.path),
+                Some(msg.clone()),
+            );
         }
     }
 
@@ -399,7 +530,10 @@ impl Transfer<'_> {
                     self.totals.dirs += st.dirs;
                     self.totals.symlinks += st.symlinks;
                     self.totals.bytes += st.bytes;
-                    self.steps.push(Step::Rename { from: node.path.clone(), to: dst });
+                    self.steps.push(Step::Rename {
+                        from: node.path.clone(),
+                        to: dst,
+                    });
                 } else {
                     self.cross_device = true;
                     self.emit(node, dst, true);
@@ -418,10 +552,12 @@ impl Transfer<'_> {
         match node.meta.kind {
             FileKind::File => {
                 if !fs.can_read(&node.path) {
-                    self.ws.add(WarningKind::Unreadable, Severity::Warning, Some(&node.path));
+                    self.ws
+                        .add(WarningKind::Unreadable, Severity::Warning, Some(&node.path));
                 }
                 if node.meta.nlink.unwrap_or(1) > 1 {
-                    self.ws.add(WarningKind::HardLinks, Severity::Info, Some(&node.path));
+                    self.ws
+                        .add(WarningKind::HardLinks, Severity::Info, Some(&node.path));
                 }
                 self.totals.files += 1;
                 self.totals.bytes += node.meta.size;
@@ -438,26 +574,44 @@ impl Transfer<'_> {
             }
             FileKind::Symlink => {
                 match node.link_state {
-                    Some(LinkState::Broken) => self.ws.add(WarningKind::BrokenSymlink, Severity::Info, Some(&node.path)),
-                    Some(LinkState::Circular) => self.ws.add(WarningKind::CircularLink, Severity::Info, Some(&node.path)),
-                    _ => self.ws.add(WarningKind::Symlink, Severity::Info, Some(&node.path)),
+                    Some(LinkState::Broken) => {
+                        self.ws
+                            .add(WarningKind::BrokenSymlink, Severity::Info, Some(&node.path))
+                    }
+                    Some(LinkState::Circular) => {
+                        self.ws
+                            .add(WarningKind::CircularLink, Severity::Info, Some(&node.path))
+                    }
+                    _ => self
+                        .ws
+                        .add(WarningKind::Symlink, Severity::Info, Some(&node.path)),
                 }
                 let Some(target) = node.link_target.clone() else {
-                    self.ws.add(WarningKind::Unreadable, Severity::Warning, Some(&node.path));
+                    self.ws
+                        .add(WarningKind::Unreadable, Severity::Warning, Some(&node.path));
                     return;
                 };
                 self.totals.symlinks += 1;
-                self.steps.push(Step::CopySymlink { src: node.path.clone(), dst, target, remove_source: mv });
+                self.steps.push(Step::CopySymlink {
+                    src: node.path.clone(),
+                    dst,
+                    target,
+                    remove_source: mv,
+                });
             }
             FileKind::Dir => {
                 if node.loop_skipped {
-                    self.ws.add(WarningKind::MountLoop, Severity::Warning, Some(&node.path));
+                    self.ws
+                        .add(WarningKind::MountLoop, Severity::Warning, Some(&node.path));
                     return;
                 }
                 self.note_unreadable_dir(node);
                 self.totals.dirs += 1;
                 // Owner can always write while the folder is being filled.
-                self.steps.push(Step::MakeDir { path: dst.clone(), mode: node.meta.mode.map(|m| m | 0o700) });
+                self.steps.push(Step::MakeDir {
+                    path: dst.clone(),
+                    mode: node.meta.mode.map(|m| m | 0o700),
+                });
                 for c in &node.children {
                     self.emit_child(c, &dst, mv);
                 }
@@ -467,10 +621,16 @@ impl Transfer<'_> {
                     mtime: node.meta.mtime.map(Into::into),
                 });
                 if mv {
-                    self.steps.push(Step::RemoveDir { path: node.path.clone() });
+                    self.steps.push(Step::RemoveDir {
+                        path: node.path.clone(),
+                    });
                 }
             }
-            FileKind::Other => self.ws.add(WarningKind::SpecialFile, Severity::Warning, Some(&node.path)),
+            FileKind::Other => self.ws.add(
+                WarningKind::SpecialFile,
+                Severity::Warning,
+                Some(&node.path),
+            ),
         }
     }
 }
