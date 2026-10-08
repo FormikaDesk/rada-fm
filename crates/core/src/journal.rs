@@ -15,7 +15,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use crate::ops::{OpKind, RunStatus, Step, Totals};
+use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
 use crate::{Error, Result};
 
 #[derive(Serialize, Deserialize)]
@@ -28,6 +28,12 @@ enum Record {
         title: String,
         reversible: bool,
         totals: Totals,
+        /// What was asked, so the operation can be planned again (redo).
+        #[serde(default)]
+        request: Option<OpRequest>,
+        /// Set when this operation re-did an undone one.
+        #[serde(default)]
+        redo_of: Option<String>,
     },
     Undo {
         id: String,
@@ -77,6 +83,9 @@ pub struct JournalEntry {
     pub bytes: u64,
     pub undo_steps: usize,
     pub undo_state: UndoState,
+    pub request: Option<OpRequest>,
+    /// Fully undone, and nothing but other undos happened since: `Ctrl+Y` can redo it.
+    pub redoable: bool,
 }
 
 impl JournalEntry {
@@ -187,6 +196,8 @@ impl Journal {
         title: &str,
         reversible: bool,
         totals: Totals,
+        request: Option<&OpRequest>,
+        redo_of: Option<&str>,
     ) -> Result<String> {
         let n = self.counter.fetch_add(1, Ordering::Relaxed);
         let ms = SystemTime::now()
@@ -202,6 +213,8 @@ impl Journal {
                 title: title.to_string(),
                 reversible,
                 totals,
+                request: request.cloned(),
+                redo_of: redo_of.map(str::to_string),
             },
             true,
         )?;
@@ -272,8 +285,14 @@ impl Journal {
 
     /// All operations, oldest first.
     pub fn entries(&self) -> Result<Vec<JournalEntry>> {
+        Ok(self.replay()?.0)
+    }
+
+    /// Entries plus the redo stack (ids, latest undo last).
+    fn replay(&self) -> Result<(Vec<JournalEntry>, Vec<String>)> {
         let mut order: Vec<String> = Vec::new();
         let mut map: HashMap<String, JournalEntry> = HashMap::new();
+        let mut redo_stack: Vec<String> = Vec::new();
         self.read_records(|r| match r {
             Record::Begin {
                 id,
@@ -282,7 +301,14 @@ impl Journal {
                 title,
                 reversible,
                 totals,
+                request,
+                redo_of,
             } => {
+                // A new operation ends the redo history, unless it *is* a redo.
+                match redo_of {
+                    Some(r) => redo_stack.retain(|x| *x != r),
+                    None => redo_stack.clear(),
+                }
                 order.push(id.clone());
                 map.insert(
                     id.clone(),
@@ -299,6 +325,8 @@ impl Journal {
                         bytes: 0,
                         undo_steps: 0,
                         undo_state: UndoState::NotUndone,
+                        request,
+                        redoable: false,
                     },
                 );
             }
@@ -322,6 +350,10 @@ impl Journal {
                 }
             }
             Record::Undone { id, remaining, .. } => {
+                if remaining.is_empty() {
+                    redo_stack.retain(|x| *x != id);
+                    redo_stack.push(id.clone());
+                }
                 if let Some(e) = map.get_mut(&id) {
                     e.undo_state = if remaining.is_empty() {
                         UndoState::Undone
@@ -333,7 +365,25 @@ impl Journal {
                 }
             }
         })?;
-        Ok(order.into_iter().filter_map(|id| map.remove(&id)).collect())
+        for id in &redo_stack {
+            if let Some(e) = map.get_mut(id) {
+                e.redoable = e.request.is_some() && e.reversible;
+            }
+        }
+        Ok((
+            order.into_iter().filter_map(|id| map.remove(&id)).collect(),
+            redo_stack,
+        ))
+    }
+
+    /// The operation `Ctrl+Y` would plan again: the most recently undone one, provided
+    /// nothing but other undos happened since.
+    pub fn last_redoable(&self) -> Result<Option<JournalEntry>> {
+        let (entries, stack) = self.replay()?;
+        Ok(stack
+            .iter()
+            .rev()
+            .find_map(|id| entries.iter().find(|e| e.id == *id && e.redoable).cloned()))
     }
 
     /// The most recent operation that `u` can undo.

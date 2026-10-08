@@ -782,6 +782,17 @@ impl App {
                     self.toast(ToastKind::Info, "nothing to undo", 3);
                 }
             }
+            JobEvent::NothingToRedo { job } => {
+                if self.plan_job == Some(job) {
+                    self.modal = None;
+                    self.plan_job = None;
+                    self.toast(
+                        ToastKind::Info,
+                        "nothing to redo (redo only follows an undo, until another operation)",
+                        4,
+                    );
+                }
+            }
             JobEvent::Progress { job, progress } => {
                 if let Some(r) = self.running.as_mut().filter(|r| r.job == job) {
                     let now = Instant::now();
@@ -1043,19 +1054,19 @@ impl App {
                 let h = self
                     .svc
                     .jobs
-                    .plan_rename(from.clone(), OsString::from(iv.text.trim_end_matches('\n')));
+                    .plan_rename(from.clone(), iv.text.trim_end_matches('\n').to_string());
                 self.begin_plan("Planning rename", h);
             }
             InputKind::NewDir => {
-                let h = self
-                    .svc
-                    .jobs
-                    .plan_mkdir(self.cwd.clone(), OsString::from(&iv.text));
+                let h = self.svc.jobs.plan_mkdir(self.cwd.clone(), iv.text.clone());
                 self.begin_plan("Planning", h);
             }
             InputKind::BulkRename { items } => match Pattern::parse(&iv.text) {
-                Ok(p) => {
-                    let h = self.svc.jobs.plan_bulk_rename(items.clone(), p);
+                Ok(_) => {
+                    let h = self
+                        .svc
+                        .jobs
+                        .plan_bulk_rename(items.clone(), iv.text.clone());
                     self.begin_plan("Planning rename", h);
                 }
                 Err(e) => {
@@ -1267,12 +1278,18 @@ impl App {
         let mut seen = std::collections::HashSet::new();
         let home = self.svc.home.clone();
         let cwd = self.cwd.clone();
+        // A mount point is listed once, as a disk (so "/" is not both "Root" and a disk).
+        let mounts: std::collections::HashSet<PathBuf> =
+            self.volumes.iter().map(|v| v.mount_point.clone()).collect();
         let mut add = |items: &mut Vec<PaletteItem>,
                        path: &Path,
                        kind: PaletteKind,
                        label: Option<String>,
                        detail: Option<String>| {
-            if !seen.insert((path.to_path_buf(), kind == PaletteKind::Disk)) {
+            if kind != PaletteKind::Disk && mounts.contains(path) {
+                return;
+            }
+            if !seen.insert(path.to_path_buf()) {
                 return;
             }
             let label = label.unwrap_or_else(|| {
@@ -1315,10 +1332,13 @@ impl App {
             Some(std::path::MAIN_SEPARATOR_STR.into()),
         );
         for v in &self.volumes {
-            let label = v
-                .label
-                .clone()
-                .unwrap_or_else(|| vela_core::display::path(&v.mount_point));
+            let label = v.label.clone().unwrap_or_else(|| {
+                if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
+                    "Root".to_string()
+                } else {
+                    vela_core::display::path(&v.mount_point)
+                }
+            });
             let free = v
                 .available
                 .map(|a| format!(" · {} free", fmt::size(a)))

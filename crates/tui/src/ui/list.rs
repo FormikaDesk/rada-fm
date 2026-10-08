@@ -32,27 +32,27 @@ struct Columns {
 
 fn columns(width: usize, icon_w: usize, density: Density) -> Columns {
     let gap = match density {
-        Density::Airy => 3,
-        Density::Balanced => 2,
+        Density::Airy | Density::Balanced => 2,
         Density::Dense => 1,
     };
     let bar_cells = match density {
-        Density::Airy => 8,
-        Density::Balanced => 7,
+        Density::Airy => 7,
+        Density::Balanced => 6,
         Density::Dense => 5,
     };
-    let (mut bar, mut size, mut kind, mut modified) = (bar_cells + 1, 9, 9, 12);
-    // Narrow terminals lose the least important columns first.
-    if width < 66 {
+    let (mut bar, mut size, mut kind, mut modified) = (bar_cells + 1, 9, 9, 11);
+    // Narrow terminals lose the least important columns first: the relative date goes
+    // before the type, then the size bar, then the size.
+    if width < 62 {
         modified = 0;
     }
-    if width < 54 {
+    if width < 50 {
         kind = 0;
     }
-    if width < 44 {
+    if width < 40 {
         bar = 0;
     }
-    if width < 34 {
+    if width < 30 {
         size = 0;
     }
     let fixed = 2 + icon_w + bar + size + kind + modified;

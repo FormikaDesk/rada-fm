@@ -3,13 +3,14 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::fs::{Fingerprint, Stamp};
 use crate::platform::TrashedItem;
 use crate::{display, pathcodec};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OpKind {
     Copy,
@@ -40,11 +41,12 @@ impl OpKind {
 /// One atomic action. The whole engine (planning, execution, journal, undo) speaks
 /// only this vocabulary, which is what makes "every operation is undoable" tractable:
 /// each step knows its own inverse (see [`Step::inverse`]).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "step", rename_all = "snake_case")]
 pub enum Step {
     MakeDir {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         path: PathBuf,
         mode: Option<u32>,
     },
@@ -52,14 +54,17 @@ pub enum Step {
     /// (after its children exist, so a read-only source dir stays writable meanwhile).
     FinishDir {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         path: PathBuf,
         mode: Option<u32>,
         mtime: Option<Stamp>,
     },
     CopyFile {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         src: PathBuf,
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         dst: PathBuf,
         size: u64,
         mode: Option<u32>,
@@ -72,33 +77,41 @@ pub enum Step {
     },
     CopySymlink {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         src: PathBuf,
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         dst: PathBuf,
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         target: PathBuf,
         remove_source: bool,
     },
     Rename {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         from: PathBuf,
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         to: PathBuf,
     },
     TrashItem {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         path: PathBuf,
     },
     /// Permanent removal of a file or symlink. With `expect`, refuses to remove a
     /// file that changed since it was recorded (used by undo).
     RemoveFile {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         path: PathBuf,
         expect: Option<Fingerprint>,
     },
     /// Removal of an *empty* directory.
     RemoveDir {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         path: PathBuf,
     },
     Restore {
@@ -298,7 +311,9 @@ impl StepResult {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 pub enum Severity {
     Info,
     Warning,
@@ -306,7 +321,9 @@ pub enum Severity {
     Blocking,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
 pub enum WarningKind {
     Irreversible,
     InsideItself,
@@ -333,13 +350,15 @@ pub enum WarningKind {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Warning {
     pub kind: WarningKind,
     pub severity: Severity,
     pub message: String,
     pub count: u64,
     /// A few representative paths (never all of them: plans can be huge).
+    #[serde(with = "pathcodec::paths")]
+    #[schemars(with = "Vec<String>")]
     pub examples: Vec<PathBuf>,
 }
 
@@ -486,7 +505,7 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
 }
 
 /// How to resolve a destination that already exists.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConflictPolicy {
     /// Leave existing items alone, do not copy the clashing source.
@@ -516,7 +535,7 @@ impl ConflictPolicy {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Totals {
     /// Top-level items the user selected.
     pub items: u64,
@@ -527,7 +546,7 @@ pub struct Totals {
 }
 
 /// What happens to one top-level item of an operation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum ItemAction {
     Copy,
     Move,
@@ -562,9 +581,11 @@ impl ItemAction {
 }
 
 /// One selected item and what the plan does with it: the unit the plan window lists.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ItemSummary {
     /// The source item (or the new folder for `Create`).
+    #[serde(with = "pathcodec::path")]
+    #[schemars(with = "String")]
     pub path: PathBuf,
     pub kind: crate::fs::FileKind,
     pub action: ItemAction,
@@ -573,13 +594,17 @@ pub struct ItemSummary {
     pub symlinks: u64,
     pub bytes: u64,
     /// Where it ends up, when that differs from where it is.
+    #[serde(with = "pathcodec::opt_path", default)]
+    #[schemars(with = "Option<String>")]
     pub target: Option<PathBuf>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     pub kind: OpKind,
     pub title: String,
+    #[serde(with = "pathcodec::opt_path", default)]
+    #[schemars(with = "Option<String>")]
     pub destination: Option<PathBuf>,
     pub steps: Vec<Step>,
     pub totals: Totals,
@@ -588,9 +613,18 @@ pub struct Plan {
     /// False for permanent deletion: the journal records it but cannot undo it.
     pub reversible: bool,
     /// Old name -> new name, for rename previews.
+    #[serde(with = "pathcodec::path_pairs")]
+    #[schemars(with = "Vec<(String, String)>")]
     pub renames: Vec<(PathBuf, PathBuf)>,
     /// One entry per selected item, for a readable overview.
     pub items: Vec<ItemSummary>,
+    /// The request this plan answers, kept in the journal so the operation can be
+    /// planned again later (redo).
+    #[serde(default)]
+    pub request: Option<crate::ops::request::OpRequest>,
+    /// Set when this plan re-does an operation that was undone.
+    #[serde(default)]
+    pub redo_of: Option<String>,
 }
 
 impl Plan {
@@ -606,6 +640,8 @@ impl Plan {
             reversible: true,
             renames: Vec::new(),
             items: Vec::new(),
+            request: None,
+            redo_of: None,
         }
     }
 

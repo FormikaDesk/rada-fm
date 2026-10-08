@@ -99,6 +99,72 @@ pub mod os {
     }
 }
 
+/// `#[serde(with = "pathcodec::opt_path")]` for `Option<PathBuf>`.
+pub mod opt_path {
+    use super::*;
+
+    pub fn serialize<S: Serializer>(p: &Option<PathBuf>, s: S) -> Result<S::Ok, S::Error> {
+        p.as_ref().map(|p| to_repr(p.as_os_str())).serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<PathBuf>, D::Error> {
+        match Option::<Repr>::deserialize(d)? {
+            None => Ok(None),
+            Some(r) => from_repr(r)
+                .map(|o| Some(PathBuf::from(o)))
+                .map_err(serde::de::Error::custom),
+        }
+    }
+}
+
+/// `#[serde(with = "pathcodec::paths")]` for `Vec<PathBuf>`.
+pub mod paths {
+    use super::*;
+
+    pub fn serialize<S: Serializer>(v: &[PathBuf], s: S) -> Result<S::Ok, S::Error> {
+        v.iter()
+            .map(|p| to_repr(p.as_os_str()))
+            .collect::<Vec<_>>()
+            .serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<PathBuf>, D::Error> {
+        Vec::<Repr>::deserialize(d)?
+            .into_iter()
+            .map(|r| {
+                from_repr(r)
+                    .map(PathBuf::from)
+                    .map_err(serde::de::Error::custom)
+            })
+            .collect()
+    }
+}
+
+/// `#[serde(with = "pathcodec::path_pairs")]` for `Vec<(PathBuf, PathBuf)>`.
+pub mod path_pairs {
+    use super::*;
+
+    pub fn serialize<S: Serializer>(v: &[(PathBuf, PathBuf)], s: S) -> Result<S::Ok, S::Error> {
+        v.iter()
+            .map(|(a, b)| (to_repr(a.as_os_str()), to_repr(b.as_os_str())))
+            .collect::<Vec<_>>()
+            .serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Vec<(PathBuf, PathBuf)>, D::Error> {
+        Vec::<(Repr, Repr)>::deserialize(d)?
+            .into_iter()
+            .map(|(a, b)| {
+                let a = from_repr(a).map_err(serde::de::Error::custom)?;
+                let b = from_repr(b).map_err(serde::de::Error::custom)?;
+                Ok((PathBuf::from(a), PathBuf::from(b)))
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

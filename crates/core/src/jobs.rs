@@ -11,14 +11,19 @@ use crossbeam_channel::Sender;
 use crate::events::{CoreEvent, FailureInfo, JobEvent, JobId};
 use crate::journal::Journal;
 use crate::ops::{
-    Cancel, Engine, ErrorChoice, ExecHandler, Failure, Pattern, Plan, Progress, Scan, ScanControl,
-    TransferOptions, UndoPlan,
+    Cancel, Engine, ErrorChoice, ExecHandler, Failure, OpRequest, Plan, Progress, Scan,
+    ScanControl, TransferOptions, UndoPlan,
 };
 
 #[derive(Clone)]
 pub struct JobHandle {
     pub id: JobId,
     pub cancel: Cancel,
+}
+
+enum PlanSource {
+    Request(OpRequest),
+    Redo,
 }
 
 #[derive(Clone)]
@@ -64,30 +69,6 @@ impl Jobs {
         handle
     }
 
-    fn scan_with_progress(
-        engine: &Engine,
-        sources: &[PathBuf],
-        id: JobId,
-        cancel: &Cancel,
-        out: &Sender<CoreEvent>,
-    ) -> Scan {
-        engine.scan(
-            sources,
-            ScanControl {
-                cancel: cancel.flag(),
-                progress: &mut |p| {
-                    let _ = out.send(CoreEvent::Job(JobEvent::Scanning {
-                        job: id,
-                        files: p.files,
-                        dirs: p.dirs,
-                        bytes: p.bytes,
-                        current: p.current.clone(),
-                    }));
-                },
-            },
-        )
-    }
-
     fn planned(out: &Sender<CoreEvent>, job: JobId, plan: Plan, scan: Option<Arc<Scan>>) {
         let _ = out.send(CoreEvent::Job(JobEvent::Planned {
             job,
@@ -99,109 +80,70 @@ impl Jobs {
 
     // ------------------------------------------------------------------ planning
 
-    pub fn plan_transfer(
-        &self,
-        sources: Vec<PathBuf>,
-        dest: PathBuf,
-        opts: TransferOptions,
-    ) -> JobHandle {
-        self.spawn(move |id, cancel, engine, out| {
-            let scan = Arc::new(Self::scan_with_progress(engine, &sources, id, &cancel, out));
-            if cancel.is_cancelled() {
-                return;
-            }
-            let plan = engine.plan_transfer(&scan, &dest, &opts);
-            Self::planned(out, id, plan, Some(scan));
-        })
+    /// Plan any request (from the interface or from a program). Scanning and planning
+    /// happen on a worker; the answer is a `Planned` event.
+    pub fn plan_request(&self, req: OpRequest) -> JobHandle {
+        self.plan_job(PlanSource::Request(req))
     }
 
-    /// Re-plan from an existing scan (e.g. after the user picked another conflict policy).
-    pub fn replan_transfer(
-        &self,
-        scan: Arc<Scan>,
-        dest: PathBuf,
-        opts: TransferOptions,
-    ) -> JobHandle {
-        self.spawn(move |id, _cancel, engine, out| {
-            let plan = engine.plan_transfer(&scan, &dest, &opts);
-            Self::planned(out, id, plan, Some(scan));
-        })
-    }
-
-    pub fn plan_trash(&self, sources: Vec<PathBuf>) -> JobHandle {
-        self.spawn(move |id, cancel, engine, out| {
-            let scan = Arc::new(Self::scan_with_progress(engine, &sources, id, &cancel, out));
-            if cancel.is_cancelled() {
-                return;
-            }
-            Self::planned(out, id, engine.plan_trash(&scan), Some(scan));
-        })
-    }
-
-    pub fn plan_delete(&self, sources: Vec<PathBuf>) -> JobHandle {
-        self.spawn(move |id, cancel, engine, out| {
-            let scan = Arc::new(Self::scan_with_progress(engine, &sources, id, &cancel, out));
-            if cancel.is_cancelled() {
-                return;
-            }
-            Self::planned(out, id, engine.plan_delete(&scan), Some(scan));
-        })
-    }
-
-    pub fn plan_rename(&self, from: PathBuf, new_name: std::ffi::OsString) -> JobHandle {
-        self.spawn(move |id, _c, engine, out| {
-            Self::planned(out, id, engine.plan_rename(&from, &new_name), None)
-        })
-    }
-
-    pub fn plan_mkdir(&self, parent: PathBuf, name: std::ffi::OsString) -> JobHandle {
-        self.spawn(move |id, _c, engine, out| {
-            Self::planned(out, id, engine.plan_mkdir(&parent, &name), None)
-        })
-    }
-
-    pub fn plan_bulk_rename(&self, items: Vec<PathBuf>, pattern: Pattern) -> JobHandle {
-        self.spawn(move |id, _c, engine, out| {
-            Self::planned(out, id, engine.plan_bulk_rename(&items, &pattern), None)
-        })
-    }
-
-    /// Plan the undo of `entry_id`, or of the latest undoable operation when `None`.
-    pub fn plan_undo(&self, entry_id: Option<String>) -> JobHandle {
+    fn plan_job(&self, source: PlanSource) -> JobHandle {
         let journal = self.journal.clone();
-        self.spawn(move |id, _c, engine, out| {
-            let Some(journal) = journal else {
-                let _ = out.send(CoreEvent::Job(JobEvent::Error {
-                    job: id,
-                    message: "the journal is unavailable; nothing can be undone".into(),
-                }));
-                return;
-            };
-            let target = match entry_id {
-                Some(i) => i,
-                None => match journal.last_undoable() {
-                    Ok(Some(e)) => e.id,
-                    Ok(None) => {
-                        let _ = out.send(CoreEvent::Job(JobEvent::NothingToUndo { job: id }));
-                        return;
-                    }
-                    Err(e) => {
+        self.spawn(move |id, cancel, engine, out| {
+            let (req, redo_of) = match source {
+                PlanSource::Request(r) => (r, None),
+                PlanSource::Redo => match journal.as_ref().map(|j| j.last_redoable()) {
+                    Some(Ok(Some(entry))) => match entry.request.clone() {
+                        Some(r) => (r, Some(entry.id)),
+                        None => {
+                            let _ = out.send(CoreEvent::Job(JobEvent::NothingToRedo { job: id }));
+                            return;
+                        }
+                    },
+                    Some(Err(e)) => {
                         let _ = out.send(CoreEvent::Job(JobEvent::Error {
                             job: id,
                             message: e.to_string(),
                         }));
                         return;
                     }
+                    Some(Ok(None)) | None => {
+                        let _ = out.send(CoreEvent::Job(JobEvent::NothingToRedo { job: id }));
+                        return;
+                    }
                 },
             };
-            match engine.plan_undo(&journal, &target) {
-                Ok(up) => {
-                    let plan = up.plan.clone();
+            // "Nothing to undo" is an answer, not an error.
+            if let (OpRequest::Undo { entry: None }, Some(j)) = (&req, &journal) {
+                if matches!(j.last_undoable(), Ok(None)) {
+                    let _ = out.send(CoreEvent::Job(JobEvent::NothingToUndo { job: id }));
+                    return;
+                }
+            }
+            let mut progress = |p: &crate::ops::ScanProgress| {
+                let _ = out.send(CoreEvent::Job(JobEvent::Scanning {
+                    job: id,
+                    files: p.files,
+                    dirs: p.dirs,
+                    bytes: p.bytes,
+                    current: p.current.clone(),
+                }));
+            };
+            let ctl = ScanControl {
+                cancel: cancel.flag(),
+                progress: &mut progress,
+            };
+            match engine.plan_request(&req, journal.as_deref(), ctl) {
+                Ok(planned) => {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let mut plan = planned.plan;
+                    plan.redo_of = redo_of;
                     let _ = out.send(CoreEvent::Job(JobEvent::Planned {
                         job: id,
                         plan: Box::new(plan),
-                        scan: None,
-                        undo: Some(Box::new(up)),
+                        scan: planned.scan,
+                        undo: planned.undo.map(Box::new),
                     }));
                 }
                 Err(e) => {
@@ -212,6 +154,69 @@ impl Jobs {
                 }
             }
         })
+    }
+
+    pub fn plan_transfer(
+        &self,
+        sources: Vec<PathBuf>,
+        dest: PathBuf,
+        opts: TransferOptions,
+    ) -> JobHandle {
+        self.plan_request(OpRequest::transfer(sources, dest, &opts))
+    }
+
+    /// Re-plan from an existing scan (e.g. after the user picked another conflict policy).
+    pub fn replan_transfer(
+        &self,
+        scan: Arc<Scan>,
+        dest: PathBuf,
+        opts: TransferOptions,
+    ) -> JobHandle {
+        self.spawn(move |id, _cancel, engine, out| {
+            let mut plan = engine.plan_transfer(&scan, &dest, &opts);
+            let sources = scan.roots.iter().map(|r| r.path.clone()).collect();
+            plan.request = Some(OpRequest::transfer(sources, dest, &opts));
+            Self::planned(out, id, plan, Some(scan));
+        })
+    }
+
+    pub fn plan_trash(&self, sources: Vec<PathBuf>) -> JobHandle {
+        self.plan_request(OpRequest::Trash { sources })
+    }
+
+    pub fn plan_delete(&self, sources: Vec<PathBuf>) -> JobHandle {
+        self.plan_request(OpRequest::Delete { sources })
+    }
+
+    pub fn plan_rename(&self, from: PathBuf, new_name: String) -> JobHandle {
+        self.plan_request(OpRequest::Rename {
+            path: from,
+            new_name,
+        })
+    }
+
+    pub fn plan_mkdir(&self, parent: PathBuf, name: String) -> JobHandle {
+        self.plan_request(OpRequest::MakeDir { parent, name })
+    }
+
+    pub fn plan_bulk_rename(&self, items: Vec<PathBuf>, pattern: String) -> JobHandle {
+        self.plan_request(OpRequest::BulkRename {
+            items,
+            pattern,
+            counter_start: None,
+            counter_step: None,
+        })
+    }
+
+    /// Plan the undo of `entry_id`, or of the latest undoable operation when `None`.
+    pub fn plan_undo(&self, entry_id: Option<String>) -> JobHandle {
+        self.plan_request(OpRequest::Undo { entry: entry_id })
+    }
+
+    /// Plan again the operation that was undone last (redo). The plan is shown and
+    /// confirmed like any other.
+    pub fn plan_redo(&self) -> JobHandle {
+        self.plan_job(PlanSource::Redo)
     }
 
     pub fn load_history(&self) -> JobHandle {

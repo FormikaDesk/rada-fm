@@ -1,27 +1,31 @@
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{Result, pathcodec};
 
 /// Where a trashed item lives, in a backend-specific way.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "backend", rename_all = "snake_case")]
 pub enum TrashHandle {
     /// freedesktop.org Trash specification: the stored file and its `.trashinfo`.
     Freedesktop {
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         stored: PathBuf,
         #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
         info: PathBuf,
     },
     /// Windows Recycle Bin / macOS: an opaque identifier owned by the backend.
     Opaque { id: String },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TrashedItem {
     #[serde(with = "pathcodec::path")]
+    #[schemars(with = "String")]
     pub original: PathBuf,
     pub handle: TrashHandle,
 }

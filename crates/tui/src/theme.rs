@@ -114,21 +114,12 @@ const fn rgb(r: u8, g: u8, b: u8) -> Color {
 }
 
 impl Theme {
-    pub const NAMES: [&'static str; 6] = [
-        "vela",
-        "catppuccin",
-        "tokyo-night",
-        "vela-azure",
-        "vela-violet",
-        "vela-mint",
-    ];
+    pub const NAMES: [&'static str; 3] = ["vela", "catppuccin", "tokyo-night"];
 
     /// A theme by name, adapted to the terminal's colour depth.
     pub fn named(name: &str, depth: ColorDepth) -> Option<Theme> {
         let t = match name.to_ascii_lowercase().as_str() {
-            "vela" | "default" | "vela-azure" | "azure" => Theme::azure(),
-            "vela-violet" | "violet" => Theme::violet(),
-            "vela-mint" | "mint" => Theme::mint(),
+            "vela" | "default" => Theme::vela(),
             "catppuccin" | "catppuccin-mocha" | "mocha" => Theme::catppuccin(),
             "tokyo-night" | "tokyonight" | "tokyo" => Theme::tokyo_night(),
             _ => return None,
@@ -173,47 +164,16 @@ impl Theme {
                 folder: rgb(110, 165, 255),
                 link: rgb(110, 220, 220),
             },
-            density: Density::Balanced,
-            bar: BarStyle::Half,
-            badge: BadgeStyle::Filled,
+            density: Density::Airy,
+            bar: BarStyle::Thin,
+            badge: BadgeStyle::Plain,
             depth: ColorDepth::True,
         }
     }
 
-    /// Azure accent, airy layout, filled badges.
-    pub fn azure() -> Theme {
-        let mut t = Theme::vela_base("vela", rgb(86, 156, 255), rgb(36, 52, 86), rgb(30, 40, 66));
-        t.density = Density::Airy;
-        t.bar = BarStyle::Thin;
-        t
-    }
-
-    /// Violet accent, balanced layout, plain badges.
-    pub fn violet() -> Theme {
-        let mut t = Theme::vela_base(
-            "vela-violet",
-            rgb(190, 130, 255),
-            rgb(56, 40, 86),
-            rgb(42, 32, 66),
-        );
-        t.density = Density::Balanced;
-        t.badge = BadgeStyle::Plain;
-        t.bar = BarStyle::Half;
-        t.track = rgb(46, 38, 66);
-        t
-    }
-
-    /// Mint accent, dense layout, filled badges.
-    pub fn mint() -> Theme {
-        let mut t = Theme::vela_base(
-            "vela-mint",
-            rgb(70, 230, 160),
-            rgb(26, 70, 62),
-            rgb(24, 52, 48),
-        );
-        t.density = Density::Dense;
-        t.track = rgb(30, 50, 50);
-        t
+    /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
+    pub fn vela() -> Theme {
+        Theme::vela_base("vela", rgb(86, 156, 255), rgb(36, 52, 86), rgb(30, 40, 66))
     }
 
     pub fn catppuccin() -> Theme {

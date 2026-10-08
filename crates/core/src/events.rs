@@ -66,6 +66,9 @@ pub enum JobEvent {
     NothingToUndo {
         job: JobId,
     },
+    NothingToRedo {
+        job: JobId,
+    },
     Error {
         job: JobId,
         message: String,

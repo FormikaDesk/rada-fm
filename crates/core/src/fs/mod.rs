@@ -13,11 +13,12 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub use local::LocalFs;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum FileKind {
     File,
     Dir,
@@ -165,7 +166,7 @@ fn stamp_to_time(secs: i64, nanos: u32) -> Option<SystemTime> {
 }
 
 /// A point in time that survives JSON round trips without precision loss.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Stamp {
     pub secs: i64,
     pub nanos: u32,
@@ -206,7 +207,7 @@ impl From<Stamp> for SystemTime {
 }
 
 /// Identity of a file at a moment in time, used to detect modifications after the fact.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Fingerprint {
     pub kind: FileKind,
     pub size: u64,

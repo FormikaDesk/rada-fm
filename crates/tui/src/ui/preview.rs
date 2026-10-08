@@ -54,9 +54,14 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     let modified = app.current().and_then(|e| e.mtime);
     let now = SystemTime::now();
     let ago = fmt::relative(modified, now);
+    // One or two lines of facts under the name (wrapped, never cut); then the content.
+    let summary = summary_of(&app.preview.content, app.preview.hex, &ago);
+    let mut sum_lines = fmt::wrap(&summary, w);
+    sum_lines.truncate(2);
+    let facts_rows = sum_lines.len().max(1) as u16;
     let body = Rect {
-        y: inner.y + 3,
-        height: inner.height.saturating_sub(3),
+        y: inner.y + 1 + facts_rows + 1,
+        height: inner.height.saturating_sub(facts_rows + 2),
         ..inner
     };
     let h = body.height as usize;
@@ -70,30 +75,28 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 ..inner
             },
         );
-        draw_image_pane(f, app, body);
+        // The picture sits right under the name and date, flush to the top.
+        let top = Rect {
+            y: inner.y + 2,
+            height: inner.height.saturating_sub(2),
+            ..inner
+        };
+        draw_image_pane(f, app, top);
         return;
     }
 
     let content = app.preview.content.clone();
     let mut lines: Vec<Line> = Vec::new();
-    let mut summary = String::new();
     match &content {
         None | Some(Preview::Image(_)) => {}
-        Some(Preview::Empty) => summary = "Empty file".into(),
+        Some(Preview::Empty) => {}
         Some(Preview::Error(m)) => {
             for l in fmt::wrap(m, w) {
                 lines.push(Line::from(Span::styled(l, th.fg(th.error))));
             }
         }
-        Some(Preview::Special(m)) => summary = m.clone(),
+        Some(Preview::Special(_)) => {}
         Some(Preview::Text(t)) => {
-            summary = format!("{} · {} · {}", t.encoding, fmt::size(t.size), ago);
-            if t.truncated {
-                summary.push_str(" · beginning only");
-            }
-            if t.long_lines > 0 {
-                summary.push_str(&format!(" · {} long line(s) cut", t.long_lines));
-            }
             let gw = t.lines.len().max(1).to_string().len();
             app.preview.scroll = app.preview.scroll.min(t.lines.len().saturating_sub(1));
             for (i, l) in t.lines.iter().enumerate().skip(app.preview.scroll).take(h) {
@@ -104,7 +107,6 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         Some(Preview::Binary(b)) if app.preview.hex => {
-            summary = format!("hex dump · first {} bytes", b.hex.len() * 16);
             lines.push(Line::from(vec![
                 Span::styled("H", th.key()),
                 Span::styled("  back to the summary", th.dim()),
@@ -122,8 +124,9 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
         }
         Some(Preview::Binary(b)) => {
             let c = &b.card;
-            summary = format!("{} · {}", c.kind, fmt::size(c.size));
-            let label = |k: &str| Span::styled(format!("{k:<13}"), th.dim());
+            let kv = |lines: &mut Vec<Line>, key: &str, value: &str, st: Style| {
+                kv_lines(lines, &th, key, value, st, w);
+            };
             if let Some(e) = &c.exec {
                 let mut what = vec![e.kind.clone(), e.arch.clone()];
                 if let Some(bits) = e.bits {
@@ -132,51 +135,36 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 if let Some(en) = e.endian {
                     what.push(en.to_string());
                 }
-                lines.push(Line::from(vec![
-                    label("Executable"),
-                    Span::styled(
-                        e.format.to_string(),
-                        th.fg(th.kinds.binary).add_modifier(Modifier::BOLD),
-                    ),
-                ]));
-                for l in fmt::wrap(&what.join(" · "), w.saturating_sub(13)) {
-                    lines.push(Line::from(vec![label(""), Span::styled(l, th.base())]));
-                }
+                kv(
+                    &mut lines,
+                    "Executable",
+                    e.format,
+                    th.fg(th.kinds.binary).add_modifier(Modifier::BOLD),
+                );
+                kv(&mut lines, "", &what.join(" · "), th.base());
                 if let Some(i) = &e.interpreter {
-                    lines.push(Line::from(vec![
-                        label("Interpreter"),
-                        Span::styled(display::truncate(i, w.saturating_sub(13)), th.base()),
-                    ]));
+                    kv(&mut lines, "Interpreter", i, th.base());
                 }
                 lines.push(Line::raw(""));
             }
-            lines.push(Line::from(vec![
-                label("Size"),
-                Span::styled(
-                    format!("{} ({} bytes)", fmt::size(c.size), fmt::thousands(c.size)),
-                    th.base(),
-                ),
-            ]));
-            lines.push(Line::from(vec![
-                label("Modified"),
-                Span::styled(fmt::date(c.modified), th.base()),
-            ]));
+            kv(
+                &mut lines,
+                "Size",
+                &format!("{} · {} bytes", fmt::size(c.size), fmt::thousands(c.size)),
+                th.base(),
+            );
+            kv(&mut lines, "Modified", &fmt::date(c.modified), th.base());
             if c.created.is_some() {
-                lines.push(Line::from(vec![
-                    label("Created"),
-                    Span::styled(fmt::date(c.created), th.base()),
-                ]));
+                kv(&mut lines, "Created", &fmt::date(c.created), th.base());
             }
-            lines.push(Line::from(vec![
-                label("Accessed"),
-                Span::styled(fmt::date(c.accessed), th.base()),
-            ]));
+            kv(&mut lines, "Accessed", &fmt::date(c.accessed), th.base());
             if let Some(m) = c.mode {
-                lines.push(Line::from(vec![
-                    label("Permissions"),
-                    Span::styled(vela_core::preview::mode_string(m), th.base()),
-                    Span::styled(format!("  {:04o}", m & 0o7777), th.dim()),
-                ]));
+                kv(
+                    &mut lines,
+                    "Permissions",
+                    &format!("{}  {:04o}", vela_core::preview::mode_string(m), m & 0o7777),
+                    th.base(),
+                );
             }
             lines.push(Line::raw(""));
             lines.push(Line::from(vec![
@@ -185,15 +173,6 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             ]));
         }
         Some(Preview::Dir(d)) => {
-            summary = format!(
-                "{} shown{}",
-                fmt::count(d.entries.len() as u64, "item", "items"),
-                if d.truncated {
-                    " · more not listed"
-                } else {
-                    ""
-                }
-            );
             app.preview.scroll = app.preview.scroll.min(d.entries.len().saturating_sub(1));
             for (name, is_dir) in d.entries.iter().skip(app.preview.scroll).take(h) {
                 let (g, c) = if *is_dir {
@@ -209,16 +188,12 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                     ),
                 ]));
             }
-            if d.entries.is_empty() {
-                summary = "Empty folder".into();
-            }
         }
         Some(Preview::Symlink {
             target,
             state,
             inner: inner_pv,
         }) => {
-            summary = "Symbolic link".into();
             lines.push(Line::from(vec![
                 Span::styled("→ ", th.fg(th.kinds.link)),
                 Span::styled(display::path(target), th.fg(th.kinds.link)),
@@ -247,16 +222,70 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
     if !summary.is_empty() {
+        let rows: Vec<Line> = sum_lines
+            .iter()
+            .map(|l| Line::from(Span::styled(l.clone(), th.dim())))
+            .collect();
         f.render_widget(
-            Paragraph::new(Span::styled(display::truncate(&summary, w), th.dim())),
+            Paragraph::new(rows),
             Rect {
                 y: inner.y + 1,
-                height: 1,
+                height: facts_rows,
                 ..inner
             },
         );
     }
     f.render_widget(Paragraph::new(lines), body);
+}
+
+/// `Label        value`, the value wrapping onto aligned continuation lines.
+fn kv_lines(lines: &mut Vec<Line>, th: &Theme, key: &str, value: &str, st: Style, w: usize) {
+    const KEY_W: usize = 13;
+    let room = w.saturating_sub(KEY_W).max(8);
+    for (i, part) in fmt::wrap(value, room).into_iter().enumerate() {
+        let label = if i == 0 { key } else { "" };
+        lines.push(Line::from(vec![
+            Span::styled(format!("{label:<KEY_W$}"), th.dim()),
+            Span::styled(part, st),
+        ]));
+    }
+}
+
+/// The one-line (possibly wrapped) description under the file name.
+fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
+    match content {
+        None | Some(Preview::Image(_)) | Some(Preview::Error(_)) => String::new(),
+        Some(Preview::Empty) => "Empty file".into(),
+        Some(Preview::Special(m)) => m.clone(),
+        Some(Preview::Text(t)) => {
+            let mut s = format!("{} · {} · {}", t.encoding, fmt::size(t.size), ago);
+            if t.truncated {
+                s.push_str(" · beginning only");
+            }
+            if t.long_lines > 0 {
+                s.push_str(&format!(" · {} long line(s) cut", t.long_lines));
+            }
+            s
+        }
+        Some(Preview::Binary(b)) if hex => format!("hex dump · first {} bytes", b.hex.len() * 16),
+        Some(Preview::Binary(b)) => format!("{} · {}", b.card.kind, fmt::size(b.card.size)),
+        Some(Preview::Dir(d)) => {
+            if d.entries.is_empty() {
+                "Empty folder".into()
+            } else {
+                format!(
+                    "{} shown{}",
+                    fmt::count(d.entries.len() as u64, "item", "items"),
+                    if d.truncated {
+                        " · more not listed"
+                    } else {
+                        ""
+                    }
+                )
+            }
+        }
+        Some(Preview::Symlink { .. }) => "Symbolic link".into(),
+    }
 }
 
 fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
@@ -282,7 +311,6 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
         ImageStatus::Failed(m) => Kind::Err(m.clone()),
     };
     let w = inner.width as usize;
-    let proto = app.image_ui.as_ref().map(|u| u.protocol_name());
     // Under the picture: format, pixels, weight, date.
     let facts = [
         format!(
@@ -305,9 +333,6 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
             fact_lines.push(Line::from(Span::styled(l, th.fg(th.warn))));
         }
     }
-    if let Some(p) = proto {
-        fact_lines.push(Line::from(Span::styled(p.to_string(), th.faint())));
-    }
     let facts_h = fact_lines.len() as u16;
     let bottom = Rect {
         y: inner.y + inner.height.saturating_sub(facts_h),
@@ -326,8 +351,8 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
                 let target = ratatui::layout::Size::new(pic.width, pic.height);
                 match ui.proto.size_for(Resize::Fit(None), target) {
                     Some(sz) => {
-                        let group = (sz.height + 1 + facts_h).min(inner.height);
-                        let y0 = inner.y + (inner.height - group) / 2;
+                        // Flush to the top, right under the name and date.
+                        let y0 = inner.y;
                         let r = Rect {
                             x: pic.x,
                             y: y0,

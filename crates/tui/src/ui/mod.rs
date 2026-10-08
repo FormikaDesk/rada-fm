@@ -63,7 +63,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let body = side(body);
     // The preview needs room: it hides itself on narrow terminals.
     if body.width >= 88 {
-        let pw = (body.width as u32 * 40 / 100) as u16;
+        let pw = ((body.width as u32 * 36 / 100) as u16).max(30);
         let [left, divider, right] = Layout::horizontal([
             Constraint::Min(30),
             Constraint::Length(1),

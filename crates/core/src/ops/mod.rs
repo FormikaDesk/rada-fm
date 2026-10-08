@@ -6,6 +6,7 @@ pub mod names;
 pub mod plan;
 pub mod planner;
 pub mod rename;
+pub mod request;
 pub mod runner;
 pub mod scan;
 pub mod undo;
@@ -18,6 +19,7 @@ pub use exec::{
 pub use plan::*;
 pub use planner::{TransferMode, TransferOptions};
 pub use rename::{Pattern, Preview};
+pub use request::{OpRequest, Planned, plan_to_json};
 pub use runner::RunOutcome;
 pub use scan::{LinkState, Scan, ScanControl, ScanNode, ScanProgress};
 pub use undo::{Blocked, UndoPlan};

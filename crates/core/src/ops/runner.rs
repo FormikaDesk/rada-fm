@@ -54,7 +54,14 @@ impl Engine {
         handler: &mut dyn ExecHandler,
         cancel: &Cancel,
     ) -> Result<RunOutcome> {
-        let id = journal.begin(plan.kind, &plan.title, plan.reversible, plan.totals)?;
+        let id = journal.begin(
+            plan.kind,
+            &plan.title,
+            plan.reversible,
+            plan.totals,
+            plan.request.as_ref(),
+            plan.redo_of.as_deref(),
+        )?;
         let mut rec = Recording {
             inner: handler,
             journal,

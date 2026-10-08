@@ -46,7 +46,7 @@ impl H {
             icons: IconSet::Unicode,
             show_hidden: false,
             sort: SortSpec::default(),
-            theme: Theme::azure(),
+            theme: Theme::vela(),
             image_mode: vela_tui::ImageMode::Halfblocks,
             limits,
             select: None,
@@ -540,8 +540,12 @@ fn an_image_is_drawn_with_its_facts_underneath() {
     assert!(s.contains("PNG · 160 × 100 px"), "{s}");
     assert!(s.contains("modified 20"), "{s}");
     assert!(
-        s.contains("half blocks"),
-        "the active graphics protocol is named: {s}"
+        !s.contains("half blocks") && !s.contains("kitty graphics"),
+        "the protocol name is not shown in the preview: {s}"
+    );
+    assert_eq!(
+        h.app.image_ui.as_ref().unwrap().protocol_name(),
+        "half blocks"
     );
 }
 

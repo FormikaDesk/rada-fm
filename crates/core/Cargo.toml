@@ -29,6 +29,7 @@ tempfile = { version = "3", optional = true }
 jiff = "0.2.38"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico", "tiff"] }
 resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts"] }
+schemars = "1.2.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -239,14 +239,37 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
 
     let mut body: Vec<Line> = Vec::new();
 
-    // Heading: what kind of operation, then its full title with the home folder as ~.
-    let home_s = display::path(home);
-    let title = plan.title.replace(&home_s, "~");
+    // Heading: what kind of operation and how many items. Every path below is relative
+    // to the bases named once here.
+    let bases = Bases::of(plan, home);
+    let (head, titled_path) = split_title(&plan.title);
     body.push(Line::from(vec![chip(th, verb(plan.kind), tone)]));
     body.push(Line::from(Span::styled(
-        display::truncate(&title, inner_w),
+        display::truncate(&head.replace(&display::path(home), "~"), inner_w),
         th.base().add_modifier(Modifier::BOLD),
     )));
+    let base_line = |label: &str, p: &std::path::Path| {
+        Line::from(vec![
+            Span::styled(format!("{label:<6}"), th.dim()),
+            Span::styled(
+                tail(&fmt::short_path(p, home), inner_w.saturating_sub(6)),
+                th.base(),
+            ),
+        ])
+    };
+    match (&bases.src, &bases.dst) {
+        (Some(s), Some(d)) => {
+            body.push(base_line("From", s));
+            body.push(base_line("To", d));
+        }
+        (Some(s), None) => body.push(base_line("In", s)),
+        (None, Some(d)) => body.push(base_line("In", d)),
+        (None, None) => {
+            if let Some(p) = &titled_path {
+                body.push(base_line("In", std::path::Path::new(p)));
+            }
+        }
+    }
     body.push(Line::raw(""));
 
     // Totals, big and calm: the number above, the label below.
@@ -341,10 +364,7 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
         }
         for ex in wn.examples.iter().take(3) {
             body.push(Line::from(Span::styled(
-                format!(
-                    "    {}",
-                    tail(&fmt::short_path(ex, home), inner_w.saturating_sub(4))
-                ),
+                format!("    {}", tail(&bases.rel(ex), inner_w.saturating_sub(4))),
                 th.faint(),
             )));
         }
@@ -503,10 +523,9 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
                 th.faint(),
             ),
         ]));
-        let base = plan.destination.as_deref();
         let mut shown = 0;
         for s in &plan.steps {
-            let Some(label) = step_label(s, base, home) else {
+            let Some(label) = step_label(s, &bases) else {
                 continue;
             };
             if shown == 500 {
@@ -583,58 +602,118 @@ fn draw_plan(f: &mut Frame, th: &Theme, pv: &PlanView, home: &std::path::Path, a
     );
 }
 
-/// One line per step, with paths relative to the destination so they stay readable.
-fn step_label(
-    step: &Step,
-    base: Option<&std::path::Path>,
-    home: &std::path::Path,
-) -> Option<String> {
-    let rel = |p: &std::path::Path| match base.and_then(|b| p.strip_prefix(b).ok()) {
-        Some(r) => display::path(r),
-        None => fmt::short_path(p, home),
-    };
-    Some(match step {
-        Step::MakeDir { path, .. } => format!("folder   {}", rel(path)),
-        Step::FinishDir { .. } => return None,
-        Step::CopyFile {
+/// The two folders a plan is about, named once at the top; everything else is shown
+/// relative to them (`→` marks something that lives in the destination).
+struct Bases {
+    src: Option<std::path::PathBuf>,
+    dst: Option<std::path::PathBuf>,
+    home: std::path::PathBuf,
+}
+
+fn common_parent<'a>(
+    paths: impl Iterator<Item = &'a std::path::Path>,
+) -> Option<std::path::PathBuf> {
+    let mut common: Option<std::path::PathBuf> = None;
+    for p in paths {
+        let parent = p.parent()?.to_path_buf();
+        common = Some(match common {
+            None => parent,
+            Some(c) => c
+                .ancestors()
+                .find(|a| parent.starts_with(a))
+                .map(|a| a.to_path_buf())?,
+        });
+    }
+    common
+}
+
+impl Bases {
+    fn of(plan: &vela_core::ops::Plan, home: &std::path::Path) -> Bases {
+        let from_items = common_parent(plan.items.iter().map(|i| i.path.as_path()));
+        let from_steps = || {
+            common_parent(
+                plan.steps
+                    .iter()
+                    .filter(|s| !matches!(s, Step::FinishDir { .. }))
+                    .map(|s| s.path()),
+            )
+        };
+        let (src, dst) = match plan.kind {
+            OpKind::Copy | OpKind::Move => {
+                (from_items.or_else(from_steps), plan.destination.clone())
+            }
+            OpKind::MakeDir => (None, plan.destination.clone()),
+            _ => (from_items.or_else(from_steps), None),
+        };
+        Bases {
             src,
             dst,
-            remove_source,
-            ..
+            home: home.to_path_buf(),
+        }
+    }
+
+    /// Relative to the source base, or to the destination (with a `→`), or abbreviated.
+    fn rel(&self, p: &std::path::Path) -> String {
+        if let Some(Ok(r)) = self.dst.as_deref().map(|d| p.strip_prefix(d)) {
+            return format!("→ {}", display::path(r));
+        }
+        self.rel_src(p)
+    }
+
+    fn rel_src(&self, p: &std::path::Path) -> String {
+        match self.src.as_deref().map(|s| p.strip_prefix(s)) {
+            Some(Ok(r)) if !r.as_os_str().is_empty() => display::path(r),
+            _ => fmt::short_path(p, &self.home),
+        }
+    }
+
+    /// Inside the destination, without the arrow (steps all live there).
+    fn rel_dst(&self, p: &std::path::Path) -> String {
+        match self.dst.as_deref().map(|d| p.strip_prefix(d)) {
+            Some(Ok(r)) => display::path(r),
+            _ => self.rel_src(p),
+        }
+    }
+}
+
+/// "Copy 5 items to /home/x/backup" -> ("Copy 5 items", Some("/home/x/backup")).
+fn split_title(title: &str) -> (String, Option<String>) {
+    for marker in [" to /", " to ~"] {
+        if let Some(i) = title.rfind(marker) {
+            return (title[..i].to_string(), Some(title[i + 4..].to_string()));
+        }
+    }
+    (title.to_string(), None)
+}
+
+/// One line per step, paths relative to the plan's bases.
+fn step_label(step: &Step, b: &Bases) -> Option<String> {
+    Some(match step {
+        Step::MakeDir { path, .. } => format!("folder   {}", b.rel_dst(path)),
+        Step::FinishDir { .. } => return None,
+        Step::CopyFile {
+            dst, remove_source, ..
         } => format!(
             "{}   {}",
             if *remove_source { "move  " } else { "copy  " },
-            if base.is_some() {
-                rel(dst)
-            } else {
-                format!("{} → {}", fmt::short_path(src, home), rel(dst))
-            }
+            b.rel_dst(dst)
         ),
         Step::CopySymlink {
             dst,
             target,
             remove_source,
             ..
-        } => {
-            format!(
-                "{}   {} → {}",
-                if *remove_source { "link↪ " } else { "link  " },
-                rel(dst),
-                display::path(target)
-            )
-        }
-        Step::Rename { from, to } => match base {
-            Some(_) => format!("move     {} → {}", fmt::short_path(from, home), rel(to)),
-            None => format!(
-                "rename   {} → {}",
-                fmt::short_path(from, home),
-                fmt::short_path(to, home)
-            ),
-        },
-        Step::TrashItem { path } => format!("trash    {}", fmt::short_path(path, home)),
-        Step::RemoveFile { path, .. } => format!("delete   {}", fmt::short_path(path, home)),
-        Step::RemoveDir { path } => format!("remove   {}/", fmt::short_path(path, home)),
-        Step::Restore { item } => format!("restore  {}", fmt::short_path(&item.original, home)),
+        } => format!(
+            "{}   {} → {}",
+            if *remove_source { "link↪ " } else { "link  " },
+            b.rel_dst(dst),
+            display::path(target)
+        ),
+        Step::Rename { from, to } => format!("rename   {} → {}", b.rel_src(from), b.rel(to)),
+        Step::TrashItem { path } => format!("trash    {}", b.rel_src(path)),
+        Step::RemoveFile { path, .. } => format!("delete   {}", b.rel_src(path)),
+        Step::RemoveDir { path } => format!("remove   {}/", b.rel_src(path)),
+        Step::Restore { item } => format!("restore  {}", b.rel_src(&item.original)),
     })
 }
 
