@@ -49,6 +49,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         draw_progress(f, app, progress);
     }
     draw_footer(f, app, footer);
+    draw_toast_box(f, app, area, footer);
     draw_modal(f, app, area);
 }
 
@@ -286,11 +287,7 @@ fn row<'a>(
     } else {
         "  "
     };
-    let gutter_style = if marked {
-        th.fg(th.accent)
-    } else {
-        th.fg(th.accent)
-    };
+    let gutter_style = th.fg(th.accent);
 
     let mut shown = e.display.clone();
     if e.is_dir() {
@@ -563,10 +560,13 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             ToastKind::Error => "✖",
         };
         left.push(Span::styled(format!(" {glyph} "), th.fg(c)));
-        left.push(Span::styled(
-            display::truncate(&t.text.replace('\n', " "), w.saturating_sub(6)),
-            th.fg(c),
-        ));
+        let one_line = t.text.replace('\n', " ");
+        if one_line.width() + 6 <= w {
+            left.push(Span::styled(one_line, th.fg(c)));
+        } else {
+            // Too long for one line: the full text is shown wrapped in a box above.
+            left.push(Span::styled("full message above", th.dim()));
+        }
     } else {
         let hints: &[(&str, &str)] = if app.marked.is_empty() {
             &[
@@ -626,6 +626,49 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         spans.extend(right);
     }
     f.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+/// A long message (typically an error with a full path) is wrapped, never truncated.
+fn draw_toast_box(f: &mut Frame, app: &App, area: Rect, footer: Rect) {
+    let Some(t) = &app.toast else { return };
+    let th = &app.th;
+    let w = area.width as usize;
+    let one_line = t.text.replace('\n', " ");
+    if one_line.width() + 6 <= w {
+        return;
+    }
+    let color = match t.kind {
+        ToastKind::Info => th.accent_soft,
+        ToastKind::Ok => th.ok,
+        ToastKind::Warn => th.warn,
+        ToastKind::Error => th.danger,
+    };
+    let inner_w = w.saturating_sub(6).max(10);
+    let mut lines = fmt::wrap(&t.text, inner_w);
+    lines.truncate(6);
+    let h = lines.len() as u16 + 2;
+    if footer.y < h {
+        return;
+    }
+    let r = Rect {
+        x: area.x + 1,
+        y: footer.y - h,
+        width: area.width.saturating_sub(2),
+        height: h,
+    };
+    f.render_widget(Clear, r);
+    let blk = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(th.fg(color))
+        .padding(ratatui::widgets::Padding::horizontal(1));
+    let inner = blk.inner(r);
+    f.render_widget(blk, r);
+    let text: Vec<Line> = lines
+        .into_iter()
+        .map(|l| Line::from(Span::styled(l, th.fg(color))))
+        .collect();
+    f.render_widget(Paragraph::new(text), inner);
 }
 
 // ------------------------------------------------------------------------------ modals

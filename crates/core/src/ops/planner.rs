@@ -356,7 +356,7 @@ impl Engine {
         let path = parent.join(name);
         let mut plan = Plan::empty(
             OpKind::MakeDir,
-            format!("Create folder {}", display::path(&path)),
+            format!("Create folder {}", display::name(name)),
         );
         let mut ws = WarningSet::default();
         plan.destination = Some(parent.to_path_buf());

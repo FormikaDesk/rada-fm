@@ -313,6 +313,7 @@ impl App {
                 8,
             );
         }
+        app.svc.watcher.watch(cfg.start_dir.clone());
         app.request_dir(cfg.start_dir);
         app
     }
