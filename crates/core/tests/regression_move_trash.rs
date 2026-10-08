@@ -1,14 +1,9 @@
 //! Move, trash and delete: same filesystem, across filesystems (tmpfs <-> disk),
 //! the freedesktop trash layout, and the failure modes superfile had (B8).
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 
-use vela_core::fs::LocalFs;
 use vela_core::ops::*;
-use vela_core::platform::freedesktop::{FreedesktopTrash, percent_decode};
-use vela_core::platform::linux::LinuxPlatform;
-use vela_core::platform::{Platform, TrashHandle};
 use vela_core::testutil::*;
 
 fn tree(sb: &Sandbox, root: &str) -> PathBuf {
@@ -27,31 +22,6 @@ fn tree(sb: &Sandbox, root: &str) -> PathBuf {
     sb.path(root)
 }
 
-/// Remove `.Trash-<uid>` at a mount top if (and only if) this test created it.
-struct TrashCleanup(PathBuf, bool);
-impl TrashCleanup {
-    fn new(top: &Path) -> Self {
-        // SAFETY: getuid cannot fail.
-        let uid = unsafe { libc_uid() };
-        let p = top.join(format!(".Trash-{uid}"));
-        let existed = p.exists();
-        TrashCleanup(p, existed)
-    }
-}
-impl Drop for TrashCleanup {
-    fn drop(&mut self) {
-        if !self.1 {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-}
-unsafe fn libc_uid() -> u32 {
-    use std::os::unix::fs::MetadataExt;
-    std::fs::metadata("/proc/self")
-        .map(|m| m.uid())
-        .unwrap_or(0)
-}
-
 // ---------------------------------------------------------------------------- move
 
 #[test]
@@ -61,7 +31,7 @@ fn same_filesystem_move_is_a_rename_per_item_and_keeps_everything() {
     let before = snapshot(&src);
     let dest = sb.mkdir("dest");
     let e = sb.engine();
-    let (plan, rep) = do_move(&e, &[src.clone()], &dest, ConflictPolicy::Skip);
+    let (plan, rep) = do_move(&e, std::slice::from_ref(&src), &dest, ConflictPolicy::Skip);
     assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
     assert_eq!(plan.steps.len(), 1, "one atomic rename for the whole tree");
     assert!(!src.exists());
@@ -84,7 +54,12 @@ fn moving_between_filesystems_copies_verifies_then_removes_the_source() {
     // disk -> tmpfs
     let src = tree(&sb, "src");
     let before = snapshot(&src);
-    let (plan, rep) = do_move(&e, &[src.clone()], other.path(), ConflictPolicy::Skip);
+    let (plan, rep) = do_move(
+        &e,
+        std::slice::from_ref(&src),
+        other.path(),
+        ConflictPolicy::Skip,
+    );
     assert!(
         plan.warnings
             .iter()
@@ -190,54 +165,13 @@ fn moving_onto_an_existing_folder_merges_and_removes_the_emptied_source() {
     assert!(!sb.path("src/box/a.txt").exists());
 }
 
-// ---------------------------------------------------------------------------- trash
-
-fn read_info(p: &Path) -> String {
-    std::fs::read_to_string(p).unwrap()
-}
+// ---------------------------------------------------------------------------- trash (portable API)
 
 #[test]
-fn trashing_writes_a_valid_freedesktop_entry_and_restores_it() {
-    let sb = Sandbox::new();
-    let f = sb.write("docs/ünï cödé & 100%.txt", "hello");
-    let e = sb.engine();
-    let plan = e.plan_trash(&scan(&e, &[f.clone()]));
-    let rep = run(&e, &plan);
-    assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
-    assert!(!f.exists());
-
-    let trash = sb.dirs.home_trash();
-    let info_dir = trash.join("info");
-    let infos: Vec<_> = std::fs::read_dir(&info_dir).unwrap().flatten().collect();
-    assert_eq!(infos.len(), 1);
-    let text = read_info(&infos[0].path());
-    assert!(text.starts_with("[Trash Info]\nPath="), "{text}");
-    let path_line = text.lines().find(|l| l.starts_with("Path=")).unwrap();
-    assert_eq!(percent_decode(&path_line[5..]), f.as_os_str());
-    let date = text
-        .lines()
-        .find(|l| l.starts_with("DeletionDate="))
-        .unwrap();
-    assert_eq!(
-        date.len(),
-        "DeletionDate=2026-10-08T15:31:25".len(),
-        "{date}"
-    );
-    assert!(date.as_bytes()[23] == b'T' || date.contains('T'));
-    assert_eq!(
-        std::fs::read_to_string(trash.join("files/ünï cödé & 100%.txt")).unwrap(),
-        "hello"
-    );
-
-    // Same name again: unique names, no clobbering.
-    let g = sb.write("other/ünï cödé & 100%.txt", "second");
-    let plan = e.plan_trash(&scan(&e, &[g]));
-    run(&e, &plan);
-    assert_eq!(std::fs::read_dir(trash.join("files")).unwrap().count(), 2);
-    assert_eq!(std::fs::read_dir(&info_dir).unwrap().count(), 2);
-}
-
-#[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
 #[cfg_attr(
     not(unix),
     ignore = "needs POSIX symlinks; Windows support is in development"
@@ -245,147 +179,25 @@ fn trashing_writes_a_valid_freedesktop_entry_and_restores_it() {
 fn trashing_a_symlink_trashes_the_link_not_its_target() {
     let sb = Sandbox::new();
     let target = sb.write("real/keep.txt", "keep me");
-    let link = sb.symlink("real", "linkdir");
-    let e = sb.engine();
-    let rep = run(&e, &e.plan_trash(&scan(&e, &[link.clone()])));
-    assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
-    assert!(std::fs::symlink_metadata(&link).is_err());
-    assert_eq!(std::fs::read_to_string(target).unwrap(), "keep me");
+    #[cfg(unix)]
+    {
+        let link = sb.symlink("real", "linkdir");
+        let e = sb.engine();
+        let rep = run(&e, &e.plan_trash(&scan(&e, std::slice::from_ref(&link))));
+        assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
+        assert!(std::fs::symlink_metadata(&link).is_err());
+        assert_eq!(std::fs::read_to_string(target).unwrap(), "keep me");
+    }
+    #[cfg(not(unix))]
+    let _ = target;
 }
 
 #[test]
 #[cfg_attr(
     not(target_os = "linux"),
-    ignore = "needs a tmpfs/disk pair; Windows and macOS support is in development"
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
 )]
-fn trash_across_filesystems_uses_the_per_device_trash_and_restores() {
-    let sb = Sandbox::new();
-    let Some(other) = other_filesystem_dir(&sb) else {
-        eprintln!("skipped: no second filesystem available");
-        return;
-    };
-    let top = {
-        // The mount point of `other`: highest ancestor with the same device.
-        use std::os::unix::fs::MetadataExt;
-        let dev = std::fs::metadata(other.path()).unwrap().dev();
-        let mut t = other.path().to_path_buf();
-        for a in other.path().ancestors().skip(1) {
-            if std::fs::metadata(a).map(|m| m.dev()).ok() == Some(dev) {
-                t = a.to_path_buf()
-            } else {
-                break;
-            }
-        }
-        t
-    };
-    let _cleanup = TrashCleanup::new(&top);
-    let victim = other.path().join("victim dir");
-    std::fs::create_dir_all(victim.join("sub")).unwrap();
-    std::fs::write(victim.join("sub/f.txt"), "payload").unwrap();
-    let e = sb.engine();
-    let plan = e.plan_trash(&scan(&e, &[victim.clone()]));
-    let rep = run(&e, &plan);
-    assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
-    assert!(!victim.exists());
-
-    // It went to $topdir/.Trash-uid (a rename on the same device), not to the home trash.
-    assert_eq!(
-        std::fs::read_dir(sb.dirs.home_trash().join("files"))
-            .map(|d| d.count())
-            .unwrap_or(0),
-        0
-    );
-    let per_dev = std::fs::read_dir(&top)
-        .unwrap()
-        .flatten()
-        .find(|d| d.file_name().to_string_lossy().starts_with(".Trash-"))
-        .expect("per-device trash")
-        .path();
-    let info = std::fs::read_dir(per_dev.join("info"))
-        .unwrap()
-        .flatten()
-        .next()
-        .unwrap()
-        .path();
-    let text = read_info(&info);
-    let rel = text.lines().find(|l| l.starts_with("Path=")).unwrap()[5..].to_string();
-    assert!(
-        !rel.starts_with('/'),
-        "Path= must be relative to the topdir for per-device trashes: {rel}"
-    );
-    assert!(per_dev.join("files/victim dir/sub/f.txt").exists());
-
-    // And undo-style restore works from there.
-    let item = {
-        let n = std::fs::read_dir(per_dev.join("files"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
-        vela_core::platform::TrashedItem {
-            original: victim.clone(),
-            handle: TrashHandle::Freedesktop { stored: n, info },
-        }
-    };
-    sb.platform().trash().restore(&item).unwrap();
-    assert_eq!(
-        std::fs::read_to_string(victim.join("sub/f.txt")).unwrap(),
-        "payload"
-    );
-}
-
-#[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "needs a tmpfs/disk pair; Windows and macOS support is in development"
-)]
-fn when_no_per_device_trash_is_possible_the_item_is_copied_to_the_home_trash() {
-    let sb = Sandbox::new();
-    let Some(other) = other_filesystem_dir(&sb) else {
-        return;
-    };
-    // Force "topdir" to a place where .Trash-uid cannot be created.
-    let trash = FreedesktopTrash::new(sb.dirs.home_trash(), Arc::new(LocalFs))
-        .with_topdir_finder(|_| Ok(PathBuf::from("/proc")));
-    let platform: Arc<dyn Platform> = Arc::new(LinuxPlatform::with_trash(sb.dirs.clone(), trash));
-    let e = Engine::local(platform);
-    let victim = other.path().join("far.txt");
-    std::fs::write(&victim, "far away").unwrap();
-    let rep = run(&e, &e.plan_trash(&scan(&e, &[victim.clone()])));
-    assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
-    assert!(!victim.exists());
-    let stored = sb.dirs.home_trash().join("files/far.txt");
-    assert_eq!(std::fs::read_to_string(stored).unwrap(), "far away");
-    assert_eq!(
-        std::fs::read_dir(sb.dirs.home_trash().join("info"))
-            .unwrap()
-            .count(),
-        1
-    );
-}
-
-#[test]
-fn a_failed_trash_leaves_no_orphan_trashinfo() {
-    // superfile B8: "invalid cross-device link" left file1.txt.2.trashinfo behind.
-    let sb = Sandbox::new();
-    let f = sb.write("will_fail.txt", "x");
-    let fault = FaultFs::new();
-    fault.fail(Op::Rename, "will_fail.txt", 13); // EACCES
-    let trash = FreedesktopTrash::new(sb.dirs.home_trash(), fault.clone());
-    let platform: Arc<dyn Platform> = Arc::new(LinuxPlatform::with_trash(sb.dirs.clone(), trash));
-    let e = Engine::local(platform);
-    let rep = run(&e, &e.plan_trash(&scan(&e, &[f.clone()])));
-    assert_eq!(rep.failed.len(), 1);
-    assert!(f.exists());
-    let infos = std::fs::read_dir(sb.dirs.home_trash().join("info"))
-        .map(|d| d.count())
-        .unwrap_or(0);
-    assert_eq!(infos, 0, "no orphan .trashinfo");
-}
-
-#[test]
-fn the_trash_refuses_the_root_a_mount_point_and_its_own_contents() {
+fn the_trash_refuses_the_root_and_its_own_contents() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let plan = e.plan_trash(&scan(&e, &[PathBuf::from("/")]));
@@ -419,8 +231,11 @@ fn permanent_delete_removes_links_but_never_their_targets() {
     let precious = sb.write("outside/precious.txt", "keep");
     sb.write("victim/a.txt", "a");
     sb.write("victim/sub/b.txt", "b");
-    sb.symlink(sb.path("outside"), "victim/link_to_outside");
-    sb.symlink("nowhere", "victim/broken");
+    #[cfg(unix)]
+    {
+        sb.symlink(sb.path("outside"), "victim/link_to_outside");
+        sb.symlink("nowhere", "victim/broken");
+    }
     let e = sb.engine();
     let plan = e.plan_delete(&scan(&e, &[sb.path("victim")]));
     assert!(!plan.reversible);
@@ -436,12 +251,13 @@ fn permanent_delete_removes_links_but_never_their_targets() {
 }
 
 #[test]
-fn deleting_the_root_is_blocked() {
+fn deleting_the_root_is_blocked_and_never_scans_it() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let started = std::time::Instant::now();
+    let root = std::path::Path::new(if cfg!(windows) { "C:\\" } else { "/" });
     assert!(
-        !e.plan_delete(&scan(&e, &[PathBuf::from("/")]))
+        !e.plan_delete(&scan(&e, &[root.to_path_buf()]))
             .is_executable()
     );
     assert!(
@@ -478,7 +294,7 @@ fn bulk_rename_swaps_names_through_temporary_names() {
     let a = sb.write("d/1", "one");
     let b = sb.write("d/2", "two");
     let e = sb.engine();
-    // 1 -> 2 and 2 -> 3 style chain: {n} with start 2.
+    // 1 -> 2 and 2 -> 3: a chain, so every rename goes through a temporary name.
     let pat = Pattern::parse("{n}").unwrap().with_counter(2, 1);
     let plan = e.plan_bulk_rename(&[a, b], &pat);
     assert!(plan.is_executable(), "{:?}", plan.warnings);
@@ -502,10 +318,16 @@ fn bulk_rename_refuses_collisions_and_invalid_results() {
     );
     assert!(!plan.is_executable());
     // Target exists and is not part of the renamed set.
-    let plan = e.plan_bulk_rename(&[a.clone()], &Pattern::parse("taken.txt").unwrap());
+    let plan = e.plan_bulk_rename(
+        std::slice::from_ref(&a),
+        &Pattern::parse("taken.txt").unwrap(),
+    );
     assert!(!plan.is_executable());
     // Result contains a slash.
-    let plan = e.plan_bulk_rename(&[a], &Pattern::parse("x/{name}").unwrap());
+    let plan = e.plan_bulk_rename(
+        std::slice::from_ref(&a),
+        &Pattern::parse("x/{name}").unwrap(),
+    );
     assert!(!plan.is_executable());
     assert!(b.exists() && sb.path("d/a.txt").exists());
 }
@@ -525,4 +347,214 @@ fn mkdir_validates_and_creates() {
     );
     assert!(!e.plan_mkdir(&sb.work, "a/b".as_ref()).is_executable());
     assert!(!e.plan_mkdir(&sb.work, "".as_ref()).is_executable());
+}
+
+// ---------------------------------------------------------------------------- Linux: freedesktop trash
+
+#[cfg(target_os = "linux")]
+mod linux_only {
+    use std::os::unix::fs::MetadataExt;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+
+    use vela_core::fs::LocalFs;
+    use vela_core::ops::*;
+    use vela_core::platform::freedesktop::{FreedesktopTrash, percent_decode};
+    use vela_core::platform::linux::LinuxPlatform;
+    use vela_core::platform::{Platform, TrashHandle};
+    use vela_core::testutil::*;
+
+    /// Remove `.Trash-<uid>` at a mount top if (and only if) this test created it.
+    struct TrashCleanup(PathBuf, bool);
+    impl TrashCleanup {
+        fn new(top: &Path) -> Self {
+            let uid = std::fs::metadata("/proc/self")
+                .map(|m| m.uid())
+                .unwrap_or(0);
+            let p = top.join(format!(".Trash-{uid}"));
+            let existed = p.exists();
+            TrashCleanup(p, existed)
+        }
+    }
+    impl Drop for TrashCleanup {
+        fn drop(&mut self) {
+            if !self.1 {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+    }
+
+    fn read_info(p: &Path) -> String {
+        std::fs::read_to_string(p).unwrap()
+    }
+
+    #[test]
+    fn trashing_writes_a_valid_freedesktop_entry_and_restores_it() {
+        let sb = Sandbox::new();
+        let f = sb.write("docs/ünï cödé & 100%.txt", "hello");
+        let e = sb.engine();
+        let plan = e.plan_trash(&scan(&e, std::slice::from_ref(&f)));
+        let rep = run(&e, &plan);
+        assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
+        assert!(!f.exists());
+
+        let trash = sb.dirs.home_trash();
+        let info_dir = trash.join("info");
+        let infos: Vec<_> = std::fs::read_dir(&info_dir).unwrap().flatten().collect();
+        assert_eq!(infos.len(), 1);
+        let text = read_info(&infos[0].path());
+        assert!(text.starts_with("[Trash Info]\nPath="), "{text}");
+        let path_line = text.lines().find(|l| l.starts_with("Path=")).unwrap();
+        assert_eq!(percent_decode(&path_line[5..]), f.as_os_str());
+        let date = text
+            .lines()
+            .find(|l| l.starts_with("DeletionDate="))
+            .unwrap();
+        // YYYY-MM-DDThh:mm:ss
+        let d = &date["DeletionDate=".len()..];
+        assert_eq!(d.len(), 19, "{date}");
+        assert_eq!(&d[10..11], "T");
+        assert_eq!(
+            std::fs::read_to_string(trash.join("files/ünï cödé & 100%.txt")).unwrap(),
+            "hello"
+        );
+
+        // Same name again: unique names, no clobbering.
+        let g = sb.write("other/ünï cödé & 100%.txt", "second");
+        let plan = e.plan_trash(&scan(&e, &[g]));
+        run(&e, &plan);
+        assert_eq!(std::fs::read_dir(trash.join("files")).unwrap().count(), 2);
+        assert_eq!(std::fs::read_dir(&info_dir).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn trash_across_filesystems_uses_the_per_device_trash_and_restores() {
+        let sb = Sandbox::new();
+        let Some(other) = other_filesystem_dir(&sb) else {
+            eprintln!("skipped: no second filesystem available");
+            return;
+        };
+        let top = {
+            // The mount point of `other`: highest ancestor with the same device.
+            let dev = std::fs::metadata(other.path()).unwrap().dev();
+            let mut t = other.path().to_path_buf();
+            for a in other.path().ancestors().skip(1) {
+                if std::fs::metadata(a).map(|m| m.dev()).ok() == Some(dev) {
+                    t = a.to_path_buf()
+                } else {
+                    break;
+                }
+            }
+            t
+        };
+        let _cleanup = TrashCleanup::new(&top);
+        let victim = other.path().join("victim dir");
+        std::fs::create_dir_all(victim.join("sub")).unwrap();
+        std::fs::write(victim.join("sub/f.txt"), "payload").unwrap();
+        let e = sb.engine();
+        let plan = e.plan_trash(&scan(&e, std::slice::from_ref(&victim)));
+        let rep = run(&e, &plan);
+        assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
+        assert!(!victim.exists());
+
+        // It went to $topdir/.Trash-uid (a rename on the same device), not to the home trash.
+        assert_eq!(
+            std::fs::read_dir(sb.dirs.home_trash().join("files"))
+                .map(|d| d.count())
+                .unwrap_or(0),
+            0
+        );
+        let per_dev = std::fs::read_dir(&top)
+            .unwrap()
+            .flatten()
+            .find(|d| d.file_name().to_string_lossy().starts_with(".Trash-"))
+            .expect("per-device trash")
+            .path();
+        let info = std::fs::read_dir(per_dev.join("info"))
+            .unwrap()
+            .flatten()
+            .next()
+            .unwrap()
+            .path();
+        let text = read_info(&info);
+        let rel = text.lines().find(|l| l.starts_with("Path=")).unwrap()[5..].to_string();
+        assert!(
+            !rel.starts_with('/'),
+            "Path= must be relative to the topdir for per-device trashes: {rel}"
+        );
+        assert!(per_dev.join("files/victim dir/sub/f.txt").exists());
+
+        // And restore works from there.
+        let item = {
+            let n = std::fs::read_dir(per_dev.join("files"))
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .path();
+            vela_core::platform::TrashedItem {
+                original: victim.clone(),
+                handle: TrashHandle::Freedesktop { stored: n, info },
+            }
+        };
+        sb.platform().trash().restore(&item).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(victim.join("sub/f.txt")).unwrap(),
+            "payload"
+        );
+    }
+
+    #[test]
+    fn when_no_per_device_trash_is_possible_the_item_is_copied_to_the_home_trash() {
+        let sb = Sandbox::new();
+        let Some(other) = other_filesystem_dir(&sb) else {
+            return;
+        };
+        // Force "topdir" to a place where .Trash-uid cannot be created.
+        let trash = FreedesktopTrash::new(sb.dirs.home_trash(), Arc::new(LocalFs))
+            .with_topdir_finder(|_| Ok(PathBuf::from("/proc")));
+        let platform: Arc<dyn Platform> =
+            Arc::new(LinuxPlatform::with_trash(sb.dirs.clone(), trash));
+        let e = Engine::local(platform);
+        let victim = other.path().join("far.txt");
+        std::fs::write(&victim, "far away").unwrap();
+        let rep = run(&e, &e.plan_trash(&scan(&e, std::slice::from_ref(&victim))));
+        assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
+        assert!(!victim.exists());
+        let stored = sb.dirs.home_trash().join("files/far.txt");
+        assert_eq!(std::fs::read_to_string(stored).unwrap(), "far away");
+        assert_eq!(
+            std::fs::read_dir(sb.dirs.home_trash().join("info"))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_failed_trash_leaves_no_orphan_trashinfo() {
+        // superfile B8: "invalid cross-device link" left file1.txt.2.trashinfo behind.
+        let sb = Sandbox::new();
+        let f = sb.write("will_fail.txt", "x");
+        let fault = FaultFs::new();
+        fault.fail(Op::Rename, "will_fail.txt", 13); // EACCES
+        let trash = FreedesktopTrash::new(sb.dirs.home_trash(), fault.clone());
+        let platform: Arc<dyn Platform> =
+            Arc::new(LinuxPlatform::with_trash(sb.dirs.clone(), trash));
+        let e = Engine::local(platform);
+        let rep = run(&e, &e.plan_trash(&scan(&e, std::slice::from_ref(&f))));
+        assert_eq!(rep.failed.len(), 1);
+        assert!(f.exists());
+        let infos = std::fs::read_dir(sb.dirs.home_trash().join("info"))
+            .map(|d| d.count())
+            .unwrap_or(0);
+        assert_eq!(infos, 0, "no orphan .trashinfo");
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+mod linux_only {
+    #[test]
+    #[ignore = "freedesktop Trash layout is Linux-only; the Windows Recycle Bin and macOS Trash backends are in development"]
+    fn freedesktop_trash_suite() {}
 }

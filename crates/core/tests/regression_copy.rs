@@ -69,7 +69,7 @@ fn symlinks_are_preserved_as_symlinks_including_broken_and_circular() {
     let src = links_fixture(&sb);
     let dest = sb.mkdir("dest");
     let e = sb.engine();
-    let (plan, rep) = do_copy(&e, &[src.clone()], &dest, ConflictPolicy::Skip);
+    let (plan, rep) = do_copy(&e, std::slice::from_ref(&src), &dest, ConflictPolicy::Skip);
     assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
     assert!(plan.is_executable());
 
@@ -276,10 +276,13 @@ fn permissions_and_times_are_preserved_and_readonly_folders_can_be_filled() {
     let e = sb.engine();
     let (_, rep) = do_copy(&e, &[sb.path("ro")], &dest, ConflictPolicy::Skip);
     assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
-    use std::os::unix::fs::PermissionsExt;
-    let m = |p: PathBuf| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
-    assert_eq!(m(dest.join("ro")), 0o555);
-    assert_eq!(m(dest.join("ro/f.txt")), 0o640);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let m = |p: PathBuf| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(m(dest.join("ro")), 0o555);
+        assert_eq!(m(dest.join("ro/f.txt")), 0o640);
+    }
     let mt = |p: PathBuf| std::fs::metadata(p).unwrap().modified().unwrap();
     assert_eq!(mt(sb.path("ro/f.txt")), mt(dest.join("ro/f.txt")));
     chmod(&sb.path("ro"), 0o755);
@@ -289,7 +292,7 @@ fn permissions_and_times_are_preserved_and_readonly_folders_can_be_filled() {
 // ------------------------------------------------------------------------------ conflicts
 
 #[test]
-fn conflict_policies_skip_keep_both_and_overwrite() {
+fn conflict_policies_skip_and_keep_both() {
     let sb = Sandbox::new();
     sb.write("src/same.txt", "NEW");
     sb.write("src/other.txt", "o");
@@ -324,7 +327,19 @@ fn conflict_policies_skip_keep_both_and_overwrite() {
         std::fs::read_to_string(dest.join("same.txt")).unwrap(),
         "OLD"
     );
+}
 
+#[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "overwriting moves the old file to the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
+fn the_overwrite_policy_replaces_and_warns() {
+    let sb = Sandbox::new();
+    sb.write("src/same.txt", "NEW");
+    sb.write("dest/same.txt", "OLD");
+    let e = sb.engine();
+    let dest = sb.path("dest");
     let over = e.plan_transfer(
         &scan(&e, &[sb.path("src/same.txt")]),
         &dest,
@@ -396,6 +411,7 @@ fn merging_into_an_existing_folder_keeps_unrelated_files() {
 // ------------------------------------------------------------------------------ names
 
 fn nasty_names() -> Vec<std::ffi::OsString> {
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut v: Vec<std::ffi::OsString> = [
         "plain.txt",
         "with space.txt",
@@ -435,6 +451,10 @@ fn nasty_names() -> Vec<std::ffi::OsString> {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "macOS and Windows normalise Unicode / reject invalid names; their name rules are in development"
+)]
 fn awkward_file_names_copy_move_and_round_trip_exactly() {
     let sb = Sandbox::new();
     let names = nasty_names();

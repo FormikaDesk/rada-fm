@@ -344,9 +344,12 @@ pub struct Warning {
 }
 
 /// Collects warnings grouped by kind so that 10 000 symlinks give one line, not 10 000.
+/// (count, example paths, first detail)
+type Group = (u64, Vec<PathBuf>, Option<String>);
+
 #[derive(Default)]
 pub struct WarningSet {
-    by_kind: BTreeMap<(WarningKind, Severity), (u64, Vec<PathBuf>, Option<String>)>,
+    by_kind: BTreeMap<(WarningKind, Severity), Group>,
 }
 
 const MAX_EXAMPLES: usize = 5;

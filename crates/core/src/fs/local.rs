@@ -27,7 +27,7 @@ pub fn copy_fault(e: &io::Error) -> Option<&CopyFault> {
 }
 
 fn fault(f: CopyFault) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, f)
+    io::Error::other(f)
 }
 
 const RW_CHUNK: usize = 1 << 20;
@@ -233,6 +233,8 @@ impl FsEngine for LocalFs {
             }
             // SAFETY: statvfs returned success, so the struct is initialised.
             let st = unsafe { st.assume_init() };
+            // The field types differ between Unix systems (u32 on macOS).
+            #[allow(clippy::unnecessary_cast)]
             Ok((st.f_bavail as u64).saturating_mul(st.f_frsize as u64))
         }
         #[cfg(not(unix))]
@@ -411,10 +413,10 @@ fn copy_body(
                 return Err(fault(CopyFault::Cancelled));
             }
         }
-        return Ok(CopyOutcome {
+        Ok(CopyOutcome {
             bytes: total,
             method: CopyMethod::KernelCopy,
-        });
+        })
     }
 
     #[cfg(not(target_os = "linux"))]

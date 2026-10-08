@@ -91,7 +91,6 @@ impl RealPathGuard {
 }
 
 fn walk(p: &Path, out: &mut BTreeMap<String, String>, depth: usize) {
-    use std::os::unix::fs::MetadataExt;
     let Ok(m) = std::fs::symlink_metadata(p) else {
         return;
     };
@@ -105,7 +104,7 @@ fn walk(p: &Path, out: &mut BTreeMap<String, String>, depth: usize) {
     let fp = if m.is_dir() {
         kind.to_string()
     } else {
-        format!("{kind} {} {}.{}", m.len(), m.mtime(), m.mtime_nsec())
+        format!("{kind} {} {:?}", m.len(), m.modified().ok())
     };
     out.insert(p.display().to_string(), fp);
     if m.is_dir() && depth < 8 {
@@ -367,6 +366,12 @@ pub fn undo(e: &Engine, j: &Journal, id: &str) -> (UndoPlan, ExecReport) {
 
 /// A scratch directory on a *different* filesystem from the sandbox (tmpfs vs disk),
 /// or `None` when this machine has no such location (the test then skips itself).
+#[cfg(not(unix))]
+pub fn other_filesystem_dir(_sb: &Sandbox) -> Option<tempfile::TempDir> {
+    None
+}
+
+#[cfg(unix)]
 pub fn other_filesystem_dir(sb: &Sandbox) -> Option<tempfile::TempDir> {
     use std::os::unix::fs::MetadataExt;
     let mine = std::fs::metadata(&sb.root).ok()?.dev();

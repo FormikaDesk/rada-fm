@@ -130,6 +130,10 @@ fn undo_of_a_copy_never_touches_a_file_replaced_by_the_user() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
 fn undoing_an_overwriting_copy_brings_the_old_file_back_from_the_trash() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -163,7 +167,7 @@ fn undoing_a_move_puts_everything_back() {
     let src = small_tree(&sb, "src");
     let before = snapshot(&src);
     let plan = e.plan_transfer(
-        &scan(&e, &[src.clone()]),
+        &scan(&e, std::slice::from_ref(&src)),
         &sb.mkdir("dest"),
         &TransferOptions::mv(ConflictPolicy::Skip),
     );
@@ -217,7 +221,7 @@ fn undoing_a_cross_filesystem_move_goes_back_across_the_boundary() {
     let src = small_tree(&sb, "src");
     let before = snapshot(&src);
     let plan = e.plan_transfer(
-        &scan(&e, &[src.clone()]),
+        &scan(&e, std::slice::from_ref(&src)),
         other.path(),
         &TransferOptions::mv(ConflictPolicy::Skip),
     );
@@ -282,6 +286,10 @@ fn undoing_mkdir_removes_it_unless_it_gained_content() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
 fn undoing_trash_restores_files_and_folders_with_their_content() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -302,11 +310,15 @@ fn undoing_trash_restores_files_and_folders_with_their_content() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
 fn undoing_trash_refuses_to_overwrite_a_new_file_at_the_original_path() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
     let f = sb.write("f.txt", "old");
-    let out = run_journaled(&e, &j, &e.plan_trash(&scan(&e, &[f.clone()])));
+    let out = run_journaled(&e, &j, &e.plan_trash(&scan(&e, std::slice::from_ref(&f))));
     sb.write("f.txt", "brand new");
     let up = e.plan_undo(&j, &out.id).unwrap();
     assert_eq!(up.blocked.len(), 1);
@@ -323,6 +335,10 @@ fn undoing_trash_refuses_to_overwrite_a_new_file_at_the_original_path() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
+)]
 fn undoing_trash_after_the_trash_was_emptied_explains_instead_of_failing() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -340,7 +356,7 @@ fn permanent_delete_is_recorded_but_cannot_be_undone() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
     let f = sb.write("bye.txt", "x");
-    let plan = e.plan_delete(&scan(&e, &[f.clone()]));
+    let plan = e.plan_delete(&scan(&e, std::slice::from_ref(&f)));
     let out = run_journaled(&e, &j, &plan);
     assert!(!f.exists());
     let entry = j.entries().unwrap().pop().unwrap();
@@ -388,7 +404,7 @@ fn the_journal_survives_a_restart_and_non_utf8_paths() {
         std::fs::create_dir_all(sb.path("src")).unwrap();
         std::fs::write(&file, "data").unwrap();
         let plan = e.plan_transfer(
-            &scan(&e, &[file.clone()]),
+            &scan(&e, std::slice::from_ref(&file)),
             &sb.mkdir("dest"),
             &TransferOptions::mv(ConflictPolicy::Skip),
         );
@@ -450,6 +466,10 @@ fn an_interrupted_operation_can_still_be_undone() {
 }
 
 #[test]
+#[cfg_attr(
+    not(unix),
+    ignore = "POSIX permissions; Windows support is in development"
+)]
 fn journal_files_are_private_to_the_user() {
     #[cfg(unix)]
     {
