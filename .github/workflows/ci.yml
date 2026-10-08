@@ -28,9 +28,6 @@ jobs:
         run: cargo build --workspace --all-targets
       - name: Test core
         run: cargo test -p vela-core
-      - name: List ignored tests and their reasons
-        if: matrix.os != 'ubuntu-latest'
-        run: cargo test -p vela-core -- --ignored --list
 
   # Formatting, lints and the rest of the workspace (Linux).
   quality:
