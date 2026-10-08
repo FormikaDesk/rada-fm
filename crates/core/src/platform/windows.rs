@@ -148,6 +148,7 @@ mod tests {
             mtime: None,
             atime: None,
             ctime: None,
+            btime: None,
             mode: None,
             dev: None,
             ino: None,

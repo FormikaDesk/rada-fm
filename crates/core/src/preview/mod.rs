@@ -2,12 +2,18 @@
 //! data, UTF-16, Latin-1, FIFOs, devices. Only a bounded prefix is ever read, and
 //! only from regular files, so a preview can neither hang nor exhaust memory.
 
+pub mod card;
+pub mod image;
+
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+pub use card::{ExecInfo, FileCard, mode_string};
+pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker};
+
 use crate::display;
-use crate::fs::{FileKind, FsEngine, SpecialKind};
+use crate::fs::{FileKind, FsEngine, FsMeta, SpecialKind};
 use crate::ops::LinkState;
 
 #[derive(Clone, Debug)]
@@ -17,6 +23,7 @@ pub struct Limits {
     pub max_line_chars: usize,
     pub hex_bytes: usize,
     pub dir_entries: usize,
+    pub image: ImageLimits,
 }
 
 impl Default for Limits {
@@ -27,6 +34,7 @@ impl Default for Limits {
             max_line_chars: 2000,
             hex_bytes: 512,
             dir_entries: 300,
+            image: ImageLimits::default(),
         }
     }
 }
@@ -36,6 +44,7 @@ pub enum Preview {
     Empty,
     Text(TextPreview),
     Binary(BinaryPreview),
+    Image(ImagePreview),
     Dir(DirPreview),
     Symlink {
         target: PathBuf,
@@ -61,6 +70,9 @@ pub struct TextPreview {
 pub struct BinaryPreview {
     pub size: u64,
     pub kind: &'static str,
+    /// The clean summary shown by default.
+    pub card: FileCard,
+    /// First bytes as a hex dump; shown on request.
     pub hex: Vec<String>,
 }
 
@@ -86,7 +98,7 @@ pub fn generate(fs: &dyn FsEngine, path: &Path, limits: &Limits) -> Preview {
                 }
                 Ok(m) if m.is_file() => (
                     LinkState::ToFile,
-                    Some(Box::new(file_preview(path, m.size, limits))),
+                    Some(Box::new(file_preview(path, &m, limits))),
                 ),
                 Ok(_) => (LinkState::ToFile, None),
                 #[cfg(unix)]
@@ -99,7 +111,7 @@ pub fn generate(fs: &dyn FsEngine, path: &Path, limits: &Limits) -> Preview {
                 inner,
             }
         }
-        FileKind::File => file_preview(path, meta.size, limits),
+        FileKind::File => file_preview(path, &meta, limits),
         FileKind::Other => Preview::Special(
             match meta.special {
                 Some(SpecialKind::Fifo) => "named pipe (not read)",
@@ -147,7 +159,8 @@ fn open_nonblocking(path: &Path) -> std::io::Result<File> {
     o.open(path)
 }
 
-fn file_preview(path: &Path, size: u64, limits: &Limits) -> Preview {
+fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits) -> Preview {
+    let size = meta.size;
     if size == 0 {
         return Preview::Empty;
     }
@@ -159,12 +172,25 @@ fn file_preview(path: &Path, size: u64, limits: &Limits) -> Preview {
     if let Err(e) = (&mut f).take(limits.max_bytes as u64).read_to_end(&mut buf) {
         return Preview::Error(crate::Error::io("read", path, e).to_string());
     }
+    // Images are recognised by their content, never by the extension.
+    if let Some(img) = image::detect(path, &buf, size, meta.mtime, &limits.image) {
+        return Preview::Image(img);
+    }
     let truncated = (buf.len() as u64) < size || size > limits.max_bytes as u64;
     match decode(&buf, truncated) {
         Some((text, encoding)) => Preview::Text(to_lines(&text, encoding, truncated, size, limits)),
         None => Preview::Binary(BinaryPreview {
             size,
             kind: sniff(&buf),
+            card: FileCard {
+                kind: sniff(&buf),
+                size,
+                modified: meta.mtime,
+                accessed: meta.atime,
+                created: meta.btime,
+                mode: meta.mode,
+                exec: card::parse_exec(&buf),
+            },
             hex: hexdump(&buf[..buf.len().min(limits.hex_bytes)]),
         }),
     }

@@ -43,6 +43,8 @@ pub struct FsMeta {
     pub mtime: Option<SystemTime>,
     pub atime: Option<SystemTime>,
     pub ctime: Option<SystemTime>,
+    /// Creation (birth) time, where the filesystem records it.
+    pub btime: Option<SystemTime>,
     pub mode: Option<u32>,
     pub dev: Option<u64>,
     pub ino: Option<u64>,
@@ -118,6 +120,7 @@ impl FsMeta {
             mtime: m.modified().ok(),
             atime,
             ctime,
+            btime: m.created().ok(),
             mode,
             dev,
             ino,

@@ -13,7 +13,7 @@ use crate::events::{CoreEvent, DirEvent, PreviewEvent};
 use crate::fs::FsEngine;
 use crate::model::{self, EntryUpdate};
 use crate::platform::{Platform, Volume};
-use crate::preview::{self, Limits};
+use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
 
 // ------------------------------------------------------------------------------ folders
 
@@ -151,6 +151,7 @@ pub struct PreviewWorker {
 impl PreviewWorker {
     pub fn spawn(fs: Arc<dyn FsEngine>, out: Sender<CoreEvent>) -> PreviewWorker {
         let (tx, rx) = unbounded::<PreviewReq>();
+        let images = ImageWorker::spawn(out.clone());
         std::thread::Builder::new()
             .name("vela-preview".into())
             .spawn(move || {
@@ -160,7 +161,14 @@ impl PreviewWorker {
                     while let Ok(newer) = rx.recv_timeout(Duration::from_millis(30)) {
                         req = newer;
                     }
+                    images.newest(req.generation);
                     let preview = preview::generate(fs.as_ref(), &req.path, &req.limits);
+                    // Decoding is slow: the header-only answer goes out now, the pixels follow.
+                    if let Preview::Image(img) = &preview {
+                        if matches!(img.state, ImageState::Loading) {
+                            images.submit(req.path.clone(), req.generation, img.info.clone(), req.limits.image.clone());
+                        }
+                    }
                     let name = req
                         .path
                         .file_name()
