@@ -92,6 +92,24 @@ fn is_dangerous(c: char) -> bool {
         )
 }
 
+/// Prepare one line of *file content* for display: tabs become spaces and anything
+/// that could be mistaken for a terminal command is escaped. Unlike [`name`], a
+/// literal backslash is left alone because this is text, not an identifier.
+pub fn line(s: &str, tab: usize) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.trim_end_matches(['\n', '\r']).chars() {
+        match c {
+            '\t' => out.extend(std::iter::repeat_n(' ', tab)),
+            '\x1b' => out.push_str("\\e"),
+            c if is_dangerous(c) => {
+                let _ = write!(out, "\\u{{{:x}}}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 /// Terminal cell width of an (already escaped) string.
 pub fn width(s: &str) -> usize {
     s.chars().map(|c| c.width().unwrap_or(0)).sum()
