@@ -622,24 +622,37 @@ pub struct FaultFs {
 struct WriteRule {
     suffix: PathBuf,
     after: u64,
-    errno: i32,
+    action: ByteAction,
 }
 
-/// A file that accepts `left` more bytes and then fails every write.
+/// A file that accepts `after` bytes and then does what the rule says.
 struct FaultSink {
     inner: Box<dyn crate::fs::FileSink>,
-    left: u64,
-    errno: i32,
+    seen: u64,
+    after: u64,
+    action: ByteAction,
+    fired: bool,
 }
 
 impl io::Write for FaultSink {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.left == 0 {
-            return Err(io::Error::from_raw_os_error(self.errno));
+        if self.seen >= self.after {
+            match &self.action {
+                ByteAction::Fail(errno) => return Err(io::Error::from_raw_os_error(*errno)),
+                ByteAction::Run(f) if !self.fired => {
+                    self.fired = true;
+                    f();
+                }
+                ByteAction::Run(_) => {}
+            }
         }
-        let n = buf.len().min(self.left as usize);
-        let n = self.inner.write(&buf[..n])?;
-        self.left -= n as u64;
+        let room = if matches!(self.action, ByteAction::Fail(_)) {
+            (self.after - self.seen) as usize
+        } else {
+            buf.len()
+        };
+        let n = self.inner.write(&buf[..buf.len().min(room)])?;
+        self.seen += n as u64;
         Ok(n)
     }
     fn flush(&mut self) -> io::Result<()> {
@@ -718,7 +731,22 @@ impl FaultFs {
         self.write_rules.lock().unwrap().push(WriteRule {
             suffix: suffix.into(),
             after,
-            errno,
+            action: ByteAction::Fail(errno),
+        });
+    }
+
+    /// Like [`fail_writes_after`](Self::fail_writes_after), but runs `action` once when the
+    /// file has taken `after` bytes (park the process, change the world) and carries on.
+    pub fn on_writes_after(
+        &self,
+        suffix: impl Into<PathBuf>,
+        after: u64,
+        f: impl Fn() + Send + Sync + 'static,
+    ) {
+        self.write_rules.lock().unwrap().push(WriteRule {
+            suffix: suffix.into(),
+            after,
+            action: ByteAction::Run(Arc::new(f)),
         });
     }
 
@@ -796,12 +824,22 @@ impl FsEngine for FaultFs {
             .unwrap()
             .iter()
             .find(|r| dir.ends_with(&r.suffix))
-            .map(|r| (r.after, r.errno));
+            .map(|r| {
+                (
+                    r.after,
+                    match &r.action {
+                        ByteAction::Fail(e) => ByteAction::Fail(*e),
+                        ByteAction::Run(f) => ByteAction::Run(f.clone()),
+                    },
+                )
+            });
         match rule {
-            Some((after, errno)) => Ok(Box::new(FaultSink {
+            Some((after, action)) => Ok(Box::new(FaultSink {
                 inner: sink,
-                left: after,
-                errno,
+                seen: 0,
+                after,
+                action,
+                fired: false,
             })),
             None => Ok(sink),
         }
