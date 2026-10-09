@@ -12,7 +12,11 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ![rada: the folder list with an image preview](docs/screenshots/main.png)
 
-> **Status:** version 0.2.0. Linux is supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
+## Status
+
+Version 0.3.0. **Linux is supported.** Windows and macOS are in development: the code is structured for them and compiles, but they are not supported yet and the attribute-preserving parts of a copy are stubs there.
+
+rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Why it is different
 
@@ -24,10 +28,14 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 | **Journal + undo** | `u` undoes the last operation (with its own plan, so you see what undo will do). `U` shows the history. Undo of a copy removes exactly what the copy created; undo of a move moves back; undo of trash restores from the trash; undo of an overwrite brings the old file back. |
 | **Per-file errors** | One unreadable file does not abort a 10,000-file copy. Errors are handled per step: skip / skip all / retry / abort. |
 | **Byte progress** | A real progress bar with throughput and ETA, not "3 of 4 items". |
+| **Faithful copies** | A copy keeps permissions (including setuid/setgid/sticky), times, extended attributes, POSIX ACLs, owner and group when the system allows, hard links between the files you copy together, and the holes of sparse files (progress counts real bytes). Before you confirm, the plan lists what the destination cannot hold (a FAT drive has no owners or ACLs); afterwards the result window lists anything that could not be kept. |
+| **Survives a crash** | Every journal record reaches the operating system as it is written. If rada is killed in the middle of an operation, the next start removes the half-written file, keeps both copies of a move that was cut, and tells you; undo still works. See [docs/SAFETY.md](docs/SAFETY.md). |
 | **Safe across filesystems** | Moves between filesystems are copy → verify (checksum of what was written) → remove source, file by file; the source is never deleted for something that failed to copy. Trashing follows the freedesktop.org specification, including per-device trash directories. |
 | **Live** | The folder view updates by itself (inotify via `notify`), with debouncing. Sorting is stable and deterministic and applies instantly. |
 | **Nothing blocks the UI** | All I/O happens in worker threads; the interface thread only draws and handles keys. Volumes are listed by a worker, never on a keypress, with a timeout per mount so a hung network share cannot freeze anything. |
 | **Real image previews** | PNG, JPEG (with EXIF rotation), GIF (first frame), WebP, BMP and SVG are drawn with the best protocol the terminal offers: Kitty graphics (Ghostty, kitty), iTerm2 images (WezTerm, iTerm2), Sixel (foot), or coloured half blocks everywhere else. Decoding and resizing run in worker threads, so browsing a folder of photos never delays a keypress. Below the picture: format, pixel size, weight and date. Images that are too big are refused from the header alone, with a clear message. |
+| **PDF previews** | The first page of a PDF is drawn like an image, with page count, title and author below it. It needs poppler (`pdftoppm`, `pdfinfo`; `pdftotext` for a text fallback): without it you get the text of the first page and a hint on how to install it. Password-protected and damaged files say so. Drawing runs in a worker with a time limit and is stopped the moment you move to another file; pages are cached in `$XDG_CACHE_HOME/rada/previews` and pruned by age and size. |
+| **Real disks only** | The sidebar lists real disks, partitions, removable drives and network shares, not `tmpfs`, `proc`, `binderfs`, snap loops, bind-mount duplicates or `/boot/efi`. The list is configurable (`[devices] hide`). |
 | **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
 | **Hostile names are harmless** | Newlines, escape sequences, bidi controls and invalid UTF-8 in file names are shown as visible escapes. Paths are `Path`/`OsString` everywhere, never text. |
 
@@ -103,10 +111,17 @@ bookmarks = ["~/projects", "/mnt/data"]
 images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
 image_max_megapixels = 50
 image_max_file_mb = 128
+pdf_max_file_mb = 512     # larger PDFs are not drawn
+pdf_timeout_seconds = 8   # a PDF that takes longer to draw is given up on
 mouse = true          # false: rada never captures the mouse
 sidebar = true        # the default; Ctrl+B toggles it and remembers
 hints = true          # false: no key hints in the bottom bar
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
+
+[devices]
+hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
+                      # disks: a name is a filesystem type (`fuse.*` a prefix), `/path` a mount point,
+                      # `/path/*` it and everything below
 
 [keys]                # per action; replaces all of its keys, [] unbinds it
 copy = ["y", "ctrl+c"]
@@ -114,7 +129,7 @@ trash = ["d", "delete"]
 quit = "ctrl+q"
 ```
 
-State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with whether you hid the sidebar). Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
+State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with whether you hid the sidebar); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
 
 ## Navigation
 
@@ -279,28 +294,24 @@ CI (GitHub Actions) checks formatting and lints, runs the whole suite and builds
 
 ## Roadmap
 
-Planned, roughly in this order of interest:
+### Next
 
-- **Storage insights**: find what takes up space and get cleanup suggestions, with an optional AI assistant that runs locally (e.g. Ollama), is off by default, and only sees file names and sizes — never file contents. Every suggestion goes through the usual plan and undo.
+- **Fidelity and robustness**, continuing: more ways to break the engine on purpose (other filesystems, network shares, power-loss simulation), file flags and capabilities, and fewer limits in [docs/SAFETY.md](docs/SAFETY.md).
+- **Windows and macOS builds**: Recycle Bin and Trash, volumes and drive letters, junctions, attributes, with real tests on both.
+- **Easy install**: signed binaries and packages for the common distributions.
+- **Dual pane**, with tabs and layout restore.
+- **Archives**: browse and extract safely, the common formats.
 
-- Dual pane, tabs, layout restore
-- Archives (browse and extract safely, all common formats)
-- Git integration
-- Animated GIF playback, image zoom, EXIF details
-- Syntax-highlighted preview
-- Recursive search, recursive sizes
-- Drag and drop
-- Trash browser (list, restore, empty)
-- Compare and sync two folders with a dry-run plan
-- Remote filesystems (SFTP) through the same engine
-- Plugins
-- Preserve extended attributes, ACLs, hard links and sparse files when copying
-- Full Windows and macOS support (Recycle Bin, Trash, volumes, drive letters, junctions)
-- Signed binaries and distribution packages
+### Ideas, not planned yet
+
+- **Space analysis**: find what takes up room and suggest cleanups, with an optional assistant that runs locally, is off by default and only sees names and sizes — never contents. Every suggestion would still go through the usual plan and undo.
+- **Remote filesystems** (SFTP) through the same engine.
+- **Plugins**.
+- Git integration, syntax-highlighted preview, recursive search, a trash browser, comparing and syncing two folders with a dry-run plan.
 
 ## Contributing
 
-Bug reports and ideas are welcome as issues; the templates ask for what helps most (version, terminal, steps). If rada ever loses or damages a file, say so first: that is the one kind of bug that matters most, and the journal (`U`) may still be able to undo it.
+Bug reports and ideas are welcome as issues; the templates ask for what helps most (version, terminal, steps). If rada ever loses or damages a file, say so first: that is the one kind of bug that matters most, and the journal (`U`) may still be able to undo it. The best thing you can do for the project is to read the operations engine and try to break it: see [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and where help is needed.
 
 For code: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` must pass. Changes to the look of the interface come with updated screen snapshots (`INSTA_UPDATE=always cargo test -p rada-tui --test snapshots`) whose diff you have reviewed. New operations must be expressed as plan steps that know their own inverse. Tests never touch your real folders and must keep it that way.
 

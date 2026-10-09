@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+
+### Added
+- **Faithful copies** (Linux): permissions with setuid/setgid/sticky, times, extended attributes, POSIX ACLs, owner and group where the system allows, hard links between the files copied together, and the holes of sparse files (progress and totals count real bytes). The plan warns before you confirm about what the destination cannot hold; the result window lists what a copy could not keep. Undo of a copy or a move restores hard links and holes too. Windows and macOS have documented stubs (`Platform::fidelity`).
+- **Survives a killed process.** Journal records reach the operating system as they are written; a *pending* record precedes every step that creates something. On the next start rada removes the temporary file of the step in doubt, adopts a copy that had finished but was not recorded, keeps both sides of a move cut between copy and removal, marks the operation *interrupted* and tells you. An undo cut short resumes where it stopped; a half-written last journal line is ignored.
+- **PDF preview**: the first page (poppler's `pdftoppm`) drawn like an image, with page count, title and author (`pdfinfo`). A time limit, a size limit (`pdf_timeout_seconds`, `pdf_max_file_mb`), stopped as soon as you move on; cached in `$XDG_CACHE_HOME/rada/previews` and pruned by age and size. Password-protected and damaged files say so; without `pdftoppm` the first page's text is shown with a hint to install poppler.
+- **Disk list**: the sidebar shows only real disks, partitions, removable drives and network shares — no `tmpfs`, `proc`, `binderfs`, `overlay`, `squashfs`, `fuse.portal`, `efivarfs`, bind-mount duplicates, `/boot` or `/efi`. Configurable with `[devices] hide`. The root disk is called *System*.
+- `docs/SAFETY.md` (what is guaranteed and what is not), `CONTRIBUTING.md`, an honest *Status* section and a reorganised roadmap.
+- Tests: fault injection (full disk in the middle of a file, revoked rights, source changed or deleted mid-copy, destination vanishing), `SIGKILL` of a real child process at six points, and property tests over random trees (symlinks, hard links, sparse files, odd names, read-only folders) for copy → undo and move → undo, also across filesystems.
+
+### Changed
+- The plan's warning about hard links now says only that links to files *outside the selection* become independent copies.
+- A move of a read-only folder undoes into a read-only folder.
+
+### Fixed
+- Undoing a copy of a read-only folder failed to delete what the copy had put in it.
+- Undoing a move across filesystems could leave folders behind when it brought back hard-linked files.
+- A move whose source vanished during the copy no longer fails after the copy is made: the copy is kept.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added
