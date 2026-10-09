@@ -103,7 +103,7 @@ pub struct Index {
 }
 
 impl Index {
-    fn new(path: &Path, format: Format, packed: u64) -> Index {
+    pub(super) fn new(path: &Path, format: Format, packed: u64) -> Index {
         Index {
             path: path.to_path_buf(),
             format,
@@ -127,7 +127,7 @@ impl Index {
         self.note = Some(why.into());
     }
 
-    fn finish(mut self) -> Index {
+    pub(super) fn finish(mut self) -> Index {
         (self.files, self.dirs, self.symlinks, self.bytes) = (0, 0, 0, 0);
         self.encrypted_members = 0;
         for e in &self.entries {
@@ -410,7 +410,11 @@ fn list_zip(ix: &mut Index, ctl: &mut ListControl<'_>) -> Result<(), ArchiveErro
             mode.and_then(kind_of_mode).unwrap_or(EntryKind::File)
         };
         let mut e = blank(kind, path, issue);
-        e.size = if kind == EntryKind::File { zf.size() } else { 0 };
+        e.size = if kind == EntryKind::File {
+            zf.size()
+        } else {
+            0
+        };
         e.compressed = Some(zf.compressed_size());
         e.mode = mode.map(|m| m & 0o7777);
         e.encrypted = zf.encrypted();
@@ -460,11 +464,7 @@ pub(super) fn tar_kind(t: tar::EntryType) -> Option<EntryKind> {
     })
 }
 
-fn list_tar(
-    ix: &mut Index,
-    c: Compression,
-    ctl: &mut ListControl<'_>,
-) -> Result<(), ArchiveError> {
+fn list_tar(ix: &mut Index, c: Compression, ctl: &mut ListControl<'_>) -> Result<(), ArchiveError> {
     let file = File::open(&ix.path)?;
     let file_len = ix.packed;
     let mut count = 0u64;
@@ -634,7 +634,9 @@ fn list_single(
     let mut e = blank(EntryKind::File, path, issue);
     e.size = total;
     e.compressed = Some(ix.packed);
-    e.mtime = std::fs::metadata(&ix.path).ok().and_then(|m| m.modified().ok());
+    e.mtime = std::fs::metadata(&ix.path)
+        .ok()
+        .and_then(|m| m.modified().ok());
     ix.push(e);
     Ok(())
 }
@@ -653,6 +655,7 @@ fn sevenz_error(e: sevenz_rust2::Error) -> ArchiveError {
         E::PasswordRequired | E::MaybeBadPassword(_) => ArchiveError::Encrypted,
         E::Io(e, _) | E::FileOpen(e, _) => ArchiveError::from(e),
         E::Unsupported(w) => ArchiveError::Unsupported(w.to_string()),
+        E::UnsupportedCompressionMethod(m) if m.contains("AES") => ArchiveError::Encrypted,
         E::UnsupportedCompressionMethod(m) => {
             ArchiveError::Unsupported(format!("compression method {m}"))
         }
@@ -683,6 +686,19 @@ fn list_7z(ix: &mut Index) -> Result<(), ArchiveError> {
         };
         let (path, issue) = sanitize(f.name().as_bytes(), true);
         let mut e = blank(kind, path, issue);
+        // Encrypted data shows only as an AES step in the chain that unpacks its block.
+        e.encrypted = ar
+            .stream_map
+            .file_block_index
+            .get(fi)
+            .copied()
+            .flatten()
+            .and_then(|b| ar.blocks.get(b))
+            .is_some_and(|b| {
+                b.coders
+                    .iter()
+                    .any(|c| c.encoder_method_id() == [0x06, 0xF1, 0x07, 0x01])
+            });
         e.size = if kind == EntryKind::File || kind == EntryKind::Symlink {
             f.size()
         } else {
@@ -761,7 +777,10 @@ mod tests {
             ("e", EntryKind::Dir),
         ]);
         assert_eq!(names(&ix, ""), ["a", "e"]);
-        let a = ix.children(Path::new("")).into_iter().find(|c| c.name == "a");
+        let a = ix
+            .children(Path::new(""))
+            .into_iter()
+            .find(|c| c.name == "a");
         assert_eq!(a.unwrap().entry, Some(0));
         assert!(ix.is_folder(Path::new("e")));
     }

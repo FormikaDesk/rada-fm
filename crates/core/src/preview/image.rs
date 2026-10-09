@@ -210,7 +210,9 @@ pub(super) fn prune_if_due(dir: &Path, limits: &ImageLimits) {
 
 /// Whether the first bytes are a picture or a PDF, the things this module can draw.
 pub(super) fn is_drawable(head: &[u8]) -> bool {
-    looks_like_pdf(head) || looks_like_svg(head) || image::guess_format(head).is_ok_and(|f| raster_format(f).is_some())
+    looks_like_pdf(head)
+        || looks_like_svg(head)
+        || image::guess_format(head).is_ok_and(|f| raster_format(f).is_some())
 }
 
 fn looks_like_pdf(head: &[u8]) -> bool {

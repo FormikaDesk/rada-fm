@@ -34,7 +34,7 @@ fn extract_req(archive: &Path, dest: &Path, into: ExtractInto) -> OpRequest {
     }
 }
 
-fn warning<'a>(p: &'a Plan, k: rada_core::ops::WarningKind) -> Option<&'a Warning> {
+fn warning(p: &Plan, k: rada_core::ops::WarningKind) -> Option<&Warning> {
     p.warnings.iter().find(|w| w.kind == k)
 }
 
@@ -97,7 +97,10 @@ fn tar_xz_and_tar_bz2_are_not_silently_dropped() {
     // Regression from another file manager: these two formats failed without an error.
     let sb = Sandbox::new();
     let e = sb.engine();
-    for (name, c) in [("x.tar.xz", Compression::Xz), ("x.tar.bz2", Compression::Bzip2)] {
+    for (name, c) in [
+        ("x.tar.xz", Compression::Xz),
+        ("x.tar.bz2", Compression::Bzip2),
+    ] {
         let a = sb.path(name);
         write_tar(&a, &[Member::file("f.txt", "content")], c);
         let out = sb.mkdir(format!("o-{name}"));
@@ -172,7 +175,13 @@ fn a_single_folder_at_the_top_is_not_wrapped_in_a_second_one() {
     let e = sb.engine();
     let dir = sb.mkdir("here");
     let a = dir.join("photos.zip");
-    write_zip(&a, &[Member::file("photos/a.jpg", "a"), Member::file("photos/b.jpg", "b")]);
+    write_zip(
+        &a,
+        &[
+            Member::file("photos/a.jpg", "a"),
+            Member::file("photos/b.jpg", "b"),
+        ],
+    );
     let plan = plan_req(&e, &extract_req(&a, &dir, ExtractInto::Auto));
     assert!(run(&e, &plan).failed.is_empty());
     assert_eq!(read(&dir.join("photos/a.jpg")), "a");
@@ -191,12 +200,24 @@ fn several_things_at_the_top_get_a_folder_and_a_named_folder_is_taken_literally(
     assert_eq!(read(&dir.join("pair/a")), "1");
     let plan = plan_req(
         &e,
-        &extract_req(&a, &dir, ExtractInto::Folder { name: "mine".into() }),
+        &extract_req(
+            &a,
+            &dir,
+            ExtractInto::Folder {
+                name: "mine".into(),
+            },
+        ),
     );
     assert!(run(&e, &plan).failed.is_empty());
     assert_eq!(read(&dir.join("mine/b")), "2");
     // A name that is a path is refused.
-    assert!(plan_try(&e, &extract_req(&a, &dir, ExtractInto::Folder { name: "a/b".into() })).is_err());
+    assert!(
+        plan_try(
+            &e,
+            &extract_req(&a, &dir, ExtractInto::Folder { name: "a/b".into() })
+        )
+        .is_err()
+    );
 }
 
 // ---------------------------------------------------------------------- safety
@@ -287,11 +308,20 @@ fn links_inside_the_archive_come_out_as_links() {
     let e = sb.engine();
     let dir = sb.mkdir("out");
     let a = sb.path("ok.zip");
-    write_zip(&a, &[Member::file("real.txt", "r"), Member::symlink("alias", "real.txt")]);
+    write_zip(
+        &a,
+        &[
+            Member::file("real.txt", "r"),
+            Member::symlink("alias", "real.txt"),
+        ],
+    );
     let plan = plan_req(&e, &extract_req(&a, &dir, ExtractInto::Here));
     assert!(warning(&plan, WarningKind::LinkOutside).is_none());
     assert!(run(&e, &plan).failed.is_empty());
-    assert_eq!(std::fs::read_link(dir.join("alias")).unwrap(), Path::new("real.txt"));
+    assert_eq!(
+        std::fs::read_link(dir.join("alias")).unwrap(),
+        Path::new("real.txt")
+    );
 }
 
 #[test]
@@ -338,9 +368,17 @@ fn a_member_that_holds_more_than_it_declares_is_stopped() {
     }
     let rep = run(&e, &plan);
     assert_eq!(rep.failed.len(), 1, "{:?}", rep.failed);
-    assert!(rep.failed[0].error.contains("more than"), "{}", rep.failed[0].error);
+    assert!(
+        rep.failed[0].error.contains("more than"),
+        "{}",
+        rep.failed[0].error
+    );
     assert!(!out.join("f").exists());
-    assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0, "no temporary file left");
+    assert_eq!(
+        std::fs::read_dir(&out).unwrap().count(),
+        0,
+        "no temporary file left"
+    );
 }
 
 #[test]
@@ -367,8 +405,12 @@ fn old_code_page_names_are_decoded_or_kept_safe() {
     write_zip(
         &a,
         &[
-            Member::file("x", "1").raw_name(b"caff\x8a.txt").no_utf8_flag(),
-            Member::file("y", "2").raw_name("più.txt".as_bytes()).no_utf8_flag(),
+            Member::file("x", "1")
+                .raw_name(b"caff\x8a.txt")
+                .no_utf8_flag(),
+            Member::file("y", "2")
+                .raw_name("più.txt".as_bytes())
+                .no_utf8_flag(),
         ],
     );
     let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
@@ -398,14 +440,22 @@ fn damaged_archives_say_so() {
     let full = std::fs::read(&t).unwrap();
     std::fs::write(&t, &full[..full.len() / 2]).unwrap();
     let plan = plan_req(&e, &extract_req(&t, &out, ExtractInto::Here));
-    assert!(warning(&plan, WarningKind::ArchiveDamaged).is_some(), "{:?}", plan.warnings);
+    assert!(
+        warning(&plan, WarningKind::ArchiveDamaged).is_some(),
+        "{:?}",
+        plan.warnings
+    );
     // And a plain tar cut in the middle of a file.
     let p = sb.path("cut.tar");
     write_tar(&p, &members, Compression::None);
     let full = std::fs::read(&p).unwrap();
     std::fs::write(&p, &full[..full.len() / 2]).unwrap();
     let plan = plan_req(&e, &extract_req(&p, &out, ExtractInto::Here));
-    assert!(warning(&plan, WarningKind::ArchiveDamaged).is_some(), "{:?}", plan.warnings);
+    assert!(
+        warning(&plan, WarningKind::ArchiveDamaged).is_some(),
+        "{:?}",
+        plan.warnings
+    );
 }
 
 // ---------------------------------------------------------------------- conflicts, undo
@@ -418,7 +468,13 @@ fn conflicts_follow_the_usual_policies_and_overwrite_goes_through_the_trash() {
     let out = sb.mkdir("out");
     std::fs::write(out.join("top.txt"), "old").unwrap();
     let a = sb.path("a.zip");
-    write_zip(&a, &[Member::file("top.txt", "new"), Member::file("fresh.txt", "f")]);
+    write_zip(
+        &a,
+        &[
+            Member::file("top.txt", "new"),
+            Member::file("fresh.txt", "f"),
+        ],
+    );
     // skip
     let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
     assert!(warning(&plan, WarningKind::Conflict).is_some());
@@ -443,7 +499,11 @@ fn conflicts_follow_the_usual_policies_and_overwrite_goes_through_the_trash() {
     let o = run_journaled(&e, &j, &plan);
     assert_eq!(read(&out.join("top.txt")), "new");
     undo(&e, &j, &o.id);
-    assert_eq!(read(&out.join("top.txt")), "old", "the old file came back from the trash");
+    assert_eq!(
+        read(&out.join("top.txt")),
+        "old",
+        "the old file came back from the trash"
+    );
 }
 
 #[test]
@@ -480,12 +540,32 @@ fn nothing_can_be_written_into_or_changed_inside_an_archive() {
     let inside = a.join("f.txt");
     let src = sb.write("loose.txt", "y");
     for req in [
-        OpRequest::Trash { sources: vec![inside.clone()] },
-        OpRequest::Delete { sources: vec![inside.clone()] },
-        OpRequest::Rename { path: inside.clone(), new_name: "g".into() },
-        OpRequest::MakeDir { parent: a.clone(), name: "d".into() },
-        OpRequest::Move { sources: vec![inside.clone()], destination: sb.path(""), conflict: ConflictPolicy::Skip, verify: false },
-        OpRequest::Copy { sources: vec![src.clone()], destination: a.join("sub"), conflict: ConflictPolicy::Skip, verify: false },
+        OpRequest::Trash {
+            sources: vec![inside.clone()],
+        },
+        OpRequest::Delete {
+            sources: vec![inside.clone()],
+        },
+        OpRequest::Rename {
+            path: inside.clone(),
+            new_name: "g".into(),
+        },
+        OpRequest::MakeDir {
+            parent: a.clone(),
+            name: "d".into(),
+        },
+        OpRequest::Move {
+            sources: vec![inside.clone()],
+            destination: sb.path(""),
+            conflict: ConflictPolicy::Skip,
+            verify: false,
+        },
+        OpRequest::Copy {
+            sources: vec![src.clone()],
+            destination: a.join("sub"),
+            conflict: ConflictPolicy::Skip,
+            verify: false,
+        },
     ] {
         // `a` itself is a regular file: only paths *inside* are refused.
         let r = plan_try(&e, &req);
@@ -515,7 +595,10 @@ fn copying_selected_members_out_is_a_partial_extraction() {
     assert!(rep.failed.is_empty(), "{:?}\n{:#?}", rep.failed, plan.steps);
     assert_eq!(read(&out.join("sub/b.txt")), "beta");
     assert_eq!(read(&out.join("top.txt")), "top");
-    assert!(!out.join("docs").exists(), "only what was selected comes out");
+    assert!(
+        !out.join("docs").exists(),
+        "only what was selected comes out"
+    );
 }
 
 // ---------------------------------------------------------------------- 7z and rar
@@ -558,4 +641,397 @@ fn a_missing_rar_tool_is_said_plainly() {
     // Whatever is installed here, the message for "no program" must tell what to do.
     assert!(rada_core::archive::external::MISSING.contains("7-Zip"));
     assert!(rada_core::archive::external::MISSING.contains("unrar"));
+}
+
+// ---------------------------------------------------------------------- more
+
+use rada_core::archive::external::Tool;
+use rada_core::archive::testkit::{index_via_tool, zip_bytes};
+use std::sync::Arc;
+
+fn leftovers(root: &Path) -> Vec<PathBuf> {
+    let mut v = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(root) {
+        for e in rd.flatten() {
+            if e.file_name().to_string_lossy().starts_with(".rada-part") {
+                v.push(e.path());
+            }
+        }
+    }
+    v
+}
+
+#[test]
+fn the_external_program_path_lists_and_streams_members_in_order() {
+    if !have_tool("7z") {
+        return;
+    }
+    let sb = Sandbox::new();
+    let src = sb.mkdir("src");
+    std::fs::create_dir_all(src.join("d")).unwrap();
+    std::fs::write(src.join("a.txt"), "hello").unwrap();
+    std::fs::write(src.join("d/b.txt"), "x".repeat(70_000)).unwrap();
+    std::fs::write(src.join("e.txt"), "end").unwrap();
+    let a = sb.path("t.7z");
+    assert!(
+        std::process::Command::new("7z")
+            .args(["a", "-bso0", "-bsp0"])
+            .arg(&a)
+            .arg(src.join("a.txt"))
+            .arg(src.join("d"))
+            .arg(src.join("e.txt"))
+            .status()
+            .unwrap()
+            .success()
+    );
+    let tool = Tool::find().expect("7z is installed");
+    let ix = index_via_tool(&a, &tool).unwrap();
+    let mut names: Vec<String> = ix
+        .entries
+        .iter()
+        .map(|e| e.path.to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["a.txt", "d", "d/b.txt", "e.txt"]);
+    let wanted: Vec<usize> = ix
+        .entries
+        .iter()
+        .filter(|e| !e.is_dir())
+        .map(|e| e.index)
+        .collect();
+    let mut got: std::collections::BTreeMap<String, Vec<u8>> = Default::default();
+    rada_core::archive::external::produce_into(&tool, &ix, &wanted, &mut |i, d| {
+        got.entry(ix.entries[i].path.to_string_lossy().into_owned())
+            .or_default()
+            .extend_from_slice(d);
+    })
+    .unwrap();
+    assert_eq!(got["a.txt"], b"hello");
+    assert_eq!(got["d/b.txt"].len(), 70_000);
+    assert_eq!(got["e.txt"], b"end");
+}
+
+#[cfg(unix)]
+#[test]
+fn unrar_output_is_understood_with_a_stand_in_program() {
+    // No real RAR can be made here: a script that prints what unrar prints.
+    use std::os::unix::fs::PermissionsExt;
+    let sb = Sandbox::new();
+    let fake = sb.write(
+        "bin/unrar",
+        "#!/bin/sh\ncat <<'EOF'\nUNRAR 7.00 freeware\n\nArchive: x.rar\n\n        Name: docs\n        Type: Directory\n        Size: 0\n\n        Name: docs/a.txt\n        Type: File\n        Size: 12\n Packed size: 9\n       mtime: 2024-03-04 05:06:07,000000000\n  Attributes: -rwxr-xr-x\nEOF\n",
+    );
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let rar = sb.write("x.rar", "Rar!\x1a\x07\x00 stand-in");
+    let ix = index_via_tool(&rar, &Tool::Unrar(fake)).unwrap();
+    assert_eq!(ix.entries.len(), 2);
+    assert!(ix.entries[0].is_dir());
+    let f = &ix.entries[1];
+    assert_eq!((f.size, f.compressed, f.mode), (12, Some(9), Some(0o755)));
+}
+
+#[test]
+fn password_protected_zip_and_7z_are_recognised_with_real_tools() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let out = sb.mkdir("out");
+    let src = sb.write("src/secret.txt", "classified");
+    if have_tool("zip") {
+        let a = sb.path("enc.zip");
+        assert!(
+            std::process::Command::new("zip")
+                .args(["-q", "-P", "pw", "-j"])
+                .arg(&a)
+                .arg(&src)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+        assert!(!plan.is_executable());
+        assert!(
+            warning(&plan, WarningKind::Encrypted).is_some(),
+            "{:?}",
+            plan.warnings
+        );
+    }
+    if have_tool("7z") {
+        let a = sb.path("enc.7z");
+        assert!(
+            std::process::Command::new("7z")
+                .args(["a", "-bso0", "-bsp0", "-ppw", "-mhe=on"])
+                .arg(&a)
+                .arg(&src)
+                .status()
+                .unwrap()
+                .success()
+        );
+        // Names visible, data encrypted: the members are reported.
+        let b = sb.path("enc2.7z");
+        assert!(
+            std::process::Command::new("7z")
+                .args(["a", "-bso0", "-bsp0", "-ppw"])
+                .arg(&b)
+                .arg(&src)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let plan = plan_req(&e, &extract_req(&b, &out, ExtractInto::Here));
+        assert!(!plan.is_executable());
+        assert!(
+            warning(&plan, WarningKind::Encrypted).is_some(),
+            "{:?}",
+            plan.warnings
+        );
+        // Even the names are hidden: the archive itself cannot be read.
+        let err = plan_try(&e, &extract_req(&a, &out, ExtractInto::Here)).unwrap_err();
+        assert!(err.to_string().contains("password"), "{err}");
+    }
+    assert!(std::fs::read_dir(&out).unwrap().next().is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn names_that_are_not_text_survive_a_tar_extraction() {
+    use std::os::unix::ffi::OsStrExt;
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let out = sb.mkdir("out");
+    let a = sb.path("odd.tar");
+    write_tar(
+        &a,
+        &[
+            Member::file("x", "data").raw_name(b"caf\xe9-\xff.txt"),
+            Member::file("ok.txt", "fine"),
+        ],
+        Compression::None,
+    );
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    assert!(run(&e, &plan).failed.is_empty());
+    let want = std::ffi::OsStr::from_bytes(b"caf\xe9-\xff.txt");
+    assert_eq!(std::fs::read(out.join(want)).unwrap(), b"data");
+    // The plan can show it without breaking the terminal.
+    let json = plan_to_json(&plan).unwrap();
+    assert!(!json.contains('\u{fffd}') || json.contains("hex"), "{json}");
+}
+
+#[cfg(unix)]
+#[test]
+fn hard_links_come_out_as_hard_links_and_a_missing_target_is_said() {
+    use std::os::unix::fs::MetadataExt;
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let out = sb.mkdir("out");
+    let a = sb.path("h.tar");
+    write_tar(
+        &a,
+        &[
+            Member::file("one", "same data"),
+            Member::hardlink("two", "one"),
+        ],
+        Compression::None,
+    );
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    assert!(run(&e, &plan).failed.is_empty());
+    assert_eq!(
+        std::fs::metadata(out.join("one")).unwrap().ino(),
+        std::fs::metadata(out.join("two")).unwrap().ino()
+    );
+    // Only the link selected: its data is not in the archive under that name.
+    let out2 = sb.mkdir("out2");
+    let req = OpRequest::Extract {
+        archive: a.clone(),
+        destination: out2.clone(),
+        into: ExtractInto::Here,
+        only: vec![PathBuf::from("two")],
+        conflict: ConflictPolicy::Skip,
+    };
+    let plan = plan_req(&e, &req);
+    assert!(warning(&plan, WarningKind::LinkTargetMissing).is_some());
+}
+
+#[test]
+fn setuid_bits_are_dropped_on_extraction_and_the_plan_says_so() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let out = sb.mkdir("out");
+    let a = sb.path("s.tar");
+    write_tar(
+        &a,
+        &[Member::file("suid", "x").mode(0o4755)],
+        Compression::None,
+    );
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    assert!(warning(&plan, WarningKind::SetuidDropped).is_some());
+    run(&e, &plan);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let m = std::fs::metadata(out.join("suid"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(m & 0o7777, 0o755);
+    }
+}
+
+#[test]
+fn a_big_member_is_extracted_with_real_byte_progress_and_can_be_cancelled() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let a = sb.path("big.tar.gz");
+    write_tar(
+        &a,
+        &[Member::file("zeros", vec![7u8; 96 << 20])],
+        Compression::Gzip,
+    );
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    assert_eq!(plan.total_bytes(), 96 << 20);
+    // Progress in real bytes, to the end.
+    let mut h = Scripted::new(ErrorChoice::Skip);
+    let rep = e.execute(&plan, &mut h, &Cancel::new());
+    assert!(rep.failed.is_empty());
+    assert_eq!(rep.bytes, 96 << 20);
+    assert_eq!(h.progress.last().unwrap().bytes_done, 96 << 20);
+    assert_eq!(
+        std::fs::metadata(out.join("zeros")).unwrap().len(),
+        96 << 20
+    );
+    std::fs::remove_file(out.join("zeros")).unwrap();
+    // Cancelled part-way: nothing under its name, no temporary file.
+    struct Stop(Cancel);
+    impl ExecHandler for Stop {
+        fn progress(&mut self, p: &Progress) {
+            if p.bytes_done > 16 << 20 {
+                self.0.cancel();
+            }
+        }
+    }
+    let c = Cancel::new();
+    let rep = e.execute(&plan, &mut Stop(c.clone()), &c);
+    assert!(rep.cancelled);
+    assert!(!out.join("zeros").exists());
+    assert!(leftovers(&out).is_empty());
+}
+
+#[test]
+fn an_archive_with_very_many_members_is_listed_and_planned() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let a = sb.path("many.tar.gz");
+    let members: Vec<Member> = (0..60_000)
+        .map(|i| Member::file(&format!("d{:03}/f{i:06}.txt", i % 300), format!("{i}")))
+        .collect();
+    write_tar(&a, &members, Compression::Gzip);
+    let out = sb.mkdir("out");
+    let t = std::time::Instant::now();
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    assert_eq!(plan.totals.files, 60_000);
+    assert_eq!(plan.totals.dirs, 300);
+    assert!(t.elapsed().as_secs() < 20, "{:?}", t.elapsed());
+    let rep = run(&e, &plan);
+    assert!(rep.failed.is_empty());
+    assert_eq!(
+        std::fs::read_to_string(out.join("d007/f000007.txt")).unwrap(),
+        "7"
+    );
+}
+
+#[test]
+fn an_archive_that_changed_since_the_plan_is_not_extracted_blindly() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let a = sb.path("a.zip");
+    write_zip(
+        &a,
+        &[Member::file("one.txt", "1"), Member::file("two.txt", "2")],
+    );
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    write_zip(
+        &a,
+        &[
+            Member::file("other.txt", "!"),
+            Member::file("one.txt", "changed"),
+        ],
+    );
+    rada_core::archive::index::clear_cache();
+    let rep = run(&e, &plan);
+    assert!(!rep.failed.is_empty());
+    assert!(
+        rep.failed[0].error.contains("changed"),
+        "{}",
+        rep.failed[0].error
+    );
+    assert!(!out.join("one.txt").exists());
+}
+
+#[test]
+fn a_full_disk_in_the_middle_of_a_member_is_an_error_and_leaves_nothing_half_written() {
+    let sb = Sandbox::new();
+    let ffs = FaultFs::new();
+    let e = sb.engine_with(ffs.clone());
+    let a = sb.path("a.zip");
+    write_zip(
+        &a,
+        &[
+            Member::file("big", vec![1u8; 1 << 20]),
+            Member::file("small.txt", "ok"),
+        ],
+    );
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    ffs.fail_writes_after("out", 100_000, 28 /* ENOSPC */);
+    let rep = run(&e, &plan);
+    assert!(!rep.failed.is_empty(), "the failure is reported");
+    assert!(!out.join("big").exists());
+    assert!(leftovers(&out).is_empty());
+}
+
+#[test]
+fn an_archive_cut_after_the_plan_fails_the_member_loudly() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let a = sb.path("a.tar.gz");
+    let members: Vec<Member> = (0..30)
+        .map(|i| Member::file(&format!("f{i:02}"), "z".repeat(50_000)))
+        .collect();
+    write_tar(&a, &members, Compression::Gzip);
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    // Cut off, keeping the size equal so the list still matches: the stream breaks mid-way.
+    let full = std::fs::read(&a).unwrap();
+    let mut broken = full.clone();
+    for b in broken[full.len() / 2..].iter_mut() {
+        *b = 0xAA;
+    }
+    std::fs::write(&a, broken).unwrap();
+    let rep = run(&e, &plan);
+    assert!(!rep.failed.is_empty(), "never silent");
+    assert!(leftovers(&out).is_empty());
+    // Whatever name exists is whole.
+    for n in std::fs::read_dir(&out).unwrap().flatten() {
+        assert_eq!(std::fs::metadata(n.path()).unwrap().len(), 50_000);
+    }
+    let _ = (Arc::new(0), zip_bytes(&[]));
+}
+
+#[cfg(unix)]
+#[test]
+fn extracting_into_a_read_only_folder_is_blocked_with_the_reason() {
+    if is_root() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let a = sb.path("a.zip");
+    write_zip(&a, &[Member::file("f", "x")]);
+    let out = sb.mkdir("ro");
+    chmod(&out, 0o555);
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    chmod(&out, 0o755);
+    assert!(!plan.is_executable());
+    assert!(warning(&plan, WarningKind::NotWritable).is_some());
 }

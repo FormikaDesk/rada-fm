@@ -10,10 +10,10 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rada_core::archive::{ArchiveKind, ArchiveView};
 use rada_core::events::{
     CoreEvent, DirEvent, FailureInfo, JobEvent, JobId, PreviewEvent, WatchEvent,
 };
-use rada_core::archive::{ArchiveKind, ArchiveView};
 use rada_core::jobs::JobHandle;
 use rada_core::journal::JournalEntry;
 use rada_core::model::{DirListing, Entry, SortKey, SortSpec};
@@ -127,7 +127,10 @@ impl Running {
 
 #[derive(Clone)]
 pub enum Replan {
-    Transfer { dest: PathBuf, mode: TransferMode },
+    Transfer {
+        dest: PathBuf,
+        mode: TransferMode,
+    },
     /// Asked again from the request the plan answers (an extraction, a new archive).
     Request,
     None,
@@ -167,9 +170,13 @@ impl PlanView {
 }
 
 pub enum InputKind {
-    Rename { from: PathBuf },
+    Rename {
+        from: PathBuf,
+    },
     NewDir,
-    BulkRename { items: Vec<PathBuf> },
+    BulkRename {
+        items: Vec<PathBuf>,
+    },
     /// The folder to extract an archive into, named after the archive unless changed.
     ExtractTo {
         archive: PathBuf,
@@ -1344,7 +1351,12 @@ impl App {
                 }
             }
             Replan::Request => {
-                if let Some(req) = pv.plan.request.as_ref().and_then(|r| r.with_conflict(policy)) {
+                if let Some(req) = pv
+                    .plan
+                    .request
+                    .as_ref()
+                    .and_then(|r| r.with_conflict(policy))
+                {
                     let h = self.svc.jobs.plan_request(req);
                     pv.replanning = Some(h.id);
                 }

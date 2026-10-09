@@ -513,8 +513,10 @@ fn draw_plan(
             if it.files > 0 && (is_dir || it.files > 1) {
                 counts.push(fmt::count(it.files, "file", "files"));
             }
-            if it.dirs > 1 {
-                counts.push(fmt::count(it.dirs - 1, "folder", "folders"));
+            // A folder's own count includes itself.
+            let own = u64::from(is_dir);
+            if it.dirs > own {
+                counts.push(fmt::count(it.dirs - own, "folder", "folders"));
             }
             if it.symlinks > 0 && is_dir {
                 counts.push(fmt::count(it.symlinks, "link", "links"));
@@ -1002,14 +1004,25 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     let (title, hint) = match &iv.kind {
         InputKind::Rename { .. } => ("Rename", "New name"),
         InputKind::NewDir => ("New folder", "Name"),
-        InputKind::ExtractTo { .. } => ("Extract", "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)"),
+        InputKind::ExtractTo { .. } => (
+            "Extract",
+            "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)",
+        ),
         InputKind::Compress { format, .. } => (
             "Compress",
             match format {
-                rada_core::archive::ArchiveKind::Zip => "Archive name — Tab changes the format: [zip]  tar.gz  tar.zst  tar.xz",
-                rada_core::archive::ArchiveKind::TarGz => "Archive name — Tab changes the format: zip  [tar.gz]  tar.zst  tar.xz",
-                rada_core::archive::ArchiveKind::TarZst => "Archive name — Tab changes the format: zip  tar.gz  [tar.zst]  tar.xz",
-                rada_core::archive::ArchiveKind::TarXz => "Archive name — Tab changes the format: zip  tar.gz  tar.zst  [tar.xz]",
+                rada_core::archive::ArchiveKind::Zip => {
+                    "Archive name — Tab changes the format: [zip]  tar.gz  tar.zst  tar.xz"
+                }
+                rada_core::archive::ArchiveKind::TarGz => {
+                    "Archive name — Tab changes the format: zip  [tar.gz]  tar.zst  tar.xz"
+                }
+                rada_core::archive::ArchiveKind::TarZst => {
+                    "Archive name — Tab changes the format: zip  tar.gz  [tar.zst]  tar.xz"
+                }
+                rada_core::archive::ArchiveKind::TarXz => {
+                    "Archive name — Tab changes the format: zip  tar.gz  tar.zst  [tar.xz]"
+                }
             },
         ),
         InputKind::BulkRename { .. } => (

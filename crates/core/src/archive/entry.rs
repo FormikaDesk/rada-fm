@@ -84,7 +84,10 @@ impl Entry {
     }
 
     pub fn name(&self) -> OsString {
-        self.path.file_name().map(|n| n.to_os_string()).unwrap_or_default()
+        self.path
+            .file_name()
+            .map(|n| n.to_os_string())
+            .unwrap_or_default()
     }
 }
 
@@ -159,7 +162,13 @@ pub fn cp437(bytes: &[u8]) -> String {
     let high: Vec<char> = CP437_HIGH.chars().collect();
     bytes
         .iter()
-        .map(|&b| if b < 0x80 { b as char } else { high[(b - 0x80) as usize] })
+        .map(|&b| {
+            if b < 0x80 {
+                b as char
+            } else {
+                high[(b - 0x80) as usize]
+            }
+        })
         .collect()
 }
 
@@ -177,7 +186,11 @@ pub fn zip_name_bytes(raw: &[u8], flagged_utf8: bool) -> Vec<u8> {
 /// Whether a symlink stored at `entry` (relative to the archive root) with the given target
 /// would lead out of the extracted tree.
 pub fn link_escapes(entry: &Path, target: &Path) -> bool {
-    if target.has_root() || target.components().any(|c| matches!(c, Component::Prefix(_))) {
+    if target.has_root()
+        || target
+            .components()
+            .any(|c| matches!(c, Component::Prefix(_)))
+    {
         return true;
     }
     let mut depth: i64 = entry.components().count().saturating_sub(1) as i64;
@@ -251,11 +264,20 @@ mod tests {
 
     #[test]
     fn zip_names_are_utf8_when_they_are_and_cp437_when_they_are_not() {
-        assert_eq!(zip_name_bytes("caffè.txt".as_bytes(), true), "caffè.txt".as_bytes());
+        assert_eq!(
+            zip_name_bytes("caffè.txt".as_bytes(), true),
+            "caffè.txt".as_bytes()
+        );
         // Valid UTF-8 without the flag (older Linux tools) is not turned into mojibake.
-        assert_eq!(zip_name_bytes("caffè.txt".as_bytes(), false), "caffè.txt".as_bytes());
+        assert_eq!(
+            zip_name_bytes("caffè.txt".as_bytes(), false),
+            "caffè.txt".as_bytes()
+        );
         // 0x8A is "è" in CP437 and not valid UTF-8 on its own.
-        assert_eq!(zip_name_bytes(b"caff\x8a.txt", false), "caffè.txt".as_bytes());
+        assert_eq!(
+            zip_name_bytes(b"caff\x8a.txt", false),
+            "caffè.txt".as_bytes()
+        );
     }
 
     #[test]

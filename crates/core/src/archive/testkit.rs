@@ -15,7 +15,11 @@ fn crc32(data: &[u8]) -> u32 {
     for &b in data {
         c ^= b as u32;
         for _ in 0..8 {
-            c = if c & 1 != 0 { (c >> 1) ^ 0xEDB8_8320 } else { c >> 1 };
+            c = if c & 1 != 0 {
+                (c >> 1) ^ 0xEDB8_8320
+            } else {
+                c >> 1
+            };
         }
     }
     !c
@@ -208,7 +212,11 @@ pub fn tar_bytes(members: &[Member]) -> Vec<u8> {
         octal(&mut h[100..108], u64::from(m.mode & 0o7777));
         octal(&mut h[108..116], 0);
         octal(&mut h[116..124], 0);
-        let size = if m.kind == Kind::File { m.data.len() as u64 } else { 0 };
+        let size = if m.kind == Kind::File {
+            m.data.len() as u64
+        } else {
+            0
+        };
         octal(&mut h[124..136], size);
         octal(&mut h[136..148], u64::from(m.mtime));
         h[156] = match m.kind {
@@ -251,8 +259,9 @@ pub fn compress(data: &[u8], c: Compression) -> Vec<u8> {
             e.finish().unwrap()
         }
         Compression::Xz => {
-            let mut e = lzma_rust2::XzWriter::new(Vec::new(), lzma_rust2::XzOptions::with_preset(1))
-                .unwrap();
+            let mut e =
+                lzma_rust2::XzWriter::new(Vec::new(), lzma_rust2::XzOptions::with_preset(1))
+                    .unwrap();
             e.write_all(data).unwrap();
             e.finish().unwrap()
         }
@@ -279,4 +288,16 @@ pub fn have_tool(name: &str) -> bool {
             f.is_file()
         })
     })
+}
+
+/// The index of a file read through the external-program path, whatever its format (a `.7z`
+/// stands in for a RAR, which cannot be made here).
+pub fn index_via_tool(
+    path: &Path,
+    tool: &super::external::Tool,
+) -> Result<super::Index, super::ArchiveError> {
+    let size = std::fs::metadata(path)?.len();
+    let mut ix = super::Index::new(path, super::Format::Rar, size);
+    super::external::list_with(tool, &mut ix, &mut super::ListControl::new(&|| false), true)?;
+    Ok(ix.finish())
 }

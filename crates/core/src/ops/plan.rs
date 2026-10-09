@@ -285,21 +285,17 @@ impl Step {
                 display::path(src),
                 display::path(dst)
             ),
-            Step::ExtractFile { src, dst, .. } => format!(
-                "extract {} -> {}",
-                display::path(src),
-                display::path(dst)
-            ),
+            Step::ExtractFile { src, dst, .. } => {
+                format!("extract {} -> {}", display::path(src), display::path(dst))
+            }
             Step::ExtractSymlink { src, dst, .. } => format!(
                 "extract link {} -> {}",
                 display::path(src),
                 display::path(dst)
             ),
-            Step::Compress { dst, items, .. } => format!(
-                "compress {} items into {}",
-                items.len(),
-                display::path(dst)
-            ),
+            Step::Compress { dst, items, .. } => {
+                format!("compress {} items into {}", items.len(), display::path(dst))
+            }
             Step::HardLink { existing, link, .. } => format!(
                 "hard link {} -> {}",
                 display::path(existing),

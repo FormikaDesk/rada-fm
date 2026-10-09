@@ -68,7 +68,11 @@ fn enter_opens_an_archive_as_a_folder_and_the_breadcrumb_says_so() {
     assert_eq!(h.cursor_name(), "photos.zip");
     // The archive's folders were never recorded as places to come back to.
     assert!(
-        h.app.paths.recents.iter().all(|p| !p.to_string_lossy().contains("photos.zip")),
+        h.app
+            .paths
+            .recents
+            .iter()
+            .all(|p| !p.to_string_lossy().contains("photos.zip")),
         "{:?}",
         h.app.paths.recents
     );
@@ -78,12 +82,20 @@ fn enter_opens_an_archive_as_a_folder_and_the_breadcrumb_says_so() {
 fn a_file_whose_content_is_an_archive_is_recognised_by_its_preview() {
     let (sb, dir) = sandbox_with_files();
     write_tar(&dir.join("mystery.dat"), &members(), Compression::Xz);
-    write_zip(&dir.join("letter.docx"), &[Member::file("word/document.xml", "<x/>")]);
+    write_zip(
+        &dir.join("letter.docx"),
+        &[Member::file("word/document.xml", "<x/>")],
+    );
     let mut h = H::new(sb, dir, 130, 30);
     put_cursor(&mut h, "mystery.dat");
-    h.wait("the archive preview", |a| matches!(a.preview.content, Some(Preview::Archive(_))));
+    h.wait("the archive preview", |a| {
+        matches!(a.preview.content, Some(Preview::Archive(_)))
+    });
     let screen = h.screen();
-    assert!(screen.contains("tar archive, xz") && screen.contains("3 files"), "{screen}");
+    assert!(
+        screen.contains("tar archive, xz") && screen.contains("3 files"),
+        "{screen}"
+    );
     h.key(KeyCode::Enter);
     in_archive(&mut h, "mystery.dat");
     // A document that is a ZIP inside is not turned into a folder by Enter.
@@ -93,7 +105,10 @@ fn a_file_whose_content_is_an_archive_is_recognised_by_its_preview() {
     h.wait("its preview", |a| a.preview.content.is_some());
     h.key(KeyCode::Enter);
     h.pump(150);
-    assert!(h.app.archive.is_none(), "opened with its program, not as a folder");
+    assert!(
+        h.app.archive.is_none(),
+        "opened with its program, not as a folder"
+    );
 }
 
 #[test]
@@ -105,7 +120,10 @@ fn members_are_previewed_inside_the_archive() {
     h.key(KeyCode::Enter);
     in_archive(&mut h, "a.zip");
     put_cursor(&mut h, "top.txt");
-    h.wait("text of a member", |a| matches!(&a.preview.content, Some(Preview::Text(t)) if t.lines == ["top"]));
+    h.wait(
+        "text of a member",
+        |a| matches!(&a.preview.content, Some(Preview::Text(t)) if t.lines == ["top"]),
+    );
 }
 
 #[test]
@@ -118,8 +136,17 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
     in_archive(&mut h, "a.zip");
     for k in ["d", "D", "r", "R", "n", "x"] {
         h.keys(k);
-        assert!(h.app.modal.is_none(), "{k}: no window may open\n{}", h.screen());
-        let t = h.app.toast.as_ref().map(|t| t.text.clone()).unwrap_or_default();
+        assert!(
+            h.app.modal.is_none(),
+            "{k}: no window may open\n{}",
+            h.screen()
+        );
+        let t = h
+            .app
+            .toast
+            .as_ref()
+            .map(|t| t.text.clone())
+            .unwrap_or_default();
         assert!(t.contains("read-only"), "{k}: {t}");
     }
     // Pasting into it is refused too, even with something copied.
@@ -129,7 +156,14 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
     // Enter on a file explains instead of trying to open it.
     put_cursor(&mut h, "top.txt");
     h.key(KeyCode::Enter);
-    assert!(h.app.toast.as_ref().unwrap().text.contains("inside an archive"));
+    assert!(
+        h.app
+            .toast
+            .as_ref()
+            .unwrap()
+            .text
+            .contains("inside an archive")
+    );
 }
 
 #[test]
@@ -150,9 +184,15 @@ fn copying_members_out_is_a_partial_extraction_with_a_plan_and_undo() {
     h.press("ctrl+v");
     plan_modal(&mut h);
     let screen = h.screen();
-    assert!(screen.contains("Extract") && screen.contains("top.txt"), "{screen}");
+    assert!(
+        screen.contains("Extract") && screen.contains("top.txt"),
+        "{screen}"
+    );
     run_plan_and_wait(&mut h);
-    assert_eq!(std::fs::read_to_string(dir.join("sub/top.txt")).unwrap(), "top");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("sub/top.txt")).unwrap(),
+        "top"
+    );
     h.keys("u");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
@@ -171,11 +211,16 @@ fn extract_here_names_the_folder_after_the_archive_and_not_after_the_path() {
     let mut h = H::new(sb, dir.clone(), 130, 36);
     put_cursor(&mut h, "pack.tar.gz");
     h.keys("E"); // into a folder: the name is offered
-    assert!(matches!(&h.app.modal, Some(Modal::Input(iv)) if matches!(iv.kind, InputKind::ExtractTo { .. }) && iv.text == "pack"));
+    assert!(
+        matches!(&h.app.modal, Some(Modal::Input(iv)) if matches!(iv.kind, InputKind::ExtractTo { .. }) && iv.text == "pack")
+    );
     h.key(KeyCode::Enter);
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
-    assert_eq!(std::fs::read_to_string(dir.join("pack/one.txt")).unwrap(), "1");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("pack/one.txt")).unwrap(),
+        "1"
+    );
     assert!(!dir.join("one.txt").exists());
     // Extract here puts the contents right in the folder.
     put_cursor(&mut h, "pack.tar.gz");
@@ -188,7 +233,11 @@ fn extract_here_names_the_folder_after_the_archive_and_not_after_the_path() {
 #[test]
 fn a_possible_bomb_needs_yes_typed_and_nothing_else_will_do() {
     let (sb, dir) = sandbox_with_files();
-    write_tar(&dir.join("big.tar.gz"), &[Member::file("zeros", vec![0u8; 3 << 20])], Compression::Gzip);
+    write_tar(
+        &dir.join("big.tar.gz"),
+        &[Member::file("zeros", vec![0u8; 3 << 20])],
+        Compression::Gzip,
+    );
     let limits = ArchiveLimits {
         max_total_bytes: 1 << 20,
         max_ratio: 50,
@@ -229,13 +278,19 @@ fn compress_asks_for_a_name_and_a_format_and_makes_the_archive() {
     h.key(KeyCode::Enter);
     plan_modal(&mut h);
     let screen = h.screen();
-    assert!(screen.contains("Compress") && screen.contains("proj.v1.tar.gz"), "{screen}");
+    assert!(
+        screen.contains("Compress") && screen.contains("proj.v1.tar.gz"),
+        "{screen}"
+    );
     run_plan_and_wait(&mut h);
     assert!(dir.join("proj.v1.tar.gz").is_file());
     h.keys("u");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
-    assert!(!dir.join("proj.v1.tar.gz").exists(), "undo removes the archive");
+    assert!(
+        !dir.join("proj.v1.tar.gz").exists(),
+        "undo removes the archive"
+    );
 }
 
 #[test]
@@ -280,5 +335,8 @@ fn having_a_big_archive_under_the_cursor_does_not_slow_navigation() {
             h.app.on_core_event(ev);
         }
     }
-    assert!(worst < Duration::from_millis(100), "a keypress took {worst:?}");
+    assert!(
+        worst < Duration::from_millis(100),
+        "a keypress took {worst:?}"
+    );
 }

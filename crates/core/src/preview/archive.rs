@@ -59,7 +59,11 @@ fn top_listing(ix: &Index, dir: &Path, limit: usize) -> (Vec<(String, bool)>, bo
     kids.sort_by(|a, b| {
         (b.kind == EntryKind::Dir)
             .cmp(&(a.kind == EntryKind::Dir))
-            .then_with(|| display::name(&a.name).to_lowercase().cmp(&display::name(&b.name).to_lowercase()))
+            .then_with(|| {
+                display::name(&a.name)
+                    .to_lowercase()
+                    .cmp(&display::name(&b.name).to_lowercase())
+            })
     });
     let more = kids.len() > limit;
     (
@@ -75,7 +79,12 @@ fn top_listing(ix: &Index, dir: &Path, limit: usize) -> (Vec<(String, bool)>, bo
 pub fn summarize(path: &Path, packed: u64, limits: &Limits, cancel: &dyn Fn() -> bool) -> Preview {
     let deadline = Instant::now() + Duration::from_secs_f32(limits.archive_seconds);
     let mut lc = ListControl::new(cancel).with_deadline(deadline);
-    let label = || crate::archive::format::sniff(path).ok().flatten().map(|f| f.label());
+    let label = || {
+        crate::archive::format::sniff(path)
+            .ok()
+            .flatten()
+            .map(|f| f.label())
+    };
     match open_cached(path, &mut lc) {
         Ok(ix) => {
             let (first, more) = top_listing(&ix, Path::new(""), limits.archive_entries);
@@ -95,7 +104,11 @@ pub fn summarize(path: &Path, packed: u64, limits: &Limits, cancel: &dyn Fn() ->
             })
         }
         Err(ArchiveError::Cancelled) => Preview::Empty,
-        Err(e) => problem(label().unwrap_or_else(|| "archive".into()), packed, e.to_string()),
+        Err(e) => problem(
+            label().unwrap_or_else(|| "archive".into()),
+            packed,
+            e.to_string(),
+        ),
     }
 }
 
@@ -132,7 +145,8 @@ fn extract_to_cache(
         std::fs::create_dir_all(dir).map_err(|e| format!("cannot use the preview cache: {e}"))?;
     }
     let part = target.with_extension("part");
-    let mut f = std::fs::File::create(&part).map_err(|e| format!("cannot use the preview cache: {e}"))?;
+    let mut f =
+        std::fs::File::create(&part).map_err(|e| format!("cannot use the preview cache: {e}"))?;
     let mut s = Session::open(ix.clone(), &[idx]);
     let mut fail: Option<std::io::Error> = None;
     let r = s.read(idx, &mut |d| {
@@ -186,10 +200,15 @@ pub fn member(loc: &Location, limits: &Limits, cancel: &dyn Fn() -> bool) -> Pre
             state: LinkState::ToFile,
             inner: None,
         },
-        EntryKind::Special => Preview::Special("device or pipe stored in the archive (never extracted)".into()),
+        EntryKind::Special => {
+            Preview::Special("device or pipe stored in the archive (never extracted)".into())
+        }
         EntryKind::Hardlink => Preview::Special(format!(
             "another name for {}",
-            e.link.as_ref().map(|l| display::path(l)).unwrap_or_default()
+            e.link
+                .as_ref()
+                .map(|l| display::path(l))
+                .unwrap_or_default()
         )),
         EntryKind::Dir => Preview::Empty,
         EntryKind::File => {
@@ -223,21 +242,21 @@ pub fn member(loc: &Location, limits: &Limits, cancel: &dyn Fn() -> bool) -> Pre
                         }
                     }
                     Err(_) if cancel() => return Preview::Empty,
-                    Err(why) => return Preview::Error(format!("cannot take it out of the archive: {why}")),
+                    Err(why) => {
+                        return Preview::Error(format!("cannot take it out of the archive: {why}"));
+                    }
                 }
             }
             let card_time = e.mtime;
             let mode = e.mode;
-            super::bytes_preview(&head, e.size, limits, move |kind, exec| {
-                FileCard {
-                    kind,
-                    size: e.size,
-                    modified: card_time,
-                    accessed: None,
-                    created: None,
-                    mode,
-                    exec,
-                }
+            super::bytes_preview(&head, e.size, limits, move |kind, exec| FileCard {
+                kind,
+                size: e.size,
+                modified: card_time,
+                accessed: None,
+                created: None,
+                mode,
+                exec,
             })
         }
     }

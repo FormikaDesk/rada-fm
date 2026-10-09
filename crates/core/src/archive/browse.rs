@@ -30,7 +30,12 @@ pub struct ArchiveView {
     pub encrypted: u64,
 }
 
-fn synthetic_meta(kind: EntryKind, size: u64, mtime: Option<std::time::SystemTime>, mode: Option<u32>) -> FsMeta {
+fn synthetic_meta(
+    kind: EntryKind,
+    size: u64,
+    mtime: Option<std::time::SystemTime>,
+    mode: Option<u32>,
+) -> FsMeta {
     FsMeta {
         kind: match kind {
             EntryKind::Dir => FileKind::Dir,

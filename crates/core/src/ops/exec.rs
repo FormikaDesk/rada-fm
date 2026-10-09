@@ -283,7 +283,8 @@ impl Engine {
                             StepStatus::Done => {
                                 report.done += 1;
                                 report.bytes += step.bytes();
-                                if matches!(step, Step::CopyFile { .. } | Step::ExtractFile { .. }) {
+                                if matches!(step, Step::CopyFile { .. } | Step::ExtractFile { .. })
+                                {
                                     prog.files_done += 1;
                                 }
                             }
@@ -389,11 +390,7 @@ impl Engine {
     }
 
     /// The pass over `archive` that serves this plan, started on first use.
-    fn archive_run<'a>(
-        &self,
-        st: &'a mut RunState,
-        archive: &Path,
-    ) -> Result<&'a mut ArchiveRun> {
+    fn archive_run<'a>(&self, st: &'a mut RunState, archive: &Path) -> Result<&'a mut ArchiveRun> {
         if !st.archives.contains_key(archive) {
             let cancel = never;
             let index = archive::index::open_cached(archive, &mut ListControl::new(&cancel))

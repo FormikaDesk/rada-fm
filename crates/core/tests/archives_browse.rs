@@ -10,7 +10,9 @@ use rada_core::preview::{self, Limits, Preview};
 use rada_core::testutil::*;
 
 fn png_bytes() -> Vec<u8> {
-    let img = image::RgbaImage::from_fn(8, 6, |x, y| image::Rgba([x as u8 * 30, y as u8 * 40, 7, 255]));
+    let img = image::RgbaImage::from_fn(8, 6, |x, y| {
+        image::Rgba([x as u8 * 30, y as u8 * 40, 7, 255])
+    });
     let mut out = std::io::Cursor::new(Vec::new());
     img.write_to(&mut out, image::ImageFormat::Png).unwrap();
     out.into_inner()
@@ -23,7 +25,10 @@ fn members() -> Vec<Member> {
         Member::file("docs/sub/deep.txt", "deep"),
         Member::file("pic.png", png_bytes()),
         Member::symlink("alias", "docs/readme.txt"),
-        Member::file("data.bin", (0..2000u32).map(|i| (i * 31) as u8).collect::<Vec<_>>()),
+        Member::file(
+            "data.bin",
+            (0..2000u32).map(|i| (i * 31) as u8).collect::<Vec<_>>(),
+        ),
     ]
 }
 
@@ -65,13 +70,21 @@ fn folders_of_an_archive_list_like_folders() {
         assert_eq!(names.len(), 4, "{name}: {names:?}");
         assert!(names.contains(&"docs".to_string()) && names.contains(&"alias".to_string()));
         assert_eq!(view.files, 4, "{name}");
-        assert!(view.format.contains(if name.ends_with(".zip") { "ZIP" } else { "tar" }), "{}", view.format);
+        assert!(
+            view.format
+                .contains(if name.ends_with(".zip") { "ZIP" } else { "tar" }),
+            "{}",
+            view.format
+        );
         let docs = top.iter().find(|e| e.display == "docs").unwrap();
         assert!(docs.is_dir());
         assert_eq!(docs.path, a.join("docs"));
         assert!(docs.readonly);
         let link = top.iter().find(|e| e.display == "alias").unwrap();
-        assert_eq!(link.link.as_ref().unwrap().target, Path::new("docs/readme.txt"));
+        assert_eq!(
+            link.link.as_ref().unwrap().target,
+            Path::new("docs/readme.txt")
+        );
         // Inside.
         let inner = archive::locate(&LocalFs, &a.join("docs")).unwrap();
         let (kids, _) = archive::browse::read_dir(&*p, &inner, &|| false).unwrap();
@@ -97,7 +110,12 @@ fn an_unopened_archive_shows_its_counts_and_top_items() {
             assert!(p.bytes > 2000);
             assert!(p.complete);
             assert!(p.packed > 0);
-            assert_eq!(p.first[0], ("docs".to_string(), true), "folders first: {:?}", p.first);
+            assert_eq!(
+                p.first[0],
+                ("docs".to_string(), true),
+                "folders first: {:?}",
+                p.first
+            );
             assert!(p.first.iter().any(|(n, _)| n == "pic.png"));
         }
         other => panic!("{other:?}"),
@@ -108,7 +126,11 @@ fn an_unopened_archive_shows_its_counts_and_top_items() {
     b.truncate(b.len() - 30);
     std::fs::write(&cut, b).unwrap();
     match preview::generate(&LocalFs, &cut, &limits(&sb)) {
-        Preview::Archive(p) => assert!(p.problem.as_deref().unwrap_or("").contains("damaged"), "{:?}", p.problem),
+        Preview::Archive(p) => assert!(
+            p.problem.as_deref().unwrap_or("").contains("damaged"),
+            "{:?}",
+            p.problem
+        ),
         other => panic!("{other:?}"),
     }
 }
@@ -136,16 +158,31 @@ fn text_and_pictures_inside_an_archive_are_previewed() {
             }
             other => panic!("{name}: {other:?}"),
         }
-        assert!(matches!(preview::generate(&LocalFs, &a.join("data.bin"), &l), Preview::Binary(_)), "{name}");
+        assert!(
+            matches!(
+                preview::generate(&LocalFs, &a.join("data.bin"), &l),
+                Preview::Binary(_)
+            ),
+            "{name}"
+        );
         match preview::generate(&LocalFs, &a.join("docs"), &l) {
-            Preview::Dir(d) => assert_eq!(d.entries, [("sub".to_string(), true), ("readme.txt".to_string(), false)]),
+            Preview::Dir(d) => assert_eq!(
+                d.entries,
+                [("sub".to_string(), true), ("readme.txt".to_string(), false)]
+            ),
             other => panic!("{other:?}"),
         }
         assert!(matches!(
             preview::generate(&LocalFs, &a.join("alias"), &l),
             Preview::Symlink { .. }
         ));
-        assert!(matches!(preview::generate(&LocalFs, &a.join("nope"), &l), Preview::Error(_)), "{name}");
+        assert!(
+            matches!(
+                preview::generate(&LocalFs, &a.join("nope"), &l),
+                Preview::Error(_)
+            ),
+            "{name}"
+        );
     }
 }
 
@@ -153,7 +190,9 @@ fn text_and_pictures_inside_an_archive_are_previewed() {
 fn a_cancelled_preview_stops_reading() {
     let sb = Sandbox::new();
     let a = sb.path("big.tar.gz");
-    let big: Vec<Member> = (0..2000).map(|i| Member::file(&format!("f{i:04}"), "x".repeat(4000))).collect();
+    let big: Vec<Member> = (0..2000)
+        .map(|i| Member::file(&format!("f{i:04}"), "x".repeat(4000)))
+        .collect();
     write_tar(&a, &big, Compression::Gzip);
     let started = std::time::Instant::now();
     let p = preview::generate_with(&LocalFs, &a, &limits(&sb), &|| true);
@@ -165,7 +204,9 @@ fn a_cancelled_preview_stops_reading() {
 fn a_big_stream_gives_a_lower_bound_instead_of_blocking_the_preview() {
     let sb = Sandbox::new();
     let a = sb.path("big.tar.gz");
-    let big: Vec<Member> = (0..3000).map(|i| Member::file(&format!("f{i:04}"), "x".repeat(2000))).collect();
+    let big: Vec<Member> = (0..3000)
+        .map(|i| Member::file(&format!("f{i:04}"), "x".repeat(2000)))
+        .collect();
     write_tar(&a, &big, Compression::Gzip);
     let mut l = limits(&sb);
     l.archive_seconds = 0.0; // no time at all

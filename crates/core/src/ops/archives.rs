@@ -21,9 +21,7 @@ use super::plan::*;
 use super::scan::{Scan, ScanControl, ScanNode, ScanProgress};
 use crate::archive::index::{Index, ListControl, open_cached};
 use crate::archive::writer::CompressItem;
-use crate::archive::{
-    ArchiveKind, EntryKind, Format, NameIssue, archive_stem, link_escapes,
-};
+use crate::archive::{ArchiveKind, EntryKind, Format, NameIssue, archive_stem, link_escapes};
 use crate::fs::{FileKind, Stamp};
 use crate::{Error, Result, display};
 
@@ -499,7 +497,8 @@ impl Engine {
                         }
                         EntryKind::Symlink => {
                             let Some(target) = e.link.clone() else {
-                                ex.ws.add(WarningKind::Unreadable, Severity::Warning, Some(&src));
+                                ex.ws
+                                    .add(WarningKind::Unreadable, Severity::Warning, Some(&src));
                                 continue;
                             };
                             ex.ws.add(WarningKind::Symlink, Severity::Info, Some(&src));
@@ -517,8 +516,10 @@ impl Engine {
                         _ => {
                             // A hard link: another name for a file extracted earlier.
                             let target = e.link.clone().unwrap_or_default();
-                            let (t, issue) =
-                                crate::archive::entry::sanitize(&crate::archive::entry::os_to_bytes(target.as_os_str()), false);
+                            let (t, issue) = crate::archive::entry::sanitize(
+                                &crate::archive::entry::os_to_bytes(target.as_os_str()),
+                                false,
+                            );
                             if issue.is_some() {
                                 ex.ws.add_with(
                                     WarningKind::UnsafePath,
@@ -599,9 +600,15 @@ impl Engine {
         if ix.format == Format::Rar {
             // nothing extra: the tool was already needed to list it
         }
+        // Every folder made, whether the archive lists it or a path only runs through it.
+        let made_dirs = ex
+            .steps
+            .iter()
+            .filter(|s| matches!(s, Step::MakeDir { .. }))
+            .count() as u64;
         let total = Count {
             files: counts.iter().map(|c| c.files).sum(),
-            dirs: counts.iter().map(|c| c.dirs).sum(),
+            dirs: made_dirs,
             symlinks: counts.iter().map(|c| c.symlinks).sum(),
             bytes: counts.iter().map(|c| c.bytes).sum(),
         };

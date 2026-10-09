@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use proptest::prelude::*;
-use rada_core::archive::testkit::have_tool;
 use rada_core::archive::ArchiveKind;
+use rada_core::archive::testkit::have_tool;
 use rada_core::ops::*;
 use rada_core::testutil::*;
 
@@ -65,7 +65,12 @@ fn deep(root: &Path) -> BTreeMap<PathBuf, String> {
                 format!("dir {mode:o} mtime={}", m.mtime())
             } else {
                 let c = std::fs::read(&p).unwrap();
-                format!("file {mode:o} len={} data={:x?} mtime={}", c.len(), &c[..c.len().min(64)], m.mtime())
+                format!(
+                    "file {mode:o} len={} data={:x?} mtime={}",
+                    c.len(),
+                    &c[..c.len().min(64)],
+                    m.mtime()
+                )
             };
             out.insert(rel, desc);
             if m.is_dir() && !m.file_type().is_symlink() {
@@ -101,7 +106,11 @@ fn fixture(sb: &Sandbox) -> PathBuf {
     let t = sb.mkdir("src/proj");
     std::fs::create_dir_all(t.join("sub/deep")).unwrap();
     std::fs::write(t.join("a.txt"), "alpha\n".repeat(300)).unwrap();
-    std::fs::write(t.join("sub/b.bin"), (0..5000u32).map(|i| (i * 7) as u8).collect::<Vec<_>>()).unwrap();
+    std::fs::write(
+        t.join("sub/b.bin"),
+        (0..5000u32).map(|i| (i * 7) as u8).collect::<Vec<_>>(),
+    )
+    .unwrap();
     std::fs::write(t.join("sub/deep/empty"), "").unwrap();
     std::fs::set_permissions(t.join("a.txt"), std::fs::Permissions::from_mode(0o640)).unwrap();
     std::os::unix::fs::symlink("a.txt", t.join("link")).unwrap();
@@ -116,7 +125,7 @@ fn every_kind_makes_an_archive_other_programs_can_read() {
     let src = fixture(&sb);
     for kind in ArchiveKind::ALL {
         let a = sb.path(format!("out{}", kind.extension()));
-        let plan = plan_of(&e, &compress_req(&[src.clone()], &a, kind));
+        let plan = plan_of(&e, &compress_req(std::slice::from_ref(&src), &a, kind));
         assert!(plan.is_executable(), "{kind:?}: {:?}", plan.warnings);
         assert!(plan.estimated_bytes.is_some());
         let rep = run(&e, &plan);
@@ -125,22 +134,38 @@ fn every_kind_makes_an_archive_other_programs_can_read() {
         // bsdtar reads zip, tar.gz, tar.xz and tar.zst: an independent check.
         if have_tool("bsdtar") {
             let out = Command::new("bsdtar").arg("-tf").arg(&a).output().unwrap();
-            assert!(out.status.success(), "{kind:?}: bsdtar: {}", String::from_utf8_lossy(&out.stderr));
+            assert!(
+                out.status.success(),
+                "{kind:?}: bsdtar: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
             let list = String::from_utf8_lossy(&out.stdout);
             assert!(list.contains("proj/sub/b.bin"), "{kind:?}: {list}");
         }
         match kind {
             ArchiveKind::Zip if have_tool("unzip") => {
                 let st = Command::new("unzip").arg("-tq").arg(&a).output().unwrap();
-                assert!(st.status.success(), "unzip -t: {}", String::from_utf8_lossy(&st.stdout));
+                assert!(
+                    st.status.success(),
+                    "unzip -t: {}",
+                    String::from_utf8_lossy(&st.stdout)
+                );
             }
             ArchiveKind::TarZst if have_tool("zstd") => {
                 let st = Command::new("zstd").arg("-tq").arg(&a).output().unwrap();
-                assert!(st.status.success(), "zstd -t: {}", String::from_utf8_lossy(&st.stderr));
+                assert!(
+                    st.status.success(),
+                    "zstd -t: {}",
+                    String::from_utf8_lossy(&st.stderr)
+                );
             }
             ArchiveKind::TarXz if have_tool("xz") => {
                 let st = Command::new("xz").arg("-tq").arg(&a).output().unwrap();
-                assert!(st.status.success(), "xz -t: {}", String::from_utf8_lossy(&st.stderr));
+                assert!(
+                    st.status.success(),
+                    "xz -t: {}",
+                    String::from_utf8_lossy(&st.stderr)
+                );
             }
             ArchiveKind::TarGz if have_tool("gzip") => {
                 let st = Command::new("gzip").arg("-tq").arg(&a).output().unwrap();
@@ -160,7 +185,12 @@ fn a_program_made_archive_of_the_same_tree_reads_back_identically() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let src = fixture(&sb);
-    for (ext, flag) in [("tar.gz", "--gzip"), ("tar.xz", "--xz"), ("tar.zst", "--zstd"), ("tar.bz2", "--bzip2")] {
+    for (ext, flag) in [
+        ("tar.gz", "--gzip"),
+        ("tar.xz", "--xz"),
+        ("tar.zst", "--zstd"),
+        ("tar.bz2", "--bzip2"),
+    ] {
         let a = sb.path(format!("sys.{ext}"));
         let st = Command::new("bsdtar")
             .args(["-cf"])
@@ -190,7 +220,10 @@ fn compress_then_extract_gives_the_same_tree_in_every_format() {
     let want = deep(&sb.path("src"));
     for kind in ArchiveKind::ALL {
         let a = sb.path(format!("rt{}", kind.extension()));
-        run(&e, &plan_of(&e, &compress_req(&[src.clone()], &a, kind)));
+        run(
+            &e,
+            &plan_of(&e, &compress_req(std::slice::from_ref(&src), &a, kind)),
+        );
         let out = sb.mkdir(format!("rt-out-{}", kind.label()));
         let rep = run(&e, &plan_of(&e, &extract_req(&a, &out)));
         assert!(rep.failed.is_empty(), "{kind:?}: {:?}", rep.failed);
@@ -203,9 +236,19 @@ fn zip_says_it_stores_links_and_tar_does_not_need_to() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let src = fixture(&sb);
-    let z = plan_of(&e, &compress_req(&[src.clone()], &sb.path("a.zip"), ArchiveKind::Zip));
+    let z = plan_of(
+        &e,
+        &compress_req(
+            std::slice::from_ref(&src),
+            &sb.path("a.zip"),
+            ArchiveKind::Zip,
+        ),
+    );
     assert!(has(&z, WarningKind::ZipLinks));
-    let t = plan_of(&e, &compress_req(&[src], &sb.path("a.tar.gz"), ArchiveKind::TarGz));
+    let t = plan_of(
+        &e,
+        &compress_req(&[src], &sb.path("a.tar.gz"), ArchiveKind::TarGz),
+    );
     assert!(!has(&t, WarningKind::ZipLinks));
 }
 
@@ -222,12 +265,19 @@ fn an_existing_archive_is_a_conflict_with_the_usual_choices() {
     let plan = plan_of(&e, &req);
     assert!(!plan.is_executable());
     // keep both
-    let OpRequest::Compress { conflict, .. } = &mut req else { unreachable!() };
+    let OpRequest::Compress { conflict, .. } = &mut req else {
+        unreachable!()
+    };
     *conflict = ConflictPolicy::KeepBoth;
     let plan = plan_of(&e, &req);
-    assert_eq!(plan.destination.as_deref(), Some(sb.path("same (1).tar.gz").as_path()));
+    assert_eq!(
+        plan.destination.as_deref(),
+        Some(sb.path("same (1).tar.gz").as_path())
+    );
     // overwrite: the old one goes to the trash, undo brings it back
-    let OpRequest::Compress { conflict, .. } = &mut req else { unreachable!() };
+    let OpRequest::Compress { conflict, .. } = &mut req else {
+        unreachable!()
+    };
     *conflict = ConflictPolicy::Overwrite;
     let plan = plan_of(&e, &req);
     let out = run_journaled(&e, &j, &plan);
@@ -245,7 +295,10 @@ fn the_archive_is_never_part_of_itself_and_undo_removes_it() {
     let src = fixture(&sb);
     // Made inside the folder it archives.
     let a = src.join("inside.zip");
-    let plan = plan_of(&e, &compress_req(&[src.clone()], &a, ArchiveKind::Zip));
+    let plan = plan_of(
+        &e,
+        &compress_req(std::slice::from_ref(&src), &a, ArchiveKind::Zip),
+    );
     let o = run_journaled(&e, &j, &plan);
     assert!(o.report.failed.is_empty(), "{:?}", o.report.failed);
     let out = sb.mkdir("o");
@@ -271,7 +324,9 @@ fn cancelling_a_compression_removes_the_half_written_archive() {
     let j = sb.journal();
     let big = sb.mkdir("big");
     // Enough data that the copy loop reports progress several times.
-    let data: Vec<u8> = (0..(24u32 << 20)).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+    let data: Vec<u8> = (0..(24u32 << 20))
+        .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+        .collect();
     std::fs::write(big.join("blob"), &data).unwrap();
     let a = sb.path("big.tar.gz");
     let plan = plan_of(&e, &compress_req(&[big], &a, ArchiveKind::TarGz));

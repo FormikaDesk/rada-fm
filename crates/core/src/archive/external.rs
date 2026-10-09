@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::SystemTime;
 
+use super::ArchiveError;
 use super::entry::{Entry, EntryKind, sanitize};
 use super::index::{Index, ListControl, unix_time};
 use super::reader::Emitter;
-use super::ArchiveError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tool {
@@ -115,7 +115,8 @@ pub fn list_with(
     let text = match tool {
         Tool::SevenZip(p) => {
             let mut c = Command::new(p);
-            c.args(["l", "-slt", "-ba", "-sccUTF-8", "-p-", "--"]).arg(&ix.path);
+            c.args(["l", "-slt", "-ba", "-sccUTF-8", "-p-", "--"])
+                .arg(&ix.path);
             run_text(c)?
         }
         Tool::Unrar(p) => {
@@ -311,6 +312,17 @@ pub(super) fn produce_rar(
     produce_with(&tool, ix, wanted, last, em)
 }
 
+pub fn produce_into(
+    tool: &Tool,
+    ix: &Index,
+    wanted: &[usize],
+    sink: &mut dyn FnMut(usize, &[u8]),
+) -> Result<(), ArchiveError> {
+    super::reader::run_with_emitter(wanted, ix.entries.len(), sink, |flags, last, em| {
+        produce_with(tool, ix, flags, last, em)
+    })
+}
+
 pub(super) fn produce_with(
     tool: &Tool,
     ix: &Index,
@@ -321,7 +333,8 @@ pub(super) fn produce_with(
     let mut cmd = match tool {
         Tool::SevenZip(p) => {
             let mut c = Command::new(p);
-            c.args(["x", "-so", "-bso0", "-bsp0", "-y", "-p-", "--"]).arg(&ix.path);
+            c.args(["x", "-so", "-bso0", "-bsp0", "-y", "-p-", "--"])
+                .arg(&ix.path);
             c
         }
         Tool::Unrar(p) => {
@@ -387,7 +400,10 @@ fn deliver(
             em.start(i)?;
         }
         let copied = if want {
-            let mut counted = Counting { inner: &mut part, n: 0 };
+            let mut counted = Counting {
+                inner: &mut part,
+                n: 0,
+            };
             em.copy(&mut counted)?;
             counted.n
         } else {
@@ -440,13 +456,19 @@ mod tests {
         let text = "UNRAR 7.00 freeware\n\nArchive: x.rar\nDetails: RAR 5\n\n        Name: a.txt\n        Type: File\n        Size: 5\n Packed size: 7\n       mtime: 2023-01-01 12:00:00,000000000\n  Attributes: -rw-r--r--\n\n        Name: dir\n        Type: Directory\n        Size: 0\n";
         let b = parse_unrar_listing(text);
         assert_eq!(b.len(), 2);
-        assert_eq!((b[0].path.as_str(), b[0].size, b[0].mode), ("a.txt", 5, Some(0o644)));
+        assert_eq!(
+            (b[0].path.as_str(), b[0].size, b[0].mode),
+            ("a.txt", 5, Some(0o644))
+        );
         assert_eq!(b[1].kind, EntryKind::Dir);
     }
 
     #[test]
     fn a_missing_tool_is_found_or_not_in_the_given_path() {
-        assert_eq!(Tool::find_in(std::ffi::OsStr::new("/nonexistent-dir-for-rada")), None);
+        assert_eq!(
+            Tool::find_in(std::ffi::OsStr::new("/nonexistent-dir-for-rada")),
+            None
+        );
     }
 
     #[test]

@@ -11,9 +11,9 @@
 
 use std::fs::File;
 use std::io::{self, BufReader, Read};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
-use std::sync::Arc;
 
 use super::entry::{EntryKind, sanitize};
 use super::format::{Compression, Format};
@@ -336,4 +336,36 @@ fn produce_7z(ix: &Index, wanted: &[bool], last: usize, em: &Emitter) -> Result<
 /// Whether a kind carries data in the stream.
 pub fn has_data(kind: EntryKind) -> bool {
     kind == EntryKind::File
+}
+
+/// Run a producer against an emitter whose output goes to `sink(member, bytes)`, on this
+/// thread. For tests of producers that are not reached through a [`Session`].
+pub(super) fn run_with_emitter(
+    wanted: &[usize],
+    n: usize,
+    sink: &mut dyn FnMut(usize, &[u8]),
+    run: impl FnOnce(&[bool], usize, &Emitter) -> Result<(), ArchiveError> + Send,
+) -> Result<(), ArchiveError> {
+    let mut flags = vec![false; n];
+    for &w in wanted {
+        flags[w] = true;
+    }
+    let last = flags.iter().rposition(|w| *w).unwrap_or(0);
+    let (tx, rx) = sync_channel(8);
+    let stop = Arc::new(AtomicBool::new(false));
+    let em = Emitter { tx, stop };
+    let mut result = Ok(());
+    std::thread::scope(|sc| {
+        let h = sc.spawn(move || run(&flags, last, &em));
+        let mut current = 0usize;
+        while let Ok(m) = rx.recv() {
+            match m {
+                Msg::Start(i) => current = i,
+                Msg::Data(d) => sink(current, &d),
+                Msg::End | Msg::Failed(_) => {}
+            }
+        }
+        result = h.join().unwrap_or(Err(ArchiveError::Cancelled));
+    });
+    result
 }

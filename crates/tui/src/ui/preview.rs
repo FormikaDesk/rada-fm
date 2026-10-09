@@ -184,16 +184,17 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 kv(
                     &mut lines,
                     "Contains",
-                    &format!(
-                        "{lower}{}",
-                        archive_counts(a.files, a.dirs, a.symlinks)
-                    ),
+                    &format!("{lower}{}", archive_counts(a.files, a.dirs, a.symlinks)),
                     th.base(),
                 );
                 kv(
                     &mut lines,
                     "Packed",
-                    &format!("{} · {} bytes", fmt::size(a.packed), fmt::thousands(a.packed)),
+                    &format!(
+                        "{} · {} bytes",
+                        fmt::size(a.packed),
+                        fmt::thousands(a.packed)
+                    ),
                     th.base(),
                 );
                 kv(

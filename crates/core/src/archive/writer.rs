@@ -124,7 +124,8 @@ pub fn write_archive<W: Write + io::Seek + Send>(
                 .map(|n| n.get() as u32)
                 .unwrap_or(2)
                 .clamp(1, 8);
-            let enc = lzma_rust2::XzWriterMt::new(out, opts, workers).map_err(ArchiveError::from)?;
+            let enc =
+                lzma_rust2::XzWriterMt::new(out, opts, workers).map_err(ArchiveError::from)?;
             let enc = write_tar(enc, items, progress)?;
             finish_io(enc.finish().and_then(|mut w| w.flush()))
         }
@@ -153,7 +154,11 @@ fn secs_of(t: Option<Stamp>) -> u64 {
     t.map(|s| s.secs.max(0) as u64).unwrap_or(0)
 }
 
-fn write_tar<W: Write>(w: W, items: &[CompressItem], progress: Progress<'_>) -> Result<W, ArchiveError> {
+fn write_tar<W: Write>(
+    w: W,
+    items: &[CompressItem],
+    progress: Progress<'_>,
+) -> Result<W, ArchiveError> {
     let mut b = tar::Builder::new(w);
     b.mode(tar::HeaderMode::Complete);
     for it in items {
@@ -251,12 +256,16 @@ fn write_zip<W: Write + io::Seek>(
         if let Some(s) = it.mtime {
             // The exact time in UTC, which the DOS time above cannot say.
             let mut field = vec![1u8];
-            field.extend_from_slice(&(s.secs.clamp(i32::MIN as i64, i32::MAX as i64) as i32).to_le_bytes());
+            field.extend_from_slice(
+                &(s.secs.clamp(i32::MIN as i64, i32::MAX as i64) as i32).to_le_bytes(),
+            );
             opts.add_extra_field(0x5455, field, false)
                 .map_err(zip_write_error)?;
         }
         match it.kind {
-            FileKind::Dir => z.add_directory(format!("{name}/"), opts).map_err(zip_write_error)?,
+            FileKind::Dir => z
+                .add_directory(format!("{name}/"), opts)
+                .map_err(zip_write_error)?,
             FileKind::Symlink => {
                 let target = it.link.clone().unwrap_or_default();
                 z.add_symlink(name, zip_member_name_raw(&target), opts)

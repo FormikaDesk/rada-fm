@@ -46,7 +46,9 @@ impl Compression {
             Compression::None => Box::new(r),
             Compression::Gzip => Box::new(flate2::read::MultiGzDecoder::new(r)),
             Compression::Bzip2 => Box::new(bzip2::read::MultiBzDecoder::new(r)),
-            Compression::Xz => Box::new(lzma_rust2::XzReader::new_mem_limit(r, true, XZ_MEMORY_KIB)),
+            Compression::Xz => {
+                Box::new(lzma_rust2::XzReader::new_mem_limit(r, true, XZ_MEMORY_KIB))
+            }
             Compression::Zstd => Box::new(
                 structured_zstd::decoding::StreamingDecoder::new(r)
                     .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?,
@@ -190,8 +192,25 @@ pub fn sniff(path: &Path) -> io::Result<Option<Format>> {
 
 /// Extensions that name an archive, longest first. Used for the name only.
 const EXTENSIONS: &[&str] = &[
-    ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.zstd", ".tgz", ".tbz2", ".tbz", ".txz",
-    ".tzst", ".tar", ".zip", ".7z", ".rar", ".gz", ".bz2", ".xz", ".zst", ".zstd",
+    ".tar.gz",
+    ".tar.bz2",
+    ".tar.xz",
+    ".tar.zst",
+    ".tar.zstd",
+    ".tgz",
+    ".tbz2",
+    ".tbz",
+    ".txz",
+    ".tzst",
+    ".tar",
+    ".zip",
+    ".7z",
+    ".rar",
+    ".gz",
+    ".bz2",
+    ".xz",
+    ".zst",
+    ".zstd",
 ];
 
 /// Container formats that happen to be ZIP files but are documents or packages: Enter opens
@@ -209,7 +228,9 @@ fn lower_name(name: &OsStr) -> String {
 /// to know would put I/O on the keypress.
 pub fn name_suggests_archive(name: &OsStr) -> bool {
     let n = lower_name(name);
-    EXTENSIONS.iter().any(|e| n.len() > e.len() && n.ends_with(e))
+    EXTENSIONS
+        .iter()
+        .any(|e| n.len() > e.len() && n.ends_with(e))
 }
 
 /// Whether the name is one of the ZIP-based document or package formats.
@@ -400,7 +421,15 @@ mod tests {
 
     #[test]
     fn names_that_suggest_an_archive() {
-        for ok in ["a.zip", "a.tar.gz", "A.TGZ", "x.7z", "y.rar", "z.tar.zst", "k.gz"] {
+        for ok in [
+            "a.zip",
+            "a.tar.gz",
+            "A.TGZ",
+            "x.7z",
+            "y.rar",
+            "z.tar.zst",
+            "k.gz",
+        ] {
             assert!(name_suggests_archive(OsStr::new(ok)), "{ok}");
         }
         for no in ["zip", "a.txt", ".zip", "a.docx", "tar"] {

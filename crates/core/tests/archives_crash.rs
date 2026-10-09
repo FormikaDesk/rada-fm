@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use rada_core::archive::testkit::{Member, write_tar};
 use rada_core::archive::Compression;
+use rada_core::archive::testkit::{Member, write_tar};
 use rada_core::journal::{EntryStatus, Journal};
 use rada_core::ops::*;
 use rada_core::platform::{self, Dirs};
@@ -74,7 +74,9 @@ fn crash_child_archive() {
 
 fn leftovers(root: &Path) -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
         for e in rd.flatten() {
             let p = e.path();
             if e.file_name().to_string_lossy().starts_with(".rada-part-") {
@@ -109,7 +111,13 @@ fn crash_at(point: &str) -> (usize, usize) {
     let marker = sb.root.join("marker");
 
     let mut child = Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "crash_child_archive", "--nocapture", "--test-threads", "1"])
+        .args([
+            "--exact",
+            "crash_child_archive",
+            "--nocapture",
+            "--test-threads",
+            "1",
+        ])
         .env("RADA_CRASH_POINT", point)
         .env("RADA_CRASH_ROOT", &sb.root)
         .env("RADA_CRASH_SRC", &archive)
@@ -149,18 +157,31 @@ fn crash_at(point: &str) -> (usize, usize) {
     assert_eq!(j.interrupted().unwrap().len(), 1, "{point}: journal knows");
     let rec = e.recover_interrupted(&j).unwrap();
     assert_eq!(rec.len(), 1, "{point}: {rec:?}");
-    assert!(leftovers(&dest).is_empty(), "{point}: {:?}", leftovers(&dest));
+    assert!(
+        leftovers(&dest).is_empty(),
+        "{point}: {:?}",
+        leftovers(&dest)
+    );
     let entry = j.entries().unwrap().pop().unwrap();
     assert_eq!(entry.status, EntryStatus::Finished(RunStatus::Interrupted));
 
     let (up, rep) = undo(&e, &j, &entry.id);
-    assert!(up.blocked.is_empty() && rep.failed.is_empty(), "{point}: {:?} {:?}", up.blocked, rep.failed);
+    assert!(
+        up.blocked.is_empty() && rep.failed.is_empty(),
+        "{point}: {:?} {:?}",
+        up.blocked,
+        rep.failed
+    );
     assert!(
         snapshot(&dest).is_empty(),
         "{point}: left {:?}",
         snapshot(&dest).keys().collect::<Vec<_>>()
     );
-    assert_eq!(snapshot(&sb.path("in")), original, "{point}: the archive is untouched");
+    assert_eq!(
+        snapshot(&sb.path("in")),
+        original,
+        "{point}: the archive is untouched"
+    );
     let _ = std::io::stdout().flush();
     (rec[0].adopted.len(), temps_before)
 }
@@ -169,7 +190,10 @@ fn crash_at(point: &str) -> (usize, usize) {
 fn killed_in_the_middle_of_a_big_member_the_temporary_file_goes_and_nothing_is_half_written() {
     let (adopted, temps) = crash_at("mid:OUT");
     assert!(temps >= 1, "the kill really left a temporary file");
-    assert_eq!(adopted, 0, "a half-written member never counts as extracted");
+    assert_eq!(
+        adopted, 0,
+        "a half-written member never counts as extracted"
+    );
 }
 
 #[test]
