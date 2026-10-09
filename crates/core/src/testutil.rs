@@ -570,6 +570,7 @@ pub enum Op {
     RemoveDir,
     CreateDir,
     CreateSymlink,
+    HardLink,
 }
 
 struct Rule {
@@ -679,6 +680,10 @@ impl FsEngine for FaultFs {
     }
     fn set_mode(&self, p: &Path, m: u32) -> io::Result<()> {
         self.inner.set_mode(p, m)
+    }
+    fn hard_link(&self, existing: &Path, link: &Path) -> io::Result<()> {
+        self.check(Op::HardLink, link)?;
+        self.inner.hard_link(existing, link)
     }
     fn set_mtime(&self, p: &Path, m: SystemTime, a: Option<SystemTime>) -> io::Result<()> {
         self.inner.set_mtime(p, m, a)

@@ -1,5 +1,6 @@
 //! The complete platform: Linux.
 
+mod fidelity;
 mod mounts;
 mod open;
 
@@ -18,6 +19,7 @@ pub struct LinuxPlatform {
     volumes: mounts::LinuxVolumes,
     attrs: UnixAttributes,
     opener: open::XdgOpener,
+    fidelity: fidelity::LinuxFidelity,
 }
 
 impl LinuxPlatform {
@@ -40,6 +42,7 @@ impl LinuxPlatform {
             volumes: mounts::LinuxVolumes::new(),
             attrs: UnixAttributes,
             opener: open::XdgOpener,
+            fidelity: fidelity::LinuxFidelity,
         }
     }
 }
@@ -65,6 +68,9 @@ impl Platform for LinuxPlatform {
     }
     fn path_rules(&self) -> PathRules {
         PathRules::POSIX
+    }
+    fn fidelity(&self) -> &dyn super::Fidelity {
+        &self.fidelity
     }
     fn user_dirs(&self) -> UserDirs {
         // xdg-user-dirs: `$XDG_CONFIG_HOME/user-dirs.dirs`. Without it the system has

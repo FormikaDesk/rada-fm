@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use super::engine::Engine;
 use crate::fs::{FileKind, FsMeta};
+use crate::platform::SourceAttrs;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LinkState {
@@ -30,6 +31,8 @@ pub struct ScanNode {
     pub unreadable: Option<String>,
     /// A directory that is its own ancestor (mount cycle): not descended into.
     pub loop_skipped: bool,
+    /// Extended attributes and ACLs of a file or folder (what a copy would carry over).
+    pub attrs: SourceAttrs,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -184,11 +187,13 @@ impl Walker<'_, '_> {
             children: Vec::new(),
             unreadable: None,
             loop_skipped: false,
+            attrs: SourceAttrs::default(),
         };
         match meta.kind {
             FileKind::File => {
                 self.prog.files += 1;
                 self.prog.bytes += meta.size;
+                node.attrs = self.engine.platform.fidelity().source_attributes(path);
             }
             FileKind::Symlink => {
                 self.prog.files += 1;
@@ -203,6 +208,7 @@ impl Walker<'_, '_> {
             }
             FileKind::Dir => {
                 self.prog.dirs += 1;
+                node.attrs = self.engine.platform.fidelity().source_attributes(path);
                 let id = meta.dev.zip(meta.ino);
                 if let Some(id) = id {
                     if ancestors.contains(&id) {

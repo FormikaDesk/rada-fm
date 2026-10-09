@@ -177,6 +177,10 @@ impl FsEngine for LocalFs {
         }
     }
 
+    fn hard_link(&self, existing: &Path, link: &Path) -> io::Result<()> {
+        fs::hard_link(existing, link)
+    }
+
     fn set_mtime(&self, p: &Path, mtime: SystemTime, atime: Option<SystemTime>) -> io::Result<()> {
         let f = File::open(p).or_else(|_| OpenOptions::new().write(true).open(p))?;
         let mut t = fs::FileTimes::new().set_modified(mtime);
@@ -378,6 +382,12 @@ fn copy_body(
         });
     }
 
+    // A sparse file keeps its holes: only the data regions are copied.
+    #[cfg(target_os = "linux")]
+    if let Some(done) = copy_sparse(src, dst, size, ctl, req)? {
+        return Ok(done);
+    }
+
     if req.verify {
         return copy_rw(src, dst, ctl, true, &req.dst);
     }
@@ -517,6 +527,153 @@ fn hash_path(p: &Path, ctl: &mut dyn CopyControl) -> io::Result<(u64, u128)> {
             libc::posix_fadvise(f.as_raw_fd(), 0, 0, libc::POSIX_FADV_DONTNEED);
         }
     }
+    let mut h = Xxh3::new();
+    let mut buf = vec![0u8; RW_CHUNK];
+    let mut total = 0u64;
+    loop {
+        let n = match f.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        h.update(&buf[..n]);
+        total += n as u64;
+        if !ctl.advance(0) {
+            return Err(fault(CopyFault::Cancelled));
+        }
+    }
+    Ok((total, h.digest128()))
+}
+
+/// Copy a sparse file by its data regions (`SEEK_DATA` / `SEEK_HOLE`), leaving the holes as
+/// holes in the copy. `None` when the file is not sparse or the filesystem cannot tell where
+/// the holes are: the caller then copies it in the ordinary way (a safe fallback, only the
+/// sparseness is lost). Progress counts the bytes really moved.
+#[cfg(target_os = "linux")]
+fn copy_sparse(
+    src: &mut File,
+    dst: &mut File,
+    size: u64,
+    ctl: &mut dyn CopyControl,
+    req: &CopyRequest,
+) -> io::Result<Option<CopyOutcome>> {
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::MetadataExt;
+
+    let meta = src.metadata()?;
+    if meta.blocks().saturating_mul(512) >= size {
+        return Ok(None);
+    }
+    let (sfd, dfd) = (src.as_raw_fd(), dst.as_raw_fd());
+    // SAFETY (all lseek calls below): plain calls on a descriptor that is open.
+    let seek = |pos: u64, whence: libc::c_int| -> io::Result<u64> {
+        let r = unsafe { libc::lseek(sfd, pos as libc::off_t, whence) };
+        if r < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(r as u64)
+        }
+    };
+    // Can this filesystem report holes at all? If not, copy the plain way.
+    match seek(0, libc::SEEK_DATA) {
+        Ok(_) => {}
+        Err(e) if e.raw_os_error() == Some(libc::ENXIO) => {
+            // Nothing but a hole: the copy is just the right length.
+            dst.set_len(size)?;
+            return Ok(Some(CopyOutcome {
+                bytes: 0,
+                method: CopyMethod::Sparse,
+            }));
+        }
+        Err(_) => return Ok(None),
+    }
+    dst.set_len(size)?;
+
+    let mut total = 0u64;
+    let mut pos = 0u64;
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        let data = match seek(pos, libc::SEEK_DATA) {
+            Ok(d) => d,
+            Err(e) if e.raw_os_error() == Some(libc::ENXIO) => break,
+            Err(e) => return Err(e),
+        };
+        if data >= size {
+            break;
+        }
+        let end = seek(data, libc::SEEK_HOLE)?.min(size);
+        let mut off = data;
+        while off < end {
+            let want = ((end - off) as usize).min(CFR_CHUNK);
+            let mut off_in = off as libc::off64_t;
+            let mut off_out = off as libc::off64_t;
+            // SAFETY: both descriptors are open and the offsets are valid pointers.
+            let n = unsafe { libc::copy_file_range(sfd, &mut off_in, dfd, &mut off_out, want, 0) };
+            let n = if n >= 0 {
+                n as usize
+            } else {
+                let e = io::Error::last_os_error();
+                match e.raw_os_error() {
+                    Some(libc::EINTR) => continue,
+                    Some(
+                        libc::EXDEV
+                        | libc::ENOSYS
+                        | libc::EINVAL
+                        | libc::EOPNOTSUPP
+                        | libc::EPERM
+                        | libc::EBADF
+                        | libc::ETXTBSY,
+                    ) => {
+                        // Positioned read and write for this stretch.
+                        use std::os::unix::fs::FileExt;
+                        buf.resize(want.min(RW_CHUNK), 0);
+                        let got = src.read_at(&mut buf, off)?;
+                        if got == 0 {
+                            0
+                        } else {
+                            dst.write_all_at(&buf[..got], off)?;
+                            got
+                        }
+                    }
+                    _ => return Err(e),
+                }
+            };
+            if n == 0 {
+                break; // the file shrank under us; the length is already right
+            }
+            off += n as u64;
+            total += n as u64;
+            if !ctl.advance(n as u64) {
+                return Err(fault(CopyFault::Cancelled));
+            }
+        }
+        pos = end;
+        if pos >= size {
+            break;
+        }
+    }
+
+    if req.verify {
+        dst.sync_all()?;
+        let (src_len, want) = hash_fd(src, ctl)?;
+        let (got_len, got) = hash_path(&req.dst, ctl)?;
+        if got_len != src_len || got != want {
+            return Err(fault(CopyFault::VerifyMismatch(
+                "the copy of a sparse file differs from the source".into(),
+            )));
+        }
+    }
+    Ok(Some(CopyOutcome {
+        bytes: total,
+        method: CopyMethod::Sparse,
+    }))
+}
+
+/// Hash an open file from its start (holes read as zeros, which is what they are).
+fn hash_fd(f: &mut File, ctl: &mut dyn CopyControl) -> io::Result<(u64, u128)> {
+    use std::io::Seek;
+    f.seek(io::SeekFrom::Start(0))?;
     let mut h = Xxh3::new();
     let mut buf = vec![0u8; RW_CHUNK];
     let mut total = 0u64;

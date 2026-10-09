@@ -11,6 +11,7 @@ use super::engine::Engine;
 use super::plan::*;
 use crate::fs::local::{CopyFault, copy_fault};
 use crate::fs::{CopyControl, CopyRequest};
+use crate::platform::Preserve;
 use crate::{Error, Result, display};
 
 /// Cooperative cancellation shared between the UI and a worker.
@@ -116,6 +117,9 @@ pub struct ExecReport {
     pub bytes: u64,
     pub aborted: bool,
     pub cancelled: bool,
+    /// What could not be carried over to a copy (owner, extended attributes, ACLs, a hard
+    /// link the destination cannot make), with the item it concerns.
+    pub not_preserved: Vec<(PathBuf, String)>,
 }
 
 impl ExecReport {
@@ -265,6 +269,16 @@ impl Engine {
                                 ));
                             }
                         }
+                        if !res.not_preserved.is_empty() {
+                            let at = step
+                                .destination()
+                                .unwrap_or_else(|| step.path())
+                                .to_path_buf();
+                            for what in &res.not_preserved {
+                                tracing::warn!("{}: {what} was not preserved", at.display());
+                                report.not_preserved.push((at.clone(), what.clone()));
+                            }
+                        }
                         handler.step_finished(index, step, &res);
                         break;
                     }
@@ -333,9 +347,26 @@ impl Engine {
                 })
             }
 
-            Step::FinishDir { path, mode, mtime } => {
+            Step::FinishDir {
+                path,
+                mode,
+                mtime,
+                src,
+                uid,
+                gid,
+            } => {
                 if !st.created_dirs.contains(path) {
                     return Ok(StepResult::noop("folder was not created by this run"));
+                }
+                // Owner and extended attributes first (they are set while the folder is still
+                // writable), then the permissions, then the time.
+                let mut not_preserved = Vec::new();
+                if let Some(src) = src {
+                    not_preserved = self
+                        .platform
+                        .fidelity()
+                        .copy_attributes(src, path, Preserve::default(), uid.zip(*gid))
+                        .not_preserved;
                 }
                 if let Some(m) = mode {
                     fs.set_mode(path, *m)
@@ -347,7 +378,10 @@ impl Engine {
                         tracing::debug!("set time of {}: {e}", path.display());
                     }
                 }
-                Ok(StepResult::done())
+                Ok(StepResult {
+                    not_preserved,
+                    ..StepResult::done()
+                })
             }
 
             Step::CopyFile {
@@ -358,6 +392,9 @@ impl Engine {
                 atime,
                 verify,
                 remove_source,
+                uid,
+                gid,
+                link_primary,
                 ..
             } => {
                 match fs.lstat(dst) {
@@ -366,10 +403,11 @@ impl Engine {
                     Err(e) => return Err(Error::io("inspect", dst, e)),
                 }
                 let tmp = temp_sibling(dst);
+                // Owner-writable while the attributes are set; the real permissions come last.
                 let req = CopyRequest {
                     src: src.clone(),
                     dst: tmp.clone(),
-                    mode: *mode,
+                    mode: mode.map(|m| m | 0o200),
                     mtime: mtime.map(Into::into),
                     atime: atime.map(Into::into),
                     verify: *verify,
@@ -386,6 +424,19 @@ impl Engine {
                         None => Error::io2("copy", src, dst, e),
                     });
                 }
+                // Owner, group, extended attributes and ACLs; whatever cannot be carried over
+                // is reported, never an error.
+                let not_preserved = self
+                    .platform
+                    .fidelity()
+                    .copy_attributes(src, &tmp, Preserve::default(), uid.zip(*gid))
+                    .not_preserved;
+                if let Some(m) = mode
+                    && let Err(e) = fs.set_mode(&tmp, *m)
+                {
+                    let _ = fs.remove_file(&tmp);
+                    return Err(Error::io("set permissions of", dst, e));
+                }
                 if let Err(e) = fs.rename_noreplace(&tmp, dst) {
                     let _ = fs.remove_file(&tmp);
                     return Err(if e.kind() == io::ErrorKind::AlreadyExists {
@@ -394,7 +445,13 @@ impl Engine {
                         Error::io2("finish copy", &tmp, dst, e)
                     });
                 }
-                let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
+                let after = fs.lstat(dst).ok().map(|m| {
+                    if *link_primary {
+                        m.fingerprint_without_ctime()
+                    } else {
+                        m.fingerprint()
+                    }
+                });
                 if *remove_source && let Err(e) = fs.remove_file(src) {
                     // Never leave the item in two places: undo the copy.
                     let _ = fs.remove_file(dst);
@@ -402,6 +459,79 @@ impl Engine {
                 }
                 Ok(StepResult {
                     after,
+                    not_preserved,
+                    ..StepResult::done()
+                })
+            }
+
+            Step::HardLink {
+                existing,
+                link,
+                src_link,
+                ..
+            } => {
+                match fs.lstat(link) {
+                    Ok(_) => return Err(Error::AlreadyExists(link.clone())),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(Error::io("inspect", link, e)),
+                }
+                let mut not_preserved = Vec::new();
+                match fs.hard_link(existing, link) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                        return Err(Error::AlreadyExists(link.clone()));
+                    }
+                    // This filesystem cannot make hard links (or refuses to): the name gets
+                    // its own copy of the data, and the report says so.
+                    Err(e)
+                        if matches!(
+                            e.raw_os_error(),
+                            Some(libc::EPERM)
+                                | Some(libc::EXDEV)
+                                | Some(libc::EMLINK)
+                                | Some(libc::ENOTSUP)
+                                | Some(libc::ENOSYS)
+                        ) =>
+                    {
+                        let meta = fs
+                            .lstat(existing)
+                            .map_err(|e| Error::io("inspect", existing, e))?;
+                        let tmp = temp_sibling(link);
+                        let req = CopyRequest {
+                            src: existing.clone(),
+                            dst: tmp.clone(),
+                            mode: meta.mode.map(|m| m | 0o200),
+                            mtime: meta.mtime,
+                            atime: meta.atime,
+                            verify: false,
+                            sync: false,
+                        };
+                        fs.copy_file(&req, ctl)
+                            .map_err(|e| Error::io2("copy", existing, link, e))?;
+                        if let Some(m) = meta.mode {
+                            let _ = fs.set_mode(&tmp, m);
+                        }
+                        if let Err(e) = fs.rename_noreplace(&tmp, link) {
+                            let _ = fs.remove_file(&tmp);
+                            return Err(Error::io2("finish copy", &tmp, link, e));
+                        }
+                        not_preserved.push(
+                            "hard link (the destination cannot make links: copied as a separate file)"
+                                .to_string(),
+                        );
+                    }
+                    Err(e) => return Err(Error::io2("link", existing, link, e)),
+                }
+                let after = fs.lstat(link).ok().map(|m| m.fingerprint());
+                if let Some(s) = src_link
+                    && let Err(e) = fs.remove_file(s)
+                {
+                    let _ = fs.remove_file(link);
+                    return Err(Error::io("remove source link", s, e));
+                }
+                Ok(StepResult {
+                    after,
+                    not_preserved,
                     ..StepResult::done()
                 })
             }

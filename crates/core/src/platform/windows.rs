@@ -120,6 +120,10 @@ impl Platform for WindowsPlatform {
     fn opener(&self) -> &dyn Opener {
         &self.opener
     }
+    fn fidelity(&self) -> &dyn super::Fidelity {
+        // Windows: NTFS ACLs and alternate data streams are for the platform phase (2A).
+        &super::fidelity::NotYet
+    }
     fn user_dirs(&self) -> UserDirs {
         // Known Folders (SHGetKnownFolderPath) come in a later phase: until then, the
         // names Windows gives these folders in a default profile.
@@ -158,6 +162,9 @@ mod tests {
             dev: None,
             ino: None,
             nlink: None,
+            uid: None,
+            gid: None,
+            blocks: None,
             readonly: false,
             os_attrs: Some(attrs),
         }

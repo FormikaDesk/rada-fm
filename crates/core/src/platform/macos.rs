@@ -97,6 +97,10 @@ impl Platform for MacPlatform {
     fn opener(&self) -> &dyn Opener {
         &self.opener
     }
+    fn fidelity(&self) -> &dyn super::Fidelity {
+        // macOS: extended attributes, resource forks and ACLs are for the platform phase (2A).
+        &super::fidelity::NotYet
+    }
     fn user_dirs(&self) -> UserDirs {
         // The Finder's standard folders; the system API comes in a later phase.
         UserDirs::conventional(&self.dirs.home, "Movies")

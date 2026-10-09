@@ -75,6 +75,12 @@ impl Sim<'_> {
                     self.overlay.insert(src.clone(), false);
                 }
             }
+            Step::HardLink { link, src_link, .. } => {
+                self.overlay.insert(link.clone(), true);
+                if let Some(s) = src_link {
+                    self.overlay.insert(s.clone(), false);
+                }
+            }
             Step::Restore { item } => {
                 self.overlay.insert(item.original.clone(), true);
             }
@@ -133,6 +139,18 @@ impl Sim<'_> {
                     Ok(())
                 }
             }
+            Step::HardLink { existing, link, .. } => {
+                if !self.exists(existing) {
+                    Err(format!("{} is no longer there", display::path(existing)))
+                } else if self.exists(link) {
+                    Err(format!(
+                        "{} is occupied; refusing to overwrite it",
+                        display::path(link)
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
             Step::Restore { item } => {
                 if !self.engine.platform.trash().contains(item) {
                     Err(format!(
@@ -151,6 +169,58 @@ impl Sim<'_> {
             Step::TrashItem { .. } => Ok(()),
         }
     }
+}
+
+/// The order undo runs the steps in: newest first, except that a moved hard link goes back as a
+/// link of the file it was a link of, so it runs right after the step that brings that file
+/// back (and still before the folders it sits in are removed).
+fn undo_order(steps: &[Step], newest_first: Vec<usize>) -> Vec<usize> {
+    let is_link = |i: usize| {
+        matches!(
+            &steps[i],
+            Step::HardLink {
+                src_link: Some(_),
+                ..
+            }
+        )
+    };
+    // The recorded step is already the inverse: its `existing` is the file that has to be back.
+    let primary_of = |i: usize| match &steps[i] {
+        Step::HardLink { existing, .. } => Some(existing.as_path()),
+        _ => None,
+    };
+    let mut order: Vec<usize> = newest_first
+        .iter()
+        .copied()
+        .filter(|&i| !is_link(i))
+        .collect();
+    // Links whose primary is not restored in this run stay where they were.
+    let mut stay: Vec<(usize, usize)> = Vec::new(); // (position among newest_first, step)
+    let mut after: Vec<(usize, usize)> = Vec::new(); // (position in `order`, step)
+    for (pos, &i) in newest_first.iter().enumerate() {
+        if !is_link(i) {
+            continue;
+        }
+        let anchor = order.iter().position(|&j| {
+            matches!(&steps[j], Step::CopyFile { dst, .. } if Some(dst.as_path()) == primary_of(i))
+        });
+        match anchor {
+            Some(a) => after.push((a, i)),
+            None => stay.push((pos, i)),
+        }
+    }
+    // Insert from the back so earlier positions stay valid; several links of one file keep
+    // their relative order.
+    after.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+    for (a, i) in after {
+        order.insert(a + 1, i);
+    }
+    // The rest go back where they were (positions are among the full list).
+    stay.sort_by_key(|&(pos, _)| pos);
+    for (pos, i) in stay {
+        order.insert(pos.min(order.len()), i);
+    }
+    order
 }
 
 impl Engine {
@@ -181,7 +251,8 @@ impl Engine {
         // Undo runs the recorded inverses newest first.
         let mut todo: Vec<usize> = remaining.into_iter().filter(|&i| i < steps.len()).collect();
         todo.sort_unstable();
-        for &i in todo.iter().rev() {
+        let order = undo_order(&steps, todo.iter().rev().copied().collect());
+        for &i in order.iter() {
             let step = &steps[i];
             match sim.check(step) {
                 Ok(()) => {

@@ -7,6 +7,7 @@
 
 pub mod attrs;
 pub mod dirs;
+pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
 pub mod macos;
@@ -26,6 +27,7 @@ use std::sync::Arc;
 
 pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
+pub use fidelity::{AttrOutcome, DestSupport, Fidelity, NotYet, Preserve, SourceAttrs};
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use userdirs::{PlaceKind, UserDirs};
 pub use volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
@@ -69,6 +71,8 @@ pub trait Platform: Send + Sync {
     fn attributes(&self) -> &dyn FileAttributes;
     fn opener(&self) -> &dyn Opener;
     fn path_rules(&self) -> PathRules;
+    /// Owner, extended attributes and ACLs: what a copy keeps besides the bytes.
+    fn fidelity(&self) -> &dyn Fidelity;
     /// The user's standard folders under their real names. May read files: call it from
     /// a worker, not from the interface thread.
     fn user_dirs(&self) -> UserDirs;

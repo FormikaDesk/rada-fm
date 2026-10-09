@@ -58,6 +58,15 @@ pub enum Step {
         path: PathBuf,
         mode: Option<u32>,
         mtime: Option<Stamp>,
+        /// The folder this one is a copy of: its owner and extended attributes are carried
+        /// over, once the folder is full.
+        #[serde(with = "pathcodec::opt_path", default)]
+        #[schemars(with = "Option<String>")]
+        src: Option<PathBuf>,
+        #[serde(default)]
+        uid: Option<u32>,
+        #[serde(default)]
+        gid: Option<u32>,
     },
     CopyFile {
         #[serde(with = "pathcodec::path")]
@@ -74,6 +83,39 @@ pub enum Step {
         verify: bool,
         /// Cross-device move: remove the source once the copy is verified.
         remove_source: bool,
+        /// Owner and group of the source, given to the copy when this process may.
+        #[serde(default)]
+        uid: Option<u32>,
+        #[serde(default)]
+        gid: Option<u32>,
+        /// Bytes really stored, when that is less than `size` (a sparse file): what progress
+        /// and free space are counted in.
+        #[serde(default)]
+        stored: Option<u64>,
+        /// Later steps of this plan make more names for this file: its fingerprint must not
+        /// depend on its link count.
+        #[serde(default)]
+        link_primary: bool,
+    },
+    /// Another name for a file this plan copied: the copies of files that were hard links of
+    /// each other stay hard links of each other.
+    HardLink {
+        /// The copy already made.
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        existing: PathBuf,
+        /// The new name.
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        link: PathBuf,
+        /// Cross-device move: the source name that goes away with this one.
+        #[serde(with = "pathcodec::opt_path", default)]
+        #[schemars(with = "Option<String>")]
+        src_link: Option<PathBuf>,
+        /// Cross-device move: where `existing` came from (for the undo).
+        #[serde(with = "pathcodec::opt_path", default)]
+        #[schemars(with = "Option<String>")]
+        src_existing: Option<PathBuf>,
     },
     CopySymlink {
         #[serde(with = "pathcodec::path")]
@@ -129,6 +171,7 @@ impl Step {
             | Step::RemoveFile { path, .. }
             | Step::RemoveDir { path } => path,
             Step::CopyFile { src, .. } | Step::CopySymlink { src, .. } => src,
+            Step::HardLink { link, .. } => link,
             Step::Rename { from, .. } => from,
             Step::Restore { item } => &item.original,
         }
@@ -139,6 +182,7 @@ impl Step {
         match self {
             Step::MakeDir { path, .. } => Some(path),
             Step::CopyFile { dst, .. } | Step::CopySymlink { dst, .. } => Some(dst),
+            Step::HardLink { link, .. } => Some(link),
             Step::Rename { to, .. } => Some(to),
             Step::Restore { item } => Some(&item.original),
             _ => None,
@@ -147,7 +191,7 @@ impl Step {
 
     pub fn bytes(&self) -> u64 {
         match self {
-            Step::CopyFile { size, .. } => *size,
+            Step::CopyFile { size, stored, .. } => stored.unwrap_or(*size),
             _ => 0,
         }
     }
@@ -178,6 +222,11 @@ impl Step {
                 display::path(src),
                 display::path(dst)
             ),
+            Step::HardLink { existing, link, .. } => format!(
+                "hard link {} -> {}",
+                display::path(existing),
+                display::path(link)
+            ),
             Step::Rename { from, to } => {
                 format!("rename {} -> {}", display::path(from), display::path(to))
             }
@@ -207,6 +256,10 @@ impl Step {
                 mode,
                 mtime,
                 atime,
+                uid,
+                gid,
+                stored,
+                link_primary,
                 ..
             } => {
                 if *remove_source {
@@ -219,6 +272,10 @@ impl Step {
                         atime: *atime,
                         verify: true,
                         remove_source: true,
+                        uid: *uid,
+                        gid: *gid,
+                        stored: *stored,
+                        link_primary: *link_primary,
                     })
                 } else {
                     Some(Step::RemoveFile {
@@ -247,6 +304,24 @@ impl Step {
                     })
                 }
             }
+            Step::HardLink {
+                existing,
+                link,
+                src_link,
+                src_existing,
+            } => match (src_link, src_existing) {
+                // A moved link goes back as a link of the file it was a link of.
+                (Some(back), Some(primary)) => Some(Step::HardLink {
+                    existing: primary.clone(),
+                    link: back.clone(),
+                    src_link: Some(link.clone()),
+                    src_existing: Some(existing.clone()),
+                }),
+                _ => Some(Step::RemoveFile {
+                    path: link.clone(),
+                    expect: result.after.clone(),
+                }),
+            },
             Step::Rename { from, to } => Some(Step::Rename {
                 from: to.clone(),
                 to: from.clone(),
@@ -282,6 +357,9 @@ pub struct StepResult {
     pub after: Option<Fingerprint>,
     pub trashed: Option<TrashedItem>,
     pub removed_dir_mode: Option<u32>,
+    /// What could not be carried over to a copy (owner, extended attributes, ACLs, a hard
+    /// link the destination cannot make...), in words.
+    pub not_preserved: Vec<String>,
 }
 
 impl StepResult {
@@ -293,6 +371,7 @@ impl StepResult {
             after: None,
             trashed: None,
             removed_dir_mode: None,
+            not_preserved: Vec::new(),
         }
     }
     pub fn noop(note: impl Into<String>) -> Self {
@@ -339,7 +418,18 @@ pub enum WarningKind {
     MountLoop,
     CrossDevice,
     SameLocation,
+    /// Files with hard links outside the selection: their copies are independent.
     HardLinks,
+    /// Hard links inside the selection that stay links in the copy.
+    HardLinksKept,
+    SparseFiles,
+    /// Extended attributes the destination cannot hold.
+    XattrsLost,
+    AclLost,
+    /// Owner and group that only their owner or root may give.
+    OwnerNotKept,
+    /// This platform does not carry extended attributes and ACLs over yet.
+    AttributesNotKept,
     InvalidName,
     Missing,
     Merge,
@@ -484,9 +574,32 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
             plural(n, "item is", "items are")
         ),
         WarningKind::HardLinks => format!(
-            "{} have several hard links; copies become independent files",
+            "{} also have hard links outside the selection; their copies are independent files",
             plural(n, "file", "files")
         ),
+        WarningKind::HardLinksKept => format!(
+            "{} stay hard links of each other in the copy",
+            plural(n, "hard link", "hard links")
+        ),
+        WarningKind::SparseFiles => format!(
+            "{} sparse: the holes are kept, only the data is copied",
+            plural(n, "file is", "files are")
+        ),
+        WarningKind::XattrsLost => format!(
+            "{} carry extended attributes that the destination does not support; they are copied without them",
+            plural(n, "item", "items")
+        ),
+        WarningKind::AclLost => format!(
+            "{} carry ACLs that the destination does not support; they are copied without them",
+            plural(n, "item", "items")
+        ),
+        WarningKind::OwnerNotKept => format!(
+            "{} belong to someone else; the copies will belong to you (only the owner or root can keep owner and group)",
+            plural(n, "item", "items")
+        ),
+        WarningKind::AttributesNotKept => {
+            "extended attributes and ACLs are not preserved on this platform yet".to_string()
+        }
         WarningKind::InvalidName => format!("invalid name{extra}"),
         WarningKind::Missing => format!("{} no longer exist", plural(n, "item", "items")),
         WarningKind::Merge => format!(
@@ -599,6 +712,19 @@ pub struct ItemSummary {
     pub target: Option<PathBuf>,
 }
 
+/// What a copy keeps besides the bytes, counted for the plan window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Preserved {
+    /// Names that are recreated as hard links of a file copied in the same operation.
+    pub hard_links: u64,
+    /// Sparse files copied hole for hole.
+    pub sparse_files: u64,
+    /// Items with extended attributes (not counting ACLs) to carry over.
+    pub xattr_items: u64,
+    /// Items with ACLs to carry over.
+    pub acl_items: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Plan {
     pub kind: OpKind,
@@ -618,6 +744,9 @@ pub struct Plan {
     pub renames: Vec<(PathBuf, PathBuf)>,
     /// One entry per selected item, for a readable overview.
     pub items: Vec<ItemSummary>,
+    /// What the copy keeps besides the bytes.
+    #[serde(default)]
+    pub preserved: Preserved,
     /// The request this plan answers, kept in the journal so the operation can be
     /// planned again later (redo).
     #[serde(default)]
@@ -640,6 +769,7 @@ impl Plan {
             reversible: true,
             renames: Vec::new(),
             items: Vec::new(),
+            preserved: Preserved::default(),
             request: None,
             redo_of: None,
         }

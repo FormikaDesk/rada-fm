@@ -785,6 +785,21 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             b.rel_dst(dst),
             display::path(target)
         ),
+        Step::HardLink {
+            existing,
+            link,
+            src_link,
+            ..
+        } => format!(
+            "{}   {} = {}",
+            if src_link.is_some() {
+                "link⇄ "
+            } else {
+                "hlink "
+            },
+            b.rel_dst(link),
+            b.rel_dst(existing)
+        ),
         Step::Rename { from, to } => format!("rename   {} → {}", b.rel_src(from), b.rel(to)),
         Step::TrashItem { path } => format!("trash    {}", b.rel_src(path)),
         Step::RemoveFile { path, .. } => format!("delete   {}", b.rel_src(path)),

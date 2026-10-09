@@ -50,6 +50,11 @@ pub struct FsMeta {
     pub dev: Option<u64>,
     pub ino: Option<u64>,
     pub nlink: Option<u64>,
+    /// Owner and group (Unix).
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+    /// 512-byte blocks really allocated (Unix); less than `size` means a sparse file.
+    pub blocks: Option<u64>,
     pub readonly: bool,
     /// Raw Windows file attributes (hidden, system, reparse point, ...). `None` elsewhere.
     pub os_attrs: Option<u32>,
@@ -98,7 +103,7 @@ impl FsMeta {
             FileKind::Other
         };
         #[cfg(unix)]
-        let (mode, dev, ino, nlink, ctime, atime) = {
+        let (mode, dev, ino, nlink, ctime, atime, uid, gid, blocks) = {
             use std::os::unix::fs::MetadataExt;
             let ct = stamp_to_time(m.ctime(), m.ctime_nsec() as u32);
             let at = stamp_to_time(m.atime(), m.atime_nsec() as u32);
@@ -109,11 +114,23 @@ impl FsMeta {
                 Some(m.nlink()),
                 ct,
                 at,
+                Some(m.uid()),
+                Some(m.gid()),
+                Some(m.blocks()),
             )
         };
         #[cfg(not(unix))]
-        let (mode, dev, ino, nlink, ctime, atime) =
-            (None, None, None, None, None, m.accessed().ok());
+        let (mode, dev, ino, nlink, ctime, atime, uid, gid, blocks) = (
+            None,
+            None,
+            None,
+            None,
+            None,
+            m.accessed().ok(),
+            None,
+            None,
+            None,
+        );
         FsMeta {
             kind,
             special,
@@ -126,17 +143,52 @@ impl FsMeta {
             dev,
             ino,
             nlink,
+            uid,
+            gid,
+            blocks,
             readonly: m.permissions().readonly(),
             os_attrs: os_attrs(m),
         }
     }
 
+    /// Bytes really stored: less than `size` for a sparse file.
+    pub fn stored_bytes(&self) -> u64 {
+        match (self.kind, self.blocks) {
+            (FileKind::File, Some(b)) => b.saturating_mul(512).min(self.size),
+            _ => self.size,
+        }
+    }
+
+    pub fn is_sparse(&self) -> bool {
+        self.kind == FileKind::File
+            && self.size > 0
+            && self
+                .blocks
+                .is_some_and(|b| b.saturating_mul(512) < self.size)
+    }
+
     pub fn fingerprint(&self) -> Fingerprint {
+        // Creating or removing a hard link changes the status-change time of every name of
+        // the file: for a file with several names it says nothing about its contents.
+        let shared = self.kind == FileKind::File && self.nlink.unwrap_or(1) > 1;
         Fingerprint {
             kind: self.kind,
             size: self.size,
             mtime: self.mtime.map(Stamp::from),
-            ctime: self.ctime.map(Stamp::from),
+            ctime: if shared {
+                None
+            } else {
+                self.ctime.map(Stamp::from)
+            },
+        }
+    }
+
+    /// Like [`fingerprint`](Self::fingerprint) without the status-change time: for a file
+    /// that is about to get more names.
+    pub fn fingerprint_without_ctime(&self) -> Fingerprint {
+        Fingerprint {
+            ctime: None,
+            ..self.fingerprint()
         }
     }
 }
@@ -230,7 +282,10 @@ impl Fingerprint {
         if self.mtime != now.mtime {
             return Some("its modification time changed".into());
         }
-        if self.ctime != now.ctime {
+        // A missing time on either side means "not comparable" (a file with several names).
+        if let (Some(a), Some(b)) = (self.ctime, now.ctime)
+            && a != b
+        {
             return Some("its metadata changed".into());
         }
         None
@@ -277,10 +332,13 @@ pub enum CopyMethod {
     Reflink,
     KernelCopy,
     ReadWrite,
+    /// Only the data regions of a sparse file were copied; the holes stay holes.
+    Sparse,
 }
 
 #[derive(Clone, Debug)]
 pub struct CopyOutcome {
+    /// Bytes actually transferred: for a sparse file, the data without the holes.
     pub bytes: u64,
     pub method: CopyMethod,
 }
@@ -300,6 +358,9 @@ pub trait FsEngine: Send + Sync {
     fn remove_dir(&self, p: &Path) -> io::Result<()>;
     fn set_mode(&self, p: &Path, mode: u32) -> io::Result<()>;
     fn set_mtime(&self, p: &Path, mtime: SystemTime, atime: Option<SystemTime>) -> io::Result<()>;
+    /// A new name `link` for the existing file `existing` (a hard link). Fails with
+    /// `AlreadyExists` if `link` is taken.
+    fn hard_link(&self, existing: &Path, link: &Path) -> io::Result<()>;
 
     fn copy_file(&self, req: &CopyRequest, ctl: &mut dyn CopyControl) -> io::Result<CopyOutcome>;
 

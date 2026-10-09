@@ -23,6 +23,16 @@
     "policy": {
       "$ref": "#/$defs/ConflictPolicy"
     },
+    "preserved": {
+      "description": "What the copy keeps besides the bytes.",
+      "$ref": "#/$defs/Preserved",
+      "default": {
+        "acl_items": 0,
+        "hard_links": 0,
+        "sparse_files": 0,
+        "xattr_items": 0
+      }
+    },
     "redo_of": {
       "description": "Set when this plan re-does an operation that was undone.",
       "type": [
@@ -486,6 +496,42 @@
         }
       ]
     },
+    "Preserved": {
+      "description": "What a copy keeps besides the bytes, counted for the plan window.",
+      "type": "object",
+      "properties": {
+        "acl_items": {
+          "description": "Items with ACLs to carry over.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "hard_links": {
+          "description": "Names that are recreated as hard links of a file copied in the same operation.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "sparse_files": {
+          "description": "Sparse files copied hole for hole.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "xattr_items": {
+          "description": "Items with extended attributes (not counting ACLs) to carry over.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "hard_links",
+        "sparse_files",
+        "xattr_items",
+        "acl_items"
+      ]
+    },
     "Severity": {
       "oneOf": [
         {
@@ -552,6 +598,15 @@
           "description": "Apply the final permissions/time of a directory created earlier in the same run\n(after its children exist, so a read-only source dir stays writable meanwhile).",
           "type": "object",
           "properties": {
+            "gid": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            },
             "mode": {
               "type": [
                 "integer",
@@ -573,9 +628,26 @@
             "path": {
               "type": "string"
             },
+            "src": {
+              "description": "The folder this one is a copy of: its owner and extended attributes are carried\nover, once the folder is full.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
             "step": {
               "type": "string",
               "const": "finish_dir"
+            },
+            "uid": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
             }
           },
           "required": [
@@ -598,6 +670,20 @@
             },
             "dst": {
               "type": "string"
+            },
+            "gid": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            },
+            "link_primary": {
+              "description": "Later steps of this plan make more names for this file: its fingerprint must not\ndepend on its link count.",
+              "type": "boolean",
+              "default": false
             },
             "mode": {
               "type": [
@@ -633,6 +719,26 @@
               "type": "string",
               "const": "copy_file"
             },
+            "stored": {
+              "description": "Bytes really stored, when that is less than `size` (a sparse file): what progress\nand free space are counted in.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "default": null,
+              "minimum": 0
+            },
+            "uid": {
+              "description": "Owner and group of the source, given to the copy when this process may.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            },
             "verify": {
               "description": "Re-read and compare the copy.",
               "type": "boolean"
@@ -645,6 +751,45 @@
             "size",
             "verify",
             "remove_source"
+          ]
+        },
+        {
+          "description": "Another name for a file this plan copied: the copies of files that were hard links of\neach other stay hard links of each other.",
+          "type": "object",
+          "properties": {
+            "existing": {
+              "description": "The copy already made.",
+              "type": "string"
+            },
+            "link": {
+              "description": "The new name.",
+              "type": "string"
+            },
+            "src_existing": {
+              "description": "Cross-device move: where `existing` came from (for the undo).",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "src_link": {
+              "description": "Cross-device move: the source name that goes away with this one.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "default": null
+            },
+            "step": {
+              "type": "string",
+              "const": "hard_link"
+            }
+          },
+          "required": [
+            "step",
+            "existing",
+            "link"
           ]
         },
         {
@@ -921,12 +1066,38 @@
             "MountLoop",
             "CrossDevice",
             "SameLocation",
-            "HardLinks",
+            "SparseFiles",
+            "AclLost",
             "InvalidName",
             "Missing",
             "Merge",
             "Other"
           ]
+        },
+        {
+          "description": "Files with hard links outside the selection: their copies are independent.",
+          "type": "string",
+          "const": "HardLinks"
+        },
+        {
+          "description": "Hard links inside the selection that stay links in the copy.",
+          "type": "string",
+          "const": "HardLinksKept"
+        },
+        {
+          "description": "Extended attributes the destination cannot hold.",
+          "type": "string",
+          "const": "XattrsLost"
+        },
+        {
+          "description": "Owner and group that only their owner or root may give.",
+          "type": "string",
+          "const": "OwnerNotKept"
+        },
+        {
+          "description": "This platform does not carry extended attributes and ACLs over yet.",
+          "type": "string",
+          "const": "AttributesNotKept"
         },
         {
           "description": "An undo step was refused because the item changed since the operation.",

@@ -277,6 +277,9 @@ impl Platform for WithSlowVolumes {
     fn user_dirs(&self) -> rada_core::platform::UserDirs {
         self.0.user_dirs()
     }
+    fn fidelity(&self) -> &dyn rada_core::platform::Fidelity {
+        self.0.fidelity()
+    }
 }
 
 #[test]

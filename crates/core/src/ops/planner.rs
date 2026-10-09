@@ -1,6 +1,6 @@
 //! Turning a request into a [`Plan`]. Planning only reads; nothing is modified.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -117,8 +117,14 @@ impl Engine {
             same_location: false,
             items: Vec::new(),
             merged_root: false,
+            support: self.platform.fidelity().destination_support(dest_dir),
+            links: BTreeMap::new(),
+            preserved: Preserved::default(),
         };
         scan_problems(scan, &mut t.ws);
+        if !self.platform.fidelity().implemented() {
+            t.ws.add(WarningKind::AttributesNotKept, Severity::Info, None);
+        }
 
         // The destination must be a writable directory.
         match self.fs.stat(dest_dir) {
@@ -192,7 +198,14 @@ impl Engine {
         if t.cross_device {
             t.ws.add(WarningKind::CrossDevice, Severity::Info, None);
         }
+        // Files that also have names outside the selection: their copies stand alone.
+        for g in t.links.values() {
+            if g.nlink > g.found {
+                t.ws.add(WarningKind::HardLinks, Severity::Info, Some(&g.src));
+            }
+        }
 
+        plan.preserved = t.preserved;
         plan.steps = t.steps;
         plan.items = t.items;
         plan.totals = t.totals;
@@ -444,6 +457,22 @@ struct Transfer<'a> {
     items: Vec<ItemSummary>,
     /// The root being planned was merged into an existing folder.
     merged_root: bool,
+    /// What the destination's filesystem accepts of extended attributes and ACLs.
+    support: crate::platform::DestSupport,
+    /// Files seen with several names, by (device, inode): the first one is copied, the others
+    /// become hard links of that copy.
+    links: BTreeMap<(u64, u64), LinkGroup>,
+    preserved: Preserved,
+}
+
+struct LinkGroup {
+    /// Index in `steps` of the step that copies the first name.
+    step_index: usize,
+    dst: PathBuf,
+    src: PathBuf,
+    /// Names the file has in total, and how many of them are in the selection.
+    nlink: u64,
+    found: u64,
 }
 
 impl Transfer<'_> {
@@ -645,6 +674,34 @@ impl Transfer<'_> {
         }
     }
 
+    /// Extended attributes, ACLs and owner of `node`: what the copy can keep, and what the
+    /// plan has to say it cannot.
+    fn note_attributes(&mut self, node: &ScanNode) {
+        let a = node.attrs;
+        if a.xattrs {
+            self.preserved.xattr_items += 1;
+            if !self.support.xattrs {
+                self.ws
+                    .add(WarningKind::XattrsLost, Severity::Warning, Some(&node.path));
+            }
+        }
+        if a.acl {
+            self.preserved.acl_items += 1;
+            if !self.support.acl {
+                self.ws
+                    .add(WarningKind::AclLost, Severity::Warning, Some(&node.path));
+            }
+        }
+        let fid = self.engine.platform.fidelity();
+        if fid.implemented()
+            && let (Some(u), Some(g)) = (node.meta.uid, node.meta.gid)
+            && !fid.can_set_owner(u, g)
+        {
+            self.ws
+                .add(WarningKind::OwnerNotKept, Severity::Info, Some(&node.path));
+        }
+    }
+
     /// Children of a directory we just created cannot clash: no existence checks.
     fn emit_child(&mut self, node: &ScanNode, parent_dst: &Path, mv: bool) {
         self.emit(node, parent_dst.join(&node.name), mv);
@@ -658,21 +715,62 @@ impl Transfer<'_> {
                     self.ws
                         .add(WarningKind::Unreadable, Severity::Warning, Some(&node.path));
                 }
-                if node.meta.nlink.unwrap_or(1) > 1 {
-                    self.ws
-                        .add(WarningKind::HardLinks, Severity::Info, Some(&node.path));
-                }
+                let meta = &node.meta;
                 self.totals.files += 1;
-                self.totals.bytes += node.meta.size;
+                self.totals.bytes += meta.size;
+                // Names of one file inside the selection stay names of one file.
+                if meta.nlink.unwrap_or(1) > 1
+                    && let (Some(dev), Some(ino)) = (meta.dev, meta.ino)
+                {
+                    if let Some(g) = self.links.get_mut(&(dev, ino)) {
+                        g.found += 1;
+                        let (existing, src_existing, index) =
+                            (g.dst.clone(), g.src.clone(), g.step_index);
+                        if let Step::CopyFile { link_primary, .. } = &mut self.steps[index] {
+                            *link_primary = true;
+                        }
+                        self.ws
+                            .add(WarningKind::HardLinksKept, Severity::Info, Some(&node.path));
+                        self.preserved.hard_links += 1;
+                        self.steps.push(Step::HardLink {
+                            existing,
+                            link: dst,
+                            src_link: mv.then(|| node.path.clone()),
+                            src_existing: mv.then_some(src_existing),
+                        });
+                        return;
+                    }
+                    self.links.insert(
+                        (dev, ino),
+                        LinkGroup {
+                            step_index: self.steps.len(),
+                            dst: dst.clone(),
+                            src: node.path.clone(),
+                            nlink: meta.nlink.unwrap_or(1),
+                            found: 1,
+                        },
+                    );
+                }
+                let stored = meta.is_sparse().then(|| meta.stored_bytes());
+                if stored.is_some() {
+                    self.ws
+                        .add(WarningKind::SparseFiles, Severity::Info, Some(&node.path));
+                    self.preserved.sparse_files += 1;
+                }
+                self.note_attributes(node);
                 self.steps.push(Step::CopyFile {
                     src: node.path.clone(),
                     dst,
-                    size: node.meta.size,
-                    mode: node.meta.mode,
-                    mtime: node.meta.mtime.map(Into::into),
-                    atime: node.meta.atime.map(Into::into),
+                    size: meta.size,
+                    mode: meta.mode,
+                    mtime: meta.mtime.map(Into::into),
+                    atime: meta.atime.map(Into::into),
                     verify: mv || self.opts.verify,
                     remove_source: mv,
+                    uid: meta.uid,
+                    gid: meta.gid,
+                    stored,
+                    link_primary: false,
                 });
             }
             FileKind::Symlink => {
@@ -718,10 +816,14 @@ impl Transfer<'_> {
                 for c in &node.children {
                     self.emit_child(c, &dst, mv);
                 }
+                self.note_attributes(node);
                 self.steps.push(Step::FinishDir {
                     path: dst,
                     mode: node.meta.mode,
                     mtime: node.meta.mtime.map(Into::into),
+                    src: Some(node.path.clone()),
+                    uid: node.meta.uid,
+                    gid: node.meta.gid,
                 });
                 if mv {
                     self.steps.push(Step::RemoveDir {

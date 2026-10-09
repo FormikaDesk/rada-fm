@@ -51,6 +51,9 @@ impl FsEngine for SlowFs {
     fn remove_dir(&self, p: &Path) -> io::Result<()> {
         self.inner.remove_dir(p)
     }
+    fn hard_link(&self, existing: &Path, link: &Path) -> io::Result<()> {
+        self.inner.hard_link(existing, link)
+    }
     fn set_mode(&self, p: &Path, m: u32) -> io::Result<()> {
         self.inner.set_mode(p, m)
     }
