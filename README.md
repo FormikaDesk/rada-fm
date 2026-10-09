@@ -1,5 +1,7 @@
 # rada
 
+![rada: copy three big files with a plan first, watch the progress, then undo it](docs/media/demo.gif)
+
 **A safe harbor for your files.**
 
 rada is a fast file manager for the terminal, written in Rust, driven by keyboard or mouse. It is built around three promises:
