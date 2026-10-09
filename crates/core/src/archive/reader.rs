@@ -62,7 +62,7 @@ impl Emitter {
             let n = loop {
                 match r.read(&mut buf) {
                     Ok(n) => break n,
-                    Err(e) if e.kind() == io::ErrorKind::Interrupted && e.to_string() != super::CANCELLED => {}
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
                     Err(e) => return Err(e.into()),
                 }
             };

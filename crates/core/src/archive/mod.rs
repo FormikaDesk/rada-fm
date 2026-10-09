@@ -74,7 +74,7 @@ impl From<io::Error> for ArchiveError {
             io::ErrorKind::UnexpectedEof | io::ErrorKind::InvalidData => {
                 ArchiveError::Damaged(e.to_string())
             }
-            io::ErrorKind::Interrupted if e.to_string() == CANCELLED => ArchiveError::Cancelled,
+            io::ErrorKind::Other if e.to_string() == CANCELLED => ArchiveError::Cancelled,
             _ => ArchiveError::Io(e),
         }
     }
@@ -83,8 +83,10 @@ impl From<io::Error> for ArchiveError {
 /// The text of the I/O error a reader returns when asked to stop.
 pub(crate) const CANCELLED: &str = "archive read cancelled";
 
+/// Not `Interrupted`: `io::copy` and the tar writer retry on that kind, and would carry on
+/// after a cancel, losing the bytes of every failed read.
 pub(crate) fn cancelled_io() -> io::Error {
-    io::Error::new(io::ErrorKind::Interrupted, CANCELLED)
+    io::Error::other(CANCELLED)
 }
 
 impl ArchiveError {

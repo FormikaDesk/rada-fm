@@ -60,10 +60,15 @@ struct Source<'a> {
     path: &'a Path,
     left: u64,
     progress: &'a mut dyn FnMut(u64) -> bool,
+    /// Once stopped, every later read fails too.
+    stopped: bool,
 }
 
 impl Read for Source<'_> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.stopped {
+            return Err(cancelled());
+        }
         if self.left == 0 {
             // The file must end where it said it would.
             let mut probe = [0u8; 1];
@@ -79,6 +84,7 @@ impl Read for Source<'_> {
         }
         self.left -= n as u64;
         if !(self.progress)(n as u64) {
+            self.stopped = true;
             return Err(cancelled());
         }
         Ok(n)
@@ -168,8 +174,8 @@ fn write_tar<W: Write>(w: W, items: &[CompressItem], progress: Progress<'_>) -> 
                 h.set_mode(it.mode.unwrap_or(0o777) & 0o7777);
                 h.set_size(0);
                 let target = it.link.clone().unwrap_or_default();
-                h.set_link_name(&target).map_err(ArchiveError::from)?;
-                b.append_data(&mut h, &it.name, io::empty())
+                // Long names and targets use the GNU extension records.
+                b.append_link(&mut h, &it.name, &target)
                     .map_err(ArchiveError::from)?;
             }
             FileKind::File => {
@@ -182,6 +188,7 @@ fn write_tar<W: Write>(w: W, items: &[CompressItem], progress: Progress<'_>) -> 
                     path: &it.src,
                     left: it.size,
                     progress: &mut *progress,
+                    stopped: false,
                 };
                 b.append_data(&mut h, &it.name, src)
                     .map_err(ArchiveError::from)?;
@@ -263,6 +270,7 @@ fn write_zip<W: Write + io::Seek>(
                     path: &it.src,
                     left: it.size,
                     progress: &mut *progress,
+                    stopped: false,
                 };
                 io::copy(&mut src, &mut z).map_err(ArchiveError::from)?;
             }
