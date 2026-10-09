@@ -280,7 +280,12 @@ fn main() -> Result<()> {
     let keymap = rada_tui::keymap::Keymap::new(preset, &cfg_file.keys);
     let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("RADA_NO_MOUSE").is_none();
 
-    let platform = platform::current(dirs.clone());
+    let platform = platform::current_with(
+        dirs.clone(),
+        platform::PlatformOptions {
+            hide_devices: cfg_file.hide_devices.clone(),
+        },
+    );
     let journal = match Journal::open(dirs.journal_path()) {
         Ok(j) => Some(j),
         Err(e) => {

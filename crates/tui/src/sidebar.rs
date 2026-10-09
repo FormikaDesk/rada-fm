@@ -174,13 +174,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
     }
 
     for v in app.volumes.iter().filter(|v| v.kind != VolumeKind::Virtual) {
-        let name = v.label.clone().unwrap_or_else(|| {
-            if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
-                "Root".to_string()
-            } else {
-                base_name(&v.mount_point)
-            }
-        });
+        let name = device_name(v);
         let usage = match (v.total, v.available) {
             (Some(t), Some(a)) if t > 0 && v.responsive => Some(Usage {
                 used: (1.0 - a as f64 / t as f64).clamp(0.0, 1.0),
@@ -197,6 +191,17 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         });
     }
     out
+}
+
+/// A disk's name in the sidebar: its label, "System" for the root, else its mount folder.
+pub fn device_name(v: &rada_core::platform::Volume) -> String {
+    v.label.clone().unwrap_or_else(|| {
+        if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
+            "System".to_string()
+        } else {
+            base_name(&v.mount_point)
+        }
+    })
 }
 
 /// The item the current folder belongs to, for the highlight: the first one that is that
@@ -220,6 +225,29 @@ mod tests {
         // Full or rail, the 88 columns the preview needs are still there (less the margins).
         assert!(124 - Mode::Full.columns() - 6 >= 88);
         assert!(100 - Mode::Rail.columns() - 6 >= 88);
+    }
+
+    #[test]
+    fn the_root_of_the_system_is_called_system() {
+        use rada_core::platform::Volume;
+        let root = Volume {
+            mount_point: PathBuf::from("/"),
+            label: None,
+            fs_type: "ext4".into(),
+            device: "/dev/sda1".into(),
+            kind: VolumeKind::Fixed,
+            drive_letter: None,
+            total: Some(100),
+            available: Some(40),
+            read_only: false,
+            responsive: true,
+        };
+        assert_eq!(device_name(&root), "System");
+        let usb = Volume {
+            mount_point: PathBuf::from("/run/media/u/USB"),
+            ..root
+        };
+        assert_eq!(device_name(&usb), "USB");
     }
 
     #[test]

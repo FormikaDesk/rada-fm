@@ -1384,7 +1384,7 @@ impl App {
         let mut seen = std::collections::HashSet::new();
         let home = self.svc.home.clone();
         let cwd = self.cwd.clone();
-        // A mount point is listed once, as a disk (so "/" is not both "Root" and a disk).
+        // A mount point is listed once, as a disk (so "/" is not both "System" and a disk).
         let mounts: std::collections::HashSet<PathBuf> =
             self.volumes.iter().map(|v| v.mount_point.clone()).collect();
         let mut add = |items: &mut Vec<PaletteItem>,
@@ -1434,13 +1434,13 @@ impl App {
             &mut items,
             Path::new(std::path::MAIN_SEPARATOR_STR),
             PaletteKind::Place,
-            Some("Root".into()),
+            Some("System".into()),
             Some(std::path::MAIN_SEPARATOR_STR.into()),
         );
         for v in &self.volumes {
             let label = v.label.clone().unwrap_or_else(|| {
                 if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
-                    "Root".to_string()
+                    "System".to_string()
                 } else {
                     rada_core::display::path(&v.mount_point)
                 }

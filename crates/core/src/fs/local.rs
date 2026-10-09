@@ -256,6 +256,41 @@ impl FsEngine for LocalFs {
     }
 }
 
+/// (total, available) bytes of the filesystem holding `p`, for the disk list.
+pub fn space_of(p: &Path) -> io::Result<(u64, u64)> {
+    #[cfg(unix)]
+    {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        let c = CString::new(p.as_os_str().as_bytes())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
+        let mut st = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+        // SAFETY: `c` is a valid C string and `st` is a valid out-pointer.
+        let r = unsafe { libc::statvfs(c.as_ptr(), st.as_mut_ptr()) };
+        if r != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: statvfs returned success, so the struct is initialised.
+        let st = unsafe { st.assume_init() };
+        // The field types differ between Unix systems (u32 on macOS).
+        #[allow(clippy::unnecessary_cast)]
+        let frsize = st.f_frsize as u64;
+        #[allow(clippy::unnecessary_cast)]
+        Ok((
+            (st.f_blocks as u64).saturating_mul(frsize),
+            (st.f_bavail as u64).saturating_mul(frsize),
+        ))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = p;
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "disk space is not available",
+        ))
+    }
+}
+
 fn access(p: &Path, read: bool, write: bool) -> bool {
     #[cfg(unix)]
     {

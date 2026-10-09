@@ -9,8 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::fs::{FsEngine, LocalFs};
-use crate::platform::volumes::{Volume, VolumeKind, VolumeLister};
+use crate::platform::volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
 use crate::{Error, Result};
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(700);
@@ -19,17 +18,23 @@ const MOUNTINFO: &str = "/proc/self/mountinfo";
 pub struct LinuxVolumes {
     /// Mounts whose last probe is still blocked: never probed twice in parallel.
     stuck: Mutex<HashMap<PathBuf, Arc<AtomicBool>>>,
+    filter: DeviceFilter,
 }
 
 impl LinuxVolumes {
     pub fn new() -> Self {
+        Self::with_filter(DeviceFilter::default())
+    }
+
+    pub fn with_filter(filter: DeviceFilter) -> Self {
         LinuxVolumes {
             stuck: Mutex::new(HashMap::new()),
+            filter,
         }
     }
 
-    /// `statvfs` on a helper thread, abandoned after [`PROBE_TIMEOUT`].
-    fn probe(&self, mount: &Path) -> Option<u64> {
+    /// `statvfs` on a helper thread, abandoned after [`PROBE_TIMEOUT`]: (total, available).
+    fn probe(&self, mount: &Path) -> Option<(u64, u64)> {
         let mut stuck = self.stuck.lock().ok()?;
         if let Some(flag) = stuck.get(mount) {
             if !flag.load(Ordering::Acquire) {
@@ -44,7 +49,7 @@ impl LinuxVolumes {
         let (tx, rx) = crossbeam_channel::bounded(1);
         let p = mount.to_path_buf();
         std::thread::spawn(move || {
-            let r = LocalFs.available_space(&p).ok();
+            let r = crate::fs::local::space_of(&p).ok();
             done.store(true, Ordering::Release);
             let _ = tx.send(r);
         });
@@ -62,33 +67,21 @@ impl VolumeLister for LinuxVolumes {
     fn list(&self) -> Result<Vec<Volume>> {
         let text = std::fs::read(MOUNTINFO).map_err(|e| Error::io("read", MOUNTINFO, e))?;
         let labels = labels_by_device();
-        let mut seen: HashMap<PathBuf, usize> = HashMap::new();
         let mut out: Vec<Volume> = Vec::new();
-        for line in text.split(|&b| b == b'\n') {
-            let Some(m) = parse_line(line) else { continue };
-            if !is_interesting(&m) {
-                continue;
-            }
-            let responsive_space = self.probe(&m.mount_point);
-            let vol = Volume {
+        for m in select_mounts(&text, &self.filter) {
+            let space = self.probe(&m.mount_point);
+            out.push(Volume {
                 label: labels.get(&m.source).cloned(),
                 kind: classify(&m),
                 drive_letter: None,
-                total: None,
-                available: responsive_space,
+                total: space.map(|s| s.0),
+                available: space.map(|s| s.1),
                 read_only: m.options.split(',').any(|o| o == "ro"),
-                responsive: responsive_space.is_some(),
+                responsive: space.is_some(),
                 mount_point: m.mount_point.clone(),
                 fs_type: m.fstype,
                 device: m.source,
-            };
-            // A later mount on the same point hides the earlier one.
-            if let Some(&i) = seen.get(&m.mount_point) {
-                out[i] = vol;
-            } else {
-                seen.insert(m.mount_point, out.len());
-                out.push(vol);
-            }
+            });
         }
         Ok(out)
     }
@@ -117,10 +110,49 @@ impl VolumeLister for LinuxVolumes {
 }
 
 struct MountLine {
+    /// `major:minor` of the device.
+    dev: String,
+    /// The part of the filesystem that is mounted here (`/` unless it is a bind mount or a
+    /// subvolume).
+    root: String,
     mount_point: PathBuf,
     options: String,
     fstype: String,
     source: String,
+    super_options: String,
+}
+
+/// The mounts worth showing, in order: the filter applied, bind mounts of something that is
+/// already listed left out, and a later mount on the same point replacing the earlier one.
+fn select_mounts(mountinfo: &[u8], filter: &DeviceFilter) -> Vec<MountLine> {
+    let mut seen_root: std::collections::HashSet<(String, String)> = Default::default();
+    let mut seen_dev: std::collections::HashSet<String> = Default::default();
+    let mut by_point: HashMap<PathBuf, usize> = HashMap::new();
+    let mut out: Vec<MountLine> = Vec::new();
+    for line in mountinfo.split(|&b| b == b'\n') {
+        let Some(m) = parse_line(line) else { continue };
+        if filter.hides(&m.fstype, &m.mount_point) {
+            continue;
+        }
+        // The same part of the same device a second time is a bind mount; so is a folder of
+        // a device already listed (a btrfs subvolume, which names itself, is a disk of its own).
+        let key = (m.dev.clone(), m.root.clone());
+        let subvolume = m.super_options.split(',').any(|o| o.starts_with("subvol"));
+        let bind_of_listed = m.root != "/" && !subvolume && seen_dev.contains(&m.dev);
+        if seen_root.contains(&key) || bind_of_listed {
+            continue;
+        }
+        seen_root.insert(key);
+        seen_dev.insert(m.dev.clone());
+        // A later mount on the same point hides the earlier one.
+        if let Some(&i) = by_point.get(&m.mount_point) {
+            out[i] = m;
+        } else {
+            by_point.insert(m.mount_point.clone(), out.len());
+            out.push(m);
+        }
+    }
+    out
 }
 
 fn parse_line(line: &[u8]) -> Option<MountLine> {
@@ -133,10 +165,16 @@ fn parse_line(line: &[u8]) -> Option<MountLine> {
         return None;
     }
     Some(MountLine {
+        dev: String::from_utf8_lossy(fields[2]).into_owned(),
+        root: String::from_utf8_lossy(&unescape(fields[3])).into_owned(),
         mount_point: PathBuf::from(OsString::from_vec(unescape(fields[4]))),
         options: String::from_utf8_lossy(fields[5]).into_owned(),
         fstype: String::from_utf8_lossy(fields[dash + 1]).into_owned(),
         source: String::from_utf8_lossy(&unescape(fields[dash + 2])).into_owned(),
+        super_options: fields
+            .get(dash + 3)
+            .map(|f| String::from_utf8_lossy(f).into_owned())
+            .unwrap_or_default(),
     })
 }
 
@@ -160,58 +198,6 @@ fn unescape(f: &[u8]) -> Vec<u8> {
         i += 1;
     }
     out
-}
-
-const PSEUDO: &[&str] = &[
-    "proc",
-    "sysfs",
-    "devtmpfs",
-    "devpts",
-    "cgroup",
-    "cgroup2",
-    "securityfs",
-    "debugfs",
-    "tracefs",
-    "configfs",
-    "fusectl",
-    "mqueue",
-    "hugetlbfs",
-    "pstore",
-    "bpf",
-    "autofs",
-    "binfmt_misc",
-    "efivarfs",
-    "rpc_pipefs",
-    "nsfs",
-    "squashfs",
-    "ramfs",
-    "selinuxfs",
-    "fuse.gvfsd-fuse",
-    "fuse.portal",
-    "overlay",
-];
-
-fn is_interesting(m: &MountLine) -> bool {
-    if PSEUDO.contains(&m.fstype.as_str()) {
-        return false;
-    }
-    let p = &m.mount_point;
-    let hidden_roots = [
-        "/proc",
-        "/sys",
-        "/run/user",
-        "/run/credentials",
-        "/var/lib/docker",
-        "/snap",
-    ];
-    if hidden_roots.iter().any(|r| p.starts_with(r)) {
-        return false;
-    }
-    if m.fstype == "tmpfs" {
-        // Real tmpfs mounts users care about; the rest is system plumbing.
-        return p == Path::new("/tmp") || p == Path::new("/dev/shm");
-    }
-    true
 }
 
 fn is_network(fstype: &str) -> bool {
@@ -286,12 +272,105 @@ mod tests {
         assert!(m.options.contains("noatime"));
     }
 
+    /// A real machine's mountinfo, trimmed: system filesystems, Waydroid's binderfs, the boot
+    /// partitions, bind mounts, a btrfs subvolume, a USB stick and a network share.
+    const SAMPLE: &str = "\
+22 28 0:21 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw
+23 28 0:22 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw
+24 28 0:5 / /dev rw,nosuid shared:2 - devtmpfs devtmpfs rw,size=4096k
+25 24 0:23 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620
+26 28 0:24 / /run rw,nosuid,nodev shared:5 - tmpfs tmpfs rw,mode=755
+27 22 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:8 - cgroup2 cgroup2 rw
+28 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw
+29 22 0:30 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime shared:9 - efivarfs efivarfs rw
+30 28 259:1 / /boot/efi rw,relatime shared:44 - vfat /dev/nvme0n1p1 rw,fmask=0077
+31 28 259:3 / /boot rw,relatime shared:45 - ext4 /dev/nvme0n1p3 rw
+32 24 0:41 / /dev/binderfs rw,relatime shared:60 - binder binder rw,max=1048576
+33 28 0:42 / /tmp rw,nosuid,nodev shared:10 - tmpfs tmpfs rw
+34 28 0:43 / /snap/core22/1612 ro,nodev,relatime shared:61 - squashfs /dev/loop0 ro,errors=continue
+35 28 0:44 / /run/user/1000/doc rw,nosuid,nodev,relatime shared:62 - fuse.portal portal rw,user_id=1000
+36 28 0:45 / /var/lib/docker/overlay2/x/merged rw,relatime shared:63 - overlay overlay rw,lowerdir=/a
+37 28 259:2 /var/lib/flatpak /var/lib/flatpak rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw
+38 28 259:2 / /mnt/bind-of-root rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw
+39 28 259:4 / /home rw,relatime shared:64 - ext4 /dev/nvme0n1p4 rw
+40 28 0:50 /@data /data rw,relatime shared:65 - btrfs /dev/sda2 rw,subvolid=257,subvol=/@data
+41 28 0:50 /@backup /backup rw,relatime shared:66 - btrfs /dev/sda2 rw,subvolid=258,subvol=/@backup
+42 28 8:17 / /run/media/user/USB\\040STICK rw,nosuid,nodev,relatime shared:70 - vfat /dev/sdb1 rw
+43 28 0:60 / /mnt/nas rw,relatime shared:71 - nfs4 nas:/export rw,vers=4.2
+";
+
+    fn points(text: &str, filter: &DeviceFilter) -> Vec<String> {
+        select_mounts(text.as_bytes(), filter)
+            .iter()
+            .map(|m| m.mount_point.display().to_string())
+            .collect()
+    }
+
     #[test]
-    fn pseudo_filesystems_are_hidden() {
-        let m = parse_line(b"20 1 0:5 / /proc rw - proc proc rw").unwrap();
-        assert!(!is_interesting(&m));
-        let m = parse_line(b"30 1 8:1 / /home rw - ext4 /dev/sda2 rw").unwrap();
-        assert!(is_interesting(&m));
+    fn only_real_disks_partitions_removables_and_shares_are_listed() {
+        assert_eq!(
+            points(SAMPLE, &DeviceFilter::default()),
+            [
+                "/",
+                "/home",
+                "/data",
+                "/backup",
+                "/run/media/user/USB STICK",
+                "/mnt/nas"
+            ],
+            "virtual and system filesystems, binderfs, the boot partitions and bind mounts are out"
+        );
+    }
+
+    #[test]
+    fn each_kind_of_noise_is_hidden_for_its_own_reason() {
+        let f = DeviceFilter::default();
+        let hidden = |fs: &str, at: &str| f.hides(fs, Path::new(at));
+        for (fs, at) in [
+            ("binder", "/dev/binderfs"),
+            ("binderfs", "/mnt/x"),
+            ("tmpfs", "/tmp"),
+            ("tmpfs", "/run"),
+            ("proc", "/proc"),
+            ("sysfs", "/sys"),
+            ("cgroup2", "/sys/fs/cgroup"),
+            ("overlay", "/var/lib/docker/overlay2/x/merged"),
+            ("squashfs", "/snap/core22/1612"),
+            ("fuse.portal", "/run/user/1000/doc"),
+            ("efivarfs", "/sys/firmware/efi/efivars"),
+            ("vfat", "/boot/efi"),
+            ("ext4", "/boot"),
+            ("vfat", "/efi"),
+            ("ext4", "/dev/binderfs"),
+        ] {
+            assert!(hidden(fs, at), "{fs} at {at} should be hidden");
+        }
+        for (fs, at) in [
+            ("ext4", "/"),
+            ("ext4", "/home"),
+            ("btrfs", "/data"),
+            ("vfat", "/run/media/user/USB"),
+            ("nfs4", "/mnt/nas"),
+            ("ntfs3", "/mnt/windows"),
+        ] {
+            assert!(!hidden(fs, at), "{fs} at {at} should be shown");
+        }
+    }
+
+    #[test]
+    fn the_hidden_list_is_configurable_and_replaces_the_default() {
+        // Someone who wants to see tmpfs mounts and the boot partition, and not the share.
+        let custom = DeviceFilter::new(&["nfs4".to_string(), "/proc/*".to_string()]);
+        let shown = points(SAMPLE, &custom);
+        assert!(shown.contains(&"/tmp".to_string()), "{shown:?}");
+        assert!(shown.contains(&"/boot".to_string()), "{shown:?}");
+        assert!(!shown.contains(&"/mnt/nas".to_string()), "{shown:?}");
+        assert!(!shown.contains(&"/proc".to_string()));
+        // Wildcards: a prefix of filesystem types and a folder with everything below it.
+        let f = DeviceFilter::new(&["fuse.*".to_string(), "/mnt/*".to_string()]);
+        assert!(f.hides("fuse.sshfs", Path::new("/x")));
+        assert!(f.hides("ext4", Path::new("/mnt/a/b")));
+        assert!(!f.hides("ext4", Path::new("/mntx")));
     }
 
     #[test]

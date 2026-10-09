@@ -18,6 +18,11 @@
 //! hints = true               # false: no key hints in the bottom bar
 //! sidebar = true             # shown by default; Ctrl+B toggles and remembers
 //!
+//! [devices]
+//! hide = ["tmpfs", "/boot"]   # replaces the built-in list of mounts kept out of the disks
+//!                               # (a name is a filesystem type, `fuse.*` a prefix of types;
+//!                               # `/path` a mount point, `/path/*` it and everything below)
+//!
 //! [keys]                      # per action: replaces all its keys; [] unbinds
 //! copy = ["y", "ctrl+c"]
 //! quit = ["q", "ctrl+q"]
@@ -43,6 +48,7 @@ pub struct FileConfig {
     pub mouse: bool,
     pub hints: bool,
     pub sidebar: bool,
+    pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     pub keys: HashMap<String, Vec<String>>,
 }
@@ -53,6 +59,11 @@ pub struct FileConfig {
 enum Keys {
     One(String),
     Many(Vec<String>),
+}
+
+#[derive(Deserialize, Default)]
+struct DevicesRaw {
+    hide: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Default)]
@@ -70,6 +81,7 @@ struct Raw {
     mouse: Option<bool>,
     hints: Option<bool>,
     sidebar: Option<bool>,
+    devices: Option<DevicesRaw>,
     keymap: Option<String>,
     keys: Option<HashMap<String, Keys>>,
 }
@@ -103,6 +115,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         mouse: raw.mouse.unwrap_or(true),
         hints: raw.hints.unwrap_or(true),
         sidebar: raw.sidebar.unwrap_or(true),
+        hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
         keys: raw
             .keys
@@ -129,5 +142,34 @@ pub fn load(dirs: &Dirs) -> FileConfig {
                 ..d
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn with_config(text: &str) -> FileConfig {
+        let root = tempfile::tempdir().unwrap();
+        let dirs = Dirs::under(root.path());
+        let dir = dirs.rada_config();
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("config.toml"), text).unwrap();
+        load(&dirs)
+    }
+
+    #[test]
+    fn devices_hide_is_read_and_absent_means_the_built_in_list() {
+        let c = with_config("[devices]\nhide = [\"tmpfs\", \"/boot/*\"]\n");
+        assert_eq!(
+            c.hide_devices,
+            Some(vec!["tmpfs".to_string(), "/boot/*".to_string()])
+        );
+        assert_eq!(with_config("sidebar = true\n").hide_devices, None);
+        // An empty list is a choice too: hide nothing.
+        assert_eq!(
+            with_config("[devices]\nhide = []\n").hide_devices,
+            Some(vec![])
+        );
     }
 }

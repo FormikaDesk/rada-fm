@@ -26,6 +26,12 @@ impl LinuxPlatform {
         Self::with_trash(dirs, trash)
     }
 
+    /// Choose which mounts stay out of the disk list.
+    pub fn with_device_filter(mut self, filter: super::DeviceFilter) -> Self {
+        self.volumes = mounts::LinuxVolumes::with_filter(filter);
+        self
+    }
+
     /// Use a customised trash backend (tests).
     pub fn with_trash(dirs: Dirs, trash: FreedesktopTrash) -> Self {
         LinuxPlatform {

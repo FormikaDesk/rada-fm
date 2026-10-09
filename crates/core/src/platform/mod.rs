@@ -28,7 +28,7 @@ pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use userdirs::{PlaceKind, UserDirs};
-pub use volumes::{Volume, VolumeKind, VolumeLister};
+pub use volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
 
 use crate::Result;
 
@@ -74,12 +74,32 @@ pub trait Platform: Send + Sync {
     fn user_dirs(&self) -> UserDirs;
 }
 
+/// Choices of the user that reach the platform layer.
+#[derive(Clone, Debug, Default)]
+pub struct PlatformOptions {
+    /// Replaces the built-in list of mounts kept out of the disk list (`devices.hide`).
+    /// Only the Linux platform lists mounts for now.
+    pub hide_devices: Option<Vec<String>>,
+}
+
 /// The one place where the operating system is selected.
 pub fn current(dirs: Dirs) -> Arc<dyn Platform> {
+    current_with(dirs, PlatformOptions::default())
+}
+
+/// [`current`], with the user's choices.
+pub fn current_with(dirs: Dirs, options: PlatformOptions) -> Arc<dyn Platform> {
     #[cfg(target_os = "linux")]
     {
-        Arc::new(linux::LinuxPlatform::new(dirs))
+        let filter = options
+            .hide_devices
+            .as_deref()
+            .map(DeviceFilter::new)
+            .unwrap_or_default();
+        Arc::new(linux::LinuxPlatform::new(dirs).with_device_filter(filter))
     }
+    #[cfg(not(target_os = "linux"))]
+    let _ = options;
     #[cfg(target_os = "windows")]
     {
         Arc::new(windows::WindowsPlatform::new(dirs))
