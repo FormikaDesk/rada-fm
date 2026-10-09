@@ -49,6 +49,10 @@ pub enum Step {
         #[schemars(with = "String")]
         path: PathBuf,
         mode: Option<u32>,
+        /// Permissions to give the folder once the whole run is over (it was made writable
+        /// for the run): used when undo brings back a folder that was read-only.
+        #[serde(default)]
+        restore_mode: Option<u32>,
     },
     /// Apply the final permissions/time of a directory created earlier in the same run
     /// (after its children exist, so a read-only source dir stays writable meanwhile).
@@ -327,10 +331,15 @@ impl Step {
                 to: from.clone(),
             }),
             Step::TrashItem { .. } => result.trashed.clone().map(|item| Step::Restore { item }),
-            Step::RemoveDir { path } => Some(Step::MakeDir {
-                path: path.clone(),
-                mode: result.removed_dir_mode.map(|m| m | 0o700),
-            }),
+            Step::RemoveDir { path } => {
+                let mode = result.removed_dir_mode;
+                Some(Step::MakeDir {
+                    path: path.clone(),
+                    // Writable while its contents come back; its own permissions last.
+                    mode: mode.map(|m| m | 0o700),
+                    restore_mode: mode.filter(|m| m & 0o700 != 0o700),
+                })
+            }
             // Permanent deletion and restore are not reversed here.
             Step::RemoveFile { .. } | Step::Restore { .. } => None,
         }

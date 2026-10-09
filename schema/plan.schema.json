@@ -584,6 +584,16 @@
             "path": {
               "type": "string"
             },
+            "restore_mode": {
+              "description": "Permissions to give the folder once the whole run is over (it was made writable\nfor the run): used when undo brings back a folder that was read-only.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "default": null,
+              "minimum": 0
+            },
             "step": {
               "type": "string",
               "const": "make_dir"

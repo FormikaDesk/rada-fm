@@ -220,6 +220,15 @@ fn undo_order(steps: &[Step], newest_first: Vec<usize>) -> Vec<usize> {
     for (pos, i) in stay {
         order.insert(pos.min(order.len()), i);
     }
+    // A folder that held a moved link is only empty once that link has gone: when there are
+    // such links, the folders the operation created are removed last (children first, as
+    // recorded).
+    if newest_first.iter().any(|&i| is_link(i)) {
+        let (dirs, rest): (Vec<usize>, Vec<usize>) = order
+            .into_iter()
+            .partition(|&i| matches!(&steps[i], Step::RemoveDir { .. }));
+        order = rest.into_iter().chain(dirs).collect();
+    }
     order
 }
 

@@ -152,6 +152,12 @@ struct RunState {
     created_dirs: HashSet<PathBuf>,
     blocked: HashSet<PathBuf>,
     skip_all: bool,
+    /// This run is an undo: it may unlock a read-only folder to take out what the operation
+    /// had put in it.
+    undo: bool,
+    /// Permissions to put back when the run is over, oldest first (applied newest first, so
+    /// that a folder is locked again only after what is inside it is done).
+    deferred_modes: Vec<(PathBuf, u32)>,
 }
 
 impl RunState {
@@ -210,6 +216,8 @@ impl Engine {
             created_dirs: HashSet::new(),
             blocked: HashSet::new(),
             skip_all: false,
+            undo: plan.kind == OpKind::Undo,
+            deferred_modes: Vec::new(),
         };
         let mut prog = Progress {
             steps_total: plan.steps.len() as u64,
@@ -330,14 +338,54 @@ impl Engine {
             prog.steps_done += 1;
             prog.bytes_done = base_bytes;
         }
+        // Folders that were opened up for the run get their own permissions back.
+        for (path, mode) in st.deferred_modes.iter().rev() {
+            if let Err(e) = self.fs.set_mode(path, *mode) {
+                tracing::debug!("restore permissions of {}: {e}", path.display());
+            }
+        }
         handler.progress(&prog);
         report
+    }
+
+    /// Run `op` on `path`; if an undo is refused because the folder holding it is read-only,
+    /// open the folder up (and put its permissions back when the run is over) and try again.
+    fn retry_unlocked<T>(
+        &self,
+        st: &mut RunState,
+        path: &Path,
+        op: impl Fn() -> io::Result<T>,
+    ) -> io::Result<T> {
+        match op() {
+            Err(e)
+                if st.undo
+                    && matches!(e.raw_os_error(), Some(libc::EACCES) | Some(libc::EPERM)) =>
+            {
+                let Some(parent) = path.parent() else {
+                    return Err(e);
+                };
+                let Some(mode) = self.fs.lstat(parent).ok().and_then(|m| m.mode) else {
+                    return Err(e);
+                };
+                if self.fs.set_mode(parent, (mode & 0o7777) | 0o300).is_err() {
+                    return Err(e);
+                }
+                st.deferred_modes
+                    .push((parent.to_path_buf(), mode & 0o7777));
+                op()
+            }
+            r => r,
+        }
     }
 
     fn run_step(&self, step: &Step, st: &mut RunState, ctl: &mut Ctl<'_>) -> Result<StepResult> {
         let fs = &*self.fs;
         match step {
-            Step::MakeDir { path, mode } => {
+            Step::MakeDir {
+                path,
+                mode,
+                restore_mode,
+            } => {
                 match fs.create_dir(path, *mode) {
                     Ok(()) => {}
                     Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -346,6 +394,9 @@ impl Engine {
                     Err(e) => return Err(Error::io("create folder", path, e)),
                 }
                 st.created_dirs.insert(path.clone());
+                if let Some(m) = restore_mode {
+                    st.deferred_modes.push((path.clone(), *m));
+                }
                 Ok(StepResult {
                     created: true,
                     ..StepResult::done()
@@ -612,7 +663,7 @@ impl Engine {
                         reason,
                     });
                 }
-                fs.remove_file(path)
+                self.retry_unlocked(st, path, || fs.remove_file(path))
                     .map_err(|e| Error::io("delete", path, e))?;
                 Ok(StepResult::done())
             }
@@ -625,7 +676,7 @@ impl Engine {
                     }
                     Err(e) => return Err(Error::io("inspect", path, e)),
                 };
-                match fs.remove_dir(path) {
+                match self.retry_unlocked(st, path, || fs.remove_dir(path)) {
                     Ok(()) => Ok(StepResult {
                         removed_dir_mode: meta.mode,
                         ..StepResult::done()

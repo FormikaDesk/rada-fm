@@ -434,7 +434,11 @@ impl Engine {
                 bytes: 0,
                 target: None,
             });
-            plan.steps.push(Step::MakeDir { path, mode: None });
+            plan.steps.push(Step::MakeDir {
+                path,
+                mode: None,
+                restore_mode: None,
+            });
         }
         plan.warnings = ws.finish();
         plan
@@ -811,6 +815,7 @@ impl Transfer<'_> {
                 // Owner can always write while the folder is being filled.
                 self.steps.push(Step::MakeDir {
                     path: dst.clone(),
+                    restore_mode: None,
                     mode: node.meta.mode.map(|m| m | 0o700),
                 });
                 for c in &node.children {
