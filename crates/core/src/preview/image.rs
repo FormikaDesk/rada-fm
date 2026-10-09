@@ -4,18 +4,19 @@
 //! and weight immediately, and to refuse a huge image with a clear message *before*
 //! any pixel is decoded (the 12000x12000 PNG that froze other file managers).
 
+use std::ffi::OsString;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use image::imageops::FilterType;
 use image::metadata::Orientation;
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, RgbaImage};
 
-use super::Preview;
+use super::{Preview, pdf};
 use crate::display;
 use crate::events::{CoreEvent, PreviewEvent};
 
@@ -29,6 +30,18 @@ pub struct ImageLimits {
     pub max_file_bytes: u64,
     /// Decoded images are downscaled so that neither side exceeds this.
     pub max_edge: u32,
+    /// PDFs bigger than this are not rendered.
+    pub pdf_max_file_bytes: u64,
+    /// Each poppler tool may run this long before it is stopped.
+    pub pdf_timeout: Duration,
+    /// Where rendered first pages are kept; `None` is a folder under the system's temporary one.
+    pub pdf_cache: Option<PathBuf>,
+    /// The cache is pruned down to this size, and of anything older than `pdf_cache_max_age`.
+    pub pdf_cache_max_bytes: u64,
+    pub pdf_cache_max_age: Duration,
+    /// Where to look for `pdftoppm`, `pdftotext` and `pdfinfo` (a `PATH`-style list); `None`
+    /// is the process's own `PATH`.
+    pub pdf_tools_path: Option<OsString>,
 }
 
 impl Default for ImageLimits {
@@ -38,6 +51,12 @@ impl Default for ImageLimits {
             max_megapixels: 50,
             max_file_bytes: 128 << 20,
             max_edge: 1600,
+            pdf_max_file_bytes: 512 << 20,
+            pdf_timeout: Duration::from_secs(8),
+            pdf_cache: None,
+            pdf_cache_max_bytes: 200 << 20,
+            pdf_cache_max_age: Duration::from_secs(30 * 24 * 3600),
+            pdf_tools_path: None,
         }
     }
 }
@@ -49,6 +68,8 @@ pub struct ImageInfo {
     pub height: Option<u32>,
     pub size: u64,
     pub modified: Option<SystemTime>,
+    /// For a PDF: page count, title and author, when known.
+    pub doc: Option<pdf::DocFacts>,
 }
 
 #[derive(Clone, Debug)]
@@ -70,6 +91,8 @@ pub struct ImagePreview {
     /// Something worth telling the user even though the image is shown
     /// (for instance a truncated file).
     pub note: Option<String>,
+    /// For a PDF that could not be drawn: the text of its first page instead.
+    pub text: Vec<String>,
 }
 
 fn raster_format(f: ImageFormat) -> Option<&'static str> {
@@ -114,7 +137,12 @@ pub(super) fn detect(
         height: None,
         size,
         modified,
+        doc: None,
     };
+
+    if looks_like_pdf(head) {
+        return Some(detect_pdf(info, size, limits));
+    }
 
     if looks_like_svg(head) {
         info.format = "SVG".into();
@@ -131,6 +159,7 @@ pub(super) fn detect(
             info,
             state: disable_if_off(state, limits),
             note: None,
+            text: Vec::new(),
         });
     }
 
@@ -164,7 +193,44 @@ pub(super) fn detect(
         info,
         state: disable_if_off(state, limits),
         note: None,
+        text: Vec::new(),
     })
+}
+
+/// A PDF announces itself with `%PDF-` in its first kilobyte.
+fn looks_like_pdf(head: &[u8]) -> bool {
+    head[..head.len().min(1024)]
+        .windows(5)
+        .any(|w| w == b"%PDF-")
+}
+
+/// The cheap answer for a PDF: refused when too big or when no tool can read it.
+fn detect_pdf(mut info: ImageInfo, size: u64, limits: &ImageLimits) -> ImagePreview {
+    info.format = "PDF".into();
+    let tools = pdf::tools_for(limits);
+    let (state, note) = if size > limits.pdf_max_file_bytes {
+        (
+            ImageState::TooLarge(format!(
+                "the file is {}; the preview limit for PDFs is {} (pdf_max_file_mb in config.toml)",
+                display::bytes(size),
+                display::bytes(limits.pdf_max_file_bytes)
+            )),
+            None,
+        )
+    } else if !tools.any() {
+        (
+            ImageState::Failed("poppler is not installed".into()),
+            Some(pdf::INSTALL_HINT.to_string()),
+        )
+    } else {
+        (ImageState::Loading, None)
+    };
+    ImagePreview {
+        info,
+        state: disable_if_off(state, limits),
+        note,
+        text: Vec::new(),
+    }
 }
 
 /// With image rendering off nothing may be decoded: report the header only.
@@ -297,8 +363,17 @@ fn load_raster(
     Ok(downscale(img, limits.max_edge))
 }
 
-/// Decode and downscale. Runs in the image worker.
-pub fn load(path: &Path, mut info: ImageInfo, limits: &ImageLimits) -> ImagePreview {
+/// Decode and downscale. Runs in the image worker; `abandon` says when the user has moved on
+/// (a PDF render is stopped at once then).
+pub fn load(
+    path: &Path,
+    mut info: ImageInfo,
+    limits: &ImageLimits,
+    abandon: &dyn Fn() -> bool,
+) -> ImagePreview {
+    if info.format == "PDF" {
+        return load_pdf(path, info, limits, abandon);
+    }
     let result = if info.format == "SVG" {
         load_svg(path, limits, &mut info)
     } else {
@@ -312,7 +387,80 @@ pub fn load(path: &Path, mut info: ImageInfo, limits: &ImageLimits) -> ImagePrev
     let note =
         (matches!(state, ImageState::Ready(_)) && info.format == "JPEG" && !jpeg_is_complete(path))
             .then(|| "the file is truncated or damaged: showing what could be decoded".to_string());
-    ImagePreview { info, state, note }
+    ImagePreview {
+        info,
+        state,
+        note,
+        text: Vec::new(),
+    }
+}
+
+/// The first page of a PDF through poppler, with its facts; the page's text when it cannot be
+/// drawn.
+fn load_pdf(
+    path: &Path,
+    mut info: ImageInfo,
+    limits: &ImageLimits,
+    abandon: &dyn Fn() -> bool,
+) -> ImagePreview {
+    let tools = pdf::tools_for(limits);
+    let mut note = None;
+    let mut text = Vec::new();
+    // Facts first: they are quick, and say at once if the file needs a password.
+    let facts = pdf::facts(&tools, path, limits, abandon);
+    let mut problem = None;
+    match facts {
+        Ok(f) => info.doc = Some(f),
+        Err(pdf::PdfProblem::NoTool(_)) => {}
+        Err(p) => problem = Some(p),
+    }
+    let rendered = match problem {
+        Some(p) => Err(p),
+        None => pdf::render_first_page(&tools, path, &info, limits, abandon),
+    };
+    let state = match rendered {
+        Ok(png) => {
+            let mut sub = info.clone();
+            sub.format = "PNG".into();
+            match load_raster(&png, limits, &mut sub) {
+                Ok(img) => ImageState::Ready(Arc::new(img)),
+                Err(e) => {
+                    // A cached picture that cannot be read: forget it.
+                    let _ = std::fs::remove_file(&png);
+                    ImageState::Failed(format!("cannot decode the page: {e}"))
+                }
+            }
+        }
+        Err(p) => {
+            if matches!(p, pdf::PdfProblem::NoTool("pdftoppm")) {
+                note = Some(pdf::INSTALL_HINT.to_string());
+            }
+            // Without the picture, the words are the next best thing.
+            if !matches!(
+                p,
+                pdf::PdfProblem::Password
+                    | pdf::PdfProblem::Abandoned
+                    | pdf::PdfProblem::TooSlow(_)
+            ) && let Ok(t) = pdf::first_page_text(&tools, path, limits, 16 * 1024, abandon)
+            {
+                text = t
+                    .lines()
+                    .map(|l| display::line(l.trim_end(), 4))
+                    .take(200)
+                    .collect();
+                while text.last().is_some_and(String::is_empty) {
+                    text.pop();
+                }
+            }
+            ImageState::Failed(p.message())
+        }
+    };
+    ImagePreview {
+        info,
+        state,
+        note,
+        text,
+    }
 }
 
 /// A complete JPEG ends with the End-Of-Image marker (trailing padding is tolerated).
@@ -374,7 +522,10 @@ impl ImageWorker {
                     if job.generation < n.load(Ordering::Relaxed) {
                         continue; // the user has moved on
                     }
-                    let preview = load(&job.path, job.info, &job.limits);
+                    let gen_ = job.generation;
+                    let preview = load(&job.path, job.info, &job.limits, &|| {
+                        gen_ < n.load(Ordering::Relaxed)
+                    });
                     let name = job
                         .path
                         .file_name()

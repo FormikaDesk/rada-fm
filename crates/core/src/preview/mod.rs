@@ -4,6 +4,7 @@
 
 pub mod card;
 pub mod image;
+pub mod pdf;
 
 use std::fs::File;
 use std::io::Read;

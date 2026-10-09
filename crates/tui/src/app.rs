@@ -75,6 +75,8 @@ pub struct ImageView {
     pub info: ImageInfo,
     pub status: ImageStatus,
     pub note: Option<String>,
+    /// A PDF that could not be drawn: the text of its first page.
+    pub text: Vec<String>,
 }
 
 pub enum ImageStatus {
@@ -874,6 +876,7 @@ impl App {
                     info: ip.info,
                     status,
                     note: ip.note,
+                    text: ip.text,
                 });
                 self.preview.content = None;
             }

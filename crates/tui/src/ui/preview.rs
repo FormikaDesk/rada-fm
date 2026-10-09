@@ -293,6 +293,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
     };
     let info = view.info.clone();
     let note = view.note.clone();
+    let fallback_text = view.text.clone();
     enum Kind {
         Decoding,
         Shown,
@@ -308,8 +309,15 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
         ImageStatus::Failed(m) => Kind::Err(m.clone()),
     };
     let w = inner.width as usize;
-    // Under the picture: format, pixels, weight, date.
-    let facts = [
+    // Under the picture: format, pixels (or pages), weight, date.
+    let mut facts = vec![if info.format == "PDF" {
+        let pages = match info.doc.as_ref().and_then(|d| d.pages) {
+            Some(1) => "1 page".to_string(),
+            Some(n) => format!("{n} pages"),
+            None => "pages unknown".to_string(),
+        };
+        format!("PDF · {pages} · {}", fmt::size(info.size))
+    } else {
         format!(
             "{} · {} · {}",
             info.format,
@@ -318,9 +326,17 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
                 _ => "size unknown".to_string(),
             },
             fmt::size(info.size)
-        ),
-        format!("modified {}", fmt::date(info.modified)),
-    ];
+        )
+    }];
+    if let Some(d) = &info.doc {
+        if let Some(t) = &d.title {
+            facts.push(format!("title: {t}"));
+        }
+        if let Some(a) = &d.author {
+            facts.push(format!("author: {a}"));
+        }
+    }
+    facts.push(format!("modified {}", fmt::date(info.modified)));
     // Wrapped, never cut: on a narrow pane "70.7 KiB" must not become "70.…".
     let mut fact_lines: Vec<Line> = facts
         .iter()
@@ -403,11 +419,37 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
             f.render_widget(Paragraph::new(fact_lines), bottom);
         }
         Kind::Warn(m) => {
-            message(f, &th, pic, "image too large to preview", &m, th.warn);
+            let what = if info.format == "PDF" {
+                "PDF too large to preview"
+            } else {
+                "image too large to preview"
+            };
+            message(f, &th, pic, what, &m, th.warn);
             f.render_widget(Paragraph::new(fact_lines), bottom);
         }
         Kind::Err(m) => {
-            message(f, &th, pic, "cannot show this image", &m, th.error);
+            let what = if info.format == "PDF" {
+                "cannot show this PDF"
+            } else {
+                "cannot show this image"
+            };
+            if fallback_text.is_empty() {
+                message(f, &th, pic, what, &m, th.error);
+            } else {
+                // The page could not be drawn, but its words can be read.
+                let mut lines = vec![
+                    Line::from(Span::styled(format!("{m} · first page as text"), th.dim())),
+                    Line::raw(""),
+                ];
+                let room = pic.height.saturating_sub(2) as usize;
+                for l in fallback_text.iter().take(room) {
+                    lines.push(Line::from(Span::styled(
+                        display::truncate(l, pic.width as usize),
+                        th.base(),
+                    )));
+                }
+                f.render_widget(Paragraph::new(lines), pic);
+            }
             f.render_widget(Paragraph::new(fact_lines), bottom);
         }
     }

@@ -13,6 +13,8 @@
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
 //! image_max_file_mb = 128
+//! pdf_max_file_mb = 512      # larger PDFs are not drawn (needs poppler: pdftoppm, pdfinfo)
+//! pdf_timeout_seconds = 8    # a PDF that takes longer to draw is given up on
 //! mouse = true                # false: no mouse capture at all
 //! keymap = "vim+classic"      # vim+classic (default) | vim | classic
 //! hints = true               # false: no key hints in the bottom bar
@@ -78,6 +80,8 @@ struct Raw {
     bookmarks: Option<Vec<String>>,
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
+    pdf_max_file_mb: Option<u64>,
+    pdf_timeout_seconds: Option<u64>,
     mouse: Option<bool>,
     hints: Option<bool>,
     sidebar: Option<bool>,
@@ -139,6 +143,15 @@ pub fn load(dirs: &Dirs) -> FileConfig {
                     .image_max_file_mb
                     .map(|m| m.saturating_mul(1 << 20))
                     .unwrap_or(d.max_file_bytes),
+                pdf_max_file_bytes: raw
+                    .pdf_max_file_mb
+                    .map(|m| m.saturating_mul(1 << 20))
+                    .unwrap_or(d.pdf_max_file_bytes),
+                pdf_timeout: raw
+                    .pdf_timeout_seconds
+                    .map(|s| std::time::Duration::from_secs(s.clamp(1, 120)))
+                    .unwrap_or(d.pdf_timeout),
+                pdf_cache: Some(dirs.rada_cache().join("previews")),
                 ..d
             }
         },
