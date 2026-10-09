@@ -309,6 +309,8 @@ impl Engine {
             index_map: &'a [usize],
             finished: Vec<usize>,
             kept: Vec<usize>,
+            journal: &'a Journal,
+            entry: &'a str,
         }
         impl ExecHandler for Tracker<'_> {
             fn progress(&mut self, p: &Progress) {
@@ -323,6 +325,10 @@ impl Engine {
                         self.kept.push(orig);
                     } else {
                         self.finished.push(orig);
+                        // Written as it happens: an undo cut short resumes where it stopped.
+                        if let Err(e) = self.journal.mark_step_undone(self.entry, orig) {
+                            tracing::warn!("journal: {e}");
+                        }
                     }
                 }
                 self.inner.step_finished(index, step, result);
@@ -334,6 +340,8 @@ impl Engine {
             index_map: &up.index_map,
             finished: Vec::new(),
             kept: Vec::new(),
+            journal,
+            entry: &up.entry.id,
         };
         let report = self.execute(&up.plan, &mut tr, cancel);
         let finished = tr.finished;

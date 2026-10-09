@@ -985,6 +985,32 @@ impl App {
                     self.svc.loader.load(self.cwd.clone(), self.dir_gen);
                 }
             }
+            JobEvent::Recovered { items } => {
+                let mut lines: Vec<(ToastKind, String)> = Vec::new();
+                for r in &items {
+                    lines.push((
+                        ToastKind::Warn,
+                        format!(
+                            "\"{}\" was interrupted last time: {} leftover temporary file(s) removed, {} finished step(s) added to the history",
+                            r.title,
+                            r.removed_temps.len(),
+                            r.adopted.len()
+                        ),
+                    ));
+                    for n in &r.notes {
+                        lines.push((ToastKind::Warn, n.clone()));
+                    }
+                }
+                lines.push((
+                    ToastKind::Info,
+                    "Open the history to undo what was done before the interruption.".to_string(),
+                ));
+                self.modal = Some(Modal::Result(ResultView {
+                    title: "An earlier operation was interrupted".to_string(),
+                    lines,
+                    scroll: 0,
+                }));
+            }
             JobEvent::History { entries, .. } => {
                 if let Some(Modal::History(h)) = &mut self.modal {
                     h.entries = entries;
@@ -1067,6 +1093,10 @@ impl App {
             Cancelled => (
                 ToastKind::Warn,
                 format!("{title}: cancelled; press u to undo what was done"),
+            ),
+            Interrupted => (
+                ToastKind::Warn,
+                format!("{title}: interrupted; press u to undo what was done"),
             ),
         };
         if lines.is_empty() {

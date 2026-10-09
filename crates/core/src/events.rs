@@ -63,6 +63,10 @@ pub enum JobEvent {
         job: JobId,
         entries: Vec<JournalEntry>,
     },
+    /// At start, operations a dead process had left half done were settled.
+    Recovered {
+        items: Vec<crate::ops::Recovered>,
+    },
     NothingToUndo {
         job: JobId,
     },

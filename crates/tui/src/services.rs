@@ -37,8 +37,11 @@ impl Services {
         let (tx, rx) = unbounded();
         let engine = Engine::new(fs.clone(), platform.clone());
         let journal_ok = journal.is_some();
+        let jobs = Jobs::new(engine, journal.map(Arc::new), tx.clone());
+        // Operations a killed process left half done are settled before anything new runs.
+        jobs.recover_on_start();
         Services {
-            jobs: Jobs::new(engine, journal.map(Arc::new), tx.clone()),
+            jobs,
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn(fs, tx.clone()),
             watcher: DirWatcher::spawn(tx.clone()),

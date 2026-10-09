@@ -5,6 +5,7 @@ pub mod exec;
 pub mod names;
 pub mod plan;
 pub mod planner;
+pub mod recover;
 pub mod rename;
 pub mod request;
 pub mod runner;
@@ -18,6 +19,7 @@ pub use exec::{
 };
 pub use plan::*;
 pub use planner::{TransferMode, TransferOptions};
+pub use recover::Recovered;
 pub use rename::{Pattern, Preview};
 pub use request::{OpRequest, Planned, plan_to_json};
 pub use runner::RunOutcome;

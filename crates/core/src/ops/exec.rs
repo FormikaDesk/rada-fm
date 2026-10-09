@@ -82,6 +82,8 @@ pub trait ExecHandler {
     fn on_failure(&mut self, _f: &Failure<'_>) -> ErrorChoice {
         ErrorChoice::Skip
     }
+    /// Called before a step starts (once, not on retries): the journal writes its intent here.
+    fn step_starting(&mut self, _index: usize, _step: &Step) {}
     /// Called after every successful step (the journal hooks in here).
     fn step_finished(&mut self, _index: usize, _step: &Step, _result: &StepResult) {}
 }
@@ -105,6 +107,8 @@ pub enum RunStatus {
     CompletedWithProblems,
     Aborted,
     Cancelled,
+    /// The process died mid-operation; the next start settled what it could.
+    Interrupted,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -237,6 +241,7 @@ impl Engine {
             prog.bytes_done = base_bytes;
             handler.progress(&prog);
 
+            handler.step_starting(index, step);
             let mut attempt = 0u32;
             loop {
                 attempt += 1;
@@ -452,7 +457,11 @@ impl Engine {
                         m.fingerprint()
                     }
                 });
-                if *remove_source && let Err(e) = fs.remove_file(src) {
+                if *remove_source
+                    && let Err(e) = fs.remove_file(src)
+                    // Someone else already removed the source: the move is what they wanted.
+                    && e.kind() != io::ErrorKind::NotFound
+                {
                     // Never leave the item in two places: undo the copy.
                     let _ = fs.remove_file(dst);
                     return Err(Error::io("remove source after copy", src, e));
@@ -555,7 +564,10 @@ impl Engine {
                     }
                 })?;
                 let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
-                if *remove_source && let Err(e) = fs.remove_file(src) {
+                if *remove_source
+                    && let Err(e) = fs.remove_file(src)
+                    && e.kind() != io::ErrorKind::NotFound
+                {
                     let _ = fs.remove_file(dst);
                     return Err(Error::io("remove source link", src, e));
                 }

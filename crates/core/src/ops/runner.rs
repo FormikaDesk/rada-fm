@@ -30,6 +30,19 @@ impl ExecHandler for Recording<'_> {
         self.inner.on_failure(f)
     }
 
+    fn step_starting(&mut self, index: usize, step: &Step) {
+        // Written before the step runs: if the process dies in it, the next start can see
+        // from the disk whether it happened.
+        if self.reversible
+            && let Some(intent) = crate::journal::Intent::of(step)
+            && let Err(e) = self.journal.pending(self.id, intent)
+        {
+            tracing::error!("journal: {e}");
+            self.errors += 1;
+        }
+        self.inner.step_starting(index, step);
+    }
+
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
         if self.reversible
             && let Some(inv) = step.inverse(result)

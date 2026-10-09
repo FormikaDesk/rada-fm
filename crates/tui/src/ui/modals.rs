@@ -1086,6 +1086,7 @@ fn draw_history(
             EntryStatus::Finished(RunStatus::CompletedWithProblems) => ("▲", th.warn),
             EntryStatus::Finished(RunStatus::Aborted)
             | EntryStatus::Finished(RunStatus::Cancelled) => ("■", th.warn),
+            EntryStatus::Finished(RunStatus::Interrupted) => ("?", th.warn),
             EntryStatus::Interrupted => ("?", th.error),
         };
         let tag = match (&e.undo_state, e.reversible) {

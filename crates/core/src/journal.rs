@@ -1,9 +1,12 @@
 //! Persistent journal: an append-only JSON-lines file in `$XDG_STATE_HOME/rada/`.
 //!
-//! Every operation writes `begin`, then one `undo` record per *completed* step (the
-//! inverse step, in execution order), then `end`. Records are flushed at least every
-//! few hundred milliseconds, so even a crash mid-copy leaves enough to undo what was
-//! done. Replaying the file reconstructs the history; nothing else is stored.
+//! Every operation writes `begin`, then for each step that creates something a `pending`
+//! record *before* the step and an `undo` record (the inverse step, in execution order) once
+//! it has completed, then `end`. Every record is handed to the operating system as soon as it
+//! is written, so even a killed process (SIGKILL, power button on the process, not on the
+//! disk) leaves an exact account: at most the very last step is in doubt, and `pending`
+//! says which one, so that the next start can settle it (see `ops::recover`). Replaying the
+//! file reconstructs the history; nothing else is stored.
 
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
@@ -11,16 +14,119 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
+use crate::pathcodec;
 use crate::{Error, Result};
+
+/// What a step was about to do, written before it starts. Small on purpose: enough to see on
+/// disk, after a crash, whether the step happened.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "k", rename_all = "snake_case")]
+pub enum Intent {
+    /// A copy (of a file or a link) to `dst`, source left in place.
+    Create {
+        #[serde(with = "pathcodec::path")]
+        dst: PathBuf,
+    },
+    /// A cross-device move of a file (`symlink: false`) or a link.
+    Move {
+        #[serde(with = "pathcodec::path")]
+        src: PathBuf,
+        #[serde(with = "pathcodec::path")]
+        dst: PathBuf,
+        symlink: bool,
+    },
+    Dir {
+        #[serde(with = "pathcodec::path")]
+        path: PathBuf,
+    },
+    Rename {
+        #[serde(with = "pathcodec::path")]
+        from: PathBuf,
+        #[serde(with = "pathcodec::path")]
+        to: PathBuf,
+    },
+    Link {
+        #[serde(with = "pathcodec::path")]
+        existing: PathBuf,
+        #[serde(with = "pathcodec::path")]
+        link: PathBuf,
+        #[serde(with = "pathcodec::opt_path", default)]
+        src_link: Option<PathBuf>,
+        #[serde(with = "pathcodec::opt_path", default)]
+        src_existing: Option<PathBuf>,
+    },
+}
+
+impl Intent {
+    /// The intent of a step, for the steps that create something.
+    pub fn of(step: &Step) -> Option<Intent> {
+        Some(match step {
+            Step::CopyFile {
+                src,
+                dst,
+                remove_source,
+                ..
+            } => {
+                if *remove_source {
+                    Intent::Move {
+                        src: src.clone(),
+                        dst: dst.clone(),
+                        symlink: false,
+                    }
+                } else {
+                    Intent::Create { dst: dst.clone() }
+                }
+            }
+            Step::CopySymlink {
+                src,
+                dst,
+                remove_source,
+                ..
+            } => {
+                if *remove_source {
+                    Intent::Move {
+                        src: src.clone(),
+                        dst: dst.clone(),
+                        symlink: true,
+                    }
+                } else {
+                    Intent::Create { dst: dst.clone() }
+                }
+            }
+            Step::HardLink {
+                existing,
+                link,
+                src_link,
+                src_existing,
+            } => Intent::Link {
+                existing: existing.clone(),
+                link: link.clone(),
+                src_link: src_link.clone(),
+                src_existing: src_existing.clone(),
+            },
+            Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
+            Step::Rename { from, to } => Intent::Rename {
+                from: from.clone(),
+                to: to.clone(),
+            },
+            _ => return None,
+        })
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "t", rename_all = "snake_case")]
 enum Record {
+    /// Written before a step that creates something starts.
+    Pending {
+        id: String,
+        intent: Intent,
+    },
     Begin {
         id: String,
         time: i64,
@@ -52,6 +158,19 @@ enum Record {
         /// Indices (into the entry's undo steps) that are still not undone.
         remaining: Vec<usize>,
     },
+    /// One undo step has been carried out (written as it happens, so that an undo that is
+    /// cut short can be taken up again where it stopped).
+    UndoneStep {
+        id: String,
+        index: usize,
+    },
+}
+
+/// An operation the process of which died, and what is known about the step it died in.
+#[derive(Clone, Debug)]
+pub struct Interrupted {
+    pub entry: JournalEntry,
+    pub in_doubt: Option<Intent>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,8 +223,6 @@ impl JournalEntry {
 
 struct Writer {
     file: File,
-    buf: Vec<u8>,
-    last_flush: Instant,
 }
 
 pub struct Journal {
@@ -113,9 +230,6 @@ pub struct Journal {
     writer: Mutex<Writer>,
     counter: AtomicU64,
 }
-
-const FLUSH_EVERY: Duration = Duration::from_millis(250);
-const FLUSH_BYTES: usize = 64 * 1024;
 
 fn now_secs() -> i64 {
     SystemTime::now()
@@ -138,11 +252,7 @@ impl Journal {
             .map_err(|e| Error::io("open journal", &path, e))?;
         Ok(Journal {
             path,
-            writer: Mutex::new(Writer {
-                file,
-                buf: Vec::new(),
-                last_flush: Instant::now(),
-            }),
+            writer: Mutex::new(Writer { file }),
             counter: AtomicU64::new(0),
         })
     }
@@ -151,6 +261,8 @@ impl Journal {
         &self.path
     }
 
+    /// Write one record. It goes to the operating system at once, in one `write` call (lines
+    /// of concurrent instances never interleave); `force` also waits for the disk.
     fn append(&self, rec: &Record, force: bool) -> Result<()> {
         let mut line = serde_json::to_vec(rec)?;
         line.push(b'\n');
@@ -158,34 +270,26 @@ impl Journal {
             .writer
             .lock()
             .map_err(|_| Error::Journal("journal lock poisoned".into()))?;
-        w.buf.extend_from_slice(&line);
-        if force || w.buf.len() >= FLUSH_BYTES || w.last_flush.elapsed() >= FLUSH_EVERY {
-            Self::flush_locked(&mut w, &self.path, force)?;
-        }
-        Ok(())
-    }
-
-    fn flush_locked(w: &mut Writer, path: &Path, sync: bool) -> Result<()> {
-        let buf = std::mem::take(&mut w.buf);
-        // One write call per batch: lines of concurrent instances never interleave.
         w.file
-            .write_all(&buf)
-            .map_err(|e| Error::io("write journal", path, e))?;
-        if sync {
+            .write_all(&line)
+            .map_err(|e| Error::io("write journal", &self.path, e))?;
+        if force {
             w.file
                 .sync_data()
-                .map_err(|e| Error::io("sync journal", path, e))?;
+                .map_err(|e| Error::io("sync journal", &self.path, e))?;
         }
-        w.last_flush = Instant::now();
         Ok(())
     }
 
+    /// Wait until everything written so far is on the disk.
     pub fn flush(&self) -> Result<()> {
-        let mut w = self
+        let w = self
             .writer
             .lock()
             .map_err(|_| Error::Journal("journal lock poisoned".into()))?;
-        Self::flush_locked(&mut w, &self.path, true)
+        w.file
+            .sync_data()
+            .map_err(|e| Error::io("sync journal", &self.path, e))
     }
 
     // ---------------------------------------------------------------- writing
@@ -221,6 +325,17 @@ impl Journal {
         Ok(id)
     }
 
+    /// A step that creates something is about to run.
+    pub fn pending(&self, id: &str, intent: Intent) -> Result<()> {
+        self.append(
+            &Record::Pending {
+                id: id.to_string(),
+                intent,
+            },
+            false,
+        )
+    }
+
     pub fn record_undo(&self, id: &str, step: Step) -> Result<()> {
         self.append(
             &Record::Undo {
@@ -251,6 +366,17 @@ impl Journal {
         )
     }
 
+    /// One step of an undo has just been carried out.
+    pub fn mark_step_undone(&self, id: &str, index: usize) -> Result<()> {
+        self.append(
+            &Record::UndoneStep {
+                id: id.to_string(),
+                index,
+            },
+            false,
+        )
+    }
+
     /// Record that (part of) an entry has been undone. `remaining` are the undo-step
     /// indices that are still outstanding; empty means fully undone.
     pub fn mark_undone(&self, id: &str, remaining: Vec<usize>) -> Result<()> {
@@ -267,7 +393,6 @@ impl Journal {
     // ---------------------------------------------------------------- reading
 
     fn read_records(&self, mut f: impl FnMut(Record)) -> Result<()> {
-        self.flush()?;
         let file = File::open(&self.path).map_err(|e| Error::io("read journal", &self.path, e))?;
         for (n, line) in BufReader::new(file).split(b'\n').enumerate() {
             let line = line.map_err(|e| Error::io("read journal", &self.path, e))?;
@@ -283,6 +408,50 @@ impl Journal {
         Ok(())
     }
 
+    /// Operations that never wrote their `end` record (the process died), with the step that was
+    /// in doubt, if any: the last `pending` record, when no `undo` record came after it.
+    pub fn interrupted(&self) -> Result<Vec<Interrupted>> {
+        let entries = self.entries()?;
+        let mut last: HashMap<String, (Intent, bool)> = HashMap::new();
+        self.read_records(|r| match r {
+            Record::Pending { id, intent } => {
+                last.insert(id, (intent, false));
+            }
+            Record::Undo { id, .. } => {
+                if let Some(l) = last.get_mut(&id) {
+                    l.1 = true;
+                }
+            }
+            _ => {}
+        })?;
+        Ok(entries
+            .into_iter()
+            .filter(|e| e.status == EntryStatus::Interrupted)
+            .map(|entry| {
+                let in_doubt = last
+                    .remove(&entry.id)
+                    .and_then(|(intent, resolved)| (!resolved).then_some(intent));
+                Interrupted { entry, in_doubt }
+            })
+            .collect())
+    }
+
+    /// Settle an interrupted operation: undo records for steps found completed but not
+    /// recorded, then an `end` record so that it is never looked at again.
+    pub fn settle(&self, entry: &JournalEntry, adopted: Vec<Step>) -> Result<()> {
+        let extra = adopted.len();
+        for step in adopted {
+            self.record_undo(&entry.id, step)?;
+        }
+        self.end(
+            &entry.id,
+            RunStatus::Interrupted,
+            (entry.undo_steps + extra) as u64,
+            0,
+            0,
+        )
+    }
+
     /// All operations, oldest first.
     pub fn entries(&self) -> Result<Vec<JournalEntry>> {
         Ok(self.replay()?.0)
@@ -293,6 +462,8 @@ impl Journal {
         let mut order: Vec<String> = Vec::new();
         let mut map: HashMap<String, JournalEntry> = HashMap::new();
         let mut redo_stack: Vec<String> = Vec::new();
+        // Undo steps still outstanding for entries whose undo is under way.
+        let mut left: HashMap<String, usize> = HashMap::new();
         self.read_records(|r| match r {
             Record::Begin {
                 id,
@@ -330,6 +501,7 @@ impl Journal {
                     },
                 );
             }
+            Record::Pending { .. } => {}
             Record::Undo { id, .. } => {
                 if let Some(e) = map.get_mut(&id) {
                     e.undo_steps += 1;
@@ -349,7 +521,19 @@ impl Journal {
                     e.bytes = bytes;
                 }
             }
+            Record::UndoneStep { id, .. } => {
+                if let Some(e) = map.get_mut(&id) {
+                    let l = left.entry(id.clone()).or_insert(e.undo_steps);
+                    *l = l.saturating_sub(1);
+                    e.undo_state = if *l == 0 {
+                        UndoState::Undone
+                    } else {
+                        UndoState::Partial { remaining: *l }
+                    };
+                }
+            }
             Record::Undone { id, remaining, .. } => {
+                left.insert(id.clone(), remaining.len());
                 if remaining.is_empty() {
                     redo_stack.retain(|x| *x != id);
                     redo_stack.push(id.clone());
@@ -399,16 +583,23 @@ impl Journal {
     pub fn load_undo(&self, id: &str) -> Result<(Vec<Step>, Vec<usize>)> {
         let mut steps = Vec::new();
         let mut remaining: Option<Vec<usize>> = None;
+        // Steps carried out since the last full account (or from the start).
+        let mut done_since: Vec<usize> = Vec::new();
         self.read_records(|r| match r {
             Record::Undo { id: rid, step } if rid == id => steps.push(step),
             Record::Undone {
                 id: rid,
                 remaining: rem,
                 ..
-            } if rid == id => remaining = Some(rem),
+            } if rid == id => {
+                remaining = Some(rem);
+                done_since.clear();
+            }
+            Record::UndoneStep { id: rid, index } if rid == id => done_since.push(index),
             _ => {}
         })?;
-        let remaining = remaining.unwrap_or_else(|| (0..steps.len()).collect());
+        let mut remaining = remaining.unwrap_or_else(|| (0..steps.len()).collect());
+        remaining.retain(|i| !done_since.contains(i));
         Ok((steps, remaining))
     }
 }

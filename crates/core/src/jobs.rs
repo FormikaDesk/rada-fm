@@ -44,6 +44,25 @@ impl Jobs {
         }
     }
 
+    /// Settle operations that a dead process left half done (see `ops::recover`), on a worker
+    /// thread, and say what was found. Call it once at start, before anything new is run.
+    pub fn recover_on_start(&self) {
+        let Some(journal) = self.journal.clone() else {
+            return;
+        };
+        let engine = self.engine.clone();
+        let out = self.out.clone();
+        let _ = std::thread::Builder::new()
+            .name("rada-recover".into())
+            .spawn(move || match engine.recover_interrupted(&journal) {
+                Ok(items) if !items.is_empty() => {
+                    let _ = out.send(CoreEvent::Job(JobEvent::Recovered { items }));
+                }
+                Ok(_) => {}
+                Err(e) => tracing::error!("recovering interrupted operations: {e}"),
+            });
+    }
+
     pub fn has_journal(&self) -> bool {
         self.journal.is_some()
     }

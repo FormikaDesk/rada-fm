@@ -573,6 +573,31 @@ pub enum Op {
     HardLink,
 }
 
+/// What happens when a copy has moved `after` bytes of a matching file.
+pub enum ByteAction {
+    /// The copy fails with this errno, partway through (a full disk, a revoked right).
+    Fail(i32),
+    /// Something else happens to the world at that moment (the source is changed, the
+    /// destination vanishes...) and the copy carries on.
+    Run(Arc<dyn Fn() + Send + Sync>),
+}
+
+struct ByteRule {
+    suffix: PathBuf,
+    after: u64,
+    action: ByteAction,
+    fired: bool,
+}
+
+/// Runs `f` on the `nth` (1-based) matching call, before the call itself.
+struct Hook {
+    op: Op,
+    suffix: PathBuf,
+    nth: usize,
+    seen: usize,
+    f: Arc<dyn Fn() + Send + Sync>,
+}
+
 struct Rule {
     op: Op,
     /// Matches when the operation's path ends with this.
@@ -585,6 +610,8 @@ struct Rule {
 pub struct FaultFs {
     inner: LocalFs,
     rules: Mutex<Vec<Rule>>,
+    byte_rules: Mutex<Vec<ByteRule>>,
+    hooks: Mutex<Vec<Hook>>,
     pub hits: Mutex<Vec<(Op, PathBuf)>>,
 }
 
@@ -593,6 +620,8 @@ impl FaultFs {
         Arc::new(FaultFs {
             inner: LocalFs,
             rules: Mutex::new(Vec::new()),
+            byte_rules: Mutex::new(Vec::new()),
+            hooks: Mutex::new(Vec::new()),
             hits: Mutex::new(Vec::new()),
         })
     }
@@ -617,11 +646,55 @@ impl FaultFs {
         });
     }
 
+    /// Run `f` on the `nth` (1-based) `op` whose path ends with `suffix`, just before it.
+    pub fn hook(
+        &self,
+        op: Op,
+        suffix: impl Into<PathBuf>,
+        nth: usize,
+        f: impl Fn() + Send + Sync + 'static,
+    ) {
+        self.hooks.lock().unwrap().push(Hook {
+            op,
+            suffix: suffix.into(),
+            nth,
+            seen: 0,
+            f: Arc::new(f),
+        });
+    }
+
+    /// When copying a file whose path ends with `suffix` has moved `after` bytes, do `action`.
+    pub fn on_bytes(&self, suffix: impl Into<PathBuf>, after: u64, action: ByteAction) {
+        self.byte_rules.lock().unwrap().push(ByteRule {
+            suffix: suffix.into(),
+            after,
+            action,
+            fired: false,
+        });
+    }
+
     pub fn clear(&self) {
         self.rules.lock().unwrap().clear();
+        self.byte_rules.lock().unwrap().clear();
+        self.hooks.lock().unwrap().clear();
     }
 
     fn check(&self, op: Op, p: &Path) -> io::Result<()> {
+        // Hooks first, and outside any lock: they may park the thread or touch the disk.
+        let due: Vec<Arc<dyn Fn() + Send + Sync>> = {
+            let mut hooks = self.hooks.lock().unwrap();
+            hooks
+                .iter_mut()
+                .filter(|h| (h.op == op || h.op == Op::Any) && p.ends_with(&h.suffix))
+                .filter_map(|h| {
+                    h.seen += 1;
+                    (h.seen == h.nth).then(|| h.f.clone())
+                })
+                .collect()
+        };
+        for f in due {
+            f();
+        }
         let mut rules = self.rules.lock().unwrap();
         for r in rules.iter_mut() {
             if (r.op == op || r.op == Op::Any) && p.ends_with(&r.suffix) {
@@ -690,7 +763,61 @@ impl FsEngine for FaultFs {
     }
     fn copy_file(&self, req: &CopyRequest, ctl: &mut dyn CopyControl) -> io::Result<CopyOutcome> {
         self.check(Op::CopyFile, &req.src)?;
-        self.inner.copy_file(req, ctl)
+        // A rule that fires partway through the data.
+        let has_rule = self
+            .byte_rules
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|r| !r.fired && req.src.ends_with(&r.suffix));
+        if !has_rule {
+            return self.inner.copy_file(req, ctl);
+        }
+        struct Tap<'a> {
+            inner: &'a mut dyn CopyControl,
+            fs: &'a FaultFs,
+            src: &'a Path,
+            seen: u64,
+            failed: Option<i32>,
+        }
+        impl CopyControl for Tap<'_> {
+            fn advance(&mut self, n: u64) -> bool {
+                self.seen += n;
+                let mut todo: Option<Arc<dyn Fn() + Send + Sync>> = None;
+                {
+                    let mut rules = self.fs.byte_rules.lock().unwrap();
+                    for r in rules.iter_mut() {
+                        if !r.fired && self.src.ends_with(&r.suffix) && self.seen >= r.after {
+                            r.fired = true;
+                            match &r.action {
+                                ByteAction::Fail(e) => self.failed = Some(*e),
+                                ByteAction::Run(f) => todo = Some(f.clone()),
+                            }
+                        }
+                    }
+                }
+                if let Some(f) = todo {
+                    f();
+                }
+                if self.failed.is_some() {
+                    return false;
+                }
+                self.inner.advance(n)
+            }
+        }
+        let mut tap = Tap {
+            inner: ctl,
+            fs: self,
+            src: &req.src,
+            seen: 0,
+            failed: None,
+        };
+        let r = self.inner.copy_file(req, &mut tap);
+        match (tap.failed, r) {
+            // The copy was stopped by the rule: the destination is already cleaned up.
+            (Some(errno), _) => Err(io::Error::from_raw_os_error(errno)),
+            (None, r) => r,
+        }
     }
     fn available_space(&self, p: &Path) -> io::Result<u64> {
         self.inner.available_space(p)
