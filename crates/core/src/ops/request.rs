@@ -14,12 +14,14 @@ use std::sync::Arc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::archives::ExtractInto;
 use super::engine::Engine;
 use super::plan::{ConflictPolicy, Plan};
 use super::planner::TransferOptions;
 use super::rename::Pattern;
 use super::scan::{Scan, ScanControl};
 use super::undo::UndoPlan;
+use crate::archive::{self, ArchiveKind};
 use crate::journal::Journal;
 use crate::{Error, Result, pathcodec};
 
@@ -95,6 +97,38 @@ pub enum OpRequest {
         #[schemars(with = "Vec<String>")]
         sources: Vec<PathBuf>,
     },
+    /// Take the contents of an archive out into a folder. With `only`, just those members
+    /// (paths inside the archive); without, everything.
+    Extract {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        archive: PathBuf,
+        /// The folder to extract into (or to make the new folder in).
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        destination: PathBuf,
+        #[serde(default)]
+        into: ExtractInto,
+        /// Members to extract, as paths inside the archive; empty means all.
+        #[serde(with = "pathcodec::paths", default)]
+        #[schemars(with = "Vec<String>")]
+        only: Vec<PathBuf>,
+        #[serde(default)]
+        conflict: ConflictPolicy,
+    },
+    /// Put items into a new archive.
+    Compress {
+        #[serde(with = "pathcodec::paths")]
+        #[schemars(with = "Vec<String>")]
+        sources: Vec<PathBuf>,
+        /// The archive to create (full path, including its extension).
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        archive: PathBuf,
+        format: ArchiveKind,
+        #[serde(default)]
+        conflict: ConflictPolicy,
+    },
     /// Undo a journal entry (the most recent undoable one when `entry` is omitted).
     Undo {
         #[serde(default)]
@@ -161,6 +195,28 @@ impl OpRequest {
             OpRequest::Trash { sources } | OpRequest::Delete { sources } => {
                 require_absolute(sources, "sources")
             }
+            OpRequest::Extract {
+                archive,
+                destination,
+                only,
+                ..
+            } => {
+                require_absolute(std::slice::from_ref(archive), "archive")?;
+                require_absolute(std::slice::from_ref(destination), "destination")?;
+                if let Some(p) = only.iter().find(|p| p.is_absolute()) {
+                    return Err(Error::Invalid(format!(
+                        "members to extract are paths inside the archive, got {}",
+                        crate::display::path(p)
+                    )));
+                }
+                Ok(())
+            }
+            OpRequest::Compress {
+                sources, archive, ..
+            } => {
+                require_absolute(sources, "sources")?;
+                require_absolute(std::slice::from_ref(archive), "archive")
+            }
             OpRequest::Undo { .. } => Ok(()),
         }
     }
@@ -199,7 +255,54 @@ impl Engine {
         ctl: ScanControl<'_>,
     ) -> Result<Planned> {
         req.validate()?;
+        self.refuse_archive_writes(req)?;
         let planned = match req {
+            OpRequest::Copy {
+                sources,
+                destination,
+                conflict,
+                ..
+            } if self.archive_sources(sources)?.is_some() => {
+                // Copying out of an archive is an extraction of those members.
+                let (archive, only) = self.archive_sources(sources)?.expect("checked");
+                let plan = self.plan_extract(
+                    &archive,
+                    &only,
+                    destination,
+                    &ExtractInto::Here,
+                    *conflict,
+                    ctl,
+                )?;
+                Planned {
+                    plan,
+                    scan: None,
+                    undo: None,
+                }
+            }
+            OpRequest::Extract {
+                archive,
+                destination,
+                into,
+                only,
+                conflict,
+            } => Planned {
+                plan: self.plan_extract(archive, only, destination, into, *conflict, ctl)?,
+                scan: None,
+                undo: None,
+            },
+            OpRequest::Compress {
+                sources,
+                archive,
+                format,
+                conflict,
+            } => {
+                let scan = Arc::new(self.scan(sources, ctl));
+                Planned {
+                    plan: self.plan_compress(&scan, archive, *format, *conflict),
+                    scan: Some(scan),
+                    undo: None,
+                }
+            }
             OpRequest::Copy {
                 sources,
                 destination,
@@ -299,6 +402,95 @@ impl Engine {
             planned.plan.request = Some(req.clone());
         }
         Ok(planned)
+    }
+}
+
+impl Engine {
+    /// The archive all of `sources` lie in, with their paths inside it; `None` when none of
+    /// them is in an archive. Items from two archives, or from an archive and a folder, are
+    /// refused: one extraction reads one archive.
+    pub(super) fn archive_sources(
+        &self,
+        sources: &[PathBuf],
+    ) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
+        let mut found: Option<PathBuf> = None;
+        let mut inner = Vec::new();
+        let mut outside = 0usize;
+        for s in sources {
+            match archive::locate(&*self.fs, s) {
+                Some(loc) if !loc.inner.as_os_str().is_empty() => {
+                    match &found {
+                        Some(a) if *a != loc.archive => {
+                            return Err(Error::Invalid(
+                                "the selection is in two different archives; copy them one archive at a time".into(),
+                            ));
+                        }
+                        _ => found = Some(loc.archive),
+                    }
+                    inner.push(loc.inner);
+                }
+                _ => outside += 1,
+            }
+        }
+        match found {
+            None => Ok(None),
+            Some(_) if outside > 0 => Err(Error::Invalid(
+                "the selection mixes items from an archive with items outside it".into(),
+            )),
+            Some(a) => Ok(Some((a, inner))),
+        }
+    }
+
+    /// Archives are read-only folders: nothing may be written, moved, renamed or deleted in
+    /// them, and the message says what to do instead.
+    fn refuse_archive_writes(&self, req: &OpRequest) -> Result<()> {
+        let inside = |p: &PathBuf| archive::is_inside(&*self.fs, p);
+        let refuse = |p: &PathBuf, what: &str| {
+            Err(Error::Invalid(format!(
+                "{} is inside an archive, which is read-only: {what}",
+                crate::display::path(p)
+            )))
+        };
+        match req {
+            OpRequest::Copy { destination, .. } | OpRequest::Extract { destination, .. }
+                if inside(destination) =>
+            {
+                refuse(destination, "choose a folder outside it")
+            }
+            OpRequest::Move {
+                sources,
+                destination,
+                ..
+            } => {
+                if let Some(p) = sources.iter().find(|p| inside(p)) {
+                    return refuse(p, "copy it out instead (an archive cannot be changed)");
+                }
+                if inside(destination) {
+                    return refuse(destination, "choose a folder outside it");
+                }
+                Ok(())
+            }
+            OpRequest::Trash { sources } | OpRequest::Delete { sources } => {
+                match sources.iter().find(|p| inside(p)) {
+                    Some(p) => refuse(p, "an archive cannot be changed"),
+                    None => Ok(()),
+                }
+            }
+            OpRequest::BulkRename { items, .. } => match items.iter().find(|p| inside(p)) {
+                Some(p) => refuse(p, "an archive cannot be changed"),
+                None => Ok(()),
+            },
+            OpRequest::Rename { path, .. } if inside(path) => {
+                refuse(path, "an archive cannot be changed")
+            }
+            OpRequest::MakeDir { parent, .. } if inside(parent) => {
+                refuse(parent, "an archive cannot be changed")
+            }
+            OpRequest::Compress { archive, .. } if inside(archive) => {
+                refuse(archive, "choose a folder outside it")
+            }
+            _ => Ok(()),
+        }
     }
 }
 

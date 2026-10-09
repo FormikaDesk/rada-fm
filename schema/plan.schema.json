@@ -10,6 +10,16 @@
       ],
       "default": null
     },
+    "estimated_bytes": {
+      "description": "For a new archive: about how large it will be (a guess from the kind of files).",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "default": null,
+      "minimum": 0
+    },
     "items": {
       "description": "One entry per selected item, for a readable overview.",
       "type": "array",
@@ -105,6 +115,70 @@
     "items"
   ],
   "$defs": {
+    "ArchiveKind": {
+      "description": "Which formats a user may ask `rada` to create.",
+      "type": "string",
+      "enum": [
+        "zip",
+        "tar_gz",
+        "tar_zst",
+        "tar_xz"
+      ]
+    },
+    "CompressItem": {
+      "description": "One member of an archive to be created.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FileKind"
+        },
+        "link": {
+          "description": "For a symlink: where it points.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "mode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "mtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "Its path inside the archive.",
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "src": {
+          "description": "Where it is on disk.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "name",
+        "kind",
+        "size"
+      ]
+    },
     "ConflictPolicy": {
       "description": "How to resolve a destination that already exists.",
       "oneOf": [
@@ -122,6 +196,54 @@
           "description": "Replace; the old item is moved to the trash first so that undo can bring it back.",
           "type": "string",
           "const": "overwrite"
+        }
+      ]
+    },
+    "ExtractInto": {
+      "description": "Where the members of an archive land.",
+      "oneOf": [
+        {
+          "description": "Straight into the destination folder.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "here"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Into a folder named after the archive (without its extensions) — unless the archive\nalready has a single folder at its top, which then is the folder.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "auto"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Into a folder with this name.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "folder"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "name"
+          ]
         }
       ]
     },
@@ -258,16 +380,30 @@
       ]
     },
     "OpKind": {
-      "type": "string",
-      "enum": [
-        "copy",
-        "move",
-        "rename",
-        "bulk_rename",
-        "make_dir",
-        "trash",
-        "delete",
-        "undo"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "copy",
+            "move",
+            "rename",
+            "bulk_rename",
+            "make_dir",
+            "trash",
+            "delete",
+            "undo"
+          ]
+        },
+        {
+          "description": "Take files out of an archive.",
+          "type": "string",
+          "const": "extract"
+        },
+        {
+          "description": "Put files into a new archive.",
+          "type": "string",
+          "const": "compress"
+        }
       ]
     },
     "OpRequest": {
@@ -471,6 +607,81 @@
           "required": [
             "op",
             "sources"
+          ]
+        },
+        {
+          "description": "Take the contents of an archive out into a folder. With `only`, just those members\n(paths inside the archive); without, everything.",
+          "type": "object",
+          "properties": {
+            "archive": {
+              "type": "string"
+            },
+            "conflict": {
+              "$ref": "#/$defs/ConflictPolicy",
+              "default": "skip"
+            },
+            "destination": {
+              "description": "The folder to extract into (or to make the new folder in).",
+              "type": "string"
+            },
+            "into": {
+              "$ref": "#/$defs/ExtractInto",
+              "default": {
+                "mode": "auto"
+              }
+            },
+            "only": {
+              "description": "Members to extract, as paths inside the archive; empty means all.",
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            },
+            "op": {
+              "type": "string",
+              "const": "extract"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "archive",
+            "destination"
+          ]
+        },
+        {
+          "description": "Put items into a new archive.",
+          "type": "object",
+          "properties": {
+            "archive": {
+              "description": "The archive to create (full path, including its extension).",
+              "type": "string"
+            },
+            "conflict": {
+              "$ref": "#/$defs/ConflictPolicy",
+              "default": "skip"
+            },
+            "format": {
+              "$ref": "#/$defs/ArchiveKind"
+            },
+            "op": {
+              "type": "string",
+              "const": "compress"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "sources",
+            "archive",
+            "format"
           ]
         },
         {
@@ -831,6 +1042,125 @@
           ]
         },
         {
+          "description": "One file out of an archive, written under a temporary name and renamed into place\nwhen complete. The members of one archive are extracted in the order the archive\nholds them, in a single pass.",
+          "type": "object",
+          "properties": {
+            "archive": {
+              "description": "The archive file.",
+              "type": "string"
+            },
+            "dst": {
+              "type": "string"
+            },
+            "entry": {
+              "description": "The member's position in the archive's list when the plan was made.",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "mode": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "mtime": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Stamp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "size": {
+              "description": "Declared size: what is written never exceeds it.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "src": {
+              "description": "The member as a path (`/home/u/photos.zip/2024/a.jpg`): what the user sees.",
+              "type": "string"
+            },
+            "step": {
+              "type": "string",
+              "const": "extract_file"
+            }
+          },
+          "required": [
+            "step",
+            "src",
+            "archive",
+            "entry",
+            "dst",
+            "size"
+          ]
+        },
+        {
+          "description": "A symbolic link stored in an archive, created as a link and never followed.",
+          "type": "object",
+          "properties": {
+            "dst": {
+              "type": "string"
+            },
+            "src": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string",
+              "const": "extract_symlink"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "step",
+            "src",
+            "dst",
+            "target"
+          ]
+        },
+        {
+          "description": "A whole new archive, written under a temporary name and renamed into place.",
+          "type": "object",
+          "properties": {
+            "dst": {
+              "type": "string"
+            },
+            "format": {
+              "$ref": "#/$defs/ArchiveKind"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CompressItem"
+              }
+            },
+            "size": {
+              "description": "Bytes of file data that will be read.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "step": {
+              "type": "string",
+              "const": "compress"
+            }
+          },
+          "required": [
+            "step",
+            "dst",
+            "format",
+            "items",
+            "size"
+          ]
+        },
+        {
           "type": "object",
           "properties": {
             "from": {
@@ -1118,6 +1448,51 @@
           "description": "An undo step cannot be carried out (target occupied, source gone, ...).",
           "type": "string",
           "const": "CannotUndo"
+        },
+        {
+          "description": "Archive members whose paths would write outside the destination: not extracted.",
+          "type": "string",
+          "const": "UnsafePath"
+        },
+        {
+          "description": "Archive links that point outside the extracted folder (kept as links, never followed).",
+          "type": "string",
+          "const": "LinkOutside"
+        },
+        {
+          "description": "An archive that unpacks to far more than its size, or to more than the limit.",
+          "type": "string",
+          "const": "ArchiveBomb"
+        },
+        {
+          "description": "An archive that is truncated or damaged: only what could be read is listed.",
+          "type": "string",
+          "const": "ArchiveDamaged"
+        },
+        {
+          "description": "Members protected by a password.",
+          "type": "string",
+          "const": "Encrypted"
+        },
+        {
+          "description": "Symbolic links stored in a ZIP, which not every program understands.",
+          "type": "string",
+          "const": "ZipLinks"
+        },
+        {
+          "description": "Names that cannot be stored exactly in the chosen format.",
+          "type": "string",
+          "const": "NamesChanged"
+        },
+        {
+          "description": "Setuid and setgid bits dropped from extracted files.",
+          "type": "string",
+          "const": "SetuidDropped"
+        },
+        {
+          "description": "A hard link in an archive whose target is not being extracted.",
+          "type": "string",
+          "const": "LinkTargetMissing"
         }
       ]
     }

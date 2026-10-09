@@ -48,6 +48,8 @@ fn the_request_schema_describes_every_operation() {
         "make_dir",
         "trash",
         "delete",
+        "extract",
+        "compress",
         "undo",
     ] {
         assert!(

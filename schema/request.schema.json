@@ -204,6 +204,81 @@
       ]
     },
     {
+      "description": "Take the contents of an archive out into a folder. With `only`, just those members\n(paths inside the archive); without, everything.",
+      "type": "object",
+      "properties": {
+        "archive": {
+          "type": "string"
+        },
+        "conflict": {
+          "$ref": "#/$defs/ConflictPolicy",
+          "default": "skip"
+        },
+        "destination": {
+          "description": "The folder to extract into (or to make the new folder in).",
+          "type": "string"
+        },
+        "into": {
+          "$ref": "#/$defs/ExtractInto",
+          "default": {
+            "mode": "auto"
+          }
+        },
+        "only": {
+          "description": "Members to extract, as paths inside the archive; empty means all.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "op": {
+          "type": "string",
+          "const": "extract"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "archive",
+        "destination"
+      ]
+    },
+    {
+      "description": "Put items into a new archive.",
+      "type": "object",
+      "properties": {
+        "archive": {
+          "description": "The archive to create (full path, including its extension).",
+          "type": "string"
+        },
+        "conflict": {
+          "$ref": "#/$defs/ConflictPolicy",
+          "default": "skip"
+        },
+        "format": {
+          "$ref": "#/$defs/ArchiveKind"
+        },
+        "op": {
+          "type": "string",
+          "const": "compress"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "sources",
+        "archive",
+        "format"
+      ]
+    },
+    {
       "description": "Undo a journal entry (the most recent undoable one when `entry` is omitted).",
       "type": "object",
       "properties": {
@@ -226,6 +301,16 @@
     }
   ],
   "$defs": {
+    "ArchiveKind": {
+      "description": "Which formats a user may ask `rada` to create.",
+      "type": "string",
+      "enum": [
+        "zip",
+        "tar_gz",
+        "tar_zst",
+        "tar_xz"
+      ]
+    },
     "ConflictPolicy": {
       "description": "How to resolve a destination that already exists.",
       "oneOf": [
@@ -243,6 +328,54 @@
           "description": "Replace; the old item is moved to the trash first so that undo can bring it back.",
           "type": "string",
           "const": "overwrite"
+        }
+      ]
+    },
+    "ExtractInto": {
+      "description": "Where the members of an archive land.",
+      "oneOf": [
+        {
+          "description": "Straight into the destination folder.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "here"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Into a folder named after the archive (without its extensions) — unless the archive\nalready has a single folder at its top, which then is the folder.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "auto"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "description": "Into a folder with this name.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "folder"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode",
+            "name"
+          ]
         }
       ]
     }
