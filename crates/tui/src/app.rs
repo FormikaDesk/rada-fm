@@ -13,6 +13,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::events::{
     CoreEvent, DirEvent, FailureInfo, JobEvent, JobId, PreviewEvent, WatchEvent,
 };
+use rada_core::archive::{ArchiveKind, ArchiveView};
 use rada_core::jobs::JobHandle;
 use rada_core::journal::JournalEntry;
 use rada_core::model::{DirListing, Entry, SortKey, SortSpec};
@@ -20,7 +21,7 @@ use rada_core::ops::{
     Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Progress, Scan, TransferMode,
     TransferOptions, UndoPlan,
 };
-use rada_core::ops::{OpKind, Totals};
+use rada_core::ops::{ExtractInto, OpKind, OpRequest, Totals, WarningKind};
 use rada_core::platform::Volume;
 use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
@@ -127,6 +128,8 @@ impl Running {
 #[derive(Clone)]
 pub enum Replan {
     Transfer { dest: PathBuf, mode: TransferMode },
+    /// Asked again from the request the plan answers (an extraction, a new archive).
+    Request,
     None,
 }
 
@@ -145,10 +148,15 @@ pub struct PlanView {
 }
 
 impl PlanView {
-    /// Permanent deletion is the only operation that asks for a typed confirmation
-    /// (undoing something is not "irreversible" in that sense).
+    /// Permanent deletion, and the extraction of what may be an archive bomb, ask for a typed
+    /// confirmation (undoing something is not "irreversible" in that sense).
     pub fn needs_typed_confirmation(&self) -> bool {
         self.plan.kind == rada_core::ops::OpKind::Delete
+            || self
+                .plan
+                .warnings
+                .iter()
+                .any(|w| w.kind == WarningKind::ArchiveBomb)
     }
 
     pub fn can_run(&self) -> bool {
@@ -162,6 +170,18 @@ pub enum InputKind {
     Rename { from: PathBuf },
     NewDir,
     BulkRename { items: Vec<PathBuf> },
+    /// The folder to extract an archive into, named after the archive unless changed.
+    ExtractTo {
+        archive: PathBuf,
+        dest: PathBuf,
+        default: String,
+    },
+    /// The name (and so the format) of a new archive.
+    Compress {
+        sources: Vec<PathBuf>,
+        dir: PathBuf,
+        format: ArchiveKind,
+    },
 }
 
 pub struct InputView {
@@ -324,6 +344,7 @@ pub struct Demo {
     pub dest: Option<PathBuf>,
 }
 
+mod archives;
 mod input;
 mod side;
 
@@ -335,6 +356,8 @@ pub struct App {
     svc: Services,
 
     pub cwd: PathBuf,
+    /// Set while looking inside an archive: the folder shown is a read-only virtual one.
+    pub archive: Option<ArchiveView>,
     pub listing: DirListing,
     pub load: LoadState,
     dir_gen: u64,
@@ -405,6 +428,7 @@ impl App {
             th: cfg.theme,
             icons: cfg.icons,
             cwd: cfg.start_dir.clone(),
+            archive: None,
             listing: DirListing::new(cfg.start_dir.clone(), Vec::new(), cfg.sort),
             load: LoadState::Loading(cfg.start_dir.clone()),
             dir_gen: 0,
@@ -695,6 +719,20 @@ impl App {
         if e.is_dir() {
             let target = e.path.clone();
             self.open_dir(target);
+        } else if self.archive.is_some() {
+            self.toast(
+                ToastKind::Info,
+                format!(
+                    "inside an archive: copy ({}) it to a folder, or extract with {}",
+                    self.key_for(Action::Copy).unwrap_or_else(|| "copy".into()),
+                    self.key_for(Action::ExtractHere)
+                        .unwrap_or_else(|| "extract".into()),
+                ),
+                4,
+            );
+        } else if self.archive_candidate(e) {
+            let target = e.path.clone();
+            self.open_dir(target);
         } else if e.error.is_none() {
             let path = e.path.clone();
             let platform = self.svc.platform.clone();
@@ -743,7 +781,7 @@ impl App {
                 generation,
                 path,
                 result,
-                ..
+                archive,
             } => {
                 if generation != self.dir_gen {
                     return; // an answer to a request that has been superseded
@@ -760,6 +798,8 @@ impl App {
                             self.remembered.get(&path).cloned()
                         };
                         self.listing = DirListing::new(path.clone(), entries, self.sort);
+                        let virtual_dir = archive.is_some();
+                        self.archive = archive;
                         if !same_dir {
                             match self.nav_move.take() {
                                 Some(NavMove::Back(to)) if to == path => self.nav.stepped_back(),
@@ -772,8 +812,12 @@ impl App {
                             self.clear_marks();
                             self.cursor = 0;
                             self.scroll = 0;
-                            self.svc.places.visit(path.clone());
-                            self.svc.watcher.watch(path);
+                            // An archive's folders are not on the disk: nothing to watch, and
+                            // not a place to come back to.
+                            if !virtual_dir {
+                                self.svc.places.visit(path.clone());
+                                self.svc.watcher.watch(path);
+                            }
                             self.previewed = None;
                         } else {
                             let existing: BTreeSet<OsString> =
@@ -937,7 +981,16 @@ impl App {
                     self.modal = None;
                     self.plan_job = None;
                     self.running = None;
-                    self.toast(ToastKind::Error, message, 6);
+                    // A sentence that does not fit a one-line message is read in a window.
+                    if message.chars().count() > 70 {
+                        self.modal = Some(Modal::Result(ResultView {
+                            title: "Could not go on".to_string(),
+                            lines: vec![(ToastKind::Error, message)],
+                            scroll: 0,
+                        }));
+                    } else {
+                        self.toast(ToastKind::Error, message, 6);
+                    }
                 }
             }
             JobEvent::NothingToUndo { job } => {
@@ -1144,6 +1197,7 @@ impl App {
                 dest: d.clone(),
                 mode: TransferMode::Move,
             },
+            (OpKind::Extract | OpKind::Compress, _) if plan.request.is_some() => Replan::Request,
             _ => Replan::None,
         };
         if self.demo_auto_run {
@@ -1202,8 +1256,24 @@ impl App {
         }
     }
 
+    /// Archives are read-only: say so, with the way to do what was meant.
+    pub(super) fn refuse_in_archive(&mut self, what: &str) -> bool {
+        if self.archive.is_none() {
+            return false;
+        }
+        self.toast(
+            ToastKind::Warn,
+            format!(
+                "an archive is read-only — cannot {what}; copy ({}) items out to a folder instead",
+                self.key_for(Action::Copy).unwrap_or_else(|| "copy".into())
+            ),
+            5,
+        );
+        true
+    }
+
     fn start_paste(&mut self) {
-        if self.refuse_if_busy() {
+        if self.refuse_if_busy() || self.refuse_in_archive("paste here") {
             return;
         }
         let Some(clip) = self.clipboard.clone() else {
@@ -1230,7 +1300,7 @@ impl App {
     }
 
     fn start_trash(&mut self, permanent: bool) {
-        if self.refuse_if_busy() {
+        if self.refuse_if_busy() || self.refuse_in_archive("delete") {
             return;
         }
         let t = self.targets();
@@ -1258,18 +1328,28 @@ impl App {
         if pv.needs_typed_confirmation() || pv.replanning.is_some() || pv.plan.policy == policy {
             return;
         }
-        if let (Some(scan), Replan::Transfer { dest, mode }) = (pv.scan.clone(), pv.replan.clone())
-        {
-            let h = self.svc.jobs.replan_transfer(
-                scan,
-                dest,
-                TransferOptions {
-                    mode,
-                    policy,
-                    verify: false,
-                },
-            );
-            pv.replanning = Some(h.id);
+        match pv.replan.clone() {
+            Replan::Transfer { dest, mode } => {
+                if let Some(scan) = pv.scan.clone() {
+                    let h = self.svc.jobs.replan_transfer(
+                        scan,
+                        dest,
+                        TransferOptions {
+                            mode,
+                            policy,
+                            verify: false,
+                        },
+                    );
+                    pv.replanning = Some(h.id);
+                }
+            }
+            Replan::Request => {
+                if let Some(req) = pv.plan.request.as_ref().and_then(|r| r.with_conflict(policy)) {
+                    let h = self.svc.jobs.plan_request(req);
+                    pv.replanning = Some(h.id);
+                }
+            }
+            Replan::None => {}
         }
     }
 
@@ -1310,6 +1390,53 @@ impl App {
             InputKind::NewDir => {
                 let h = self.svc.jobs.plan_mkdir(self.cwd.clone(), iv.text.clone());
                 self.begin_plan("Planning", h);
+            }
+            InputKind::ExtractTo {
+                archive,
+                dest,
+                default,
+            } => {
+                let name = iv.text.trim().to_string();
+                let into = if name == *default {
+                    ExtractInto::Auto
+                } else {
+                    ExtractInto::Folder { name }
+                };
+                let h = self.svc.jobs.plan_request(OpRequest::Extract {
+                    archive: archive.clone(),
+                    destination: dest.clone(),
+                    into,
+                    only: Vec::new(),
+                    conflict: ConflictPolicy::Skip,
+                });
+                self.begin_plan("Reading the archive", h);
+            }
+            InputKind::Compress {
+                sources,
+                dir,
+                format,
+            } => {
+                let mut name = iv.text.trim().to_string();
+                if name.contains(['/', '\\']) {
+                    let mut iv = iv;
+                    iv.error = Some("a name cannot contain a slash".into());
+                    self.modal = Some(Modal::Input(iv));
+                    return;
+                }
+                let kind = match ArchiveKind::from_name(std::ffi::OsStr::new(&name)) {
+                    Some(k) => k,
+                    None => {
+                        name.push_str(format.extension());
+                        *format
+                    }
+                };
+                let h = self.svc.jobs.plan_request(OpRequest::Compress {
+                    sources: sources.clone(),
+                    archive: dir.join(&name),
+                    format: kind,
+                    conflict: ConflictPolicy::Skip,
+                });
+                self.begin_plan("Planning compression", h);
             }
             InputKind::BulkRename { items } => match Pattern::parse(&iv.text) {
                 Ok(_) => {
@@ -1367,6 +1494,9 @@ impl App {
     }
 
     fn yank(&mut self, mode: TransferMode) {
+        if mode == TransferMode::Move && self.refuse_in_archive("cut") {
+            return;
+        }
         let paths = self.targets();
         if paths.is_empty() {
             return;
@@ -1406,7 +1536,7 @@ impl App {
     }
 
     fn start_rename(&mut self) {
-        if self.refuse_if_busy() {
+        if self.refuse_if_busy() || self.refuse_in_archive("rename") {
             return;
         }
         if let Some(e) = self.current() {
@@ -1420,7 +1550,7 @@ impl App {
     }
 
     fn start_bulk_rename(&mut self) {
-        if self.refuse_if_busy() {
+        if self.refuse_if_busy() || self.refuse_in_archive("rename") {
             return;
         }
         let items = self.targets();
@@ -1690,8 +1820,7 @@ impl App {
                     }
                 }
                 KeyCode::Char('c')
-                    if !pv.needs_typed_confirmation()
-                        && matches!(pv.replan, Replan::Transfer { .. }) =>
+                    if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
                 {
                     let policy = pv.plan.policy.next();
                     self.replan_with(&mut pv, policy);
@@ -1747,6 +1876,10 @@ impl App {
             }
             Modal::Input(mut iv) => match key.code {
                 KeyCode::Esc => {}
+                KeyCode::Tab if matches!(iv.kind, InputKind::Compress { .. }) => {
+                    iv.cycle_format();
+                    self.modal = Some(Modal::Input(iv));
+                }
                 KeyCode::Enter => {
                     if iv.text.is_empty() {
                         self.modal = Some(Modal::Input(iv));

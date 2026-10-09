@@ -20,6 +20,12 @@
 //! hints = true               # false: no key hints in the bottom bar
 //! sidebar = true             # shown by default; Ctrl+B toggles and remembers
 //!
+//! [archives]
+//! max_extract_gb = 8         # an extraction that would write more asks for a typed "yes"
+//! max_ratio = 200            # ...and so does one that unpacks this many times its size
+//! preview_entries = 200      # items listed in the preview of an archive
+//! preview_seconds = 1.5      # how long counting an archive's members may take there
+//!
 //! [devices]
 //! hide = ["tmpfs", "/boot"]   # replaces the built-in list of mounts kept out of the disks
 //!                               # (a name is a filesystem type, `fuse.*` a prefix of types;
@@ -32,6 +38,7 @@
 
 use std::collections::HashMap;
 
+use rada_core::archive::ArchiveLimits;
 use rada_core::model::{SortKey, SortSpec};
 use rada_core::platform::Dirs;
 use rada_core::preview::ImageLimits;
@@ -47,6 +54,9 @@ pub struct FileConfig {
     pub appearance: Option<String>,
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
+    pub archive_limits: ArchiveLimits,
+    pub archive_preview_entries: usize,
+    pub archive_preview_seconds: f32,
     pub mouse: bool,
     pub hints: bool,
     pub sidebar: bool,
@@ -61,6 +71,14 @@ pub struct FileConfig {
 enum Keys {
     One(String),
     Many(Vec<String>),
+}
+
+#[derive(Deserialize, Default)]
+struct ArchivesRaw {
+    max_extract_gb: Option<u64>,
+    max_ratio: Option<u64>,
+    preview_entries: Option<usize>,
+    preview_seconds: Option<f32>,
 }
 
 #[derive(Deserialize, Default)]
@@ -86,6 +104,7 @@ struct Raw {
     hints: Option<bool>,
     sidebar: Option<bool>,
     devices: Option<DevicesRaw>,
+    archives: Option<ArchivesRaw>,
     keymap: Option<String>,
     keys: Option<HashMap<String, Keys>>,
 }
@@ -104,7 +123,19 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         Some("date") | Some("modified") => SortKey::Modified,
         _ => SortKey::Name,
     };
+    let archives = raw.archives.unwrap_or_default();
+    let al = ArchiveLimits::default();
     FileConfig {
+        archive_limits: ArchiveLimits {
+            max_total_bytes: archives
+                .max_extract_gb
+                .map(|g| g.saturating_mul(1 << 30))
+                .unwrap_or(al.max_total_bytes),
+            max_ratio: archives.max_ratio.unwrap_or(al.max_ratio).max(1),
+            ..al
+        },
+        archive_preview_entries: archives.preview_entries.unwrap_or(200).clamp(10, 5000),
+        archive_preview_seconds: archives.preview_seconds.unwrap_or(1.5).clamp(0.0, 30.0),
         icons: raw.icons,
         show_hidden: raw.show_hidden.unwrap_or(false),
         sort: SortSpec {
@@ -169,6 +200,16 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("config.toml"), text).unwrap();
         load(&dirs)
+    }
+
+    #[test]
+    fn archive_limits_are_read_and_have_defaults() {
+        let c = with_config("[archives]\nmax_extract_gb = 2\nmax_ratio = 50\n");
+        assert_eq!(c.archive_limits.max_total_bytes, 2 << 30);
+        assert_eq!(c.archive_limits.max_ratio, 50);
+        let d = with_config("sidebar = true\n");
+        assert_eq!(d.archive_limits, ArchiveLimits::default());
+        assert_eq!(d.archive_preview_entries, 200);
     }
 
     #[test]

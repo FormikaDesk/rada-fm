@@ -1,5 +1,6 @@
 ---
 source: crates/tui/tests/snapshots.rs
+assertion_line: 190
 expression: shot(&mut h)
 ---
   ‹   ›   ↑   ⌂ › demo › projects                                 ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
@@ -46,11 +47,11 @@ expression: shot(&mut h)
      │ │  Rename                        r                             F2                              │
      │ │  Rename many                   R                                                             │
      │ │  New folder                    n                             Ctrl+N F7                       │
+     │ │  Extract here                  e                             Ctrl+E                          │
+     │ │  Extract to a folder…          E                             Alt+e                           │
+     │ │  Compress…                     z                             Alt+z                           │
      │ │  Undo                          u                             Ctrl+Z                          │
      │ │  Redo                          Ctrl+R                        Ctrl+Y Ctrl+Shift+Z             │
-     │ │  Operation history             U                             F3                              │
-     │ │                                                                                              │
-     │ │  Looking                                                                                     │
      │ │                                                                                              │
      │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
      │                                                                 │

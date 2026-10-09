@@ -221,6 +221,20 @@ impl OpRequest {
         }
     }
 
+    /// The same request with another way of settling name clashes; `None` for requests that
+    /// have no such thing.
+    pub fn with_conflict(&self, policy: ConflictPolicy) -> Option<OpRequest> {
+        let mut r = self.clone();
+        match &mut r {
+            OpRequest::Copy { conflict, .. }
+            | OpRequest::Move { conflict, .. }
+            | OpRequest::Extract { conflict, .. }
+            | OpRequest::Compress { conflict, .. } => *conflict = policy,
+            _ => return None,
+        }
+        Some(r)
+    }
+
     /// The request for a copy/move, as the interface builds it.
     pub fn transfer(
         sources: Vec<PathBuf>,

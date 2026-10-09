@@ -41,6 +41,9 @@ pub enum Action {
     Rename,
     BulkRename,
     NewFolder,
+    ExtractHere,
+    ExtractToFolder,
+    Compress,
     Undo,
     Redo,
     History,
@@ -96,7 +99,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 44] = [
+    pub const ALL: [Action; 47] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -122,6 +125,9 @@ impl Action {
         Action::Rename,
         Action::BulkRename,
         Action::NewFolder,
+        Action::ExtractHere,
+        Action::ExtractToFolder,
+        Action::Compress,
         Action::Undo,
         Action::Redo,
         Action::History,
@@ -171,6 +177,9 @@ impl Action {
             Action::Rename => "rename",
             Action::BulkRename => "bulk_rename",
             Action::NewFolder => "new_folder",
+            Action::ExtractHere => "extract_here",
+            Action::ExtractToFolder => "extract_to_folder",
+            Action::Compress => "compress",
             Action::Undo => "undo",
             Action::Redo => "redo",
             Action::History => "history",
@@ -225,6 +234,9 @@ impl Action {
             Action::Rename => "Rename",
             Action::BulkRename => "Rename many",
             Action::NewFolder => "New folder",
+            Action::ExtractHere => "Extract here",
+            Action::ExtractToFolder => "Extract to a folder…",
+            Action::Compress => "Compress…",
             Action::Undo => "Undo",
             Action::Redo => "Redo",
             Action::History => "Operation history",
@@ -255,7 +267,7 @@ impl Action {
             ToggleMark | SelectAll | SelectUp | SelectDown | SelectToFirst | SelectToLast
             | ClearSelection => Group::Select,
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
-            | Undo | Redo | History => Group::Files,
+            | ExtractHere | ExtractToFolder | Compress | Undo | Redo | History => Group::Files,
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
             | PreviewUp | Bookmark | SwitchPane | ToggleSidebar => Group::View,
             Help | Quit => Group::Program,
@@ -466,6 +478,9 @@ const VIM: &[(Action, &[&str])] = &[
     (Action::Rename, &["r"]),
     (Action::BulkRename, &["R"]),
     (Action::NewFolder, &["n"]),
+    (Action::ExtractHere, &["e"]),
+    (Action::ExtractToFolder, &["E"]),
+    (Action::Compress, &["z"]),
     (Action::Undo, &["u"]),
     (Action::Redo, &["ctrl+r"]),
     (Action::History, &["U"]),
@@ -507,6 +522,9 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::DeletePermanently, &["shift+delete"]),
     (Action::Rename, &["f2"]),
     (Action::NewFolder, &["ctrl+n", "f7"]),
+    (Action::ExtractHere, &["ctrl+e"]),
+    (Action::ExtractToFolder, &["alt+e"]),
+    (Action::Compress, &["alt+z"]),
     (Action::Undo, &["ctrl+z"]),
     (Action::Redo, &["ctrl+y", "ctrl+shift+z"]),
     (Action::History, &["f3"]),
@@ -927,7 +945,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 44);
+        assert_eq!(Action::ALL.len(), 47);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

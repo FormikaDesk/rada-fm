@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, unbounded};
+use rada_core::archive::ArchiveLimits;
 use rada_core::events::CoreEvent;
 use rada_core::fs::FsEngine;
 use rada_core::jobs::Jobs;
@@ -34,8 +35,18 @@ impl Services {
         platform: Arc<dyn Platform>,
         journal: Option<Journal>,
     ) -> Services {
+        Services::start_with(fs, platform, journal, ArchiveLimits::default())
+    }
+
+    /// [`start`](Self::start) with the user's limits for extracting archives.
+    pub fn start_with(
+        fs: Arc<dyn FsEngine>,
+        platform: Arc<dyn Platform>,
+        journal: Option<Journal>,
+        archive_limits: ArchiveLimits,
+    ) -> Services {
         let (tx, rx) = unbounded();
-        let engine = Engine::new(fs.clone(), platform.clone());
+        let engine = Engine::new(fs.clone(), platform.clone()).with_archive_limits(archive_limits);
         let journal_ok = journal.is_some();
         let jobs = Jobs::new(engine, journal.map(Arc::new), tx.clone());
         // Operations a killed process left half done are settled before anything new runs.

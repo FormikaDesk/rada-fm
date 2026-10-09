@@ -298,7 +298,7 @@ fn main() -> Result<()> {
         Some(s) => Arc::new(s),
         None => Arc::new(LocalFs),
     };
-    let services = Services::start(fs, platform, journal);
+    let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits);
     let cfg = Config {
         start_dir: start,
         icons,
@@ -322,6 +322,8 @@ fn main() -> Result<()> {
         select,
         limits: rada_core::preview::Limits {
             image: cfg_file.image_limits.clone(),
+            archive_entries: cfg_file.archive_preview_entries,
+            archive_seconds: cfg_file.archive_preview_seconds,
             ..Default::default()
         },
     };

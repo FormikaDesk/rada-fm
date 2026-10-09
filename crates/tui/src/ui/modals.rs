@@ -281,7 +281,8 @@ fn draw_plan(
     let plan = &pv.plan;
     let blocked = !plan.is_executable() && plan.blocking().next().is_some();
     let delete = plan.kind == OpKind::Delete;
-    let tone = if blocked || delete {
+    let typed = pv.needs_typed_confirmation();
+    let tone = if blocked || typed {
         th.error
     } else {
         th.accent
@@ -429,7 +430,7 @@ fn draw_plan(
     }
 
     // How name clashes are settled: a segmented control.
-    if matches!(pv.replan, Replan::Transfer { .. }) {
+    if !matches!(pv.replan, Replan::None) {
         seg_line = Some(body.len());
         let mut seg: Vec<Span> = vec![Span::styled("If a name already exists   ", th.dim())];
         for p in [
@@ -503,7 +504,11 @@ fn draw_plan(
                 .map(display::name)
                 .unwrap_or_else(|| display::path(&it.path));
             let name = if is_dir { format!("{name}/") } else { name };
-            let tag = it.action.verb();
+            let tag = match (plan.kind, it.action) {
+                (OpKind::Extract, ItemAction::Copy) => "extract",
+                (OpKind::Compress, ItemAction::Copy) => "add",
+                _ => it.action.verb(),
+            };
             let mut counts: Vec<String> = Vec::new();
             if it.files > 0 && (is_dir || it.files > 1) {
                 counts.push(fmt::count(it.files, "file", "files"));
@@ -600,10 +605,14 @@ fn draw_plan(
 
     // Footer: the typed confirmation for deletions, then the buttons.
     let mut foot: Vec<Line> = Vec::new();
-    if delete {
+    if typed {
         foot.push(Line::from(vec![
             Span::styled(
-                "This cannot be undone.  ",
+                if delete {
+                    "This cannot be undone.  "
+                } else {
+                    "This archive may be a bomb.  "
+                },
                 Style::default().fg(th.error).add_modifier(Modifier::BOLD),
             ),
             Span::styled("Type ", th.dim()),
@@ -633,7 +642,7 @@ fn draw_plan(
     }
     button_hits.push((buttons.len(), Target::Key(KeyCode::Esc)));
     buttons.push(button(th, "Esc", "Cancel", None, true));
-    if !delete {
+    if !typed {
         buttons.push(Span::styled("      ↑↓ scroll", th.faint()));
     }
     foot.push(Line::raw(""));
@@ -717,9 +726,17 @@ impl Bases {
             )
         };
         let (src, dst) = match plan.kind {
-            OpKind::Copy | OpKind::Move => {
+            OpKind::Copy | OpKind::Move | OpKind::Extract => {
                 (from_items.or_else(from_steps), plan.destination.clone())
             }
+            // The destination is the new archive; its steps live in the folder it is in.
+            OpKind::Compress => (
+                from_items.or_else(from_steps),
+                plan.destination
+                    .as_deref()
+                    .and_then(|d| d.parent())
+                    .map(std::path::Path::to_path_buf),
+            ),
             OpKind::MakeDir => (None, plan.destination.clone()),
             _ => (from_items.or_else(from_steps), None),
         };
@@ -985,6 +1002,16 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     let (title, hint) = match &iv.kind {
         InputKind::Rename { .. } => ("Rename", "New name"),
         InputKind::NewDir => ("New folder", "Name"),
+        InputKind::ExtractTo { .. } => ("Extract", "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)"),
+        InputKind::Compress { format, .. } => (
+            "Compress",
+            match format {
+                rada_core::archive::ArchiveKind::Zip => "Archive name — Tab changes the format: [zip]  tar.gz  tar.zst  tar.xz",
+                rada_core::archive::ArchiveKind::TarGz => "Archive name — Tab changes the format: zip  [tar.gz]  tar.zst  tar.xz",
+                rada_core::archive::ArchiveKind::TarZst => "Archive name — Tab changes the format: zip  tar.gz  [tar.zst]  tar.xz",
+                rada_core::archive::ArchiveKind::TarXz => "Archive name — Tab changes the format: zip  tar.gz  tar.zst  [tar.xz]",
+            },
+        ),
         InputKind::BulkRename { .. } => (
             "Bulk rename",
             "Pattern:  {name} {ext} {n} {n:3} {parent} {name:lower}   or   s/find/replace/",

@@ -74,8 +74,24 @@ fn hints(app: &App) -> Vec<Hint> {
         v.extend(Hint::act(app, ToggleSidebar, "hide sidebar"));
         return v;
     }
-    let mut v = if app.marked.is_empty() {
+    let mut v = if app.marked.is_empty() && app.in_archive() {
+        // Looking into an archive: reading only.
         acts(&[
+            (Open, "open"),
+            (Copy, "copy out"),
+            (ExtractHere, "extract all"),
+            (ToggleMark, "mark"),
+            (Parent, "back"),
+            (Undo, "undo"),
+            (Help, "help"),
+        ])
+    } else if app.marked.is_empty() {
+        let mut first = if app.on_archive_item() {
+            acts(&[(ExtractHere, "extract"), (ExtractToFolder, "extract to…")])
+        } else {
+            Vec::new()
+        };
+        first.extend(acts(&[
             (Open, "open"),
             (ToggleMark, "mark"),
             (Copy, "copy"),
@@ -90,8 +106,10 @@ fn hints(app: &App) -> Vec<Hint> {
             (Bookmark, "bookmark"),
             (SwitchPane, "sidebar"),
             (ToggleHidden, "hidden"),
+            (Compress, "compress"),
             (Help, "help"),
-        ])
+        ]));
+        first
     } else {
         let mut v = acts(&[
             (Copy, "copy"),

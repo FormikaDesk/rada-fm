@@ -164,11 +164,16 @@ impl App {
             Rename => self.start_rename(),
             BulkRename => self.start_bulk_rename(),
             NewFolder => {
-                self.modal = Some(Modal::Input(InputView::new(
-                    InputKind::NewDir,
-                    String::new(),
-                )))
+                if !self.refuse_in_archive("create a folder") {
+                    self.modal = Some(Modal::Input(InputView::new(
+                        InputKind::NewDir,
+                        String::new(),
+                    )))
+                }
             }
+            ExtractHere => self.start_extract(true),
+            ExtractToFolder => self.start_extract(false),
+            Compress => self.start_compress(),
             Undo => self.start_undo(None),
             Redo => self.start_redo(),
             History => {
@@ -574,19 +579,35 @@ impl App {
         let mut add = |action: Action, enabled: bool, gap_before: bool| {
             items.push(MenuItem::act(action, enabled, gap_before))
         };
+        let ro = self.archive.is_some();
+        let on_archive = self.on_archive_item();
         if on_item {
             add(Open, true, false);
-            add(Copy, true, true);
-            add(Cut, true, false);
-            add(Paste, has_clip, false);
-            add(Rename, true, true);
-            add(Trash, true, false);
-            add(DeletePermanently, true, false);
-            add(NewFolder, true, true);
+            if on_archive {
+                add(ExtractHere, true, true);
+                add(ExtractToFolder, true, false);
+            }
+            add(Copy, true, !on_archive);
+            add(Cut, !ro, false);
+            add(Paste, has_clip && !ro, false);
+            add(Rename, !ro, true);
+            add(Trash, !ro, false);
+            add(DeletePermanently, !ro, false);
+            if ro {
+                add(ExtractHere, true, true);
+                add(ExtractToFolder, true, false);
+            } else {
+                add(Compress, true, true);
+            }
+            add(NewFolder, !ro, !ro && false);
             add(SelectAll, true, false);
         } else {
-            add(Paste, has_clip, false);
-            add(NewFolder, true, false);
+            add(Paste, has_clip && !ro, false);
+            add(NewFolder, !ro, false);
+            if ro {
+                add(ExtractHere, true, true);
+                add(ExtractToFolder, true, false);
+            }
             add(SelectAll, true, false);
         }
         add(Undo, true, true);
