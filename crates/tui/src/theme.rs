@@ -81,6 +81,11 @@ pub struct KindColors {
 #[derive(Clone, Debug)]
 pub struct Theme {
     pub name: &'static str,
+    /// Designed for a light terminal background.
+    pub light: bool,
+    /// The background colour the tokens were chosen against (and tints are mixed
+    /// with). The terminal's own background is still what is drawn.
+    pub canvas: Color,
     /// `None` leaves the terminal's own background (and its transparency) alone.
     pub bg: Option<Color>,
     /// Main text.
@@ -113,18 +118,62 @@ const fn rgb(r: u8, g: u8, b: u8) -> Color {
     Color::Rgb(r, g, b)
 }
 
+/// A named look, with a dark and a light variant.
+#[derive(Clone, Copy)]
+enum Family {
+    Rada,
+    Catppuccin,
+    TokyoNight,
+}
+
+impl Family {
+    fn theme(self, light: bool) -> Theme {
+        match (self, light) {
+            (Family::Rada, false) => Theme::rada(),
+            (Family::Rada, true) => Theme::rada_light(),
+            (Family::Catppuccin, false) => Theme::catppuccin(),
+            (Family::Catppuccin, true) => Theme::catppuccin_latte(),
+            (Family::TokyoNight, false) => Theme::tokyo_night(),
+            (Family::TokyoNight, true) => Theme::tokyo_night_day(),
+        }
+    }
+}
+
 impl Theme {
-    pub const NAMES: [&'static str; 3] = ["rada", "catppuccin", "tokyo-night"];
+    /// Every built-in theme: three for dark terminals, then their light counterparts.
+    pub const NAMES: [&'static str; 6] = [
+        "rada",
+        "catppuccin",
+        "tokyo-night",
+        "rada-light",
+        "catppuccin-latte",
+        "tokyo-night-day",
+    ];
+
+    /// The family a name belongs to and whether the name asks for the light variant.
+    fn family(name: &str) -> Option<(Family, bool)> {
+        Some(match name.to_ascii_lowercase().as_str() {
+            "rada" | "default" => (Family::Rada, false),
+            "rada-light" | "rada-day" => (Family::Rada, true),
+            "catppuccin" | "catppuccin-mocha" | "mocha" => (Family::Catppuccin, false),
+            "catppuccin-latte" | "latte" => (Family::Catppuccin, true),
+            "tokyo-night" | "tokyonight" | "tokyo" => (Family::TokyoNight, false),
+            "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, true),
+            _ => return None,
+        })
+    }
 
     /// A theme by name, adapted to the terminal's colour depth.
     pub fn named(name: &str, depth: ColorDepth) -> Option<Theme> {
-        let t = match name.to_ascii_lowercase().as_str() {
-            "rada" | "default" => Theme::rada(),
-            "catppuccin" | "catppuccin-mocha" | "mocha" => Theme::catppuccin(),
-            "tokyo-night" | "tokyonight" | "tokyo" => Theme::tokyo_night(),
-            _ => return None,
-        };
-        Some(t.with_depth(depth))
+        let (family, light) = Theme::family(name)?;
+        Some(family.theme(light).with_depth(depth))
+    }
+
+    /// The theme `name` belongs to, in the variant for a light or a dark background:
+    /// `variant("rada-light", false, ..)` is the dark `rada`.
+    pub fn variant(name: &str, light: bool, depth: ColorDepth) -> Option<Theme> {
+        let (family, _) = Theme::family(name)?;
+        Some(family.theme(light).with_depth(depth))
     }
 
     pub fn detect() -> Theme {
@@ -135,6 +184,8 @@ impl Theme {
     fn rada_base(name: &'static str, accent: Color, selection: Color, mark: Color) -> Theme {
         Theme {
             name,
+            light: false,
+            canvas: rgb(26, 27, 38),
             bg: None,
             text: rgb(214, 220, 240),
             text_dim: rgb(138, 147, 175),
@@ -245,6 +296,140 @@ impl Theme {
         t
     }
 
+    /// Light themes share the structure of the dark ones; every token is chosen to read on
+    /// its `canvas` (see the contrast tests).
+    #[allow(clippy::too_many_arguments)]
+    fn light_base(
+        name: &'static str,
+        canvas: Color,
+        text: Color,
+        text_dim: Color,
+        muted: Color,
+        accent: Color,
+        selection: Color,
+        mark: Color,
+        track: Color,
+    ) -> Theme {
+        let mut t = Theme::rada_base(name, accent, selection, mark);
+        t.light = true;
+        t.canvas = canvas;
+        t.text = text;
+        t.text_dim = text_dim;
+        t.muted = muted;
+        t.on_accent = rgb(255, 255, 255);
+        t.track = track;
+        t
+    }
+
+    /// The default theme for a light terminal: the azure accent, deepened to read on white.
+    pub fn rada_light() -> Theme {
+        let mut t = Theme::light_base(
+            "rada-light",
+            rgb(255, 255, 255),
+            rgb(28, 34, 52),
+            rgb(84, 94, 122),
+            rgb(150, 158, 178),
+            rgb(35, 101, 225),
+            rgb(214, 228, 255),
+            rgb(232, 240, 254),
+            rgb(223, 228, 238),
+        );
+        t.success = rgb(26, 129, 77);
+        t.warn = rgb(157, 102, 8);
+        t.error = rgb(209, 48, 68);
+        t.kinds = KindColors {
+            code: rgb(150, 104, 13),
+            markup: rgb(137, 82, 210),
+            text: rgb(103, 113, 141),
+            doc: rgb(187, 75, 50),
+            image: rgb(137, 82, 214),
+            vector: rgb(17, 120, 180),
+            audio: rgb(195, 62, 133),
+            video: rgb(205, 55, 91),
+            archive: rgb(153, 102, 24),
+            data: rgb(16, 125, 106),
+            config: rgb(100, 114, 146),
+            binary: rgb(40, 129, 57),
+            other: rgb(105, 111, 137),
+            folder: rgb(35, 101, 225),
+            link: rgb(17, 125, 133),
+        };
+        t
+    }
+
+    /// Catppuccin Latte, with the bright accents deepened where the original is too pale
+    /// to read as text.
+    pub fn catppuccin_latte() -> Theme {
+        let mut t = Theme::light_base(
+            "catppuccin-latte",
+            rgb(239, 241, 245),
+            rgb(62, 64, 88),
+            rgb(95, 99, 121),
+            rgb(146, 149, 167),
+            rgb(27, 93, 224),
+            rgb(212, 219, 238),
+            rgb(224, 229, 242),
+            rgb(214, 218, 229),
+        );
+        t.success = rgb(47, 118, 32);
+        t.warn = rgb(146, 93, 19);
+        t.error = rgb(210, 15, 57);
+        t.kinds = KindColors {
+            code: rgb(137, 95, 12),
+            markup: rgb(129, 77, 198),
+            text: rgb(94, 103, 129),
+            doc: rgb(176, 71, 47),
+            image: rgb(129, 77, 202),
+            vector: rgb(16, 110, 165),
+            audio: rgb(178, 57, 121),
+            video: rgb(187, 50, 83),
+            archive: rgb(139, 93, 21),
+            data: rgb(15, 118, 100),
+            config: rgb(92, 104, 133),
+            binary: rgb(37, 118, 52),
+            other: rgb(99, 105, 129),
+            folder: rgb(27, 93, 224),
+            link: rgb(15, 114, 122),
+        };
+        t
+    }
+
+    /// Tokyo Night Day, with the text and accents deepened for contrast.
+    pub fn tokyo_night_day() -> Theme {
+        let mut t = Theme::light_base(
+            "tokyo-night-day",
+            rgb(225, 226, 231),
+            rgb(52, 59, 88),
+            rgb(83, 92, 132),
+            rgb(130, 137, 167),
+            rgb(34, 92, 172),
+            rgb(200, 208, 236),
+            rgb(212, 217, 238),
+            rgb(208, 211, 222),
+        );
+        t.success = rgb(78, 104, 50);
+        t.warn = rgb(117, 90, 52);
+        t.error = rgb(181, 31, 74);
+        t.kinds = KindColors {
+            code: rgb(125, 87, 11),
+            markup: rgb(118, 71, 180),
+            text: rgb(86, 94, 118),
+            doc: rgb(161, 64, 43),
+            image: rgb(118, 71, 184),
+            vector: rgb(14, 100, 150),
+            audio: rgb(162, 52, 111),
+            video: rgb(176, 47, 78),
+            archive: rgb(131, 87, 20),
+            data: rgb(13, 108, 91),
+            config: rgb(84, 95, 122),
+            binary: rgb(34, 108, 47),
+            other: rgb(90, 96, 118),
+            folder: rgb(34, 92, 172),
+            link: rgb(14, 107, 114),
+        };
+        t
+    }
+
     /// Plain 16-colour theme for terminals that offer nothing more.
     fn ansi16(mut self) -> Theme {
         self.text = Color::Reset;
@@ -275,6 +460,14 @@ impl Theme {
             folder: Color::Blue,
             link: Color::Cyan,
         };
+        if self.light {
+            // Pale greys vanish on a light background.
+            self.text_dim = Color::DarkGray;
+            self.muted = Color::DarkGray;
+            self.kinds.text = Color::DarkGray;
+            self.kinds.config = Color::DarkGray;
+            self.kinds.other = Color::DarkGray;
+        }
         self.depth = ColorDepth::Ansi16;
         self
     }
@@ -299,6 +492,7 @@ impl Theme {
                 t.warn = f(t.warn);
                 t.error = f(t.error);
                 t.bg = t.bg.map(f);
+                t.canvas = f(t.canvas);
                 let k = &mut t.kinds;
                 for c in [
                     &mut k.code,
@@ -435,6 +629,14 @@ impl Theme {
     /// A tinted background for a badge of colour `c`.
     pub fn tint(&self, c: Color) -> Color {
         match (self.depth, c) {
+            (ColorDepth::True, Color::Rgb(r, g, b)) if self.light => {
+                // 14% of the colour over the light canvas.
+                let Color::Rgb(cr, cg, cb) = self.canvas else {
+                    return self.mark;
+                };
+                let mix = |v: u8, base: u8| (v as f32 * 0.14 + base as f32 * 0.86) as u8;
+                rgb(mix(r, cr), mix(g, cg), mix(b, cb))
+            }
             (ColorDepth::True, Color::Rgb(r, g, b)) => {
                 // 22% of the colour over a dark base.
                 let mix = |v: u8, base: u8| (v as f32 * 0.22 + base as f32 * 0.78) as u8;
@@ -517,6 +719,142 @@ mod tests {
         );
         let t16 = Theme::named("catppuccin", ColorDepth::Ansi16).unwrap();
         assert!(!matches!(t16.accent, Color::Rgb(..)) && !matches!(t16.kinds.code, Color::Rgb(..)));
+    }
+
+    // ------------------------------------------------------------------ contrast
+
+    fn channels(c: Color) -> (u8, u8, u8) {
+        match c {
+            Color::Rgb(r, g, b) => (r, g, b),
+            other => panic!("not a true colour: {other:?}"),
+        }
+    }
+
+    /// Relative luminance (WCAG 2.x).
+    fn luminance(c: Color) -> f64 {
+        let (r, g, b) = channels(c);
+        let lin = |v: u8| {
+            let v = v as f64 / 255.0;
+            if v <= 0.03928 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+    }
+
+    /// WCAG contrast ratio, 1.0 (identical) to 21.0 (black on white).
+    fn contrast(a: Color, b: Color) -> f64 {
+        let (la, lb) = (luminance(a), luminance(b));
+        let (hi, lo) = if la >= lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    #[test]
+    fn every_theme_meets_the_contrast_minimums() {
+        // Text that carries information: 7:1 for the main text, 4.5:1 for everything
+        // else that is read (secondary text, accents, file kinds, statuses); decorative
+        // tokens (separators, empty bars, the cursor row) only have to be visible.
+        let mut failures = Vec::new();
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let c = t.canvas;
+            let mut need = |what: &str, ratio: f64, min: f64| {
+                if ratio < min {
+                    failures.push(format!("{n}: {what} is {ratio:.2}:1, needs {min}:1"));
+                }
+            };
+            need("text on canvas", contrast(t.text, c), 7.0);
+            need("text_dim on canvas", contrast(t.text_dim, c), 4.5);
+            need("muted on canvas", contrast(t.muted, c), 1.9);
+            need("accent on canvas", contrast(t.accent, c), 4.5);
+            need("on_accent on accent", contrast(t.on_accent, t.accent), 4.5);
+            need("selection against canvas", contrast(t.selection, c), 1.15);
+            need("mark against canvas", contrast(t.mark, c), 1.05);
+            need("track against canvas", contrast(t.track, c), 1.1);
+            need("text on selection", contrast(t.text, t.selection), 7.0);
+            need(
+                "text_dim on selection",
+                contrast(t.text_dim, t.selection),
+                3.5,
+            );
+            need("text on mark", contrast(t.text, t.mark), 7.0);
+            for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
+                need(&format!("{what} on canvas"), contrast(col, c), 4.5);
+            }
+            let k = &t.kinds;
+            for (what, col) in [
+                ("code", k.code),
+                ("markup", k.markup),
+                ("text", k.text),
+                ("doc", k.doc),
+                ("image", k.image),
+                ("vector", k.vector),
+                ("audio", k.audio),
+                ("video", k.video),
+                ("archive", k.archive),
+                ("data", k.data),
+                ("config", k.config),
+                ("binary", k.binary),
+                ("other", k.other),
+                ("folder", k.folder),
+                ("link", k.link),
+            ] {
+                need(&format!("kind {what} on canvas"), contrast(col, c), 4.5);
+                // The pale tinted pill behind a type label must not swallow the label.
+                need(
+                    &format!("kind {what} on its badge tint"),
+                    contrast(col, t.tint(col)),
+                    3.0,
+                );
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn light_themes_have_a_light_canvas_and_dark_ones_a_dark_canvas() {
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let l = luminance(t.canvas);
+            assert_eq!(
+                t.light,
+                n.ends_with("-light") || n.ends_with("latte") || n.ends_with("day")
+            );
+            assert!(
+                if t.light { l > 0.6 } else { l < 0.05 },
+                "{n}: canvas luminance {l}"
+            );
+            // Text goes the other way round.
+            assert_eq!(luminance(t.text) < luminance(t.canvas), t.light, "{n}");
+        }
+    }
+
+    #[test]
+    fn a_theme_has_a_variant_for_each_brightness() {
+        let d = ColorDepth::True;
+        for (dark, light) in [
+            ("rada", "rada-light"),
+            ("catppuccin", "catppuccin-latte"),
+            ("tokyo-night", "tokyo-night-day"),
+        ] {
+            for name in [dark, light] {
+                assert_eq!(Theme::variant(name, false, d).unwrap().name, dark);
+                assert_eq!(Theme::variant(name, true, d).unwrap().name, light);
+            }
+        }
+        assert!(Theme::variant("nope", true, d).is_none());
+        assert_eq!(Theme::named("latte", d).unwrap().name, "catppuccin-latte");
+    }
+
+    #[test]
+    fn light_tints_are_pale_and_the_16_colour_light_theme_avoids_pale_greys() {
+        let t = Theme::named("rada-light", ColorDepth::True).unwrap();
+        assert!(luminance(t.tint(t.accent)) > 0.6);
+        let t16 = Theme::named("rada-light", ColorDepth::Ansi16).unwrap();
+        assert_eq!(t16.text_dim, Color::DarkGray);
+        assert_ne!(t16.kinds.text, Color::Gray);
     }
 
     #[test]

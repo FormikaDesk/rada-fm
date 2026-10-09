@@ -352,5 +352,131 @@ fn the_themes_really_differ_and_ansi_fallbacks_stay_in_range() {
     }
 }
 
+// ------------------------------------------------------------------------------ light themes
+
+fn hex(c: ratatui::style::Color) -> String {
+    match c {
+        ratatui::style::Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+        other => format!("{other:?}"),
+    }
+}
+
+/// Every token of the light themes, so that a change of palette shows up as a diff.
+#[test]
+fn light_theme_tokens() {
+    use rada_tui::theme::ColorDepth;
+    let mut out = String::new();
+    for name in ["rada-light", "catppuccin-latte", "tokyo-night-day"] {
+        let t = Theme::named(name, ColorDepth::True).unwrap();
+        out.push_str(&format!("[{name}] canvas {}\n", hex(t.canvas)));
+        for (k, v) in [
+            ("text", t.text),
+            ("text_dim", t.text_dim),
+            ("muted", t.muted),
+            ("accent", t.accent),
+            ("on_accent", t.on_accent),
+            ("selection", t.selection),
+            ("mark", t.mark),
+            ("track", t.track),
+            ("success", t.success),
+            ("warn", t.warn),
+            ("error", t.error),
+            ("kind.code", t.kinds.code),
+            ("kind.markup", t.kinds.markup),
+            ("kind.text", t.kinds.text),
+            ("kind.doc", t.kinds.doc),
+            ("kind.image", t.kinds.image),
+            ("kind.vector", t.kinds.vector),
+            ("kind.audio", t.kinds.audio),
+            ("kind.video", t.kinds.video),
+            ("kind.archive", t.kinds.archive),
+            ("kind.data", t.kinds.data),
+            ("kind.config", t.kinds.config),
+            ("kind.binary", t.kinds.binary),
+            ("kind.other", t.kinds.other),
+            ("kind.folder", t.kinds.folder),
+            ("kind.link", t.kinds.link),
+            ("tint(accent)", t.tint(t.accent)),
+        ] {
+            out.push_str(&format!("  {k:<13} {}\n", hex(v)));
+        }
+    }
+    insta::assert_snapshot!("light_theme_tokens", out);
+}
+
+/// The main screen in a light theme, each cell reduced to the token that colours it:
+/// which parts of the screen use which colour, as two grids (text colour, background).
+#[test]
+fn main_screen_token_map_in_a_light_theme() {
+    use rada_tui::theme::ColorDepth;
+    use ratatui::style::Color;
+    let th = Theme::named("rada-light", ColorDepth::True).unwrap();
+    let mut h = scene(100, 26);
+    h.app.th = th.clone();
+    on(&mut h, "README.md");
+    let _ = h.screen();
+    let buf = h.term.backend().buffer().clone();
+    let kinds = [
+        th.kinds.code,
+        th.kinds.markup,
+        th.kinds.text,
+        th.kinds.doc,
+        th.kinds.image,
+        th.kinds.vector,
+        th.kinds.audio,
+        th.kinds.video,
+        th.kinds.archive,
+        th.kinds.data,
+        th.kinds.config,
+        th.kinds.binary,
+        th.kinds.other,
+        th.kinds.folder,
+        th.kinds.link,
+    ];
+    let letter = |c: Color| -> char {
+        if c == Color::Reset {
+            '.'
+        } else if c == th.text {
+            't'
+        } else if c == th.text_dim {
+            'd'
+        } else if c == th.muted {
+            'm'
+        } else if c == th.accent {
+            'A'
+        } else if c == th.on_accent {
+            'o'
+        } else if c == th.selection {
+            'S'
+        } else if c == th.mark {
+            'M'
+        } else if c == th.track {
+            'r'
+        } else if c == th.success {
+            's'
+        } else if c == th.warn {
+            'w'
+        } else if c == th.error {
+            'e'
+        } else if kinds.contains(&c) {
+            'k'
+        } else {
+            '+' // a tint of a kind colour
+        }
+    };
+    let mut out =
+        String::from("text colour: t text, d dim, m muted, A accent, k a file kind, + tint\n");
+    for y in 0..buf.area.height {
+        out.extend((0..buf.area.width).map(|x| letter(buf[(x, y)].fg)));
+        out.push('\n');
+    }
+    out.push_str("\nbackground: . none, S selection, M mark, + tint\n");
+    for y in 0..buf.area.height {
+        out.extend((0..buf.area.width).map(|x| letter(buf[(x, y)].bg)));
+        out.push('\n');
+    }
+    insta::assert_snapshot!("main_100x26_light_token_map", out);
+}
+
 #[allow(dead_code)]
 fn unused(_: PathBuf) {}
