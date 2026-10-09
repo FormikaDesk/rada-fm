@@ -16,6 +16,8 @@ pub mod format;
 pub mod index;
 pub mod limits;
 pub mod reader;
+#[cfg(any(test, feature = "testutil"))]
+pub mod testkit;
 pub mod writer;
 
 use std::io;

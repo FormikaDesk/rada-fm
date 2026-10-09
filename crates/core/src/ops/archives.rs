@@ -386,7 +386,11 @@ impl Engine {
                 };
                 let tail = e.path.strip_prefix(sel).unwrap_or(Path::new(""));
                 let base = sel.file_name().map(PathBuf::from).unwrap_or_default();
-                (base.join(tail), i)
+                if tail.as_os_str().is_empty() {
+                    (base, i)
+                } else {
+                    (base.join(tail), i)
+                }
             };
             if rel.as_os_str().is_empty() && e.issue.is_none() {
                 continue; // the archive's own top
