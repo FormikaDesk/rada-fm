@@ -32,7 +32,7 @@ impl Place {
             _ => self
                 .path
                 .file_name()
-                .map(|n| crate::display::name(n))
+                .map(crate::display::name)
                 .unwrap_or_default(),
         }
     }
