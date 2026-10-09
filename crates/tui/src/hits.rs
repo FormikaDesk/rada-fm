@@ -24,6 +24,8 @@ pub enum Target {
     Crumb(PathBuf),
     /// The "…" of a long path: the folders it stands for, to choose from.
     CrumbMore(Vec<PathBuf>),
+    /// An item of the sidebar: the folder it leads to.
+    Place(PathBuf),
     /// An item of the hint bar or a header button: runs the action.
     Act(Action),
     Preview,

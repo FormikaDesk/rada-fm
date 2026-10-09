@@ -3,38 +3,38 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
   ‹   ›   ↑   ⌂ › demo › backup                                               ⌕ Filter… Ctrl+F   Go to… Ctrl+P   1 item
-        Name ↑                              Size  Type          Modified   │   · Cargo.toml
-   ─────────────────────────────────────────────────────────────────────── │   UTF-8 · 42 B · Oct 2026
-   ▎  · README.md              ━━━━━━━       3 B  ● md          Oct 2026   │
-                                                                           │   1  [package]
-                                                                           │   2  name = "demo"
-                                                                           │   3  version = "0.1.0"
-                                                                           │
-      ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-      │                                                                                                          │
-      │   Copy                                                                                                   │
-      │  Copy 2 items                                                                                            │
-      │  From  ~/demo/projects                                                                                   │
-      │  To    ~/demo/backup                                                                                     │
-      │                                                                                                          │
-      │  2             79 B                                                                                      │
-      │  files         in total                                                                                  │
-      │                                                                                                          │
-      │  If a name already exists    skip  keep both  overwrite    c to change                                   │
-      │                                                                                                          │
-      │  What will happen                                                                                        │
-      │  · Cargo.toml                                  copy                                              42 B    │
-      │  · main.rs                                     copy                                              37 B    │
-      │                                                                                                          │
-      │   Enter  Run    Esc  Cancel       ↑↓ scroll                                                              │
-      │                                                                                                          │
-      ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                           │
-                                                                           │
-                                                                           │
-                                                                           │
-                                                                           │
-                                                                           │
-                                                                           │
-                                                                ●  2 items copied — go to the destination and press p
+     │        Name ↑                           Size  Type          Modified   │   · Cargo.toml
+  ⌂  │   ──────────────────────────────────────────────────────────────────── │   UTF-8 · 42 B · Oct 2026
+     │   ▎  · README.md           ━━━━━━━       3 B  ● md          Oct 2026   │
+     │                                                                        │   1  [package]
+     │                                                                        │   2  name = "demo"
+     │                                                                        │   3  version = "0.1.0"
+     │                                                                        │
+     │╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+     ││                                                                                                          │
+     ││   Copy                                                                                                   │
+     ││  Copy 2 items                                                                                            │
+     ││  From  ~/demo/projects                                                                                   │
+     ││  To    ~/demo/backup                                                                                     │
+     ││                                                                                                          │
+     ││  2             79 B                                                                                      │
+     ││  files         in total                                                                                  │
+     ││                                                                                                          │
+     ││  If a name already exists    skip  keep both  overwrite    c to change                                   │
+     ││                                                                                                          │
+     ││  What will happen                                                                                        │
+     ││  · Cargo.toml                                  copy                                              42 B    │
+     ││  · main.rs                                     copy                                              37 B    │
+     ││                                                                                                          │
+     ││   Enter  Run    Esc  Cancel       ↑↓ scroll                                                              │
+     ││                                                                                                          │
+     │╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+     │                                                                        │
+     │                                                                        │
+     │                                                                        │
+     │                                                                        │
+     │                                                                        │
+     │                                                                        │
+     │                                                                        │
+     │                                                          ●  2 items copied — go to the destination and press p
  ⎘ 2 items ready to paste                                   Enter  run    Esc  cancel

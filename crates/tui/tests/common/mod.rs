@@ -89,6 +89,7 @@ impl H {
             request,
             mouse: true,
             show_hints: true,
+            sidebar: true,
         };
         let app = App::new(cfg, svc, images);
         let mut h = H {

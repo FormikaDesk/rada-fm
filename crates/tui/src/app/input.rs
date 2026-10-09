@@ -92,6 +92,10 @@ impl App {
             return;
         }
         if let Some(action) = self.keymap.action_for(&key) {
+            if self.side_focus && self.on_side_action(action) {
+                self.dirty = true;
+                return;
+            }
             self.dispatch(action);
         }
     }
@@ -214,6 +218,8 @@ impl App {
             PreviewDown => self.preview.scroll = self.preview.scroll.saturating_add(5),
             PreviewUp => self.preview.scroll = self.preview.scroll.saturating_sub(5),
             Bookmark => self.toggle_bookmark(),
+            SwitchPane => self.switch_pane(),
+            ToggleSidebar => self.toggle_sidebar(),
 
             Help => {
                 self.help_scroll = 0;
@@ -330,7 +336,20 @@ impl App {
         if !self.mouse {
             return;
         }
-        // Motion and drag events arrive in floods and mean nothing here: no redraw.
+        // Motion only matters for what is under the pointer in the sidebar (its names show
+        // in the bottom bar when it is reduced to icons): redraw only when that changes.
+        if m.kind == MouseEventKind::Moved {
+            let over = match self.hits.at(m.column, m.row) {
+                Some(Target::Place(p)) => Some(p.clone()),
+                _ => None,
+            };
+            if over != self.hover {
+                self.hover = over;
+                self.dirty = true;
+            }
+            return;
+        }
+        // Drag events arrive in floods and mean nothing here: no redraw.
         if !matches!(
             m.kind,
             MouseEventKind::ScrollUp
@@ -410,7 +429,14 @@ impl App {
             return self.click_in_modal(target);
         }
         match target {
-            Some(Target::Row(i)) => self.click_row(i, mods),
+            Some(Target::Row(i)) => {
+                self.side_focus = false;
+                self.click_row(i, mods)
+            }
+            Some(Target::Place(path)) => {
+                self.side_focus = false;
+                self.open_dir(path)
+            }
             Some(Target::Crumb(path)) => self.open_dir(path),
             Some(Target::CrumbMore(hidden)) => {
                 // The folders folded into the "…", to pick one.
@@ -518,6 +544,10 @@ impl App {
             if matches!(self.modal, Some(Modal::Menu(_))) {
                 self.modal = None;
             }
+            return;
+        }
+        if let Some(Target::Place(path)) = &target {
+            self.modal = Some(Modal::Menu(self.side_menu(path, (x, y))));
             return;
         }
         let on_item = match target {

@@ -3,11 +3,11 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
   ‹   ›   ↑   ⌂ › demo › projects                                 ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
-        Name ↑                        Size  Type          Modified   │   · notes.txt
-   ───────────────────────────────────────────────────────────────── │   UTF-8 · 3.52 KiB · 5 weeks ago
-      ▸ data/                            —  Folder      6 days ago   │
-      ▸ src/                             —  Folder      6 days ago   │     1  remember the milk
-      ▸ 目录/                            —  Folder      6 days ago   │     2  remember the milk
+     │        Name ↑                                 Size  Type        │   · notes.txt
+  ⌂  │   ───────────────────────────────────────────────────────────── │   UTF-8 · 3.52 KiB · 5 weeks ago
+     │      ▸ data/                                     —  Folder      │
+     │      ▸ src/                                      —  Folder      │     1  remember the milk
+     │      ▸ 目录/                                     —  Folder      │     2  remember the milk
    ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
    │                                                                                                      │
    │   Delete                                                                                             │
@@ -26,9 +26,9 @@ expression: shot(&mut h)
    │   Enter  Run    Esc  Cancel                                                                          │
    │                                                                                                      │
    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                     │    21  remember the milk
-                                                                     │    22  remember the milk
-                                                                     │    23  remember the milk
-                                                                     │    24  remember the milk
-                                                                     │    25  remember the milk
+     │                                                                 │    21  remember the milk
+     │                                                                 │    22  remember the milk
+     │                                                                 │    23  remember the milk
+     │                                                                 │    24  remember the milk
+     │                                                                 │    25  remember the milk
                                           Enter  run    Esc  cancel

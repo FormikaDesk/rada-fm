@@ -611,6 +611,16 @@ impl Theme {
         }
     }
 
+    /// The background of a highlighted row of a list that is not the cursor (the place you
+    /// are in, the item under the mouse).
+    pub fn chip_row(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default().bg(self.selection)
+        }
+    }
+
     /// A key name on a chip.
     pub fn chip_key(&self) -> Style {
         if self.depth == ColorDepth::Ansi16 {

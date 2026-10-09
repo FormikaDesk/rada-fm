@@ -14,6 +14,7 @@ pub mod places;
 pub mod platform;
 pub mod preview;
 pub mod schema;
+pub mod uistate;
 pub mod watch;
 pub mod workers;
 

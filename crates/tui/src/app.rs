@@ -269,6 +269,9 @@ pub struct Config {
     pub mouse: bool,
     /// Key hints in the bottom bar (`hints = false` hides them).
     pub show_hints: bool,
+    /// Whether the sidebar is wanted at all (the configuration's value, or what was
+    /// last chosen with its key).
+    pub sidebar: bool,
     /// An operation handed in as data (`--request`): planned at start and shown in the
     /// usual confirmation window.
     pub request: Option<rada_core::ops::OpRequest>,
@@ -281,6 +284,7 @@ pub struct Demo {
 }
 
 mod input;
+mod side;
 
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
 
@@ -331,6 +335,16 @@ pub struct App {
     pub keymap: Keymap,
     pub mouse: bool,
     pub show_hints: bool,
+    /// The sidebar is wanted (the user's choice; the width decides how much of it shows).
+    pub side_on: bool,
+    /// What the last frame showed of it.
+    pub side_mode: crate::sidebar::Mode,
+    /// The keyboard is in the sidebar, on item `side_cursor`.
+    pub side_focus: bool,
+    pub side_cursor: usize,
+    /// The sidebar item under the mouse.
+    pub hover: Option<PathBuf>,
+    pub term_width: u16,
     /// Screen rectangles of everything clickable, rebuilt every frame.
     pub hits: Hits,
     pub filter: Option<FilterState>,
@@ -395,6 +409,12 @@ impl App {
             keymap: cfg.keymap,
             mouse: cfg.mouse,
             show_hints: cfg.show_hints,
+            side_on: cfg.sidebar,
+            side_mode: crate::sidebar::Mode::Hidden,
+            side_focus: false,
+            side_cursor: 0,
+            hover: None,
+            term_width: 0,
             hits: Hits::default(),
             filter: None,
             sel_anchor: None,

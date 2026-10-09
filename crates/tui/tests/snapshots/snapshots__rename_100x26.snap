@@ -3,28 +3,28 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
   ‹   ›   ↑   ⌂ › demo › projects                       ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
-        Name ↑                               Size  Type        │   · main.rs
-   ─────────────────────────────────────────────────────────── │   UTF-8 · 37 B · yesterday
-      ▸ data/                                   —  Folder      │
-      ▸ src/                                    —  Folder      │   1  fn main() {
-      ▸ 目录/                                   —  Folder      │   2      println!("hello");
-      · a-very-long-file-name…  ───────       1 B  ● archive   │   3  }
-      · backup.img              ━━━━━━━   420 MiB  ● file      │
-      ╭──────────────────────────────────────────────────────────────────────────────────────╮
-   ▎  │                                                                                      │
-      │   Rename                                                                             │
-      │                                                                                      │
-      │  New name                                                                            │
-      │  › main.rs                                                                           │
-      │                                                                                      │
-      │                                                                                      │
-      │                                                                                      │
-      ╰──────────────────────────────────────────────────────────────────────────────────────╯
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
+     │        Name ↑                           Size  Type        │   · main.rs
+  ⌂  │   ─────────────────────────────────────────────────────── │   UTF-8 · 37 B · yesterday
+     │      ▸ data/                               —  Folder      │
+     │      ▸ src/                                —  Folder      │   1  fn main() {
+     │      ▸ 目录/                               —  Folder      │   2      println!("hello");
+     │      · a-very-long-file-…  ───────       1 B  ● archive   │   3  }
+     │      · backup.img          ━━━━━━━   420 MiB  ● file      │
+     │╭──────────────────────────────────────────────────────────────────────────────────────╮
+     ││                                                                                      │
+     ││   Rename                                                                             │
+     ││                                                                                      │
+     ││  New name                                                                            │
+     ││  › main.rs                                                                           │
+     ││                                                                                      │
+     ││                                                                                      │
+     ││                                                                                      │
+     │╰──────────────────────────────────────────────────────────────────────────────────────╯
+     │                                                           │
+     │                                                           │
+     │                                                           │
+     │                                                           │
+     │                                                           │
+     │                                                           │
+     │                                                           │
                                      Enter  ok    Esc  cancel

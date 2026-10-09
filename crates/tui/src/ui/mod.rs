@@ -10,6 +10,7 @@ mod header;
 mod list;
 mod modals;
 mod preview;
+mod sidebar;
 pub mod widgets;
 
 use std::path::Path;
@@ -25,6 +26,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::*;
 use crate::fmt;
 use crate::hits::Target;
+use crate::sidebar::Mode;
 use crate::theme::Density;
 use widgets::{SPIN, dim_backdrop, pad, progress_spans};
 
@@ -61,6 +63,35 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     header::draw_header(f, app, header);
 
+    // The sidebar takes what it needs from the left; the preview comes before it when
+    // the terminal is too narrow for both.
+    app.term_width = area.width;
+    app.side_mode = Mode::for_width(area.width, app.side_on);
+    if app.side_mode == Mode::Hidden {
+        app.side_focus = false;
+    }
+    let body = if app.side_mode != Mode::Hidden {
+        let width = if app.side_mode == Mode::Full {
+            crate::sidebar::FULL_WIDTH
+        } else {
+            crate::sidebar::RAIL_WIDTH
+        };
+        let [side_area, divider, rest] = Layout::horizontal([
+            Constraint::Length(width),
+            Constraint::Length(1),
+            Constraint::Min(1),
+        ])
+        .areas(body);
+        let mode = app.side_mode;
+        sidebar::draw_sidebar(f, app, side_area, mode);
+        let rule: Vec<Line> = (0..divider.height)
+            .map(|_| Line::from(Span::styled("│", th.faint())))
+            .collect();
+        f.render_widget(Paragraph::new(rule), divider);
+        rest
+    } else {
+        body
+    };
     let body = side(body);
     // The preview needs room: it hides itself on narrow terminals.
     if body.width >= 88 {

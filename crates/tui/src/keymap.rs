@@ -57,6 +57,9 @@ pub enum Action {
     GoHome,
     Back,
     Forward,
+    // the sidebar
+    SwitchPane,
+    ToggleSidebar,
     // the program
     Help,
     Quit,
@@ -93,7 +96,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 42] = [
+    pub const ALL: [Action; 44] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -134,6 +137,8 @@ impl Action {
         Action::GoHome,
         Action::Back,
         Action::Forward,
+        Action::SwitchPane,
+        Action::ToggleSidebar,
         Action::Help,
         Action::Quit,
     ];
@@ -181,6 +186,8 @@ impl Action {
             Action::GoHome => "go_home",
             Action::Back => "back",
             Action::Forward => "forward",
+            Action::SwitchPane => "switch_pane",
+            Action::ToggleSidebar => "toggle_sidebar",
             Action::Help => "help",
             Action::Quit => "quit",
         }
@@ -233,6 +240,8 @@ impl Action {
             Action::GoHome => "Go to home",
             Action::Back => "Back to the previous folder",
             Action::Forward => "Forward to the next folder",
+            Action::SwitchPane => "Move between the list and the sidebar",
+            Action::ToggleSidebar => "Show / hide the sidebar",
             Action::Help => "Help",
             Action::Quit => "Quit",
         }
@@ -248,7 +257,7 @@ impl Action {
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
             | Undo | Redo | History => Group::Files,
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
-            | PreviewUp | Bookmark => Group::View,
+            | PreviewUp | Bookmark | SwitchPane | ToggleSidebar => Group::View,
             Help | Quit => Group::Program,
         }
     }
@@ -514,6 +523,8 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Back, &["alt+left"]),
     (Action::Forward, &["alt+right"]),
     (Action::Parent, &["alt+up"]),
+    (Action::SwitchPane, &["tab"]),
+    (Action::ToggleSidebar, &["ctrl+b"]),
 ];
 
 #[derive(Clone, Debug)]
@@ -913,7 +924,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 42);
+        assert_eq!(Action::ALL.len(), 44);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

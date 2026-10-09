@@ -66,6 +66,14 @@ fn hints(app: &App) -> Vec<Hint> {
     {
         return vec![Hint::fixed("Enter", "keep"), Hint::fixed("Esc", "clear")];
     }
+    if app.side_focus {
+        let mut v = vec![Hint::fixed("Enter", "open")];
+        v.extend(Hint::act(app, SwitchPane, "list"));
+        v.extend(Hint::act(app, Bookmark, "bookmark"));
+        v.push(Hint::fixed("Del", "remove bookmark"));
+        v.extend(Hint::act(app, ToggleSidebar, "hide sidebar"));
+        return v;
+    }
     let mut v = if app.marked.is_empty() {
         acts(&[
             (Open, "open"),
@@ -80,6 +88,7 @@ fn hints(app: &App) -> Vec<Hint> {
             (NewFolder, "new folder"),
             (BulkRename, "bulk rename"),
             (Bookmark, "bookmark"),
+            (SwitchPane, "sidebar"),
             (ToggleHidden, "hidden"),
             (Help, "help"),
         ])
@@ -110,6 +119,14 @@ fn status<'a>(app: &App) -> Bar<'a> {
     let band = th.band();
     let mut b = Bar::default();
     b.push(Span::styled(" ", band));
+    // Icon-only sidebar: the name of the item the keyboard or the mouse is on.
+    if let Some(text) = app.side_description() {
+        b.push(Span::styled(
+            format!("▸ {text}"),
+            th.base().add_modifier(Modifier::BOLD).patch(band),
+        ));
+        b.push(Span::styled("   ", band));
+    }
     if !app.marked.is_empty() {
         let size: u64 = app
             .listing

@@ -272,6 +272,9 @@ fn main() -> Result<()> {
         keymap,
         mouse,
         show_hints: cfg_file.hints,
+        sidebar: rada_core::uistate::load(&dirs.rada_state())
+            .sidebar
+            .unwrap_or(cfg_file.sidebar),
         request,
         select,
         limits: rada_core::preview::Limits {
