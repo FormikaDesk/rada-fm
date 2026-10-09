@@ -10,7 +10,7 @@ use rada_core::fs::FsEngine;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
 use rada_core::ops::Engine;
-use rada_core::places::PlacesStore;
+use rada_core::places::{PlacesStore, standard_places};
 use rada_core::platform::Platform;
 use rada_core::watch::DirWatcher;
 use rada_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
@@ -44,7 +44,11 @@ impl Services {
             watcher: DirWatcher::spawn(tx.clone()),
             places: PlacesStore::spawn(
                 platform.dirs().rada_state(),
-                platform.dirs().home.clone(),
+                standard_places(
+                    &platform.dirs().home,
+                    &platform.user_dirs(),
+                    &platform.dirs().home_trash().join("files"),
+                ),
                 tx.clone(),
             ),
             volumes: VolumesWorker::spawn(platform.clone(), Duration::from_secs(5), tx),

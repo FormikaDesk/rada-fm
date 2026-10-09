@@ -1329,8 +1329,8 @@ impl App {
         for p in self.paths.recents.iter().filter(|p| **p != cwd) {
             add(&mut items, p, PaletteKind::Recent, None, None);
         }
-        for p in &self.paths.places {
-            add(&mut items, p, PaletteKind::Place, None, None);
+        for place in &self.paths.places {
+            add(&mut items, &place.path, PaletteKind::Place, None, None);
         }
         add(
             &mut items,

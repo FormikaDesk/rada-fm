@@ -11,6 +11,7 @@ pub mod dirs;
 pub mod freedesktop;
 pub mod macos;
 pub mod trash;
+pub mod userdirs;
 pub mod volumes;
 pub mod windows;
 
@@ -26,6 +27,7 @@ use std::sync::Arc;
 pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
+pub use userdirs::{PlaceKind, UserDirs};
 pub use volumes::{Volume, VolumeKind, VolumeLister};
 
 use crate::Result;
@@ -67,6 +69,9 @@ pub trait Platform: Send + Sync {
     fn attributes(&self) -> &dyn FileAttributes;
     fn opener(&self) -> &dyn Opener;
     fn path_rules(&self) -> PathRules;
+    /// The user's standard folders under their real names. May read files: call it from
+    /// a worker, not from the interface thread.
+    fn user_dirs(&self) -> UserDirs;
 }
 
 /// The one place where the operating system is selected.

@@ -13,7 +13,7 @@ use std::path::Path;
 use super::attrs::{Attrs, FileAttributes, ReparseKind};
 use super::trash::{TrashBackend, TrashedItem};
 use super::volumes::{Volume, VolumeLister};
-use super::{Dirs, Opener, PathRules, Platform};
+use super::{Dirs, Opener, PathRules, Platform, UserDirs};
 use crate::fs::FsMeta;
 use crate::{Error, Result};
 
@@ -119,6 +119,11 @@ impl Platform for WindowsPlatform {
     }
     fn opener(&self) -> &dyn Opener {
         &self.opener
+    }
+    fn user_dirs(&self) -> UserDirs {
+        // Known Folders (SHGetKnownFolderPath) come in a later phase: until then, the
+        // names Windows gives these folders in a default profile.
+        UserDirs::conventional(&self.dirs.home, "Videos")
     }
     fn path_rules(&self) -> PathRules {
         PathRules {

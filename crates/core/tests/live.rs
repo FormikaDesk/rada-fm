@@ -274,6 +274,9 @@ impl Platform for WithSlowVolumes {
     fn path_rules(&self) -> PathRules {
         self.0.path_rules()
     }
+    fn user_dirs(&self) -> rada_core::platform::UserDirs {
+        self.0.user_dirs()
+    }
 }
 
 #[test]

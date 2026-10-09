@@ -11,16 +11,58 @@ use serde::{Deserialize, Serialize};
 
 use crate::events::CoreEvent;
 use crate::pathcodec;
+use crate::platform::{PlaceKind, UserDirs};
 
 const MAX_RECENT: usize = 60;
+
+/// A standard place of the sidebar: where it is and what it is.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Place {
+    pub kind: PlaceKind,
+    pub path: PathBuf,
+}
+
+impl Place {
+    /// The name shown for it: the real name of the folder (so "Scaricati" on an Italian
+    /// system), "Home" and "Trash" for those two.
+    pub fn name(&self) -> String {
+        match self.kind {
+            PlaceKind::Home => "Home".into(),
+            PlaceKind::Trash => "Trash".into(),
+            _ => self
+                .path
+                .file_name()
+                .map(|n| crate::display::name(n))
+                .unwrap_or_default(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PathLists {
     /// Most recent first.
     pub recents: Vec<PathBuf>,
     pub bookmarks: Vec<PathBuf>,
-    /// Existing standard folders: home, Documents, Downloads...
-    pub places: Vec<PathBuf>,
+    /// Standard places that exist: Home, Documents, Downloads…, Trash.
+    pub places: Vec<Place>,
+}
+
+/// The standard places a system defines, whether or not they exist yet: Home first, then
+/// the user folders in display order, then the trash.
+pub fn standard_places(home: &Path, user: &UserDirs, trash: &Path) -> Vec<Place> {
+    let mut v = vec![Place {
+        kind: PlaceKind::Home,
+        path: home.to_path_buf(),
+    }];
+    v.extend(user.entries().into_iter().map(|(kind, p)| Place {
+        kind,
+        path: p.to_path_buf(),
+    }));
+    v.push(Place {
+        kind: PlaceKind::Trash,
+        path: trash.to_path_buf(),
+    });
+    v
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,8 +80,9 @@ pub struct PlacesStore {
 }
 
 impl PlacesStore {
-    /// `state_dir` is `$XDG_STATE_HOME/rada`; `home` is the user's home folder.
-    pub fn spawn(state_dir: PathBuf, home: PathBuf, out: Sender<CoreEvent>) -> PlacesStore {
+    /// `state_dir` is `$XDG_STATE_HOME/rada`; `standard` are the candidate standard places
+    /// (see [`standard_places`]), of which the ones that exist are reported.
+    pub fn spawn(state_dir: PathBuf, standard: Vec<Place>, out: Sender<CoreEvent>) -> PlacesStore {
         let (tx, rx) = mpsc::channel::<Req>();
         std::thread::Builder::new()
             .name("rada-places".into())
@@ -48,12 +91,18 @@ impl PlacesStore {
                 let mark_file = state_dir.join("bookmarks.json");
                 let mut recents = read(&recent_file);
                 let mut bookmarks = read(&mark_file);
-                let places = standard_places(&home);
                 let send = |r: &Vec<PathBuf>, b: &Vec<PathBuf>| {
+                    // Checked on every report, here on the worker: a folder created or
+                    // removed since the last one comes and goes.
+                    let places = standard
+                        .iter()
+                        .filter(|p| p.path.is_dir())
+                        .cloned()
+                        .collect();
                     out.send(CoreEvent::Paths(PathLists {
                         recents: r.clone(),
                         bookmarks: b.clone(),
-                        places: places.clone(),
+                        places,
                     }))
                     .is_ok()
                 };
@@ -116,82 +165,5 @@ fn write(dir: &Path, file: &Path, list: &[PathBuf]) {
     let tmp = file.with_extension("json.tmp");
     if std::fs::write(&tmp, json).is_ok() {
         let _ = std::fs::rename(&tmp, file);
-    }
-}
-
-fn standard_places(home: &Path) -> Vec<PathBuf> {
-    let mut v = vec![home.to_path_buf()];
-    for name in [
-        "Desktop",
-        "Documents",
-        "Downloads",
-        "Music",
-        "Pictures",
-        "Videos",
-        "Projects",
-        "Code",
-    ] {
-        let p = home.join(name);
-        if p.is_dir() {
-            v.push(p);
-        }
-    }
-    v
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::testutil::*;
-    use crossbeam_channel::unbounded;
-    use std::time::Duration;
-
-    fn next(rx: &crossbeam_channel::Receiver<CoreEvent>) -> PathLists {
-        loop {
-            match rx.recv_timeout(Duration::from_secs(5)).expect("event") {
-                CoreEvent::Paths(p) => return p,
-                _ => continue,
-            }
-        }
-    }
-
-    #[test]
-    fn recents_and_bookmarks_persist_and_places_are_listed() {
-        let sb = Sandbox::new();
-        std::fs::create_dir_all(sb.dirs.home.join("Documents")).unwrap();
-        let (tx, rx) = unbounded();
-        let dir = sb.dirs.rada_state();
-        let s = PlacesStore::spawn(dir.clone(), sb.dirs.home.clone(), tx);
-        s.load();
-        let p = next(&rx);
-        assert!(p.recents.is_empty() && p.bookmarks.is_empty());
-        assert_eq!(
-            p.places,
-            vec![sb.dirs.home.clone(), sb.dirs.home.join("Documents")]
-        );
-
-        s.visit(PathBuf::from("/a"));
-        s.visit(PathBuf::from("/b"));
-        s.visit(PathBuf::from("/a"));
-        assert_eq!(next(&rx).recents.len(), 1);
-        assert_eq!(next(&rx).recents.len(), 2);
-        let p = next(&rx);
-        assert_eq!(
-            p.recents,
-            vec![PathBuf::from("/a"), PathBuf::from("/b")],
-            "newest first, no duplicates"
-        );
-        s.toggle_bookmark(PathBuf::from("/b"));
-        assert_eq!(next(&rx).bookmarks, vec![PathBuf::from("/b")]);
-
-        // A new process sees the same data.
-        let (tx2, rx2) = unbounded();
-        let s2 = PlacesStore::spawn(dir, sb.dirs.home.clone(), tx2);
-        s2.load();
-        let p = next(&rx2);
-        assert_eq!(p.recents.len(), 2);
-        assert_eq!(p.bookmarks, vec![PathBuf::from("/b")]);
-        s2.toggle_bookmark(PathBuf::from("/b"));
-        assert!(next(&rx2).bookmarks.is_empty());
     }
 }

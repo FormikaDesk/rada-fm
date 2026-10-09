@@ -8,7 +8,7 @@ use std::path::Path;
 
 use super::trash::{TrashBackend, TrashedItem};
 use super::volumes::{Volume, VolumeLister};
-use super::{Dirs, FileAttributes, Opener, PathRules, Platform};
+use super::{Dirs, FileAttributes, Opener, PathRules, Platform, UserDirs};
 use crate::{Error, Result};
 
 struct MacTrash;
@@ -96,6 +96,10 @@ impl Platform for MacPlatform {
     }
     fn opener(&self) -> &dyn Opener {
         &self.opener
+    }
+    fn user_dirs(&self) -> UserDirs {
+        // The Finder's standard folders; the system API comes in a later phase.
+        UserDirs::conventional(&self.dirs.home, "Movies")
     }
     fn path_rules(&self) -> PathRules {
         PathRules {

@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 use super::freedesktop::FreedesktopTrash;
 use super::unix::UnixAttributes;
-use super::{Dirs, FileAttributes, Opener, PathRules, Platform, TrashBackend, VolumeLister};
+use super::{
+    Dirs, FileAttributes, Opener, PathRules, Platform, TrashBackend, UserDirs, VolumeLister,
+};
 use crate::fs::LocalFs;
 
 pub struct LinuxPlatform {
@@ -57,5 +59,13 @@ impl Platform for LinuxPlatform {
     }
     fn path_rules(&self) -> PathRules {
         PathRules::POSIX
+    }
+    fn user_dirs(&self) -> UserDirs {
+        // xdg-user-dirs: `$XDG_CONFIG_HOME/user-dirs.dirs`. Without it the system has
+        // never been localised, which means the English names.
+        match std::fs::read_to_string(self.dirs.config.join("user-dirs.dirs")) {
+            Ok(text) => UserDirs::parse_xdg(&text, &self.dirs.home),
+            Err(_) => UserDirs::conventional(&self.dirs.home, "Videos"),
+        }
     }
 }
