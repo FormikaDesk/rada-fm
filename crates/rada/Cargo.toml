@@ -16,8 +16,8 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
-rada-core = { path = "../core", version = "0.2.0" }
-rada-tui = { path = "../tui", version = "0.2.0" }
+rada-core = { path = "../core", version = "0.3.0" }
+rada-tui = { path = "../tui", version = "0.3.0" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"

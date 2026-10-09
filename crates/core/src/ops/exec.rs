@@ -357,10 +357,7 @@ impl Engine {
         op: impl Fn() -> io::Result<T>,
     ) -> io::Result<T> {
         match op() {
-            Err(e)
-                if st.undo
-                    && matches!(e.raw_os_error(), Some(libc::EACCES) | Some(libc::EPERM)) =>
-            {
+            Err(e) if st.undo && crate::error::is_denied(&e) => {
                 let Some(parent) = path.parent() else {
                     return Err(e);
                 };
@@ -543,16 +540,7 @@ impl Engine {
                     }
                     // This filesystem cannot make hard links (or refuses to): the name gets
                     // its own copy of the data, and the report says so.
-                    Err(e)
-                        if matches!(
-                            e.raw_os_error(),
-                            Some(libc::EPERM)
-                                | Some(libc::EXDEV)
-                                | Some(libc::EMLINK)
-                                | Some(libc::ENOTSUP)
-                                | Some(libc::ENOSYS)
-                        ) =>
-                    {
+                    Err(e) if crate::error::is_link_unsupported(&e) => {
                         let meta = fs
                             .lstat(existing)
                             .map_err(|e| Error::io("inspect", existing, e))?;

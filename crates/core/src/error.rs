@@ -116,6 +116,42 @@ pub fn is_exdev(e: &io::Error) -> bool {
     }
 }
 
+/// True for "permission denied" (`EACCES`, `EPERM`).
+pub fn is_denied(e: &io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        matches!(e.raw_os_error(), Some(libc::EACCES) | Some(libc::EPERM))
+    }
+    #[cfg(not(unix))]
+    {
+        e.kind() == io::ErrorKind::PermissionDenied
+    }
+}
+
+/// True when a hard link could not be made because of where it was asked for (another
+/// filesystem, one without links, too many links, no right to link): the file can still be
+/// copied.
+pub fn is_link_unsupported(e: &io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        matches!(
+            e.raw_os_error(),
+            Some(libc::EPERM)
+                | Some(libc::EXDEV)
+                | Some(libc::EMLINK)
+                | Some(libc::ENOTSUP)
+                | Some(libc::ENOSYS)
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        matches!(
+            e.kind(),
+            io::ErrorKind::PermissionDenied | io::ErrorKind::Unsupported
+        )
+    }
+}
+
 /// True for `ENOTEMPTY`/`EEXIST` on directory removal.
 pub fn is_not_empty(e: &io::Error) -> bool {
     #[cfg(unix)]
