@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Tests: every format and every safety rule, a fault-injected full disk, an archive changed or cut after the plan, `SIGKILL` in the middle of an extraction, random trees compressed and extracted in all four formats (contents, permissions, symlinks, times), archives with 60,000 members and a 96 MiB member, and unchanged navigation latency with a huge archive under the cursor.
 
 ### Changed
+- The minimum Rust version is now 1.92 (the pure-Rust zstd encoder needs it).
 - `FsEngine` gained `create_file`. The plan JSON gained the steps `extract_file`, `extract_symlink`, `compress` and `estimated_bytes`.
 
 ### Fixed

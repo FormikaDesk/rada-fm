@@ -52,7 +52,7 @@ rada is young and written by one person. The parts that touch your files — pla
 
 ## Install
 
-From source. You need Linux and a Rust toolchain of version 1.90 or newer ([rustup](https://rustup.rs)).
+From source. You need Linux and a Rust toolchain of version 1.92 or newer ([rustup](https://rustup.rs)).
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada
