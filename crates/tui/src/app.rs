@@ -1019,19 +1019,39 @@ impl App {
         for (_, note) in &report.kept {
             lines.push((ToastKind::Warn, note.clone()));
         }
+        // What a copy could not carry over (owner, extended attributes, ACLs...), one line per
+        // kind with how many items and an example.
+        let mut lost: std::collections::BTreeMap<&str, Vec<&Path>> = Default::default();
+        for (path, what) in &report.not_preserved {
+            lost.entry(what.as_str()).or_default().push(path);
+        }
+        for (what, paths) in lost {
+            lines.push((
+                ToastKind::Warn,
+                format!(
+                    "not preserved: {what} — {}, for example {}",
+                    fmt::count(paths.len() as u64, "item", "items"),
+                    fmt::short_path(paths[0], self.home())
+                ),
+            ));
+        }
         if journal_errors > 0 {
             lines.push((ToastKind::Warn, format!("{journal_errors} steps could not be written to the journal and may not be undoable")));
         }
         let (kind, headline) = match report.status() {
-            Completed if report.kept.is_empty() => (
+            Completed if report.kept.is_empty() && report.not_preserved.is_empty() => (
                 ToastKind::Ok,
                 done.as_ref()
                     .map(|r| self.done_message(r))
                     .unwrap_or_else(|| format!("{title}: done")),
             ),
-            Completed => (
+            Completed if report.not_preserved.is_empty() => (
                 ToastKind::Warn,
                 format!("{title}: done, some items were kept"),
+            ),
+            Completed => (
+                ToastKind::Warn,
+                format!("{title}: done, but some attributes could not be kept"),
             ),
             CompletedWithProblems => (
                 ToastKind::Warn,
