@@ -124,6 +124,8 @@ On the right of the bar: the **filter** field (`⌕ Filter…`, click it, or pre
 
 The mouse's own back and forward buttons are not used: the terminal library rada is built on does not report them. Use the buttons in the bar or `Alt+←` / `Alt+→`.
 
+![The top bar with its buttons, path, filter and Go to; the bottom bar with the selection, the clipboard, the keys that fit and the free space](docs/screenshots/bars.png)
+
 ## Sidebar
 
 On the left: your **places**, your **bookmarks** and your **disks**.
@@ -135,6 +137,8 @@ On the left: your **places**, your **bookmarks** and your **disks**.
 The place you are in is highlighted. Click an item to open it. **`Tab`** moves the keyboard into the sidebar (the focused item is drawn with the cursor colour); `↑` `↓` move, `Enter` opens and returns to the list, `Tab` or `Esc` returns to the list without opening. While the sidebar has the focus, file operations are refused rather than done to an item you cannot see.
 
 **`Ctrl+B`** shows or hides the sidebar and remembers it (`sidebar = false` in the config file sets the default). It is 26 columns wide from a terminal width of 124; from 100 to 123 columns it becomes a **column of icons** with the places only (bookmarks and disks stay reachable with `Ctrl+P`): hover an icon, or move onto it with the keyboard, and its name shows in the bottom bar. Below 100 columns it is not shown at all, so it always gives way before the preview does. A section with nothing in it does not appear.
+
+![The sidebar as a column of icons on a narrow terminal](docs/screenshots/sidebar-narrow.png)
 
 ## Themes
 

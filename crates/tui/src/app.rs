@@ -287,6 +287,35 @@ pub struct Adaptive {
     pub depth: crate::theme::ColorDepth,
 }
 
+/// Disks that do not exist, for screenshots that must not show the machine's own.
+fn demo_volumes() -> Vec<Volume> {
+    use rada_core::platform::VolumeKind;
+    let gb = 1_000_000_000u64;
+    let vol = |mount: &str, label: &str, kind, total: u64, free: u64| Volume {
+        mount_point: PathBuf::from(mount),
+        label: Some(label.into()),
+        fs_type: "ext4".into(),
+        device: "demo".into(),
+        kind,
+        drive_letter: None,
+        total: Some(total * gb),
+        available: Some(free * gb),
+        read_only: false,
+        responsive: true,
+    };
+    vec![
+        vol("/", "System", VolumeKind::Fixed, 512, 212),
+        vol("/run/media/user/Data", "Data", VolumeKind::Fixed, 1000, 640),
+        vol(
+            "/run/media/user/USB",
+            "USB drive",
+            VolumeKind::Removable,
+            64,
+            41,
+        ),
+    ]
+}
+
 /// Developer hook: put the interface in a ready-made state (for screenshots).
 pub struct Demo {
     pub scene: String,
@@ -329,6 +358,8 @@ pub struct App {
     pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
     demo: Option<Demo>,
+    /// Developer hook: show made-up disks instead of the machine's own (screenshots).
+    demo_volumes: bool,
     demo_auto_run: bool,
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
@@ -404,6 +435,7 @@ impl App {
             volumes: Vec::new(),
             paths: Default::default(),
             cfg_bookmarks: cfg.bookmarks,
+            demo_volumes: cfg.demo.is_some(),
             demo: cfg.demo,
             demo_auto_run: false,
             clipboard: None,
@@ -692,7 +724,7 @@ impl App {
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),
             CoreEvent::Volumes(v) => {
-                self.volumes = v;
+                self.volumes = if self.demo_volumes { demo_volumes() } else { v };
                 self.refresh_palette();
             }
             CoreEvent::Paths(p) => {
@@ -1510,6 +1542,27 @@ impl App {
                 }));
                 self.svc.jobs.load_history();
             }
+            // A selection and something on the clipboard, to show the bottom bar at work.
+            "selection" => {
+                let files: Vec<_> = self
+                    .listing
+                    .all()
+                    .iter()
+                    .filter(|e| !e.is_dir())
+                    .map(|e| (e.name.clone(), e.path.clone()))
+                    .collect();
+                self.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
+                self.clipboard = Some(Clip {
+                    mode: TransferMode::Copy,
+                    paths: files
+                        .iter()
+                        .skip(3)
+                        .take(2)
+                        .map(|(_, p)| p.clone())
+                        .collect(),
+                });
+            }
+            "main" => {}
             "help" => self.modal = Some(Modal::Help),
             "menu" => self.modal = Some(Modal::Menu(self.context_menu(true, (30, 11)))),
             _ => {}
