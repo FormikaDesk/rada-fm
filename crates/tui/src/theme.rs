@@ -98,8 +98,11 @@ pub struct Theme {
     pub accent: Color,
     /// Text drawn on top of the accent colour.
     pub on_accent: Color,
-    /// Row under the cursor.
+    /// Highlighted things that are not the cursor: buttons, key caps, the current place.
     pub selection: Color,
+    /// The row under the cursor: stronger than `selection`, so that it stands out from
+    /// marked rows and from the chips around it.
+    pub cursor: Color,
     /// Marked rows.
     pub mark: Color,
     /// The empty part of a size bar or progress bar.
@@ -193,6 +196,7 @@ impl Theme {
             accent,
             on_accent: rgb(12, 14, 24),
             selection,
+            cursor: rgb(48, 72, 124),
             mark,
             track: rgb(36, 42, 62),
             success: rgb(120, 220, 160),
@@ -235,6 +239,7 @@ impl Theme {
             rgb(49, 50, 68),
             rgb(40, 42, 58),
         );
+        t.cursor = rgb(66, 72, 108);
         t.text = rgb(205, 214, 244);
         t.text_dim = rgb(147, 153, 178);
         t.muted = rgb(88, 91, 112);
@@ -269,6 +274,7 @@ impl Theme {
             rgb(41, 46, 66),
             rgb(34, 38, 56),
         );
+        t.cursor = rgb(56, 66, 108);
         t.text = rgb(192, 202, 245);
         t.text_dim = rgb(130, 139, 184);
         t.muted = rgb(68, 75, 106);
@@ -307,10 +313,12 @@ impl Theme {
         muted: Color,
         accent: Color,
         selection: Color,
+        cursor: Color,
         mark: Color,
         track: Color,
     ) -> Theme {
         let mut t = Theme::rada_base(name, accent, selection, mark);
+        t.cursor = cursor;
         t.light = true;
         t.canvas = canvas;
         t.text = text;
@@ -331,6 +339,7 @@ impl Theme {
             rgb(150, 158, 178),
             rgb(35, 101, 225),
             rgb(214, 228, 255),
+            rgb(186, 210, 252),
             rgb(232, 240, 254),
             rgb(223, 228, 238),
         );
@@ -368,6 +377,7 @@ impl Theme {
             rgb(146, 149, 167),
             rgb(27, 93, 224),
             rgb(212, 219, 238),
+            rgb(190, 202, 232),
             rgb(224, 229, 242),
             rgb(214, 218, 229),
         );
@@ -404,6 +414,7 @@ impl Theme {
             rgb(130, 137, 167),
             rgb(34, 92, 172),
             rgb(200, 208, 236),
+            rgb(176, 190, 230),
             rgb(212, 217, 238),
             rgb(208, 211, 222),
         );
@@ -438,6 +449,7 @@ impl Theme {
         self.accent = Color::Blue;
         self.on_accent = Color::Black;
         self.selection = Color::DarkGray;
+        self.cursor = Color::DarkGray;
         self.mark = Color::DarkGray;
         self.track = Color::DarkGray;
         self.success = Color::Green;
@@ -486,6 +498,7 @@ impl Theme {
                 t.accent = f(t.accent);
                 t.on_accent = f(t.on_accent);
                 t.selection = f(t.selection);
+                t.cursor = f(t.cursor);
                 t.mark = f(t.mark);
                 t.track = f(t.track);
                 t.success = f(t.success);
@@ -567,7 +580,7 @@ impl Theme {
         if self.depth == ColorDepth::Ansi16 {
             Style::default().add_modifier(Modifier::REVERSED)
         } else {
-            Style::default().bg(self.selection)
+            Style::default().bg(self.cursor)
         }
     }
 
@@ -598,6 +611,7 @@ impl Theme {
             self.accent,
             self.on_accent,
             self.selection,
+            self.cursor,
             self.mark,
             self.track,
             self.success,
@@ -704,6 +718,7 @@ mod tests {
             t.accent,
             t.on_accent,
             t.selection,
+            t.cursor,
             t.mark,
             t.success,
             t.warn,
@@ -773,6 +788,16 @@ mod tests {
             need("selection against canvas", contrast(t.selection, c), 1.15);
             need("mark against canvas", contrast(t.mark, c), 1.05);
             need("track against canvas", contrast(t.track, c), 1.1);
+            need("cursor against canvas", contrast(t.cursor, c), 1.4);
+            need(
+                "cursor against selection",
+                contrast(t.cursor, t.selection),
+                1.15,
+            );
+            need("cursor against mark", contrast(t.cursor, t.mark), 1.2);
+            // The cursor row is bold, which carries the text; its secondary text is
+            // drawn in the main colour (see the list).
+            need("text on cursor", contrast(t.text, t.cursor), 5.5);
             need("text on selection", contrast(t.text, t.selection), 7.0);
             need(
                 "text_dim on selection",

@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                          7/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                                Size  Type        │   · main.rs
+        Name ↑                               Size  Type        │   · main.rs
    ─────────────────────────────────────────────────────────── │   UTF-8 · 37 B · yesterday
-     ▸ data/                                    —  Folder      │
-     ▸ src/                                     —  Folder      │   1  fn main() {
-     ▸ 目录/                                    —  Folder      │   2      println!("hello");
-     · a-very-long-file-name-…  ───────       1 B  ● archive   │   3  }
-     ·╭──────────────────────────────────────────────────────────────────────────────────────╮
-     ·│                                                                                      │
-   ▎ ·│   Rename                                                                             │
-     ·│                                                                                      │
-     ·│  New name                                                                            │
-     ·│  › main.rs                                                                           │
-     ·│                                                                                      │
-     ·│                                                                                      │
+      ▸ data/                                   —  Folder      │
+      ▸ src/                                    —  Folder      │   1  fn main() {
+      ▸ 目录/                                   —  Folder      │   2      println!("hello");
+      · a-very-long-file-name…  ───────       1 B  ● archive   │   3  }
+      ╭──────────────────────────────────────────────────────────────────────────────────────╮
+      │                                                                                      │
+   ▎  │   Rename                                                                             │
+      │                                                                                      │
+      │  New name                                                                            │
+      │  › main.rs                                                                           │
+      │                                                                                      │
+      │                                                                                      │
       │                                                                                      │
       ╰──────────────────────────────────────────────────────────────────────────────────────╯
                                                                │

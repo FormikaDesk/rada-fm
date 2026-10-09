@@ -3,16 +3,16 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
   ▍ … › projects6/12 items
-      Name ↑
+       Name ↑
   ────────────────────────
-    ▸ data/
-    ▸ src/
-    ▸ 目录/
-    · a-very-long-file-na…
-    · backup.img
-  ▎ · Cargo.toml
-    · main.rs
-    · notes.txt
-    · README.md
-    · тест-файл.md
+     ▸ data/
+     ▸ src/
+     ▸ 目录/
+     · a-very-long-file-n…
+     · backup.img
+  ▎  · Cargo.toml
+     · main.rs
+     · notes.txt
+     · README.md
+     · тест-файл.md
   Enter open

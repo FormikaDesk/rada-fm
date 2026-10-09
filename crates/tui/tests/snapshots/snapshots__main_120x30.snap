@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                                              9/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                               Size  Type          Modified   │   · README.md
+        Name ↑                              Size  Type          Modified   │   · README.md
    ─────────────────────────────────────────────────────────────────────── │   UTF-8 · 73 B · 3 h ago
-     ▸ data/                                   —  Folder      6 days ago   │
-     ▸ src/                                    —  Folder      6 days ago   │   1  # Projects
-     ▸ 目录/                                   —  Folder      6 days ago   │   2
-     · a-very-long-file-name…  ───────       1 B  ● archive  12 days ago   │   3  A few notes about what lives here.
-     · backup.img              ━━━━━━━   420 MiB  file        9 days ago   │   4
-     · Cargo.toml              ───────      42 B  ● config    2 days ago   │   5  - rada
-     · main.rs                 ───────      37 B  ● code       yesterday   │   6  - site
-     · notes.txt               ───────  3.52 KiB  ● text     5 weeks ago   │   7  - dotfiles
-   ▎ · README.md               ───────      73 B  ● md           3 h ago   │
-     · тест-файл.md            ───────      13 B  ● md           1 h ago   │
-     · 日本語のファイル名.txt  ───────      16 B  ● text      5 days ago   │
-     · 📷 holiday photos 🌴.…  ───────       6 B  ● text        Nov 2028   │
+      ▸ data/                                  —  Folder      6 days ago   │
+      ▸ src/                                   —  Folder      6 days ago   │   1  # Projects
+      ▸ 目录/                                  —  Folder      6 days ago   │   2
+      · a-very-long-file-nam…  ───────       1 B  ● archive  12 days ago   │   3  A few notes about what lives here.
+      · backup.img             ━━━━━━━   420 MiB  ● file      9 days ago   │   4
+      · Cargo.toml             ───────      42 B  ● config    2 days ago   │   5  - rada
+      · main.rs                ───────      37 B  ● code       yesterday   │   6  - site
+      · notes.txt              ───────  3.52 KiB  ● text     5 weeks ago   │   7  - dotfiles
+   ▎  · README.md              ───────      73 B  ● md           3 h ago   │
+      · тест-файл.md           ───────      13 B  ● md           1 h ago   │
+      · 日本語のファイル名.t…  ───────      16 B  ● text      5 days ago   │
+      · 📷 holiday photos 🌴…  ───────       6 B  ● text        Nov 2028   │
                                                                            │
                                                                            │
                                                                            │

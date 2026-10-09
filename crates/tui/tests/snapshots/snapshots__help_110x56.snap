@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                                    1/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                         Size  Type          Modified   │   ▸
+        Name ↑                        Size  Type          Modified   │   ▸
    ───────────────────────────────────────────────────────────────── │
-   ▎ ▸ data/                             —  Folder      6 days ago   │
-     ▸ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-     ▸ │                                                                                              │
-     · │   Keys    ↑↓ scroll · Esc close                                                              │
-     · │                                                                                              │
-     · │                                Vim                           Classic                         │
-     · │                                                                                              │
-     · │  Moving around                                                                               │
-     · │  Move up                       k ↑                           ↑                               │
-     · │  Move down                     j ↓                           ↓                               │
-     · │  Parent folder                 h ← Backspace                 ← Backspace Alt+↑               │
-     · │  Open                          l → Enter                     → Enter                         │
+   ▎  ▸ data/                            —  Folder      6 days ago   │
+      ▸╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+      ▸│                                                                                              │
+      ·│   Keys    ↑↓ scroll · Esc close                                                              │
+      ·│                                                                                              │
+      ·│                                Vim                           Classic                         │
+      ·│                                                                                              │
+      ·│  Moving around                                                                               │
+      ·│  Move up                       k ↑                           ↑                               │
+      ·│  Move down                     j ↓                           ↓                               │
+      ·│  Parent folder                 h ← Backspace                 ← Backspace Alt+↑               │
+      ·│  Open                          l → Enter                     → Enter                         │
        │  First item                    g Home                        Home                            │
        │  Last item                     G End                         End                             │
        │  Page up                       PgUp                          PgUp                            │

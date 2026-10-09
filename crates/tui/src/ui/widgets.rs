@@ -129,7 +129,7 @@ pub fn bar_spans<'a>(
     let (f, e) = bar_parts(frac, cells, th.bar);
     let mut fill_style = Style::default().fg(fill);
     // The track must stay visible on the highlighted row too, where it would blend in.
-    let on_selection = row_bg == Some(th.selection);
+    let on_selection = row_bg == Some(th.cursor);
     let mut track_style = match th.bar {
         BarStyle::Half if on_selection => Style::default().fg(th.muted),
         BarStyle::Half => Style::default().fg(th.track),

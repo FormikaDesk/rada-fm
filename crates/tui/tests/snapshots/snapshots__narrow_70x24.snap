@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects            6/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                        Size  Type          Modified
+        Name ↑                       Size  Type          Modified
    ────────────────────────────────────────────────────────────────
-     ▸ data/                            —  Folder      6 days ago
-     ▸ src/                             —  Folder      6 days ago
-     ▸ 目录/                            —  Folder      6 days ago
-     · a-very-long-fi…  ───────       1 B  ● archive  12 days ago
-     · backup.img       ━━━━━━━   420 MiB  file        9 days ago
-   ▎ · Cargo.toml       ───────      42 B  ● config    2 days ago
-     · main.rs          ───────      37 B  ● code       yesterday
-     · notes.txt        ───────  3.52 KiB  ● text     5 weeks ago
-     · README.md        ───────      73 B  ● md           3 h ago
-     · тест-файл.md     ───────      13 B  ● md           1 h ago
-     · 日本語のファイ…  ───────      16 B  ● text      5 days ago
-     · 📷 holiday pho…  ───────       6 B  ● text        Nov 2028
+      ▸ data/                           —  Folder      6 days ago
+      ▸ src/                            —  Folder      6 days ago
+      ▸ 目录/                           —  Folder      6 days ago
+      · a-very-long-f…  ───────       1 B  ● archive  12 days ago
+      · backup.img      ━━━━━━━   420 MiB  ● file      9 days ago
+   ▎  · Cargo.toml      ───────      42 B  ● config    2 days ago
+      · main.rs         ───────      37 B  ● code       yesterday
+      · notes.txt       ───────  3.52 KiB  ● text     5 weeks ago
+      · README.md       ───────      73 B  ● md           3 h ago
+      · тест-файл.md    ───────      13 B  ● md           1 h ago
+      · 日本語のファ…   ───────      16 B  ● text      5 days ago
+      · 📷 holiday ph…  ───────       6 B  ● text        Nov 2028
 
 
 

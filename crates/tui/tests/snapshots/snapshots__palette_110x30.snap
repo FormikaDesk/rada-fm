@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                                    1/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                         Size  Type          Modified   │   ▸
+        Name ↑                        Size  Type          Modified   │   ▸
    ───────────────────────────────────────────────────────────────── │
-   ▎ ▸ data/                             —  Folder      6 days ago   │
-     ▸ src/                              —  Folder      6 days ago   │
-     ▸ 目录/                             —  Folder      6 days ago   │
-     · a-very-lo╭────────────────────────────────────────────────────────────────────────────╮
-     · backup.im│                                                                            │
-     · Cargo.tom│  ⌕  projec                                                                 │
-     · main.rs  │  ────────────────────────────────────────────────────────────────────────  │
-     · notes.txt│  ▎ ▸ data                      ~/demo/projects/data                folder  │
-     · README.md│    ▸ src                       ~/demo/projects/src                 folder  │
-     · тест-файл│                                                                            │
-     · 日本語のフ  ↑↓ move   Enter go   Esc close   3 results                                │
-     · 📷 holida│                                                                            │
+   ▎  ▸ data/                            —  Folder      6 days ago   │
+      ▸ src/                             —  Folder      6 days ago   │
+      ▸ 目录/                            —  Folder      6 days ago   │
+      · a-very-l╭────────────────────────────────────────────────────────────────────────────╮
+      · backup.i│                                                                            │
+      · Cargo.to│  ⌕  projec                                                                 │
+      · main.rs │  ────────────────────────────────────────────────────────────────────────  │
+      · notes.tx│  ▎ ▸ data                      ~/demo/projects/data                folder  │
+      · README.m│    ▸ src                       ~/demo/projects/src                 folder  │
+      · тест-фай│                                                                            │
+      · 日本語の│  ↑↓ move   Enter go   Esc close   3 results                                │
+      · 📷 holid│                                                                            │
                 ╰────────────────────────────────────────────────────────────────────────────╯
                                                                      │
                                                                      │

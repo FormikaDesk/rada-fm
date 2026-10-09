@@ -20,6 +20,9 @@ use crate::hits::Target;
 use crate::icons::{self, Category};
 use crate::theme::Density;
 
+/// Cells before the icon: the cursor bar, the mark dot, a space.
+const GUTTER: usize = 3;
+
 /// Which columns fit, and how wide each is.
 struct Columns {
     icon: usize,
@@ -56,7 +59,7 @@ fn columns(width: usize, icon_w: usize, density: Density) -> Columns {
     if width < 30 {
         size = 0;
     }
-    let fixed = 2 + icon_w + bar + size + kind + modified;
+    let fixed = GUTTER + icon_w + bar + size + kind + modified;
     let cols = [bar, size, kind, modified]
         .iter()
         .filter(|c| **c > 0)
@@ -95,7 +98,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         (t, st)
     };
     let gap = " ".repeat(cols.gap);
-    let mut head: Vec<Span> = vec![Span::raw(" ".repeat(2 + cols.icon))];
+    let mut head: Vec<Span> = vec![Span::raw(" ".repeat(GUTTER + cols.icon))];
     let mut head_hits: Vec<(usize, Target)> = Vec::new();
     let (t, st) = label("Name", SortKey::Name);
     head_hits.push((head.len(), Target::SortBy(SortKey::Name)));
@@ -252,14 +255,16 @@ fn row<'a>(
         name_style = name_style.add_modifier(Modifier::BOLD);
     }
 
-    let gutter = if marked {
-        Span::styled("● ", with(th.accent_style()))
-    } else if is_cursor {
-        Span::styled("▎ ", with(th.accent_style()))
-    } else {
-        Span::styled("  ", with(Style::default()))
-    };
-    let mut spans: Vec<Span> = vec![gutter];
+    // Three cells: the cursor bar, the mark dot, a space. A row can have both, and the
+    // cursor's background alone must not be the only thing telling it from a marked row.
+    let mut spans: Vec<Span> = vec![
+        Span::styled(if is_cursor { "▎" } else { " " }, with(th.accent_style())),
+        Span::styled(if marked { "●" } else { " " }, with(th.accent_style())),
+        Span::styled(" ", with(Style::default())),
+    ];
+    // On the cursor row the secondary text turns to the main colour: the stronger
+    // background would leave it too faint.
+    let dim = if is_cursor { th.base() } else { th.dim() };
     if cols.icon > 0 {
         spans.push(Span::styled(
             format!("{glyph} "),
@@ -279,7 +284,7 @@ fn row<'a>(
         if room > 5 {
             let n = display::truncate(&format!(" → {}", display::path(&l.target)), room);
             used += n.width();
-            spans.push(Span::styled(n, with(th.dim())));
+            spans.push(Span::styled(n, with(dim)));
         }
     }
     spans.push(Span::styled(
@@ -318,10 +323,11 @@ fn row<'a>(
     }
     if cols.kind > 0 {
         spans.push(gap());
-        if matches!(cat, Category::Folder | Category::Other) {
+        if cat == Category::Folder {
+            // The icon already says it is a folder: the word recedes.
             spans.push(Span::styled(
                 super::widgets::pad(cat.label(), cols.kind),
-                with(th.dim()),
+                with(th.faint()),
             ));
         } else {
             spans.extend(badge(th, cat.label(), cat.color(th), cols.kind, row_bg));
@@ -331,7 +337,7 @@ fn row<'a>(
         spans.push(gap());
         spans.push(Span::styled(
             pad_left(&fmt::relative(e.mtime, now), cols.modified),
-            with(th.dim()),
+            with(dim),
         ));
     }
     // Make the highlight reach the right edge.

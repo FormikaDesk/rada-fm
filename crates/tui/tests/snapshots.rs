@@ -376,6 +376,7 @@ fn light_theme_tokens() {
             ("accent", t.accent),
             ("on_accent", t.on_accent),
             ("selection", t.selection),
+            ("cursor", t.cursor),
             ("mark", t.mark),
             ("track", t.track),
             ("success", t.success),
@@ -446,6 +447,8 @@ fn main_screen_token_map_in_a_light_theme() {
             'A'
         } else if c == th.on_accent {
             'o'
+        } else if c == th.cursor {
+            'C'
         } else if c == th.selection {
             'S'
         } else if c == th.mark {
@@ -470,7 +473,7 @@ fn main_screen_token_map_in_a_light_theme() {
         out.extend((0..buf.area.width).map(|x| letter(buf[(x, y)].fg)));
         out.push('\n');
     }
-    out.push_str("\nbackground: . none, S selection, M mark, + tint\n");
+    out.push_str("\nbackground: . none, C cursor row, S selection, M mark, + tint\n");
     for y in 0..buf.area.height {
         out.extend((0..buf.area.width).map(|x| letter(buf[(x, y)].bg)));
         out.push('\n');

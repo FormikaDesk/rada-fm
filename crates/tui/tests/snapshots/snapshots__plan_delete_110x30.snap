@@ -4,10 +4,10 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                                    8/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                         Size  Type          Modified   │   · notes.txt
+        Name ↑                        Size  Type          Modified   │   · notes.txt
    ───────────────────────────────────────────────────────────────── │   UTF-8 · 3.52 KiB · 5 weeks ago
-     ▸ data/                             —  Folder      6 days ago   │
-     ▸ src/                              —  Folder      6 days ago   │     1  remember the milk
+      ▸ data/                            —  Folder      6 days ago   │
+      ▸ src/                             —  Folder      6 days ago   │     1  remember the milk
    ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
    │                                                                                                      │
    │   Delete                                                                                             │

@@ -9,6 +9,7 @@ expression: out
   accent        #2365e1
   on_accent     #ffffff
   selection     #d6e4ff
+  cursor        #bad2fc
   mark          #e8f0fe
   track         #dfe4ee
   success       #1a814d
@@ -37,6 +38,7 @@ expression: out
   accent        #1b5de0
   on_accent     #ffffff
   selection     #d4dbee
+  cursor        #becae8
   mark          #e0e5f2
   track         #d6dae5
   success       #2f7620
@@ -65,6 +67,7 @@ expression: out
   accent        #225cac
   on_accent     #ffffff
   selection     #c8d0ec
+  cursor        #b0bee6
   mark          #d4d9ee
   track         #d0d3de
   success       #4e6832

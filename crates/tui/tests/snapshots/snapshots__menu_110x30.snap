@@ -4,20 +4,20 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › projects                                                    7/12 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                         Size  Type          Modified   │   · main.rs
+        Name ↑                        Size  Type          Modified   │   · main.rs
    ───────────────────────────────────────────────────────────────── │   UTF-8 · 37 B · yesterday
-     ▸ data/                             —  Folder      6 days ago   │
-     ▸ src/                              —  Folder      6 days ago   │   1  fn main() {
-     ▸ 目录/                             —  Folder      6 days ago   │   2      println!("hello");
-     · a-very-long-fil…  ───────       1 B  ● archive  12 days ago   │   3  }
-     · backup.img        ━━━━━━━   420 MiB  file        9 days ago   │
-     · Cargo.toml        ───────      42 B  ● config    2 days ago   │
-   ▎ · main.rs           ───────   ╭────────────────────────────────╮│
-     · notes.txt         ───────  3│ Open                      Enter││
-     · README.md         ───────   │────────────────────────────────││
-     · тест-файл.md      ───────   │ Copy                     Ctrl+C││
-     · 日本語のファイ…   ───────   │ Cut                      Ctrl+X││
-     · 📷 holiday phot…  ───────   │ Paste                    Ctrl+V││
+      ▸ data/                            —  Folder      6 days ago   │
+      ▸ src/                             —  Folder      6 days ago   │   1  fn main() {
+      ▸ 目录/                            —  Folder      6 days ago   │   2      println!("hello");
+      · a-very-long-fi…  ───────       1 B  ● archive  12 days ago   │   3  }
+      · backup.img       ━━━━━━━   420 MiB  ● file      9 days ago   │
+      · Cargo.toml       ───────      42 B  ● config    2 days ago   │
+   ▎  · main.rs          ───────   ╭────────────────────────────────╮│
+      · notes.txt        ───────  3│ Open                      Enter││
+      · README.md        ───────   │────────────────────────────────││
+      · тест-файл.md     ───────   │ Copy                     Ctrl+C││
+      · 日本語のファイ…  ───────   │ Cut                      Ctrl+X││
+      · 📷 holiday pho…  ───────   │ Paste                    Ctrl+V││
                                    │────────────────────────────────││
                                    │ Rename                       F2││
                                    │ Move to trash               Del││

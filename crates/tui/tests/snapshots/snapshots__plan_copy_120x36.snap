@@ -4,9 +4,9 @@ expression: shot(&mut h)
 ---
    ▍ ~ › demo › backup                                                                 1/1 items   ⌕ Ctrl+P   F1 help
 
-       Name ↑                               Size  Type          Modified   │   · Cargo.toml
+        Name ↑                              Size  Type          Modified   │   · Cargo.toml
    ─────────────────────────────────────────────────────────────────────── │   UTF-8 · 42 B · Oct 2026
-   ▎ · README.md               ━━━━━━━       3 B  ● md          Oct 2026   │
+   ▎  · README.md              ━━━━━━━       3 B  ● md          Oct 2026   │
                                                                            │   1  [package]
                                                                            │   2  name = "demo"
                                                                            │   3  version = "0.1.0"
