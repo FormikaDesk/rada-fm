@@ -15,6 +15,7 @@ pub mod palette;
 pub mod run;
 pub mod services;
 pub mod sidebar;
+pub mod termtheme;
 pub mod theme;
 pub mod ui;
 

@@ -1763,6 +1763,7 @@ dependencies = [
  "image",
  "insta",
  "jiff",
+ "libc",
  "rada-core",
  "ratatui",
  "ratatui-image",

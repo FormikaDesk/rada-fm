@@ -33,3 +33,4 @@ rada-core = { path = "../core", features = ["testutil"] }
 
 [target."cfg(unix)".dependencies]
 signal-hook = "0.4.5"
+libc = "0.2"

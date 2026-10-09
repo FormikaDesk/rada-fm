@@ -5,7 +5,10 @@
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
-//! theme = "rada"            # rada | catppuccin | tokyo-night
+//! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:
+//!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
+//!                            # | tokyo-night-dark | tokyo-night-day
+//! appearance = "auto"        # auto | light | dark: which variant a theme name uses
 //! bookmarks = ["~/projects", "/mnt/data"]
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
@@ -34,6 +37,7 @@ pub struct FileConfig {
     pub sort: SortSpec,
     pub images: Option<String>,
     pub theme: Option<String>,
+    pub appearance: Option<String>,
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
     pub mouse: bool,
@@ -59,6 +63,7 @@ struct Raw {
     reverse: Option<bool>,
     images: Option<String>,
     theme: Option<String>,
+    appearance: Option<String>,
     bookmarks: Option<Vec<String>>,
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
@@ -93,6 +98,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         },
         images: raw.images,
         theme: raw.theme,
+        appearance: raw.appearance,
         bookmarks: raw.bookmarks.unwrap_or_default(),
         mouse: raw.mouse.unwrap_or(true),
         hints: raw.hints.unwrap_or(true),

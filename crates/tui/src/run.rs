@@ -83,7 +83,25 @@ pub fn run(cfg: Config, svc: Services) -> io::Result<Outcome> {
     result
 }
 
-fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Outcome> {
+fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result<Outcome> {
+    // The terminal is asked about its background before anything else reads the keyboard,
+    // and before the graphics query below (one question at a time). Keys the user typed in
+    // the meantime are given back and replayed.
+    let mut replay: Vec<crossterm::event::KeyEvent> = Vec::new();
+    if let Some(a) = cfg.adaptive.take() {
+        let t = std::time::Instant::now();
+        let detection = crate::termtheme::detect_here(None);
+        let light = detection.appearance.is_light();
+        if let Some(theme) = crate::theme::Theme::variant(&a.name, light, a.depth) {
+            cfg.theme = theme;
+        }
+        tracing::info!(
+            "terminal background — {} (in {:?})",
+            detection.describe(),
+            t.elapsed()
+        );
+        replay = crate::termtheme::keys_from_bytes(&detection.leftover);
+    }
     // Terminal graphics are detected now: the query needs raw mode and must finish
     // before the keyboard reader starts.
     let image_ui = match cfg.image_mode {
@@ -113,6 +131,9 @@ fn event_loop(terminal: &mut Term, cfg: Config, svc: Services) -> io::Result<Out
         tracing::debug!("image protocol in use: {}", u.protocol_name());
     }
     let mut app = App::new(cfg, svc, image_ui);
+    for key in replay {
+        app.on_key(key);
+    }
     let shutdown = shutdown_flag();
     let core_rx = app.events();
     let resize_rx = app

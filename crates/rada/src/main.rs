@@ -66,9 +66,15 @@ struct Cli {
     #[arg(long, value_name = "MODE")]
     images: Option<String>,
 
-    /// Colour theme: rada, catppuccin or tokyo-night.
+    /// Colour theme: `auto` (default), rada, catppuccin or tokyo-night (these follow the
+    /// terminal's background), or one fixed variant: rada-dark, rada-light,
+    /// catppuccin-mocha, catppuccin-latte, tokyo-night-dark, tokyo-night-day.
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
+
+    /// Which variant a theme name takes: `auto` (ask the terminal), `light` or `dark`.
+    #[arg(long, value_name = "LOOK")]
+    appearance: Option<String>,
 
     /// Developer: start in a ready-made scene (palette[:query], plan, progress).
     #[arg(long, value_name = "SCENE", hide = true)]
@@ -202,11 +208,42 @@ fn main() -> Result<()> {
         .theme
         .clone()
         .or_else(|| std::env::var("RADA_THEME").ok())
-        .or(cfg_file.theme.clone());
-    let theme = match theme_name {
-        Some(n) => Theme::named(&n, depth)
-            .with_context(|| format!("unknown theme {n:?} (use {})", Theme::NAMES.join(", ")))?,
-        None => Theme::named("rada", depth).expect("built-in theme"),
+        .or(cfg_file.theme.clone())
+        .unwrap_or_else(|| "auto".into());
+    let follows = Theme::follows_background(&theme_name).with_context(|| {
+        format!(
+            "unknown theme {theme_name:?} (use auto, rada, catppuccin, tokyo-night, or one of {})",
+            Theme::NAMES.join(", ")
+        )
+    })?;
+    let appearance_name = cli
+        .appearance
+        .clone()
+        .or_else(|| std::env::var("RADA_APPEARANCE").ok())
+        .or(cfg_file.appearance.clone());
+    let forced = match appearance_name {
+        Some(n) => rada_tui::termtheme::Appearance::parse(&n)
+            .with_context(|| format!("unknown appearance {n:?} (use auto, light or dark)"))?,
+        None => None,
+    };
+    // A name that follows the background is resolved once the terminal is up (it may have
+    // to be asked); a fixed variant, or a forced appearance, needs no asking.
+    let (theme, adaptive) = match (follows, forced) {
+        (true, None) => (
+            Theme::variant(&theme_name, false, depth).expect("checked above"),
+            Some(rada_tui::app::Adaptive {
+                name: theme_name.clone(),
+                depth,
+            }),
+        ),
+        (true, Some(look)) => (
+            Theme::variant(&theme_name, look.is_light(), depth).expect("checked above"),
+            None,
+        ),
+        (false, _) => (
+            Theme::named(&theme_name, depth).expect("checked above"),
+            None,
+        ),
     };
     let bookmarks = cfg_file
         .bookmarks
@@ -263,6 +300,7 @@ fn main() -> Result<()> {
         show_hidden: cli.hidden || cfg_file.show_hidden,
         sort: cfg_file.sort,
         theme,
+        adaptive,
         bookmarks,
         demo: cli.demo.clone().map(|scene| rada_tui::app::Demo {
             scene,

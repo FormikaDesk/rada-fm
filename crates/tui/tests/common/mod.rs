@@ -80,6 +80,7 @@ impl H {
             show_hidden: false,
             sort: SortSpec::default(),
             theme: Theme::rada(),
+            adaptive: None,
             image_mode: rada_tui::ImageMode::Halfblocks,
             limits,
             select: None,

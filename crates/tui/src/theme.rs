@@ -121,6 +121,13 @@ const fn rgb(r: u8, g: u8, b: u8) -> Color {
     Color::Rgb(r, g, b)
 }
 
+/// Whether a theme name stands for the whole family or for one variant of it.
+#[derive(Clone, Copy)]
+enum Pick {
+    Adaptive,
+    Exact { light: bool },
+}
+
 /// A named look, with a dark and a light variant.
 #[derive(Clone, Copy)]
 enum Family {
@@ -153,23 +160,37 @@ impl Theme {
         "tokyo-night-day",
     ];
 
-    /// The family a name belongs to and whether the name asks for the light variant.
-    fn family(name: &str) -> Option<(Family, bool)> {
+    /// The family a name belongs to, and whether the name pins a variant: `catppuccin-latte`
+    /// is always the light one, `catppuccin` follows the terminal's background.
+    fn family(name: &str) -> Option<(Family, Pick)> {
+        use Pick::{Adaptive, Exact};
         Some(match name.to_ascii_lowercase().as_str() {
-            "rada" | "default" => (Family::Rada, false),
-            "rada-light" | "rada-day" => (Family::Rada, true),
-            "catppuccin" | "catppuccin-mocha" | "mocha" => (Family::Catppuccin, false),
-            "catppuccin-latte" | "latte" => (Family::Catppuccin, true),
-            "tokyo-night" | "tokyonight" | "tokyo" => (Family::TokyoNight, false),
-            "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, true),
+            "auto" | "rada" | "default" => (Family::Rada, Adaptive),
+            "rada-dark" => (Family::Rada, Exact { light: false }),
+            "rada-light" | "rada-day" => (Family::Rada, Exact { light: true }),
+            "catppuccin" => (Family::Catppuccin, Adaptive),
+            "catppuccin-mocha" | "mocha" => (Family::Catppuccin, Exact { light: false }),
+            "catppuccin-latte" | "latte" => (Family::Catppuccin, Exact { light: true }),
+            "tokyo-night" | "tokyonight" | "tokyo" => (Family::TokyoNight, Adaptive),
+            "tokyo-night-dark" => (Family::TokyoNight, Exact { light: false }),
+            "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, Exact { light: true }),
             _ => return None,
         })
     }
 
-    /// A theme by name, adapted to the terminal's colour depth.
+    /// A theme by name, adapted to the terminal's colour depth. A name that follows the
+    /// terminal's background (`rada`, `catppuccin`, `tokyo-night`, `auto`) gives its dark
+    /// variant here; see [`Theme::variant`] to choose.
     pub fn named(name: &str, depth: ColorDepth) -> Option<Theme> {
-        let (family, light) = Theme::family(name)?;
+        let (family, pick) = Theme::family(name)?;
+        let light = matches!(pick, Pick::Exact { light: true });
         Some(family.theme(light).with_depth(depth))
+    }
+
+    /// Does `name` follow the terminal's background (`Some(true)`), pin one variant
+    /// (`Some(false)`), or mean nothing (`None`)?
+    pub fn follows_background(name: &str) -> Option<bool> {
+        Theme::family(name).map(|(_, p)| matches!(p, Pick::Adaptive))
     }
 
     /// The theme `name` belongs to, in the variant for a light or a dark background:
@@ -912,6 +933,41 @@ mod tests {
         }
         assert!(Theme::variant("nope", true, d).is_none());
         assert_eq!(Theme::named("latte", d).unwrap().name, "catppuccin-latte");
+    }
+
+    #[test]
+    fn family_names_follow_the_background_and_variant_names_pin_it() {
+        for follows in [
+            "auto",
+            "rada",
+            "catppuccin",
+            "tokyo-night",
+            "default",
+            "tokyo",
+        ] {
+            assert_eq!(Theme::follows_background(follows), Some(true), "{follows}");
+        }
+        for pinned in [
+            "rada-dark",
+            "rada-light",
+            "catppuccin-mocha",
+            "catppuccin-latte",
+            "tokyo-night-dark",
+            "tokyo-night-day",
+            "latte",
+            "mocha",
+        ] {
+            assert_eq!(Theme::follows_background(pinned), Some(false), "{pinned}");
+        }
+        assert_eq!(Theme::follows_background("nope"), None);
+        // A pinned name is that theme whatever the terminal looks like.
+        let d = ColorDepth::True;
+        assert_eq!(Theme::named("rada-dark", d).unwrap().name, "rada");
+        assert!(Theme::named("tokyo-night-day", d).unwrap().light);
+        assert!(!Theme::named("tokyo-night-dark", d).unwrap().light);
+        // "auto" is the rada family, and `variant` picks its side.
+        assert_eq!(Theme::variant("auto", true, d).unwrap().name, "rada-light");
+        assert_eq!(Theme::variant("auto", false, d).unwrap().name, "rada");
     }
 
     #[test]

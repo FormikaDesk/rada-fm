@@ -257,6 +257,9 @@ pub struct Config {
     pub show_hidden: bool,
     pub sort: SortSpec,
     pub theme: Theme,
+    /// Set when the theme is to follow the terminal's background: `theme` is then only the
+    /// stand-in until the terminal has been looked at.
+    pub adaptive: Option<Adaptive>,
     pub image_mode: ImageMode,
     pub limits: Limits,
     /// Put the cursor on this entry of `start_dir` (when started with a file path).
@@ -275,6 +278,13 @@ pub struct Config {
     /// An operation handed in as data (`--request`): planned at start and shown in the
     /// usual confirmation window.
     pub request: Option<rada_core::ops::OpRequest>,
+}
+
+/// A theme that follows the terminal's background: which one, and how to show it. Resolved
+/// when the terminal is started, because finding out may need to ask the terminal.
+pub struct Adaptive {
+    pub name: String,
+    pub depth: crate::theme::ColorDepth,
 }
 
 /// Developer hook: put the interface in a ready-made state (for screenshots).
