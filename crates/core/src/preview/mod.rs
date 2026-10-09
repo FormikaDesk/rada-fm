@@ -2,6 +2,7 @@
 //! data, UTF-16, Latin-1, FIFOs, devices. Only a bounded prefix is ever read, and
 //! only from regular files, so a preview can neither hang nor exhaust memory.
 
+pub mod archive;
 pub mod card;
 pub mod image;
 pub mod pdf;
@@ -10,6 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+pub use archive::ArchivePreview;
 pub use card::{ExecInfo, FileCard, mode_string};
 pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker};
 
@@ -24,6 +26,10 @@ pub struct Limits {
     pub max_line_chars: usize,
     pub hex_bytes: usize,
     pub dir_entries: usize,
+    /// How many things at the top of an archive its preview lists.
+    pub archive_entries: usize,
+    /// How long counting an archive's members may take before the preview gives a lower bound.
+    pub archive_seconds: f32,
     pub image: ImageLimits,
 }
 
@@ -35,6 +41,8 @@ impl Default for Limits {
             max_line_chars: 2000,
             hex_bytes: 512,
             dir_entries: 300,
+            archive_entries: 200,
+            archive_seconds: 1.5,
             image: ImageLimits::default(),
         }
     }
@@ -47,6 +55,8 @@ pub enum Preview {
     Binary(BinaryPreview),
     Image(ImagePreview),
     Dir(DirPreview),
+    /// An archive that is not opened: what it holds.
+    Archive(ArchivePreview),
     Symlink {
         target: PathBuf,
         state: LinkState,
@@ -85,6 +95,22 @@ pub struct DirPreview {
 }
 
 pub fn generate(fs: &dyn FsEngine, path: &Path, limits: &Limits) -> Preview {
+    generate_with(fs, path, limits, &|| false)
+}
+
+/// [`generate`], giving up (with an empty preview) as soon as `cancel` says the answer is no
+/// longer wanted: reading inside an archive can take a while.
+pub fn generate_with(
+    fs: &dyn FsEngine,
+    path: &Path,
+    limits: &Limits,
+    cancel: &dyn Fn() -> bool,
+) -> Preview {
+    if let Some(loc) = crate::archive::locate(fs, path)
+        && !loc.inner.as_os_str().is_empty()
+    {
+        return archive::member(&loc, limits, cancel);
+    }
     let meta = match fs.lstat(path) {
         Ok(m) => m,
         Err(e) => return Preview::Error(crate::Error::io("read", path, e).to_string()),
@@ -99,7 +125,7 @@ pub fn generate(fs: &dyn FsEngine, path: &Path, limits: &Limits) -> Preview {
                 }
                 Ok(m) if m.is_file() => (
                     LinkState::ToFile,
-                    Some(Box::new(file_preview(path, &m, limits))),
+                    Some(Box::new(file_preview(path, &m, limits, cancel))),
                 ),
                 Ok(_) => (LinkState::ToFile, None),
                 #[cfg(unix)]
@@ -112,7 +138,7 @@ pub fn generate(fs: &dyn FsEngine, path: &Path, limits: &Limits) -> Preview {
                 inner,
             }
         }
-        FileKind::File => file_preview(path, &meta, limits),
+        FileKind::File => file_preview(path, &meta, limits, cancel),
         FileKind::Other => Preview::Special(
             match meta.special {
                 Some(SpecialKind::Fifo) => "named pipe (not read)",
@@ -160,7 +186,7 @@ fn open_nonblocking(path: &Path) -> std::io::Result<File> {
     o.open(path)
 }
 
-fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits) -> Preview {
+fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits, cancel: &dyn Fn() -> bool) -> Preview {
     let size = meta.size;
     if size == 0 {
         return Preview::Empty;
@@ -177,21 +203,37 @@ fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits) -> Preview {
     if let Some(img) = image::detect(path, &buf, size, meta.mtime, &limits.image) {
         return Preview::Image(img);
     }
+    // So are archives: what they hold, without opening them.
+    if let Some(fmt) = crate::archive::format::sniff_head(&buf) {
+        let _ = fmt;
+        return archive::summarize(path, size, limits, cancel);
+    }
+    let (modified, accessed, created, mode) = (meta.mtime, meta.atime, meta.btime, meta.mode);
+    bytes_preview(&buf, size, limits, move |kind, exec| FileCard {
+        kind,
+        size,
+        modified,
+        accessed,
+        created,
+        mode,
+        exec,
+    })
+}
+
+/// Text, or a card for binary data, from the first bytes of something of `size` bytes.
+fn bytes_preview(
+    buf: &[u8],
+    size: u64,
+    limits: &Limits,
+    card: impl FnOnce(&'static str, Option<ExecInfo>) -> FileCard,
+) -> Preview {
     let truncated = (buf.len() as u64) < size || size > limits.max_bytes as u64;
-    match decode(&buf, truncated) {
+    match decode(buf, truncated) {
         Some((text, encoding)) => Preview::Text(to_lines(&text, encoding, truncated, size, limits)),
         None => Preview::Binary(BinaryPreview {
             size,
-            kind: sniff(&buf),
-            card: FileCard {
-                kind: sniff(&buf),
-                size,
-                modified: meta.mtime,
-                accessed: meta.atime,
-                created: meta.btime,
-                mode: meta.mode,
-                exec: card::parse_exec(&buf),
-            },
+            kind: sniff(buf),
+            card: card(sniff(buf), card::parse_exec(buf)),
             hex: hexdump(&buf[..buf.len().min(limits.hex_bytes)]),
         }),
     }

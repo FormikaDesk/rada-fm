@@ -93,6 +93,9 @@ pub struct ImagePreview {
     pub note: Option<String>,
     /// For a PDF that could not be drawn: the text of its first page instead.
     pub text: Vec<String>,
+    /// The real file to decode when the thing shown is not itself a file (a picture inside an
+    /// archive, taken out into the cache).
+    pub source: Option<PathBuf>,
 }
 
 fn raster_format(f: ImageFormat) -> Option<&'static str> {
@@ -160,6 +163,7 @@ pub(super) fn detect(
             state: disable_if_off(state, limits),
             note: None,
             text: Vec::new(),
+            source: None,
         });
     }
 
@@ -194,10 +198,21 @@ pub(super) fn detect(
         state: disable_if_off(state, limits),
         note: None,
         text: Vec::new(),
+        source: None,
     })
 }
 
 /// A PDF announces itself with `%PDF-` in its first kilobyte.
+/// Keep the preview cache within its limits (it is also used for archive members).
+pub(super) fn prune_if_due(dir: &Path, limits: &ImageLimits) {
+    pdf::maybe_prune(dir, limits);
+}
+
+/// Whether the first bytes are a picture or a PDF, the things this module can draw.
+pub(super) fn is_drawable(head: &[u8]) -> bool {
+    looks_like_pdf(head) || looks_like_svg(head) || image::guess_format(head).is_ok_and(|f| raster_format(f).is_some())
+}
+
 fn looks_like_pdf(head: &[u8]) -> bool {
     head[..head.len().min(1024)]
         .windows(5)
@@ -230,6 +245,7 @@ fn detect_pdf(mut info: ImageInfo, size: u64, limits: &ImageLimits) -> ImagePrev
         state: disable_if_off(state, limits),
         note,
         text: Vec::new(),
+        source: None,
     }
 }
 
@@ -392,6 +408,7 @@ pub fn load(
         state,
         note,
         text: Vec::new(),
+        source: None,
     }
 }
 
@@ -460,6 +477,7 @@ fn load_pdf(
         state,
         note,
         text,
+        source: None,
     }
 }
 

@@ -349,7 +349,7 @@ pub fn render_first_page(
 static RENDERS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Prune on the first render of a run and then every ten renders.
-fn maybe_prune(dir: &Path, limits: &ImageLimits) {
+pub(super) fn maybe_prune(dir: &Path, limits: &ImageLimits) {
     let n = RENDERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     if n.is_multiple_of(10) {
         prune_cache(dir, limits.pdf_cache_max_bytes, limits.pdf_cache_max_age);

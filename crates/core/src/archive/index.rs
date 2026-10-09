@@ -153,30 +153,35 @@ impl Index {
                 let name = p.file_name().map(|n| n.to_os_string()).unwrap_or_default();
                 let folder = self.tree.entry(parent.to_path_buf()).or_default();
                 let is_leaf = std::ptr::eq(p, e.path.as_path());
-                let child = folder.entry(name.clone()).or_insert_with(|| Child {
-                    name,
-                    kind: EntryKind::Dir,
-                    entry: None,
-                    size: 0,
-                    mtime: None,
-                    mode: None,
-                    link: None,
-                });
+                // A name that so far exists only because other paths run through it.
+                let implied = folder.get(&name).is_some_and(|c| c.entry.is_none());
                 if is_leaf {
-                    // The member itself (a later one with the same path replaces an earlier).
-                    // A folder that already has children stays a folder.
-                    let keeps_folder = child.kind == EntryKind::Dir && child.entry.is_none() && {
-                        // an implied folder met before its own entry
-                        e.kind != EntryKind::Dir
-                    };
-                    if !keeps_folder || e.kind == EntryKind::Dir {
-                        child.kind = e.kind;
-                        child.entry = Some(e.index);
-                        child.size = e.size;
-                        child.mtime = e.mtime;
-                        child.mode = e.mode;
-                        child.link = e.link.clone();
+                    if !(implied && e.kind != EntryKind::Dir) {
+                        // The member itself (a later one with the same path replaces an
+                        // earlier one).
+                        folder.insert(
+                            name.clone(),
+                            Child {
+                                name,
+                                kind: e.kind,
+                                entry: Some(e.index),
+                                size: e.size,
+                                mtime: e.mtime,
+                                mode: e.mode,
+                                link: e.link.clone(),
+                            },
+                        );
                     }
+                } else {
+                    folder.entry(name.clone()).or_insert_with(|| Child {
+                        name,
+                        kind: EntryKind::Dir,
+                        entry: None,
+                        size: 0,
+                        mtime: None,
+                        mode: None,
+                        link: None,
+                    });
                 }
                 p = parent;
                 if parent.as_os_str().is_empty() {
@@ -206,7 +211,10 @@ impl Index {
 
     /// Whether `dir` is a folder of this archive (the top counts).
     pub fn is_folder(&self, dir: &Path) -> bool {
-        dir.as_os_str().is_empty() || self.tree.contains_key(dir)
+        dir.as_os_str().is_empty()
+            || self.tree.contains_key(dir)
+            // An empty folder has nothing under it, only its own entry.
+            || self.find(dir).is_some_and(|e| e.kind == EntryKind::Dir)
     }
 
     /// The member at `path` (the last one, if the archive repeats a name).

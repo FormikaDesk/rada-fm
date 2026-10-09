@@ -743,6 +743,7 @@ impl App {
                 generation,
                 path,
                 result,
+                ..
             } => {
                 if generation != self.dir_gen {
                     return; // an answer to a request that has been superseded

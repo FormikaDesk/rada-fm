@@ -169,6 +169,90 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::styled("  show the hex dump", th.dim()),
             ]));
         }
+        Some(Preview::Archive(a)) => {
+            let kv = |lines: &mut Vec<Line>, key: &str, value: &str, st: Style| {
+                kv_lines(lines, &th, key, value, st, w);
+            };
+            kv(&mut lines, "Format", &a.format, th.base());
+            if let Some(why) = &a.problem {
+                lines.push(Line::raw(""));
+                for l in fmt::wrap(why, w) {
+                    lines.push(Line::from(Span::styled(l, th.fg(th.error))));
+                }
+            } else {
+                let lower = if a.complete { "" } else { "at least " };
+                kv(
+                    &mut lines,
+                    "Contains",
+                    &format!(
+                        "{lower}{}",
+                        archive_counts(a.files, a.dirs, a.symlinks)
+                    ),
+                    th.base(),
+                );
+                kv(
+                    &mut lines,
+                    "Packed",
+                    &format!("{} · {} bytes", fmt::size(a.packed), fmt::thousands(a.packed)),
+                    th.base(),
+                );
+                kv(
+                    &mut lines,
+                    "Unpacked",
+                    &format!("{lower}{}", fmt::size(a.bytes)),
+                    th.base(),
+                );
+                if a.packed > 0 && a.bytes > a.packed {
+                    kv(
+                        &mut lines,
+                        "Ratio",
+                        &format!("{:.1} to 1", a.bytes as f64 / a.packed as f64),
+                        th.dim(),
+                    );
+                }
+                if let Some(n) = &a.note {
+                    for l in fmt::wrap(n, w) {
+                        lines.push(Line::from(Span::styled(l, th.fg(th.warn))));
+                    }
+                }
+                if a.encrypted > 0 {
+                    lines.push(Line::from(Span::styled(
+                        format!(
+                            "{} protected by a password",
+                            fmt::count(a.encrypted, "item is", "items are")
+                        ),
+                        th.fg(th.warn),
+                    )));
+                }
+                lines.push(Line::raw(""));
+                lines.push(Line::from(vec![
+                    Span::styled("Enter", th.key()),
+                    Span::styled("  open like a folder   ", th.dim()),
+                    Span::styled("x", th.key()),
+                    Span::styled("  extract", th.dim()),
+                ]));
+                lines.push(Line::raw(""));
+                let room = h.saturating_sub(lines.len());
+                app.preview.scroll = app.preview.scroll.min(a.first.len().saturating_sub(1));
+                for (name, is_dir) in a.first.iter().skip(app.preview.scroll).take(room) {
+                    let (g, c) = if *is_dir {
+                        ("▸ ", th.kinds.folder)
+                    } else {
+                        ("· ", th.muted)
+                    };
+                    lines.push(Line::from(vec![
+                        Span::styled(g, th.fg(c)),
+                        Span::styled(
+                            display::truncate(name, w.saturating_sub(2)),
+                            th.fg(if *is_dir { th.kinds.folder } else { th.text }),
+                        ),
+                    ]));
+                }
+                if a.more {
+                    lines.push(Line::from(Span::styled("…", th.faint())));
+                }
+            }
+        }
         Some(Preview::Dir(d)) => {
             app.preview.scroll = app.preview.scroll.min(d.entries.len().saturating_sub(1));
             for (name, is_dir) in d.entries.iter().skip(app.preview.scroll).take(h) {
@@ -282,7 +366,30 @@ fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
             }
         }
         Some(Preview::Symlink { .. }) => "Symbolic link".into(),
+        Some(Preview::Archive(a)) if a.problem.is_some() => a.format.clone(),
+        Some(Preview::Archive(a)) => format!(
+            "{} · {}{} · {}",
+            a.format,
+            if a.complete { "" } else { "at least " },
+            archive_counts(a.files, a.dirs, a.symlinks),
+            fmt::size(a.packed)
+        ),
     }
+}
+
+/// "12 files, 3 folders" without the parts that are zero.
+fn archive_counts(files: u64, dirs: u64, links: u64) -> String {
+    let mut parts = Vec::new();
+    if files > 0 || (dirs == 0 && links == 0) {
+        parts.push(fmt::count(files, "file", "files"));
+    }
+    if dirs > 0 {
+        parts.push(fmt::count(dirs, "folder", "folders"));
+    }
+    if links > 0 {
+        parts.push(fmt::count(links, "link", "links"));
+    }
+    parts.join(", ")
 }
 
 fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {

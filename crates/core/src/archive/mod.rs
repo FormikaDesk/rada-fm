@@ -10,6 +10,7 @@
 //! xz or zstd, 7z), so the same code builds on every platform. RAR is read only through an
 //! external program (`7z`, `7zz` or `unrar`) for licence reasons.
 
+pub mod browse;
 pub mod entry;
 pub mod external;
 pub mod format;
@@ -23,6 +24,7 @@ pub mod writer;
 use std::io;
 use std::path::{Path, PathBuf};
 
+pub use browse::ArchiveView;
 pub use entry::{Entry, EntryKind, NameIssue, link_escapes};
 pub use format::{
     ArchiveKind, Compression, Format, archive_stem, name_is_zip_document, name_suggests_archive,

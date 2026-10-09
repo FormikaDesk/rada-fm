@@ -84,6 +84,8 @@ pub enum DirEvent {
         generation: u64,
         path: PathBuf,
         result: Result<Vec<Entry>, String>,
+        /// Set when `path` is an archive or a folder inside one.
+        archive: Option<crate::archive::ArchiveView>,
     },
     Patched {
         generation: u64,

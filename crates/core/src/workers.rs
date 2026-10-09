@@ -94,13 +94,30 @@ fn dir_loop(
         }
 
         if let Some((path, generation)) = load {
-            let result = model::read_entries(fs.as_ref(), platform.as_ref(), &path)
-                .map_err(|e| e.to_string());
+            // A path that runs through a file is inside an archive. An ordinary folder costs
+            // one `stat` to find that out.
+            let (result, archive) = match crate::archive::locate(fs.as_ref(), &path) {
+                Some(loc) => {
+                    // A newer request waiting means nobody wants this listing any more.
+                    let superseded = || !rx.is_empty();
+                    match crate::archive::browse::read_dir(platform.as_ref(), &loc, &superseded) {
+                        Ok((entries, view)) => (Ok(entries), Some(view)),
+                        Err(crate::Error::Cancelled) => continue,
+                        Err(e) => (Err(e.to_string()), None),
+                    }
+                }
+                None => (
+                    model::read_entries(fs.as_ref(), platform.as_ref(), &path)
+                        .map_err(|e| e.to_string()),
+                    None,
+                ),
+            };
             if out
                 .send(CoreEvent::Dir(DirEvent::Loaded {
                     generation,
                     path,
                     result,
+                    archive,
                 }))
                 .is_err()
             {
@@ -162,14 +179,19 @@ impl PreviewWorker {
                         req = newer;
                     }
                     images.newest(req.generation);
-                    let preview = preview::generate(fs.as_ref(), &req.path, &req.limits);
+                    // Reading inside an archive can take long: a newer request waiting means
+                    // the answer is no longer wanted.
+                    let superseded = || !rx.is_empty();
+                    let preview =
+                        preview::generate_with(fs.as_ref(), &req.path, &req.limits, &superseded);
                     // Decoding is slow: the header-only answer goes out first, the pixels
                     // follow. The decoder is only started once the header has been sent:
                     // started before, it could finish first, and the header (still
                     // "loading") would then arrive after the picture and undo it.
                     let decode = match &preview {
                         Preview::Image(img) if matches!(img.state, ImageState::Loading) => Some((
-                            req.path.clone(),
+                            // A picture inside an archive is decoded from its cached copy.
+                            img.source.clone().unwrap_or_else(|| req.path.clone()),
                             req.generation,
                             img.info.clone(),
                             req.limits.image.clone(),
