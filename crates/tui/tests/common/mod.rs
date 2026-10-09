@@ -64,6 +64,26 @@ impl H {
         )
     }
 
+    /// With the user's limits for extracting archives.
+    pub fn with_archive_limits(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        limits: rada_core::archive::ArchiveLimits,
+    ) -> H {
+        H::build_with(
+            sb,
+            start,
+            w,
+            h,
+            Some(rada_tui::ImageUi::halfblocks()),
+            Default::default(),
+            None,
+            limits,
+        )
+    }
+
     fn build(
         sb: Sandbox,
         start: PathBuf,
@@ -73,7 +93,26 @@ impl H {
         limits: rada_core::preview::Limits,
         request: Option<rada_core::ops::OpRequest>,
     ) -> H {
-        let svc = Services::start(Arc::new(LocalFs), sb.platform(), Some(sb.journal()));
+        H::build_with(sb, start, w, h, images, limits, request, Default::default())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_with(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        images: Option<rada_tui::ImageUi>,
+        limits: rada_core::preview::Limits,
+        request: Option<rada_core::ops::OpRequest>,
+        archive_limits: rada_core::archive::ArchiveLimits,
+    ) -> H {
+        let svc = Services::start_with(
+            Arc::new(LocalFs),
+            sb.platform(),
+            Some(sb.journal()),
+            archive_limits,
+        );
         let cfg = Config {
             start_dir: start,
             icons: IconSet::Unicode,

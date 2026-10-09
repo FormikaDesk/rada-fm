@@ -225,10 +225,13 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                     )));
                 }
                 lines.push(Line::raw(""));
+                let extract_key = app
+                    .key_for(crate::keymap::Action::ExtractHere)
+                    .unwrap_or_else(|| "e".into());
                 lines.push(Line::from(vec![
                     Span::styled("Enter", th.key()),
                     Span::styled("  open like a folder   ", th.dim()),
-                    Span::styled("x", th.key()),
+                    Span::styled(extract_key, th.key()),
                     Span::styled("  extract", th.dim()),
                 ]));
                 lines.push(Line::raw(""));
