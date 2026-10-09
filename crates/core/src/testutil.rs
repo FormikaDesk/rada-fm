@@ -135,6 +135,71 @@ pub fn disk_base() -> PathBuf {
     base.canonicalize().unwrap_or(base)
 }
 
+/// Remove the scratch areas (`proc-<pid>`) that earlier test runs left in `base`
+/// because they were interrupted (killed, power loss). An area still owned by a live
+/// process, and anything not named like a scratch area, is left alone.
+fn reap_stale_scratch(base: &Path, own_pid: u32) {
+    let Ok(rd) = std::fs::read_dir(base) else {
+        return;
+    };
+    for e in rd.flatten() {
+        let name = e.file_name();
+        let Some(pid) = name
+            .to_str()
+            .and_then(|n| n.strip_prefix("proc-"))
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if pid != own_pid && !scratch_owner_alive(pid, &e.path()) {
+            force_remove_dir_all(&e.path());
+        }
+    }
+}
+
+/// Whether the process that created a scratch area may still be running.
+#[cfg(target_os = "linux")]
+fn scratch_owner_alive(pid: u32, _dir: &Path) -> bool {
+    Path::new("/proc").join(pid.to_string()).exists()
+}
+
+/// Without a process table to ask, an area is stale once it has not been touched for a day.
+#[cfg(not(target_os = "linux"))]
+fn scratch_owner_alive(_pid: u32, dir: &Path) -> bool {
+    const DAY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+    std::fs::metadata(dir)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_none_or(|age| age < DAY)
+}
+
+/// `remove_dir_all` that first gives back the permissions a test may have taken away.
+fn force_remove_dir_all(dir: &Path) {
+    restore_permissions(dir);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[cfg(unix)]
+fn restore_permissions(dir: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let Ok(m) = std::fs::symlink_metadata(dir) else {
+        return;
+    };
+    if !m.is_dir() {
+        return;
+    }
+    let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for e in rd.flatten() {
+            restore_permissions(&e.path());
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn restore_permissions(_dir: &Path) {}
+
 fn process() -> &'static Process {
     PROCESS.get_or_init(|| {
         // Capture the REAL locations before re-pointing the environment.
@@ -151,7 +216,9 @@ fn process() -> &'static Process {
         }
         let guard = RealPathGuard::new(paths, shallow);
 
-        let scratch = disk_base().join(format!("proc-{}", std::process::id()));
+        let base = disk_base();
+        reap_stale_scratch(&base, std::process::id());
+        let scratch = base.join(format!("proc-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&scratch);
         let d = Dirs::under(&scratch);
         // SAFETY: executed once, before any sandbox exists; the engine itself never
@@ -672,6 +739,53 @@ mod tests {
         assert!(Path::new(&home).starts_with(disk_base()));
         let st = std::env::var_os("XDG_STATE_HOME").unwrap();
         assert!(Path::new(&st).starts_with(disk_base()));
+    }
+
+    /// A pid no process can have (above the kernel's maximum).
+    #[cfg(target_os = "linux")]
+    const DEAD_PID: u32 = 4_000_000_000;
+
+    #[cfg(unix)]
+    #[test]
+    fn leftovers_without_permissions_can_be_removed() {
+        use std::os::unix::fs::PermissionsExt;
+        let sb = Sandbox::new();
+        let locked = sb.mkdir("left/over/locked");
+        std::fs::write(locked.join("f"), b"x").unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        force_remove_dir_all(&sb.path("left"));
+        assert!(!sb.path("left").exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn scratch_areas_of_interrupted_runs_are_reaped_at_startup() {
+        use std::os::unix::fs::PermissionsExt;
+        let sb = Sandbox::new();
+        let base = sb.mkdir("base");
+        let own = std::process::id();
+
+        let stale = base.join(format!("proc-{DEAD_PID}"));
+        let locked = stale.join("sb-x/work/dest/top/locked");
+        std::fs::create_dir_all(&locked).unwrap();
+        std::fs::write(locked.join("f"), b"x").unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+        let mine = base.join(format!("proc-{own}"));
+        let foreign = base.join("keep-me");
+        let odd = base.join("proc-not-a-pid");
+        for d in [&mine, &foreign, &odd] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+
+        reap_stale_scratch(&base, own);
+
+        assert!(!stale.exists(), "stale area survived");
+        assert!(mine.exists(), "own area was removed");
+        assert!(
+            foreign.exists() && odd.exists(),
+            "unrelated entries removed"
+        );
     }
 
     #[test]
