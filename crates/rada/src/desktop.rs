@@ -74,8 +74,15 @@ impl Setup {
         let mut manifest = self.read_manifest();
         let mut written: Vec<PathBuf> = Vec::new();
 
+        // The entry only claims folders when rada is (to be) the folder handler: a
+        // `MimeType=inode/directory` line alone would already make it the fallback
+        // handler ahead of the system's own file manager.
+        let claims_folders = default_file_manager || manifest.previous_default.is_some();
         let desktop = self.desktop_path();
-        write_file(&desktop, with_exec(DESKTOP_ENTRY, &self.exe).as_bytes())?;
+        write_file(
+            &desktop,
+            launcher_entry(DESKTOP_ENTRY, &self.exe, claims_folders).as_bytes(),
+        )?;
         say.push(format!("installed {}", desktop.display()));
         written.push(desktop);
         for (path, bytes) in self.icon_files() {
@@ -262,10 +269,12 @@ fn exec_quote(p: &Path) -> String {
 }
 
 /// The entry says `Exec=rada …`; launchers often do not have `~/.cargo/bin` in their
-/// PATH, so the installed entry names the program by its full path.
-fn with_exec(template: &str, exe: &Path) -> String {
+/// PATH, so the installed entry names the program by its full path. The `MimeType=` line
+/// is dropped unless the entry is to claim folders.
+fn launcher_entry(template: &str, exe: &Path, claims_folders: bool) -> String {
     template
         .lines()
+        .filter(|l| claims_folders || !l.starts_with("MimeType="))
         .map(|l| match l.strip_prefix("Exec=rada ") {
             Some(rest) => format!("Exec={} {rest}", exec_quote(exe)),
             None => l.to_string(),
@@ -476,12 +485,15 @@ mod tests {
             exec_quote(Path::new("/opt/a$b/rada")),
             "\"/opt/a\\$b/rada\""
         );
-        let e = with_exec(DESKTOP_ENTRY, Path::new("/opt/my apps/rada"));
+        let e = launcher_entry(DESKTOP_ENTRY, Path::new("/opt/my apps/rada"), false);
         assert!(
             e.contains("Exec=\"/opt/my apps/rada\" --spawn-terminal %F\n"),
             "{e}"
         );
         assert!(e.contains("Name=rada"));
+        assert!(!e.contains("MimeType="), "{e}");
+        let e = launcher_entry(DESKTOP_ENTRY, Path::new("/opt/rada"), true);
+        assert!(e.contains("MimeType=inode/directory;\n"), "{e}");
     }
 
     #[test]

@@ -143,10 +143,9 @@ fn setup_installs_the_entry_and_icons_for_the_user_and_says_so() {
     let out = text(&o);
 
     let entry = read(&sb.p("data/applications/rada.desktop"));
-    assert!(
-        entry.contains("Name=rada") && entry.contains("MimeType=inode/directory;"),
-        "{entry}"
-    );
+    assert!(entry.contains("Name=rada"), "{entry}");
+    // A plain setup must not claim folders: the entry would become the fallback handler.
+    assert!(!entry.contains("MimeType="), "{entry}");
     // The entry names the program by its full path, so launchers need no PATH.
     let exe = env!("CARGO_BIN_EXE_rada");
     assert!(
@@ -252,6 +251,49 @@ fn default_file_manager_is_only_set_on_request_and_restored_on_remove() {
         "{}",
         text(&o)
     );
+}
+
+#[test]
+fn a_plain_setup_leaves_the_folder_handler_alone() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    sb.fake_xdg_mime();
+    let mimeapps = "[Default Applications]\ninode/directory=org.example.Files.desktop\n";
+    fs::write(sb.p("config/mimeapps.list"), mimeapps).unwrap();
+
+    // Twice, as an update of the installed entry is a plain setup again.
+    for _ in 0..2 {
+        assert!(sb.rada(&["setup", "desktop"]).status.success());
+        assert!(!read(&sb.p("data/applications/rada.desktop")).contains("MimeType="));
+        assert_eq!(read(&sb.p("config/mimeapps.list")), mimeapps);
+        assert!(!read(&sb.p("xdg-mime.log")).contains("default"));
+    }
+}
+
+#[test]
+fn the_entry_claims_folders_only_with_the_default_file_manager_option() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    sb.fake_xdg_mime();
+    let entry = || read(&sb.p("data/applications/rada.desktop"));
+
+    assert!(sb.rada(&["setup", "desktop"]).status.success());
+    assert!(!entry().contains("MimeType="));
+
+    assert!(
+        sb.rada(&["setup", "desktop", "--default-file-manager"])
+            .status
+            .success()
+    );
+    assert!(entry().contains("MimeType=inode/directory;"), "{}", entry());
+    assert!(read(&sb.p("config/mimeapps.list")).contains("inode/directory=rada.desktop"));
+
+    // Refreshing the entry later keeps it consistent with the handler it was made.
+    assert!(sb.rada(&["setup", "desktop"]).status.success());
+    assert!(entry().contains("MimeType=inode/directory;"), "{}", entry());
+
+    assert!(sb.rada(&["setup", "desktop", "--remove"]).status.success());
+    assert!(!sb.p("data/applications/rada.desktop").exists());
 }
 
 #[test]
