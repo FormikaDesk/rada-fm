@@ -163,17 +163,19 @@ impl PreviewWorker {
                     }
                     images.newest(req.generation);
                     let preview = preview::generate(fs.as_ref(), &req.path, &req.limits);
-                    // Decoding is slow: the header-only answer goes out now, the pixels follow.
-                    if let Preview::Image(img) = &preview
-                        && matches!(img.state, ImageState::Loading)
-                    {
-                        images.submit(
+                    // Decoding is slow: the header-only answer goes out first, the pixels
+                    // follow. The decoder is only started once the header has been sent:
+                    // started before, it could finish first, and the header (still
+                    // "loading") would then arrive after the picture and undo it.
+                    let decode = match &preview {
+                        Preview::Image(img) if matches!(img.state, ImageState::Loading) => Some((
                             req.path.clone(),
                             req.generation,
                             img.info.clone(),
                             req.limits.image.clone(),
-                        );
-                    }
+                        )),
+                        _ => None,
+                    };
                     let name = req
                         .path
                         .file_name()
@@ -187,6 +189,9 @@ impl PreviewWorker {
                     };
                     if out.send(CoreEvent::Preview(ev)).is_err() {
                         return;
+                    }
+                    if let Some((path, generation, info, limits)) = decode {
+                        images.submit(path, generation, info, limits);
                     }
                 }
             })

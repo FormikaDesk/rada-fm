@@ -111,6 +111,49 @@ fn every_supported_format_gives_header_info_first_then_pixels() {
     }
 }
 
+/// Regression: the pixels were handed to the decoding thread before the header-only answer
+/// was sent, so under load the decoded picture could arrive first and the header (still
+/// "loading") after it. The header must always come first, whatever the machine is doing.
+#[test]
+fn the_header_always_comes_before_the_pixels_even_when_decoding_is_instant() {
+    let sb = Sandbox::new();
+    // A tiny picture decodes in microseconds: the best chance for the pixels to win.
+    let p = save(&sb, "tiny.png", &gradient(4, 4), ImageFormat::Png);
+    let (w, rx) = worker();
+    // Keep every core busy meanwhile, as a parallel test run does.
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let burners: Vec<_> = (0..std::thread::available_parallelism().map_or(4, |n| n.get()) * 2)
+        .map(|_| {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut x = 1u64;
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    x = x.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    std::hint::black_box(x);
+                }
+            })
+        })
+        .collect();
+    for g in 1..=150u64 {
+        request(&w, &p, g, Limits::default());
+        let first = next_for(&rx, g, 10);
+        let Preview::Image(h) = first.preview else {
+            panic!("generation {g}: {:?}", first.preview)
+        };
+        assert!(
+            matches!(h.state, ImageState::Loading),
+            "generation {g}: the first answer must be the header, not {:?}",
+            h.state
+        );
+        let done = settled(&rx, g);
+        assert!(matches!(done.state, ImageState::Ready(_)), "generation {g}");
+    }
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for b in burners {
+        b.join().unwrap();
+    }
+}
+
 #[test]
 fn a_gif_shows_its_first_frame() {
     let sb = Sandbox::new();
