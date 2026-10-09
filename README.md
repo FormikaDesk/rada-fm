@@ -10,13 +10,13 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ![rada: the folder list with an image preview](docs/screenshots/main.png)
 
-> **Status:** version 0.1.0, the first release. Linux is supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
+> **Status:** version 0.2.0. Linux is supported. Windows and macOS are **in development**: the code is structured for them and compiles, but they are not supported yet.
 
 ## Why it is different
 
 | | |
 |---|---|
-| **A calm interface** | A top bar with back / forward / parent buttons, the path (a house for home, clickable segments, a clickable `…` for a long path), a labelled filter field and a `Go to…` button; a sidebar with your standard places under their real names (Scaricati, Documenti…), bookmarks and disks; a list with a size bar and a coloured type dot per file and relative dates ("3 h ago"); a bottom bar with what is selected, the keys that make sense right now drawn as little keys, and the free space of the disk. Windows (plan, errors, prompts, jump palette) float in the middle over a dimmed background; notifications come and go by themselves ("Copied 342 files — press u to undo"). It adapts to the width of the terminal: the sidebar shrinks to icons, then goes, before the preview does; then the date, the type and the size bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
+| **A calm interface** | A top bar with back / forward / parent buttons, the path (a house for home, clickable segments, a clickable `…` for a long path), a labelled filter field and a `Go to…` button; a sidebar with your standard places under their real names (Scaricati, Documenti…), bookmarks and disks; a list with a size bar and a coloured type dot per file and relative dates ("3 h ago"); a bottom bar with what is selected, the keys that make sense right now drawn as little keys, and the free space of the disk. Floating windows (plan, errors, prompts, jump palette) appear in the middle over a dimmed background; notifications come and go by themselves ("Copied 342 files — press u to undo"). It adapts to the width of the terminal: the sidebar shrinks to icons, then goes, before the preview does; then the date, the type and the size bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
 | **Keyboard *and* mouse** | Vim keys and the usual desktop shortcuts work together by default (`y` or `Ctrl+C`, `d` or `Del`, `u` or `Ctrl+Z`…). The mouse selects, opens, scrolls, sorts by column, goes back and forward, picks places in the sidebar, and a right click opens a context menu that shows each shortcut. Every key can be rebound. |
 | **Plan window** | Copy, move, rename, bulk rename, new folder, trash, delete: all show a plan with totals and warnings first. Permanent deletion states clearly that it cannot be undone and asks you to type `yes`. |
 | **Journal + undo** | `u` undoes the last operation (with its own plan, so you see what undo will do). `U` shows the history. Undo of a copy removes exactly what the copy created; undo of a move moves back; undo of trash restores from the trash; undo of an overwrite brings the old file back. |
@@ -273,7 +273,7 @@ The suite includes regression tests for real bugs found in other terminal file m
 
 Tests never touch your real folders: each one runs in a temporary sandbox with `HOME` and all `XDG_*` variables pointing into it, and a guard fingerprints your real trash, config, state and cache before the first test and fails the test if anything under them changed.
 
-CI (GitHub Actions) builds and runs the core tests on Linux, Windows and macOS. Tests that are not supported yet on Windows/macOS are marked `#[ignore = "<reason>"]`.
+CI (GitHub Actions) checks formatting and lints, runs the whole suite and builds with the minimum Rust version on Linux, and all of that must pass. It also builds the workspace and runs the core tests on Windows and macOS, but those two jobs are allowed to fail (`continue-on-error`) while platform support is in progress. Tests that are not supported yet there are marked `#[ignore = "<reason>"]`.
 
 ## Roadmap
 
