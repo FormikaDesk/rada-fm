@@ -14,9 +14,9 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Status
 
-Version 0.3.0. **Linux is supported.** Windows and macOS are in development: the code is structured for them and compiles, but they are not supported yet and the attribute-preserving parts of a copy are stubs there.
+Version 0.4.0. **Linux is supported.** Windows and macOS are in development: the code is structured for them and compiles, but they are not supported yet and the attribute-preserving parts of a copy are stubs there.
 
-rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
+rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Why it is different
 
@@ -35,6 +35,7 @@ rada is young and written by one person. The parts that touch your files — pla
 | **Nothing blocks the UI** | All I/O happens in worker threads; the interface thread only draws and handles keys. Volumes are listed by a worker, never on a keypress, with a timeout per mount so a hung network share cannot freeze anything. |
 | **Real image previews** | PNG, JPEG (with EXIF rotation), GIF (first frame), WebP, BMP and SVG are drawn with the best protocol the terminal offers: Kitty graphics (Ghostty, kitty), iTerm2 images (WezTerm, iTerm2), Sixel (foot), or coloured half blocks everywhere else. Decoding and resizing run in worker threads, so browsing a folder of photos never delays a keypress. Below the picture: format, pixel size, weight and date. Images that are too big are refused from the header alone, with a clear message. |
 | **PDF previews** | The first page of a PDF is drawn like an image, with page count, title and author below it. It needs poppler (`pdftoppm`, `pdfinfo`; `pdftotext` for a text fallback): without it you get the text of the first page and a hint on how to install it. Password-protected and damaged files say so. Drawing runs in a worker with a time limit and is stopped the moment you move to another file; pages are cached in `$XDG_CACHE_HOME/rada/previews` and pruned by age and size. |
+| **Archives** | `Enter` on a zip, tar (`.gz` `.bz2` `.xz` `.zst`), 7z or RAR opens it like a read-only folder; the path reads `photos.zip › 2024`, and text and pictures inside are previewed. Extract here or into a folder, or compress a selection, always with a plan, byte progress, cancel and undo. Paths that climb out of the destination, links that lead out, password-protected files and decompression bombs are stopped or confirmed first. See [Archives](#archives). |
 | **Real disks only** | The sidebar lists real disks, partitions, removable drives and network shares, not `tmpfs`, `proc`, `binderfs`, snap loops, bind-mount duplicates or `/boot/efi`. The list is configurable (`[devices] hide`). |
 | **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
 | **Hostile names are harmless** | Newlines, escape sequences, bidi controls and invalid UTF-8 in file names are shown as visible escapes. Paths are `Path`/`OsString` everywhere, never text. |
@@ -118,6 +119,10 @@ sidebar = true        # the default; Ctrl+B toggles it and remembers
 hints = true          # false: no key hints in the bottom bar
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
 
+[archives]
+max_extract_gb = 8        # an extraction that would write more asks for a typed "yes"
+max_ratio = 200           # ...and so does one that unpacks this many times its size
+
 [devices]
 hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
                       # disks: a name is a filesystem type (`fuse.*` a prefix), `/path` a mount point,
@@ -130,6 +135,44 @@ quit = "ctrl+q"
 ```
 
 State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with whether you hid the sidebar); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
+
+## Archives
+
+`Enter` on an archive opens it like a folder, read-only. What counts as an archive is decided by the **content**, not the name: a zip called `backup.dat` opens, a `.docx` (which is a zip inside) opens in your word processor. Supported to read and extract:
+
+| Format | How |
+|---|---|
+| zip, tar, `.tar.gz` `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar.zst`, and single files `.gz` `.bz2` `.xz` `.zst` | built in, pure Rust, the same on every platform |
+| 7z | built in (not password-protected ones) |
+| RAR | through `7z`/`7zz` or `unrar`, if installed (the licence does not allow including a RAR decoder); without one rada says so and how to install it |
+
+Inside an archive you navigate, filter and sort as in any folder; the breadcrumb reads `archive.zip › folder`. Selecting an archive (without opening it) shows its format, how many files and folders, packed and unpacked size, and the first items. Text and pictures inside are previewed (taken out into the preview cache, with size limits). Rename, move, delete and new folder are refused in an archive; **copy** items out (`Ctrl+C`, then `Ctrl+V` in a folder) and that is a partial extraction with its own plan.
+
+| Action | Vim | Classic | Menu |
+|---|---|---|---|
+| extract here | `e` | `Ctrl+E` | right-click an archive → *Extract here* |
+| extract into a folder named after the archive (you can change the name) | `E` | `Alt+E` | *Extract to a folder…* |
+| compress the selection (name and format; `Tab` changes the format) | `z` | `Alt+Z` | *Compress…* |
+
+The folder is named from the archive's **file name** only (`photos.tar.gz` → `photos/`; a dot in a folder above never matters). If the archive already has a single folder at its top, no second one is made around it. The plan shows files, folders, links, total size, free space, name conflicts (skip / keep both / overwrite, with the old file going to the trash so undo brings it back) and the safety findings below, each with its reason.
+
+- **Paths that would leave the destination** (`..`, absolute, drive letters, a `\` that climbs out) are not extracted, and the plan counts them. Nothing is written through a link that the archive itself made.
+- **Links** are created as links and never followed; if one points outside the extracted folder the plan says so.
+- **Bombs**: an extraction above 8 GiB or above 200× its packed size asks for a typed `yes`. Whatever the list says, a member can never write more than the archive declared for it. Limits are in `[archives]`.
+- **Password-protected** zip and 7z are recognised and said so; passwords are not supported yet.
+- **Old zip names** (code page 437) are decoded correctly; names that are not text are kept as they are.
+- Extraction writes every file under a temporary name and renames it when complete, counts progress in real bytes, can be cancelled (what was made is removed) and undone (exactly what was extracted; a file you edited is left alone). A `SIGKILL` in the middle leaves no half file and the next start cleans up. Setuid/setgid bits are dropped from extracted files.
+- **Compress** makes zip, `.tar.gz`, `.tar.zst` or `.tar.xz` with contents, permissions, times and symlinks (zip stores them as links; the plan warns that some programs, Windows Explorer for one, extract those as small files). The estimated size comes with the plan; cancelling removes the half-written archive, undo removes the finished one.
+
+```toml
+[archives]
+max_extract_gb = 8      # an extraction that would write more asks for a typed "yes"
+max_ratio = 200         # ...and so does one that unpacks this many times its size
+preview_entries = 200   # items listed in the preview of an archive
+preview_seconds = 1.5   # how long counting an archive's members may take in the preview
+```
+
+What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no owner or ACLs in archives you create…), is in [docs/SAFETY.md](docs/SAFETY.md).
 
 ## Navigation
 
@@ -203,6 +246,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | copy · cut · paste (a plan comes first) | `y` `x` `p` | `Ctrl+C` `Ctrl+X` `Ctrl+V` |
 | move to trash · delete permanently (type `yes`) | `d` `D` | `Del` · `Shift+Del` |
 | rename · bulk rename · new folder | `r` · `R` · `n` | `F2` · — · `Ctrl+N` |
+| extract here · extract into a folder · compress | `e` · `E` · `z` | `Ctrl+E` · `Alt+E` · `Alt+Z` |
 | undo · redo | `u` · `Ctrl+R` | `Ctrl+Z` · `Ctrl+Y` (or `Ctrl+Shift+Z`) |
 | back · forward in the folder history | `Alt+←` · `Alt+→` (both schemes) | |
 | history of operations | `U` | `F3` |
@@ -276,7 +320,7 @@ A Cargo workspace:
 - `crates/tui` — the interface (ratatui + crossterm).
 - `crates/rada` — the `rada` binary.
 
-Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait already models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin), with a complete Linux implementation and compilable stubs for Windows and macOS.
+Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `ExtractFile`, `Compress`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait already models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin), with a complete Linux implementation and compilable stubs for Windows and macOS.
 
 ### Tests
 
@@ -286,7 +330,7 @@ cargo test --workspace
 
 The interface is tested headlessly with real workers on a sandboxed filesystem: every action through both key schemes, simulated mouse events (click, double click, wheel, right click, modifiers), and committed text snapshots of the screens (`crates/tui/tests/snapshots/`, pinned clock and home folder; update with `INSTA_UPDATE=always cargo test -p rada-tui --test snapshots` and review the diff).
 
-The suite includes regression tests for real bugs found in other terminal file managers: folders with dots in their names, symlinks (to files, to folders, broken, circular) inside copied trees, an unreadable file in a copied folder, moving and trashing across filesystems (tmpfs ↔ disk), Unicode/emoji/special/non-UTF-8 names, and undo of every kind of operation including "modified after the operation".
+The suite includes regression tests for real bugs found in other terminal file managers: extraction into the wrong folder when a folder above has a dot in its name, `tar.xz` and `tar.bz2` that failed without an error, folders with dots in their names, symlinks (to files, to folders, broken, circular) inside copied trees, an unreadable file in a copied folder, moving and trashing across filesystems (tmpfs ↔ disk), Unicode/emoji/special/non-UTF-8 names, and undo of every kind of operation including "modified after the operation".
 
 Tests never touch your real folders: each one runs in a temporary sandbox with `HOME` and all `XDG_*` variables pointing into it, and a guard fingerprints your real trash, config, state and cache before the first test and fails the test if anything under them changed.
 
@@ -300,7 +344,7 @@ CI (GitHub Actions) checks formatting and lints, runs the whole suite and builds
 - **Windows and macOS builds**: Recycle Bin and Trash, volumes and drive letters, junctions, attributes, with real tests on both.
 - **Easy install**: signed binaries and packages for the common distributions.
 - **Dual pane**, with tabs and layout restore.
-- **Archives**: browse and extract safely, the common formats.
+- **Archives**, continuing: passwords (zip and 7z), creating 7z, keeping owners and extended attributes in the archives you make.
 
 ### Ideas, not planned yet
 

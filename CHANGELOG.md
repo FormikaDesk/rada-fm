@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+### Added
+- **Archives.** `Enter` on an archive opens it as a read-only folder (the path reads `photos.zip › 2024`); the format is recognised from the content, not the name. Read and extract: zip, tar, `.tar.gz`/`.tgz`, `.tar.bz2`, `.tar.xz`, `.tar.zst`, single `.gz` `.bz2` `.xz` `.zst`, and 7z, all with pure-Rust libraries so they work the same on every platform; RAR through `7z`, `7zz` or `unrar` when installed, with a clear message and the install command when not.
+- **Archive previews.** An archive that is not opened shows its format, number of files and folders, packed and unpacked size and its first items (counting stops after about 1.5 s on a huge stream and says "at least"); text and pictures inside an archive are previewed, taken out into the preview cache with size limits; the preview is abandoned as soon as you move on.
+- **Extract.** *Extract here* (`e`, `Ctrl+E`) and *Extract to a folder…* (`E`, `Alt+E`), also from the right-click menu and the bottom bar. The folder is named from the archive's file name only; an archive with a single folder at its top gets no second one. Copying members out (`Ctrl+C`, `Ctrl+V`) is a partial extraction. Always with a plan (files, folders, links, size, free space, conflicts with skip / keep both / overwrite-through-the-trash), byte progress, cancel, journal and undo, and the same crash recovery as a copy.
+- **Compress.** *Compress…* (`z`, `Alt+Z`) on the selection: name and format (zip, `.tar.gz`, `.tar.zst`, `.tar.xz`; `Tab` changes the format), a plan with an estimated size, progress in bytes, cancel (removes the half archive) and undo. Symlinks are kept as links; the plan warns that some programs do not understand them in a zip.
+- **Safety.** Members with `..`, absolute or drive paths are not extracted and the plan says why; nothing is written through a link that the archive made; links are created but never followed, with a warning when they lead out; setuid/setgid bits are dropped; extractions above a size or compression-ratio limit (`[archives]`, 8 GiB and 200×) need a typed `yes`; a member can never write more than the archive declared for it; password-protected zip and 7z are recognised and said so; truncated or damaged archives are reported, never silently half-extracted; old code-page-437 zip names are decoded; archives refuse every write.
+- New `[archives]` section in `config.toml`; requests `extract` and `compress` (and copy from an archive) in the JSON schema.
+- Tests: every format and every safety rule, a fault-injected full disk, an archive changed or cut after the plan, `SIGKILL` in the middle of an extraction, random trees compressed and extracted in all four formats (contents, permissions, symlinks, times), archives with 60,000 members and a 96 MiB member, and unchanged navigation latency with a huge archive under the cursor.
+
+### Changed
+- `FsEngine` gained `create_file`. The plan JSON gained the steps `extract_file`, `extract_symlink`, `compress` and `estimated_bytes`.
+
+### Fixed
+- Found by the new tests: a cancelled read was retried by the copy loops and silently dropped data; tar link names over 100 bytes were refused; an empty folder inside an archive could not be opened.
+
 ## [0.3.0] - 2026-10-09
 
 ### Added

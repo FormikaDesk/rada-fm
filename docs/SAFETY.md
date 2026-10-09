@@ -103,6 +103,48 @@ it loop. A filesystem root is never accepted as a source.
 Newlines, escape sequences, bidirectional controls and invalid UTF-8 in names are shown as
 visible escapes. Paths are never handled as text.
 
+### Archives are read, never trusted
+
+An archive is data from a stranger, and rada treats it so. The checks below are on the plan
+and on the executor, and each has a test (`archives.rs`, `archives_write.rs`,
+`archives_crash.rs`, `archives_browse.rs`).
+
+- **Nothing is written outside the destination.** A member whose path has `..`, starts at the
+  root or a drive, contains a NUL, or (in a ZIP) uses `\` to climb out is **not extracted**; the
+  plan names how many and why. This holds for ZIP, tar, 7z and RAR alike. Nor does a member
+  go through a symbolic link that the same archive created (the classic way round a path check).
+- **Links stay links.** A symlink in an archive is created as a link and never followed. If it
+  points outside the extracted folder the plan says so first.
+- **Permissions are not a way in.** Setuid and setgid bits are dropped from extracted files (the
+  plan counts them). Other permissions and times are kept as the archive gives them.
+- **Bombs ask for a typed `yes`.** An extraction that would write more than 8 GiB, or that
+  unpacks to more than 200 times the archive's size (from 256 MiB up), carries a warning
+  that has to be confirmed by typing; both limits are in `[archives]`. Independently of the
+  list, a member is never allowed to write more bytes than the archive declared for it, so a
+  lying header cannot get round the check.
+- **A file never appears half-written, and a killed extraction is cleaned up.** Members are
+  written under the same hidden temporary name and renamed into place as every copy is; each
+  one is recorded in the journal as it completes. After a `SIGKILL` the next start removes
+  the temporary file and undo removes exactly what was extracted (a member you edited since
+  is left alone and reported).
+- **Errors are never silent.** A truncated or damaged archive is reported when it is read
+  (what could be listed is offered, with a warning), and when it breaks during extraction the
+  member that failed is reported with its full path. A full disk is an error for that
+  member and leaves nothing under its name.
+- **Archives are read-only.** Inside one, rename, move, delete, new folder and paste are
+  refused with the way to do what was meant (copy the items out).
+- **Passwords are not supported yet.** A protected ZIP or 7z is recognised and the plan says
+  so; nothing is extracted. A password is never asked for, stored or logged because it is
+  never used.
+- **Compressing writes a new archive under a temporary name** and renames it into place;
+  cancelling removes it, and undo removes the finished one (if you changed it, it is kept).
+
+*Tests:* zip-slip, tar-slip and link tricks in `archives.rs`; bombs and declared sizes;
+password-protected ZIP and 7z made with real tools; a cut or damaged archive before and after
+the plan; the full disk; `SIGKILL` in the middle of a big member in `archives_crash.rs`; and
+`archives_write.rs`, where random trees (odd names, symlinks, read-only folders, permissions)
+are compressed and extracted in all four formats and must come back identical.
+
 ## Limits, known and by design
 
 These are real, and we would rather you read them here than discover them.
@@ -144,6 +186,15 @@ These are real, and we would rather you read them here than discover them.
 - **Network and FUSE filesystems** may report sizes, times and links the way their server
   decides. Nothing here has been tested against a flaky network share beyond the
   per-mount timeout used when listing disks.
+- **Archives.** RAR is read only through `7z`, `7zz` or `unrar` when one is installed; that
+  path is tested with 7-Zip (on a 7z) and with a stand-in program that prints what `unrar` prints,
+  not with a real RAR file, which cannot be made without the proprietary compressor. Archives
+  you create hold contents, permissions, times and symlinks, **not** owner, extended attributes,
+  ACLs, hard links or sparse holes (a hard-linked file is stored twice). ZIP keeps times to the
+  second (rada also writes the exact UTC time, but other programs may read only the 2-second
+  DOS one). Extraction does not restore the owner stored in a tar. A compressed tar has to be
+  read once to be listed and once to be extracted. 7z cannot be created, only read. Listing a
+  very large compressed archive in the preview stops after about 1.5 s and shows "at least".
 
 ## How this is tested
 

@@ -1288,6 +1288,8 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
         .hint(Action::Quit)
         .unwrap_or_else(|| "Ctrl+Q".to_string());
     for l in [
+        "Enter on an archive opens it like a folder, read-only: copy items out (Ctrl+C), paste in a folder.".to_string(),
+        "Extract here / to a folder and Compress… need no archive tool installed; RAR needs 7z or unrar.".to_string(),
         format!("Ctrl+C copies; it never quits. Quit with {quit}."),
         "Every operation shows a plan first. Every finished operation can be undone.".to_string(),
         "Rebind keys in the [keys] section of the configuration file.".to_string(),
