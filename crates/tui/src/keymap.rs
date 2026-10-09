@@ -55,6 +55,8 @@ pub enum Action {
     PreviewUp,
     Bookmark,
     GoHome,
+    Back,
+    Forward,
     // the program
     Help,
     Quit,
@@ -91,7 +93,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 40] = [
+    pub const ALL: [Action; 42] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -130,6 +132,8 @@ impl Action {
         Action::PreviewUp,
         Action::Bookmark,
         Action::GoHome,
+        Action::Back,
+        Action::Forward,
         Action::Help,
         Action::Quit,
     ];
@@ -175,6 +179,8 @@ impl Action {
             Action::PreviewUp => "preview_up",
             Action::Bookmark => "bookmark",
             Action::GoHome => "go_home",
+            Action::Back => "back",
+            Action::Forward => "forward",
             Action::Help => "help",
             Action::Quit => "quit",
         }
@@ -225,6 +231,8 @@ impl Action {
             Action::PreviewUp => "Scroll preview up",
             Action::Bookmark => "Bookmark this folder",
             Action::GoHome => "Go to home",
+            Action::Back => "Back to the previous folder",
+            Action::Forward => "Forward to the next folder",
             Action::Help => "Help",
             Action::Quit => "Quit",
         }
@@ -234,7 +242,7 @@ impl Action {
         use Action::*;
         match self {
             Up | Down | Parent | Open | First | Last | PageUp | PageDown | HalfPageUp
-            | HalfPageDown | GoHome => Group::Move,
+            | HalfPageDown | GoHome | Back | Forward => Group::Move,
             ToggleMark | SelectAll | SelectUp | SelectDown | SelectToFirst | SelectToLast
             | ClearSelection => Group::Select,
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
@@ -500,7 +508,13 @@ const CLASSIC: &[(Action, &[&str])] = &[
 ];
 
 /// Keys that mean the same in both schemes and are bound whatever the preset.
-const ALWAYS: &[(Action, &[&str])] = &[(Action::Palette, &["ctrl+p"]), (Action::Help, &["f1"])];
+const ALWAYS: &[(Action, &[&str])] = &[
+    (Action::Palette, &["ctrl+p"]),
+    (Action::Help, &["f1"]),
+    (Action::Back, &["alt+left"]),
+    (Action::Forward, &["alt+right"]),
+    (Action::Parent, &["alt+up"]),
+];
 
 #[derive(Clone, Debug)]
 pub struct Binding {
@@ -899,7 +913,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 40);
+        assert_eq!(Action::ALL.len(), 42);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

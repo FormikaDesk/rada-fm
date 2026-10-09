@@ -58,6 +58,8 @@ impl App {
             action,
             Up | Down
                 | Parent
+                | Back
+                | Forward
                 | Open
                 | First
                 | Last
@@ -72,6 +74,8 @@ impl App {
             Up => self.set_cursor(self.cursor.saturating_sub(1)),
             Down => self.set_cursor(self.cursor + 1),
             Parent => self.go_parent(),
+            Back => self.go_history(true),
+            Forward => self.go_history(false),
             Open => self.enter(),
             First => self.set_cursor(0),
             Last => self.set_cursor(usize::MAX),

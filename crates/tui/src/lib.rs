@@ -10,6 +10,7 @@ pub mod hits;
 pub mod icons;
 pub mod images;
 pub mod keymap;
+pub mod nav;
 pub mod palette;
 pub mod run;
 pub mod services;

@@ -29,6 +29,7 @@ use crate::hits::{Hits, Target};
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
 use crate::keymap::{Action, Keymap};
+use crate::nav::NavMove;
 use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 use crate::services::Services;
 use crate::theme::Theme;
@@ -297,6 +298,9 @@ pub struct App {
     pub show_hidden: bool,
     pub sort: SortSpec,
     remembered: HashMap<PathBuf, OsString>,
+    /// Folders visited, for back and forward.
+    pub nav: crate::nav::NavHistory,
+    nav_move: Option<crate::nav::NavMove>,
 
     pub preview: PreviewState,
     pub image_ui: Option<ImageUi>,
@@ -351,6 +355,8 @@ impl App {
             show_hidden: cfg.show_hidden,
             sort: cfg.sort,
             remembered: HashMap::new(),
+            nav: crate::nav::NavHistory::new(cfg.start_dir.clone()),
+            nav_move: None,
             preview: PreviewState {
                 name: String::new(),
                 content: None,
@@ -587,6 +593,24 @@ impl App {
         self.request_dir(path);
     }
 
+    /// Back to the previous folder of the history (or forward to the next one).
+    fn go_history(&mut self, back: bool) {
+        let target = if back {
+            self.nav.back_target()
+        } else {
+            self.nav.forward_target()
+        };
+        let Some(target) = target.map(Path::to_path_buf) else {
+            return;
+        };
+        self.nav_move = Some(if back {
+            NavMove::Back(target.clone())
+        } else {
+            NavMove::Forward(target.clone())
+        });
+        self.open_dir(target);
+    }
+
     fn go_parent(&mut self) {
         let Some(parent) = self.cwd.parent().map(|p| p.to_path_buf()) else {
             self.toast(ToastKind::Info, "already at the top", 2);
@@ -668,6 +692,13 @@ impl App {
                         };
                         self.listing = DirListing::new(path.clone(), entries, self.sort);
                         if !same_dir {
+                            match self.nav_move.take() {
+                                Some(NavMove::Back(to)) if to == path => self.nav.stepped_back(),
+                                Some(NavMove::Forward(to)) if to == path => {
+                                    self.nav.stepped_forward()
+                                }
+                                _ => self.nav.visit(path.clone()),
+                            }
                             self.cwd = path.clone();
                             self.clear_marks();
                             self.cursor = 0;
@@ -687,6 +718,7 @@ impl App {
                         self.run_demo();
                     }
                     Err(msg) => {
+                        self.nav_move = None;
                         self.load = LoadState::Ready;
                         self.toast(ToastKind::Error, msg, 6);
                     }
