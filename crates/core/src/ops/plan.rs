@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::archive::ArchiveKind;
+use crate::archive::writer::CompressItem;
 use crate::fs::{Fingerprint, Stamp};
 use crate::platform::TrashedItem;
 use crate::{display, pathcodec};
@@ -21,6 +23,10 @@ pub enum OpKind {
     Trash,
     Delete,
     Undo,
+    /// Take files out of an archive.
+    Extract,
+    /// Put files into a new archive.
+    Compress,
 }
 
 impl OpKind {
@@ -34,6 +40,8 @@ impl OpKind {
             OpKind::Trash => "Move to trash",
             OpKind::Delete => "Delete permanently",
             OpKind::Undo => "Undo",
+            OpKind::Extract => "Extract",
+            OpKind::Compress => "Compress",
         }
     }
 }
@@ -133,6 +141,50 @@ pub enum Step {
         target: PathBuf,
         remove_source: bool,
     },
+    /// One file out of an archive, written under a temporary name and renamed into place
+    /// when complete. The members of one archive are extracted in the order the archive
+    /// holds them, in a single pass.
+    ExtractFile {
+        /// The member as a path (`/home/u/photos.zip/2024/a.jpg`): what the user sees.
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        src: PathBuf,
+        /// The archive file.
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        archive: PathBuf,
+        /// The member's position in the archive's list when the plan was made.
+        entry: usize,
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        dst: PathBuf,
+        /// Declared size: what is written never exceeds it.
+        size: u64,
+        mode: Option<u32>,
+        mtime: Option<Stamp>,
+    },
+    /// A symbolic link stored in an archive, created as a link and never followed.
+    ExtractSymlink {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        src: PathBuf,
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        dst: PathBuf,
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        target: PathBuf,
+    },
+    /// A whole new archive, written under a temporary name and renamed into place.
+    Compress {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        dst: PathBuf,
+        format: ArchiveKind,
+        items: Vec<CompressItem>,
+        /// Bytes of file data that will be read.
+        size: u64,
+    },
     Rename {
         #[serde(with = "pathcodec::path")]
         #[schemars(with = "String")]
@@ -174,6 +226,8 @@ impl Step {
             | Step::TrashItem { path }
             | Step::RemoveFile { path, .. }
             | Step::RemoveDir { path } => path,
+            Step::Compress { dst, .. } => dst,
+            Step::ExtractFile { src, .. } | Step::ExtractSymlink { src, .. } => src,
             Step::CopyFile { src, .. } | Step::CopySymlink { src, .. } => src,
             Step::HardLink { link, .. } => link,
             Step::Rename { from, .. } => from,
@@ -185,7 +239,11 @@ impl Step {
     pub fn destination(&self) -> Option<&Path> {
         match self {
             Step::MakeDir { path, .. } => Some(path),
-            Step::CopyFile { dst, .. } | Step::CopySymlink { dst, .. } => Some(dst),
+            Step::CopyFile { dst, .. }
+            | Step::CopySymlink { dst, .. }
+            | Step::ExtractFile { dst, .. }
+            | Step::ExtractSymlink { dst, .. }
+            | Step::Compress { dst, .. } => Some(dst),
             Step::HardLink { link, .. } => Some(link),
             Step::Rename { to, .. } => Some(to),
             Step::Restore { item } => Some(&item.original),
@@ -196,6 +254,7 @@ impl Step {
     pub fn bytes(&self) -> u64 {
         match self {
             Step::CopyFile { size, stored, .. } => stored.unwrap_or(*size),
+            Step::ExtractFile { size, .. } | Step::Compress { size, .. } => *size,
             _ => 0,
         }
     }
@@ -224,6 +283,21 @@ impl Step {
                 "{} link {} -> {}",
                 if *remove_source { "move" } else { "copy" },
                 display::path(src),
+                display::path(dst)
+            ),
+            Step::ExtractFile { src, dst, .. } => format!(
+                "extract {} -> {}",
+                display::path(src),
+                display::path(dst)
+            ),
+            Step::ExtractSymlink { src, dst, .. } => format!(
+                "extract link {} -> {}",
+                display::path(src),
+                display::path(dst)
+            ),
+            Step::Compress { dst, items, .. } => format!(
+                "compress {} items into {}",
+                items.len(),
                 display::path(dst)
             ),
             Step::HardLink { existing, link, .. } => format!(
@@ -326,6 +400,12 @@ impl Step {
                     expect: result.after.clone(),
                 }),
             },
+            Step::ExtractFile { dst, .. }
+            | Step::ExtractSymlink { dst, .. }
+            | Step::Compress { dst, .. } => Some(Step::RemoveFile {
+                path: dst.clone(),
+                expect: result.after.clone(),
+            }),
             Step::Rename { from, to } => Some(Step::Rename {
                 from: to.clone(),
                 to: from.clone(),
@@ -446,6 +526,24 @@ pub enum WarningKind {
     ModifiedSince,
     /// An undo step cannot be carried out (target occupied, source gone, ...).
     CannotUndo,
+    /// Archive members whose paths would write outside the destination: not extracted.
+    UnsafePath,
+    /// Archive links that point outside the extracted folder (kept as links, never followed).
+    LinkOutside,
+    /// An archive that unpacks to far more than its size, or to more than the limit.
+    ArchiveBomb,
+    /// An archive that is truncated or damaged: only what could be read is listed.
+    ArchiveDamaged,
+    /// Members protected by a password.
+    Encrypted,
+    /// Symbolic links stored in a ZIP, which not every program understands.
+    ZipLinks,
+    /// Names that cannot be stored exactly in the chosen format.
+    NamesChanged,
+    /// Setuid and setgid bits dropped from extracted files.
+    SetuidDropped,
+    /// A hard link in an archive whose target is not being extracted.
+    LinkTargetMissing,
     Other,
 }
 
@@ -622,6 +720,40 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::CannotUndo => {
             format!("{} cannot be undone{extra}", plural(n, "step", "steps"))
         }
+        WarningKind::UnsafePath => format!(
+            "{} NOT extracted: their paths would write outside the destination{extra}",
+            plural(n, "item is", "items are")
+        ),
+        WarningKind::LinkOutside => format!(
+            "{} point outside the extracted folder; they are created as links and never followed",
+            plural(n, "link", "links")
+        ),
+        WarningKind::ArchiveBomb => format!(
+            "this archive may be a decompression bomb{extra}; type yes to extract it anyway"
+        ),
+        WarningKind::ArchiveDamaged => {
+            format!("the archive is damaged or incomplete{extra}: only what could be read is shown")
+        }
+        WarningKind::Encrypted => format!(
+            "{} protected by a password, which rada cannot use yet",
+            plural(n, "item is", "items are")
+        ),
+        WarningKind::ZipLinks => format!(
+            "{} stored as links; programs that do not know ZIP links (Windows Explorer, for one) extract them as small text files",
+            plural(n, "symlink is", "symlinks are")
+        ),
+        WarningKind::NamesChanged => format!(
+            "{} cannot be stored exactly in this format and will be changed{extra}",
+            plural(n, "name", "names")
+        ),
+        WarningKind::SetuidDropped => format!(
+            "setuid/setgid permission bits are dropped from {}",
+            plural(n, "file", "files")
+        ),
+        WarningKind::LinkTargetMissing => format!(
+            "{} point to a file that is not part of the selection and are skipped",
+            plural(n, "hard link", "hard links")
+        ),
         WarningKind::Other => detail.unwrap_or("see details").to_string(),
     }
 }
@@ -763,6 +895,9 @@ pub struct Plan {
     /// Set when this plan re-does an operation that was undone.
     #[serde(default)]
     pub redo_of: Option<String>,
+    /// For a new archive: about how large it will be (a guess from the kind of files).
+    #[serde(default)]
+    pub estimated_bytes: Option<u64>,
 }
 
 impl Plan {
@@ -781,6 +916,7 @@ impl Plan {
             preserved: Preserved::default(),
             request: None,
             redo_of: None,
+            estimated_bytes: None,
         }
     }
 

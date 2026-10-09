@@ -109,6 +109,9 @@ impl Intent {
                 src_link: src_link.clone(),
                 src_existing: src_existing.clone(),
             },
+            Step::ExtractFile { dst, .. }
+            | Step::ExtractSymlink { dst, .. }
+            | Step::Compress { dst, .. } => Intent::Create { dst: dst.clone() },
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
             Step::Rename { from, to } => Intent::Rename {
                 from: from.clone(),

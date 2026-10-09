@@ -1,5 +1,6 @@
 //! Plan, execute, journal, undo.
 
+pub mod archives;
 pub mod engine;
 pub mod exec;
 pub mod names;
@@ -12,6 +13,7 @@ pub mod runner;
 pub mod scan;
 pub mod undo;
 
+pub use archives::ExtractInto;
 pub use engine::Engine;
 pub use exec::{
     Cancel, ErrorChoice, ExecHandler, ExecReport, FailedStep, Failure, Progress, RunStatus,

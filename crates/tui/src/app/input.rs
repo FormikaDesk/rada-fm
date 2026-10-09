@@ -658,6 +658,8 @@ impl App {
             OpKind::Trash => format!("Moved {} to the trash", what(false)),
             OpKind::Delete => format!("Deleted {} permanently", what(false)),
             OpKind::Undo => "Undone".to_string(),
+            OpKind::Extract => format!("Extracted {}", what(true)),
+            OpKind::Compress => "Archive created".to_string(),
         };
         let tail = match r.kind {
             OpKind::Undo => self

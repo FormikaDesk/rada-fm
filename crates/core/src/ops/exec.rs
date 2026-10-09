@@ -9,8 +9,9 @@ use std::time::{Duration, Instant};
 
 use super::engine::Engine;
 use super::plan::*;
+use crate::archive::{self, ArchiveError, ListControl, Session};
 use crate::fs::local::{CopyFault, copy_fault};
-use crate::fs::{CopyControl, CopyRequest};
+use crate::fs::{CopyControl, CopyRequest, Stamp};
 use crate::platform::Preserve;
 use crate::{Error, Result, display};
 
@@ -158,6 +159,16 @@ struct RunState {
     /// Permissions to put back when the run is over, oldest first (applied newest first, so
     /// that a folder is locked again only after what is inside it is done).
     deferred_modes: Vec<(PathBuf, u32)>,
+    /// For each archive the plan reads: the members it will ask for, so that one pass over
+    /// the archive serves them all.
+    archive_wanted: std::collections::HashMap<PathBuf, Vec<usize>>,
+    archives: std::collections::HashMap<PathBuf, ArchiveRun>,
+}
+
+/// An archive being extracted from: its list, and the one pass over its data.
+struct ArchiveRun {
+    index: Arc<archive::Index>,
+    session: Session,
 }
 
 impl RunState {
@@ -218,6 +229,8 @@ impl Engine {
             skip_all: false,
             undo: plan.kind == OpKind::Undo,
             deferred_modes: Vec::new(),
+            archive_wanted: archive_members(plan),
+            archives: Default::default(),
         };
         let mut prog = Progress {
             steps_total: plan.steps.len() as u64,
@@ -270,7 +283,7 @@ impl Engine {
                             StepStatus::Done => {
                                 report.done += 1;
                                 report.bytes += step.bytes();
-                                if matches!(step, Step::CopyFile { .. }) {
+                                if matches!(step, Step::CopyFile { .. } | Step::ExtractFile { .. }) {
                                     prog.files_done += 1;
                                 }
                             }
@@ -373,6 +386,182 @@ impl Engine {
             }
             r => r,
         }
+    }
+
+    /// The pass over `archive` that serves this plan, started on first use.
+    fn archive_run<'a>(
+        &self,
+        st: &'a mut RunState,
+        archive: &Path,
+    ) -> Result<&'a mut ArchiveRun> {
+        if !st.archives.contains_key(archive) {
+            let cancel = never;
+            let index = archive::index::open_cached(archive, &mut ListControl::new(&cancel))
+                .map_err(|e| e.into_error(archive))?;
+            let wanted = st.archive_wanted.get(archive).cloned().unwrap_or_default();
+            let session = Session::open(index.clone(), &wanted);
+            st.archives
+                .insert(archive.to_path_buf(), ArchiveRun { index, session });
+        }
+        Ok(st.archives.get_mut(archive).expect("just inserted"))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn extract_file(
+        &self,
+        st: &mut RunState,
+        ctl: &mut Ctl<'_>,
+        src: &Path,
+        archive: &Path,
+        entry: usize,
+        dst: &Path,
+        size: u64,
+        mode: Option<u32>,
+        mtime: Option<Stamp>,
+    ) -> Result<StepResult> {
+        let fs = &*self.fs;
+        match fs.lstat(dst) {
+            Ok(_) => return Err(Error::AlreadyExists(dst.to_path_buf())),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::io("inspect", dst, e)),
+        }
+        let inner = src.strip_prefix(archive).unwrap_or(src);
+        let run = self.archive_run(st, archive)?;
+        // The list the plan was made from must still be the archive's list.
+        if run.index.entries.get(entry).is_none_or(|e| e.path != inner) {
+            return Err(Error::Archive {
+                path: archive.to_path_buf(),
+                message: "the archive changed since the plan was made".into(),
+            });
+        }
+        let tmp = temp_sibling(dst);
+        let mut sink = fs
+            .create_file(&tmp, 0o600)
+            .map_err(|e| Error::io("create", dst, e))?;
+        enum Stop {
+            No,
+            Write(io::Error),
+            TooBig,
+            Cancelled,
+        }
+        let mut stop = Stop::No;
+        let mut written = 0u64;
+        let r = run.session.read(entry, &mut |chunk| {
+            written += chunk.len() as u64;
+            if written > size {
+                stop = Stop::TooBig;
+                return Ok(false);
+            }
+            if let Err(e) = io::Write::write_all(&mut sink, chunk) {
+                stop = Stop::Write(e);
+                return Ok(false);
+            }
+            if !ctl.advance(chunk.len() as u64) {
+                stop = Stop::Cancelled;
+                return Ok(false);
+            }
+            Ok(true)
+        });
+        drop(sink);
+        let fail = |e: Error| {
+            let _ = fs.remove_file(&tmp);
+            Err(e)
+        };
+        match (stop, r) {
+            (Stop::Write(e), _) => return fail(Error::io("write", dst, e)),
+            (Stop::TooBig, _) => {
+                return fail(Error::Archive {
+                    path: src.to_path_buf(),
+                    message: format!(
+                        "it holds more than the {size} bytes the archive declares for it (an archive bomb?)"
+                    ),
+                });
+            }
+            (Stop::Cancelled, _) | (_, Err(ArchiveError::Cancelled)) => {
+                return fail(Error::Cancelled);
+            }
+            (Stop::No, Err(e)) => return fail(e.into_error(src)),
+            (Stop::No, Ok(n)) if n != size => {
+                return fail(Error::Archive {
+                    path: src.to_path_buf(),
+                    message: format!("it holds {n} bytes, but the archive declares {size}"),
+                });
+            }
+            (Stop::No, Ok(_)) => {}
+        }
+        if let Some(t) = mtime
+            && let Err(e) = fs.set_mtime(&tmp, t.into(), None)
+        {
+            tracing::debug!("set time of {}: {e}", tmp.display());
+        }
+        if let Some(m) = mode
+            && let Err(e) = fs.set_mode(&tmp, m)
+        {
+            return fail(Error::io("set permissions of", dst, e));
+        }
+        if let Err(e) = fs.rename_noreplace(&tmp, dst) {
+            let _ = fs.remove_file(&tmp);
+            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
+                Error::AlreadyExists(dst.to_path_buf())
+            } else {
+                Error::io2("finish extraction", &tmp, dst, e)
+            });
+        }
+        let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
+        Ok(StepResult {
+            after,
+            ..StepResult::done()
+        })
+    }
+
+    fn compress(
+        &self,
+        ctl: &mut Ctl<'_>,
+        dst: &Path,
+        format: archive::ArchiveKind,
+        items: &[archive::writer::CompressItem],
+    ) -> Result<StepResult> {
+        let fs = &*self.fs;
+        match fs.lstat(dst) {
+            Ok(_) => return Err(Error::AlreadyExists(dst.to_path_buf())),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::io("inspect", dst, e)),
+        }
+        let tmp = temp_sibling(dst);
+        let sink = fs
+            .create_file(&tmp, 0o666)
+            .map_err(|e| Error::io("create", dst, e))?;
+        let mut cancelled = false;
+        let r = archive::writer::write_archive(format, sink, items, &mut |n| {
+            let go = ctl.advance(n);
+            cancelled |= !go;
+            go
+        });
+        match r {
+            Ok(()) => {}
+            Err(e) => {
+                let _ = fs.remove_file(&tmp);
+                return Err(match e {
+                    ArchiveError::Cancelled => Error::Cancelled,
+                    _ if cancelled => Error::Cancelled,
+                    ArchiveError::Io(e) => Error::io("write", dst, e),
+                    other => other.into_error(dst),
+                });
+            }
+        }
+        if let Err(e) = fs.rename_noreplace(&tmp, dst) {
+            let _ = fs.remove_file(&tmp);
+            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
+                Error::AlreadyExists(dst.to_path_buf())
+            } else {
+                Error::io2("finish archive", &tmp, dst, e)
+            });
+        }
+        let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
+        Ok(StepResult {
+            after,
+            ..StepResult::done()
+        })
     }
 
     fn run_step(&self, step: &Step, st: &mut RunState, ctl: &mut Ctl<'_>) -> Result<StepResult> {
@@ -616,6 +805,40 @@ impl Engine {
                 })
             }
 
+            Step::ExtractFile {
+                src,
+                archive,
+                entry,
+                dst,
+                size,
+                mode,
+                mtime,
+            } => self.extract_file(st, ctl, src, archive, *entry, dst, *size, *mode, *mtime),
+
+            Step::ExtractSymlink { dst, target, .. } => {
+                match fs.lstat(dst) {
+                    Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(Error::io("inspect", dst, e)),
+                }
+                fs.create_symlink(target, dst).map_err(|e| {
+                    if e.kind() == io::ErrorKind::AlreadyExists {
+                        Error::AlreadyExists(dst.clone())
+                    } else {
+                        Error::io("create link", dst, e)
+                    }
+                })?;
+                let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
+                Ok(StepResult {
+                    after,
+                    ..StepResult::done()
+                })
+            }
+
+            Step::Compress {
+                dst, format, items, ..
+            } => self.compress(ctl, dst, *format, items),
+
             Step::Rename { from, to } => match fs.rename_noreplace(from, to) {
                 Ok(()) => Ok(StepResult::done()),
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -683,6 +906,21 @@ impl Engine {
             }
         }
     }
+}
+
+/// The archive members a plan asks for, by archive.
+fn archive_members(plan: &Plan) -> std::collections::HashMap<PathBuf, Vec<usize>> {
+    let mut out: std::collections::HashMap<PathBuf, Vec<usize>> = Default::default();
+    for step in &plan.steps {
+        if let Step::ExtractFile { archive, entry, .. } = step {
+            out.entry(archive.clone()).or_default().push(*entry);
+        }
+    }
+    out
+}
+
+fn never() -> bool {
+    false
 }
 
 fn failed(index: usize, step: &Step, error: &Error) -> FailedStep {

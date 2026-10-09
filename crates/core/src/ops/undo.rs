@@ -84,6 +84,11 @@ impl Sim<'_> {
             Step::Restore { item } => {
                 self.overlay.insert(item.original.clone(), true);
             }
+            Step::ExtractFile { dst, .. }
+            | Step::ExtractSymlink { dst, .. }
+            | Step::Compress { dst, .. } => {
+                self.overlay.insert(dst.clone(), true);
+            }
             Step::FinishDir { .. } => {}
         }
     }
@@ -166,7 +171,12 @@ impl Sim<'_> {
                     Ok(())
                 }
             }
-            Step::TrashItem { .. } => Ok(()),
+            // Never recorded as an inverse: extraction and compression are undone by removing
+            // what they made.
+            Step::TrashItem { .. }
+            | Step::ExtractFile { .. }
+            | Step::ExtractSymlink { .. }
+            | Step::Compress { .. } => Ok(()),
         }
     }
 }

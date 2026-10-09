@@ -343,6 +343,10 @@ pub struct CopyOutcome {
     pub method: CopyMethod,
 }
 
+/// A new file being written (and, for formats that go back to patch a header, seeked).
+pub trait FileSink: std::io::Write + std::io::Seek + Send {}
+impl<T: std::io::Write + std::io::Seek + Send> FileSink for T {}
+
 pub trait FsEngine: Send + Sync {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta>;
     fn stat(&self, p: &Path) -> io::Result<FsMeta>;
@@ -351,6 +355,9 @@ pub trait FsEngine: Send + Sync {
 
     fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()>;
     fn create_symlink(&self, target: &Path, link: &Path) -> io::Result<()>;
+    /// A new, empty file opened for writing; fails with `AlreadyExists` if the name is taken.
+    /// `mode` is the permission bits it is created with (the process's umask still applies).
+    fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn FileSink>>;
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
     /// Rename that fails with `AlreadyExists` instead of replacing the destination.
     fn rename_noreplace(&self, from: &Path, to: &Path) -> io::Result<()>;

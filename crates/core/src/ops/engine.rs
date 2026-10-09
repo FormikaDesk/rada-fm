@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::archive::ArchiveLimits;
 use crate::fs::{FsEngine, LocalFs};
 use crate::platform::Platform;
 
@@ -8,11 +9,17 @@ use crate::platform::Platform;
 pub struct Engine {
     pub fs: Arc<dyn FsEngine>,
     pub platform: Arc<dyn Platform>,
+    /// When an extraction needs an explicit confirmation.
+    pub archive_limits: ArchiveLimits,
 }
 
 impl Engine {
     pub fn new(fs: Arc<dyn FsEngine>, platform: Arc<dyn Platform>) -> Self {
-        Engine { fs, platform }
+        Engine {
+            fs,
+            platform,
+            archive_limits: ArchiveLimits::default(),
+        }
     }
 
     /// The real local filesystem with the given platform.
@@ -20,6 +27,12 @@ impl Engine {
         Engine {
             fs: Arc::new(LocalFs),
             platform,
+            archive_limits: ArchiveLimits::default(),
         }
+    }
+
+    pub fn with_archive_limits(mut self, limits: ArchiveLimits) -> Self {
+        self.archive_limits = limits;
+        self
     }
 }

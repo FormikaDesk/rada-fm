@@ -256,6 +256,8 @@ fn verb(kind: OpKind) -> &'static str {
         OpKind::Trash => "Trash",
         OpKind::Delete => "Delete",
         OpKind::Undo => "Undo",
+        OpKind::Extract => "Extract",
+        OpKind::Compress => "Compress",
     }
 }
 
@@ -799,6 +801,15 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             },
             b.rel_dst(link),
             b.rel_dst(existing)
+        ),
+        Step::ExtractFile { dst, .. } => format!("extract  {}", b.rel_dst(dst)),
+        Step::ExtractSymlink { dst, target, .. } => {
+            format!("link     {} → {}", b.rel_dst(dst), display::path(target))
+        }
+        Step::Compress { dst, items, .. } => format!(
+            "archive  {} ({})",
+            b.rel_dst(dst),
+            fmt::count(items.len() as u64, "item", "items")
         ),
         Step::Rename { from, to } => format!("rename   {} → {}", b.rel_src(from), b.rel(to)),
         Step::TrashItem { path } => format!("trash    {}", b.rel_src(path)),

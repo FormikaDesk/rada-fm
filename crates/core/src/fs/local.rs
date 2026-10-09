@@ -113,6 +113,21 @@ impl FsEngine for LocalFs {
         }
     }
 
+    fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn super::FileSink>> {
+        let mut o = OpenOptions::new();
+        o.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            o.mode(mode & 0o7777);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = mode;
+        }
+        Ok(Box::new(o.open(p)?))
+    }
+
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
         fs::rename(from, to)
     }

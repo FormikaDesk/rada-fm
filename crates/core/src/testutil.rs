@@ -565,6 +565,9 @@ pub enum Op {
     Lstat,
     ReadDir,
     CopyFile,
+    /// Creating a file to write into (extraction, a new archive). The file has a temporary
+    /// name, so a rule matches the folder it is created in.
+    CreateFile,
     Rename,
     RemoveFile,
     RemoveDir,
@@ -612,7 +615,42 @@ pub struct FaultFs {
     rules: Mutex<Vec<Rule>>,
     byte_rules: Mutex<Vec<ByteRule>>,
     hooks: Mutex<Vec<Hook>>,
+    write_rules: Mutex<Vec<WriteRule>>,
     pub hits: Mutex<Vec<(Op, PathBuf)>>,
+}
+
+struct WriteRule {
+    suffix: PathBuf,
+    after: u64,
+    errno: i32,
+}
+
+/// A file that accepts `left` more bytes and then fails every write.
+struct FaultSink {
+    inner: Box<dyn crate::fs::FileSink>,
+    left: u64,
+    errno: i32,
+}
+
+impl io::Write for FaultSink {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.left == 0 {
+            return Err(io::Error::from_raw_os_error(self.errno));
+        }
+        let n = buf.len().min(self.left as usize);
+        let n = self.inner.write(&buf[..n])?;
+        self.left -= n as u64;
+        Ok(n)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl io::Seek for FaultSink {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.inner.seek(pos)
+    }
 }
 
 impl FaultFs {
@@ -622,6 +660,7 @@ impl FaultFs {
             rules: Mutex::new(Vec::new()),
             byte_rules: Mutex::new(Vec::new()),
             hooks: Mutex::new(Vec::new()),
+            write_rules: Mutex::new(Vec::new()),
             hits: Mutex::new(Vec::new()),
         })
     }
@@ -673,7 +712,18 @@ impl FaultFs {
         });
     }
 
+    /// A file created in a folder whose path ends with `suffix` takes `after` bytes, then
+    /// every write fails with `errno` (a full disk in the middle of a file).
+    pub fn fail_writes_after(&self, suffix: impl Into<PathBuf>, after: u64, errno: i32) {
+        self.write_rules.lock().unwrap().push(WriteRule {
+            suffix: suffix.into(),
+            after,
+            errno,
+        });
+    }
+
     pub fn clear(&self) {
+        self.write_rules.lock().unwrap().clear();
         self.rules.lock().unwrap().clear();
         self.byte_rules.lock().unwrap().clear();
         self.hooks.lock().unwrap().clear();
@@ -734,6 +784,27 @@ impl FsEngine for FaultFs {
     fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
         self.check(Op::CreateSymlink, l)?;
         self.inner.create_symlink(t, l)
+    }
+    fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn crate::fs::FileSink>> {
+        let dir = p.parent().unwrap_or(p);
+        self.check(Op::CreateFile, dir)?;
+        let sink = self.inner.create_file(p, mode)?;
+        // A rule that fails the writes partway: the disk filling up in the middle of a file.
+        let rule = self
+            .write_rules
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|r| dir.ends_with(&r.suffix))
+            .map(|r| (r.after, r.errno));
+        match rule {
+            Some((after, errno)) => Ok(Box::new(FaultSink {
+                inner: sink,
+                left: after,
+                errno,
+            })),
+            None => Ok(sink),
+        }
     }
     fn rename(&self, a: &Path, b: &Path) -> io::Result<()> {
         self.check(Op::Rename, a)?;

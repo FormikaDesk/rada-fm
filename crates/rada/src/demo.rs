@@ -39,6 +39,9 @@ impl FsEngine for SlowFs {
     fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
         self.inner.create_symlink(t, l)
     }
+    fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn rada_core::fs::FileSink>> {
+        self.inner.create_file(p, mode)
+    }
     fn rename(&self, a: &Path, b: &Path) -> io::Result<()> {
         self.inner.rename(a, b)
     }
