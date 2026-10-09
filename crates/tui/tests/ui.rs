@@ -30,7 +30,7 @@ fn lists_sorted_hides_dotfiles_and_previews_the_selection() {
     h.wait("preview of b.txt", |a| a.preview.name == "b.txt");
     let s = h.screen();
     assert!(s.contains("second line"), "{s}");
-    assert!(s.contains("3/3 items"), "position counter: {s}");
+    assert_eq!(h.app.visible.len(), 3, "{s}");
 }
 
 #[test]

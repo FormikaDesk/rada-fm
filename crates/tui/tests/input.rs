@@ -424,9 +424,21 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     let target = Target::Crumb(h.app.cwd.parent().unwrap().to_path_buf());
     h.click(&target);
     h.wait("parent", |a| a.cwd.ends_with("dir") && !a.is_loading());
-    // The hint bar: clicking "paste"-like items runs the action.
-    h.click(&Target::Act(Action::Help));
-    assert!(matches!(h.app.modal, Some(Modal::Help)), "{}", h.screen());
+    // The top bar's "Go to" button and the bottom bar's hints run their action.
+    h.click(&Target::Act(Action::Palette));
+    assert!(
+        matches!(h.app.modal, Some(Modal::Palette(_))),
+        "{}",
+        h.screen()
+    );
+    h.key(crossterm::event::KeyCode::Esc);
+    assert!(h.app.modal.is_none());
+    h.click(&Target::Act(Action::Rename));
+    assert!(
+        matches!(h.app.modal, Some(Modal::Input(_))),
+        "{}",
+        h.screen()
+    );
 }
 
 #[test]

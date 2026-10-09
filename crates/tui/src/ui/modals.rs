@@ -1250,17 +1250,16 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
 }
 
 fn draw_menu(f: &mut Frame, th: &Theme, km: &Keymap, m: &MenuView, area: Rect, hits: &mut Hits) {
-    let hint_of = |a: Action| km.hint(a).unwrap_or_default();
-    let label_w = m
-        .items
-        .iter()
-        .map(|i| i.action.label().width())
-        .max()
-        .unwrap_or(10);
+    // Only entries that stand for an action have a key to show.
+    let hint_of = |i: &crate::app::MenuItem| match &i.cmd {
+        crate::app::MenuCmd::Act(a) => km.hint(*a).unwrap_or_default(),
+        _ => String::new(),
+    };
+    let label_w = m.items.iter().map(|i| i.label.width()).max().unwrap_or(10);
     let hint_w = m
         .items
         .iter()
-        .map(|i| hint_of(i.action).width())
+        .map(|i| hint_of(i).width())
         .max()
         .unwrap_or(0);
     let inner_w = label_w + 3 + hint_w;
@@ -1293,11 +1292,11 @@ fn draw_menu(f: &mut Frame, th: &Theme, km: &Keymap, m: &MenuView, area: Rect, h
         let sel = i == m.selected;
         let row = if sel { th.selected() } else { Style::default() };
         let text_style = if it.enabled { th.base() } else { th.faint() };
-        let hint = hint_of(it.action);
-        let gap = inner_w.saturating_sub(it.action.label().width() + hint.width());
+        let hint = hint_of(it);
+        let gap = inner_w.saturating_sub(it.label.width() + hint.width());
         lines.push(Line::from(vec![
             Span::styled(" ", row),
-            Span::styled(it.action.label().to_string(), text_style.patch(row)),
+            Span::styled(it.label.clone(), text_style.patch(row)),
             Span::styled(" ".repeat(gap + 1), row),
             Span::styled(
                 hint,

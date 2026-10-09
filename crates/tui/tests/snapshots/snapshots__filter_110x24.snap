@@ -2,8 +2,7 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-   ▍ ~ › demo › projects                    ▽ txt▏  Enter keep · Esc clear   1/3 items   ⌕ Ctrl+P   F1 help
-
+  ‹   ›   ↑   ⌂ › demo › projects                                            ▽ txt▏   Go to… Ctrl+P   3 of 12
         Name ↑                        Size  Type          Modified   │   ·
    ───────────────────────────────────────────────────────────────── │
    ▎  · notes.txt        ━━━━━━━  3.52 KiB  ● text     5 weeks ago   │
@@ -25,4 +24,5 @@ expression: shot(&mut h)
                                                                      │
                                                                      │
                                                                      │
-   Enter open   Space mark   Ctrl+C copy   Ctrl+X cut   Ctrl+V paste   Del trash   F2 rename
+                                                                     │
+                                          Enter  keep    Esc  clear

@@ -2,7 +2,7 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-  ▍ … › projects6/12 items
+  ↑   … › pro… ⌕ Filter…   G
        Name ↑
   ────────────────────────
      ▸ data/
@@ -15,4 +15,4 @@ expression: shot(&mut h)
      · notes.txt
      · README.md
      · тест-файл.md
-  Enter open
+        Enter  open

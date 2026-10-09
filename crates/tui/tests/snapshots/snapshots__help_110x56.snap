@@ -2,13 +2,13 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-   ▍ ~ › demo › projects                                                    1/12 items   ⌕ Ctrl+P   F1 help
-
+  ‹   ›   ↑   ⌂ › demo › projects                                 ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
         Name ↑                        Size  Type          Modified   │   ▸
    ───────────────────────────────────────────────────────────────── │
    ▎  ▸ data/                            —  Folder      6 days ago   │
+      ▸ src/                             —  Folder      6 days ago   │
       ▸╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-      ▸│                                                                                              │
+      ·│                                                                                              │
       ·│   Keys    ↑↓ scroll · Esc close                                                              │
       ·│                                                                                              │
       ·│                                Vim                           Classic                         │
@@ -17,7 +17,7 @@ expression: shot(&mut h)
       ·│  Move up                       k ↑                           ↑                               │
       ·│  Move down                     j ↓                           ↓                               │
       ·│  Parent folder                 h ← Backspace                 ← Backspace Alt+↑               │
-      ·│  Open                          l → Enter                     → Enter                         │
+       │  Open                          l → Enter                     → Enter                         │
        │  First item                    g Home                        Home                            │
        │  Last item                     G End                         End                             │
        │  Page up                       PgUp                          PgUp                            │
@@ -57,4 +57,4 @@ expression: shot(&mut h)
                                                                      │
                                                                      │
                                                                      │
-   Enter open   Space mark   Ctrl+C copy   Ctrl+X cut   Ctrl+V paste   Del trash   F2 rename
+                                                 Esc  close

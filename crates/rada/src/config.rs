@@ -12,6 +12,7 @@
 //! image_max_file_mb = 128
 //! mouse = true                # false: no mouse capture at all
 //! keymap = "vim+classic"      # vim+classic (default) | vim | classic
+//! hints = true               # false: no key hints in the bottom bar
 //!
 //! [keys]                      # per action: replaces all its keys; [] unbinds
 //! copy = ["y", "ctrl+c"]
@@ -35,6 +36,7 @@ pub struct FileConfig {
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
     pub mouse: bool,
+    pub hints: bool,
     pub keymap: Option<String>,
     pub keys: HashMap<String, Vec<String>>,
 }
@@ -59,6 +61,7 @@ struct Raw {
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
     mouse: Option<bool>,
+    hints: Option<bool>,
     keymap: Option<String>,
     keys: Option<HashMap<String, Keys>>,
 }
@@ -89,6 +92,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         theme: raw.theme,
         bookmarks: raw.bookmarks.unwrap_or_default(),
         mouse: raw.mouse.unwrap_or(true),
+        hints: raw.hints.unwrap_or(true),
         keymap: raw.keymap,
         keys: raw
             .keys

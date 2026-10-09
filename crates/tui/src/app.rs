@@ -267,6 +267,8 @@ pub struct Config {
     pub keymap: Keymap,
     /// Mouse capture on/off (`mouse = false` in the configuration).
     pub mouse: bool,
+    /// Key hints in the bottom bar (`hints = false` hides them).
+    pub show_hints: bool,
     /// An operation handed in as data (`--request`): planned at start and shown in the
     /// usual confirmation window.
     pub request: Option<rada_core::ops::OpRequest>,
@@ -280,7 +282,7 @@ pub struct Demo {
 
 mod input;
 
-pub use input::{FilterState, MenuItem, MenuView};
+pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
 
 pub struct App {
     pub th: Theme,
@@ -328,6 +330,7 @@ pub struct App {
 
     pub keymap: Keymap,
     pub mouse: bool,
+    pub show_hints: bool,
     /// Screen rectangles of everything clickable, rebuilt every frame.
     pub hits: Hits,
     pub filter: Option<FilterState>,
@@ -391,6 +394,7 @@ impl App {
             plan_job: None,
             keymap: cfg.keymap,
             mouse: cfg.mouse,
+            show_hints: cfg.show_hints,
             hits: Hits::default(),
             filter: None,
             sel_anchor: None,
@@ -1484,14 +1488,23 @@ impl App {
 
     fn toggle_bookmark(&mut self) {
         let cwd = self.cwd.clone();
-        let was = self.paths.bookmarks.contains(&cwd);
-        self.svc.places.toggle_bookmark(cwd);
+        let add = !self.paths.bookmarks.contains(&cwd);
+        self.set_bookmark(cwd, add);
+    }
+
+    /// Add a folder to the bookmarks, or take it out (nothing happens when it already is
+    /// as asked).
+    pub(super) fn set_bookmark(&mut self, path: PathBuf, add: bool) {
+        if self.paths.bookmarks.contains(&path) == add {
+            return;
+        }
+        self.svc.places.toggle_bookmark(path);
         self.toast(
             ToastKind::Ok,
-            if was {
-                "bookmark removed"
+            if add {
+                "folder bookmarked — it is in the sidebar and in Ctrl+P"
             } else {
-                "folder bookmarked: Ctrl+P to jump back"
+                "bookmark removed"
             },
             3,
         );

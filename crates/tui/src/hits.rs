@@ -22,6 +22,8 @@ pub enum Target {
     SortBy(rada_core::model::SortKey),
     /// A breadcrumb segment: go to that folder.
     Crumb(PathBuf),
+    /// The "…" of a long path: the folders it stands for, to choose from.
+    CrumbMore(Vec<PathBuf>),
     /// An item of the hint bar or a header button: runs the action.
     Act(Action),
     Preview,
@@ -70,6 +72,11 @@ impl Hits {
 
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
+    }
+
+    /// Everything registered, in drawing order.
+    pub fn all(&self) -> impl Iterator<Item = &(Rect, Target)> {
+        self.items.iter()
     }
 
     pub fn find(&self, t: &Target) -> Option<Rect> {

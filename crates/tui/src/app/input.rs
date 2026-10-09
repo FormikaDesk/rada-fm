@@ -11,11 +11,58 @@ pub struct FilterState {
     pub editing: bool,
 }
 
+/// What choosing an entry of a menu does.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MenuCmd {
+    Act(Action),
+    /// Go to a folder (the hidden parts of a long path).
+    Go(PathBuf),
+    /// Add a folder to the bookmarks or take it out.
+    Bookmark {
+        path: PathBuf,
+        add: bool,
+    },
+}
+
 pub struct MenuItem {
-    pub action: Action,
+    pub cmd: MenuCmd,
+    pub label: String,
     pub enabled: bool,
     /// Draw a separator above this entry.
     pub gap_before: bool,
+}
+
+impl MenuItem {
+    pub fn act(action: Action, enabled: bool, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd: MenuCmd::Act(action),
+            label: action.label().to_string(),
+            enabled,
+            gap_before,
+        }
+    }
+
+    pub fn go(label: String, path: PathBuf) -> MenuItem {
+        MenuItem {
+            cmd: MenuCmd::Go(path),
+            label,
+            enabled: true,
+            gap_before: false,
+        }
+    }
+
+    pub fn bookmark(path: PathBuf, add: bool, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd: MenuCmd::Bookmark { path, add },
+            label: if add {
+                "Add to bookmarks".into()
+            } else {
+                "Remove from bookmarks".into()
+            },
+            enabled: true,
+            gap_before,
+        }
+    }
 }
 
 /// A context menu opened with the right mouse button.
@@ -297,7 +344,9 @@ impl App {
         match m.kind {
             MouseEventKind::ScrollUp => self.wheel(target, false),
             MouseEventKind::ScrollDown => self.wheel(target, true),
-            MouseEventKind::Down(MouseButton::Left) => self.click(target, m.modifiers),
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.click(target, m.modifiers, (m.column, m.row))
+            }
             MouseEventKind::Down(MouseButton::Right) => self.right_click(target, m.column, m.row),
             _ => {}
         }
@@ -356,13 +405,31 @@ impl App {
         self.set_cursor(to);
     }
 
-    fn click(&mut self, target: Option<Target>, mods: KeyModifiers) {
+    fn click(&mut self, target: Option<Target>, mods: KeyModifiers, at: (u16, u16)) {
         if self.modal.is_some() {
             return self.click_in_modal(target);
         }
         match target {
             Some(Target::Row(i)) => self.click_row(i, mods),
             Some(Target::Crumb(path)) => self.open_dir(path),
+            Some(Target::CrumbMore(hidden)) => {
+                // The folders folded into the "…", to pick one.
+                let items = hidden
+                    .into_iter()
+                    .map(|p| {
+                        let name = p
+                            .file_name()
+                            .map(rada_core::display::name)
+                            .unwrap_or_else(|| rada_core::display::path(&p));
+                        MenuItem::go(name, p)
+                    })
+                    .collect();
+                self.modal = Some(Modal::Menu(MenuView {
+                    at: (at.0, at.1 + 1),
+                    items,
+                    selected: 0,
+                }));
+            }
             Some(Target::Act(a)) => self.dispatch(a),
             Some(Target::SortBy(key)) => {
                 let spec = if self.sort.key == key {
@@ -413,10 +480,10 @@ impl App {
         match (&mut self.modal, target) {
             (Some(Modal::Help), _) => self.modal = None,
             (Some(Modal::Menu(m)), Some(Target::MenuItem(i))) => {
-                let item = m.items.get(i).map(|it| (it.action, it.enabled));
+                let item = m.items.get(i).map(|it| (it.cmd.clone(), it.enabled));
                 self.modal = None;
-                if let Some((action, true)) = item {
-                    self.dispatch(action);
+                if let Some((cmd, true)) = item {
+                    self.run_menu(cmd);
                 }
             }
             (Some(Modal::Menu(_)), _) => self.modal = None,
@@ -475,11 +542,7 @@ impl App {
         let has_clip = self.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();
         let mut add = |action: Action, enabled: bool, gap_before: bool| {
-            items.push(MenuItem {
-                action,
-                enabled,
-                gap_before,
-            })
+            items.push(MenuItem::act(action, enabled, gap_before))
         };
         if on_item {
             add(Open, true, false);
@@ -506,6 +569,15 @@ impl App {
         }
     }
 
+    /// Do what a chosen menu entry says. The menu is already closed.
+    pub(super) fn run_menu(&mut self, cmd: MenuCmd) {
+        match cmd {
+            MenuCmd::Act(action) => self.dispatch(action),
+            MenuCmd::Go(path) => self.open_dir(path),
+            MenuCmd::Bookmark { path, add } => self.set_bookmark(path, add),
+        }
+    }
+
     pub(super) fn on_menu_key(&mut self, mut m: MenuView, key: KeyEvent) {
         let n = m.items.len();
         match key.code {
@@ -521,7 +593,8 @@ impl App {
             KeyCode::Enter => {
                 if let Some(it) = m.items.get(m.selected) {
                     if it.enabled {
-                        self.dispatch(it.action);
+                        let cmd = it.cmd.clone();
+                        self.run_menu(cmd);
                     } else {
                         self.modal = Some(Modal::Menu(m));
                     }

@@ -271,6 +271,7 @@ fn main() -> Result<()> {
         image_mode,
         keymap,
         mouse,
+        show_hints: cfg_file.hints,
         request,
         select,
         limits: rada_core::preview::Limits {

@@ -272,3 +272,49 @@ pub fn hit_spans(hits: &mut Hits, x: u16, y: u16, spans: &[Span], targets: &[(us
         cx = cx.saturating_add(w);
     }
 }
+
+/// One row of a bar, built from spans, some of them clickable. Positions are worked out
+/// from the widths, so what is drawn and what can be clicked cannot disagree.
+#[derive(Default)]
+pub struct Bar<'a> {
+    pub spans: Vec<Span<'a>>,
+    targets: Vec<(usize, Target)>,
+}
+
+impl<'a> Bar<'a> {
+    pub fn push(&mut self, span: Span<'a>) {
+        self.spans.push(span);
+    }
+
+    pub fn push_hit(&mut self, span: Span<'a>, target: Target) {
+        self.targets.push((self.spans.len(), target));
+        self.spans.push(span);
+    }
+
+    /// Several spans that are one clickable thing.
+    pub fn push_hits(&mut self, spans: Vec<Span<'a>>, target: Target) {
+        for s in spans {
+            self.push_hit(s, target.clone());
+        }
+    }
+
+    pub fn width(&self) -> usize {
+        self.spans.iter().map(|s| s.content.width()).sum()
+    }
+
+    pub fn append(&mut self, other: Bar<'a>) {
+        let base = self.spans.len();
+        self.targets
+            .extend(other.targets.into_iter().map(|(i, t)| (base + i, t)));
+        self.spans.extend(other.spans);
+    }
+
+    /// Draw it at the left edge of `area` and register what can be clicked.
+    pub fn render(self, f: &mut ratatui::Frame, hits: &mut Hits, area: Rect) {
+        hit_spans(hits, area.x, area.y, &self.spans, &self.targets);
+        f.render_widget(
+            ratatui::widgets::Paragraph::new(ratatui::text::Line::from(self.spans)),
+            area,
+        );
+    }
+}

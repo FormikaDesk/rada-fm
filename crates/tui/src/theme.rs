@@ -592,6 +592,37 @@ impl Theme {
         }
     }
 
+    /// The strip behind the top and bottom bars: a tone apart from the content. On a
+    /// 16-colour terminal there is no such tone, and the chips carry the structure.
+    pub fn band(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            self.on(Style::default())
+        } else {
+            Style::default().bg(self.mark)
+        }
+    }
+
+    /// Something clickable in a bar: a button, a field, a key cap.
+    pub fn chip(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default().fg(self.text).bg(self.selection)
+        }
+    }
+
+    /// A key name on a chip.
+    pub fn chip_key(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            self.chip().add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .fg(self.accent)
+                .bg(self.selection)
+                .add_modifier(Modifier::BOLD)
+        }
+    }
+
     /// Apply the theme's own background, if it has one.
     pub fn on(&self, s: Style) -> Style {
         match self.bg {

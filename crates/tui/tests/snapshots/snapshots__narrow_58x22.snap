@@ -2,7 +2,7 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-   ▍ ~ › demo › projects          6/12 items   ⌕ Ctrl+P
+  ‹   ›   ↑   ⌂ › demo › projects     ⌕ Filter…   Go to…
         Name ↑                        Size  Type
    ────────────────────────────────────────────────────
       ▸ data/                            —  Folder
@@ -23,4 +23,4 @@ expression: shot(&mut h)
 
 
 
-   Enter open   Space mark   Ctrl+C copy
+       Enter  open    Space  mark    Ctrl+C  copy
