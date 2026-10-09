@@ -321,9 +321,11 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
         ),
         format!("modified {}", fmt::date(info.modified)),
     ];
+    // Wrapped, never cut: on a narrow pane "70.7 KiB" must not become "70.…".
     let mut fact_lines: Vec<Line> = facts
         .iter()
-        .map(|l| Line::from(Span::styled(display::truncate(l, w), th.base())))
+        .flat_map(|l| fmt::wrap(l, w))
+        .map(|l| Line::from(Span::styled(l, th.base())))
         .collect();
     if let Some(n) = &note {
         for l in fmt::wrap(n, w) {
@@ -337,7 +339,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
         ..inner
     };
     let pic = Rect {
-        height: inner.height.saturating_sub(facts_h + 1),
+        height: inner.height.saturating_sub(facts_h),
         ..inner
     };
 
@@ -357,9 +359,10 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
                             height: sz.height.min(pic.height),
                         };
                         f.render_stateful_widget(StatefulImage::default(), r, &mut ui.proto);
+                        // The facts follow the picture directly, no empty row between.
                         facts_at = Rect {
                             x: inner.x,
-                            y: r.y + r.height + 1,
+                            y: r.y + r.height,
                             width: inner.width,
                             height: facts_h,
                         };

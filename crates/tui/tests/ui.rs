@@ -397,6 +397,69 @@ fn an_image_is_drawn_with_its_facts_underneath() {
     );
 }
 
+/// Waits for the picture of `photo.png` (made of blocks) to be on screen.
+fn show_photo(h: &mut H) -> String {
+    h.keys("j"); // photo.png
+    h.wait("the picture", |a| {
+        a.preview.name == "photo.png"
+            && matches!(
+                a.preview.image.as_ref().map(|i| &i.status),
+                Some(rada_tui::app::ImageStatus::Shown)
+            )
+    });
+    let mut s = h.screen();
+    for _ in 0..100 {
+        if s.chars().filter(|c| is_block(*c)).count() > 50 {
+            break;
+        }
+        h.pump(50);
+        s = h.screen();
+    }
+    s
+}
+
+#[test]
+fn the_image_facts_follow_the_picture_directly() {
+    let sb = Sandbox::new();
+    sb.write("pics/a_first.txt", "x");
+    sb.write("pics/photo.png", png_bytes(160, 100));
+    let dir = sb.path("pics");
+    let mut h = H::new(sb, dir, 150, 36);
+    let s = show_photo(&mut h);
+    let rows: Vec<&str> = s.lines().collect();
+    let last_picture_row = rows
+        .iter()
+        .rposition(|l| l.chars().filter(|c| is_block(*c)).count() > 5)
+        .expect("a picture");
+    let facts_row = rows
+        .iter()
+        .position(|l| l.contains("PNG ·"))
+        .expect("the facts");
+    assert_eq!(
+        facts_row,
+        last_picture_row + 1,
+        "no empty row between the picture and its facts:\n{s}"
+    );
+}
+
+#[test]
+fn the_image_facts_wrap_in_a_narrow_preview_instead_of_being_cut() {
+    let sb = Sandbox::new();
+    sb.write("pics/a_first.txt", "x");
+    sb.write("pics/photo.png", png_bytes(1600, 1066));
+    let dir = sb.path("pics");
+    let mut h = H::new(sb, dir, 100, 36);
+    let s = show_photo(&mut h);
+    assert!(s.contains("1600 × 1066 px"), "{s}");
+    for l in s
+        .lines()
+        .filter(|l| l.contains("px") || l.contains("modified"))
+    {
+        assert!(!l.contains('…'), "cut instead of wrapped: {l}");
+    }
+    assert!(s.contains("modified 20"), "{s}");
+}
+
 #[test]
 fn a_huge_image_shows_a_clear_message_instead_of_a_picture() {
     let sb = Sandbox::new();
