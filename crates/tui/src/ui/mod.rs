@@ -116,7 +116,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         // Only the window is clickable while it is open.
         app.hits.clear();
         if !matches!(app.modal, Some(Modal::Menu(_))) {
-            dim_backdrop(f.buffer_mut(), area);
+            dim_backdrop(f.buffer_mut(), area, th.light);
         }
         modals::draw_modal(f, app, area);
     }

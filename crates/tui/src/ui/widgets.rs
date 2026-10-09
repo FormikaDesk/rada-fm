@@ -63,14 +63,18 @@ pub fn centered(area: Rect, w: u16, h: u16) -> Rect {
 }
 
 /// Dim everything already drawn, so that a window in front is the only thing in focus.
-pub fn dim_backdrop(buf: &mut Buffer, area: Rect) {
-    fn darken(c: Color, f: f32) -> Color {
+/// On a light theme "dimmer" means paler: colours move towards white instead of black.
+pub fn dim_backdrop(buf: &mut Buffer, area: Rect, light: bool) {
+    fn shade(c: Color, f: f32, light: bool) -> Color {
+        let ch = |v: u8| -> u8 {
+            if light {
+                (v as f32 + (255.0 - v as f32) * (1.0 - f)) as u8
+            } else {
+                (v as f32 * f) as u8
+            }
+        };
         match c {
-            Color::Rgb(r, g, b) => Color::Rgb(
-                (r as f32 * f) as u8,
-                (g as f32 * f) as u8,
-                (b as f32 * f) as u8,
-            ),
+            Color::Rgb(r, g, b) => Color::Rgb(ch(r), ch(g), ch(b)),
             other => other,
         }
     }
@@ -82,8 +86,8 @@ pub fn dim_backdrop(buf: &mut Buffer, area: Rect) {
             if cell.symbol().contains('\u{10EEEE}') {
                 continue;
             }
-            cell.fg = darken(cell.fg, 0.62);
-            cell.bg = darken(cell.bg, 0.6);
+            cell.fg = shade(cell.fg, 0.62, light);
+            cell.bg = shade(cell.bg, 0.6, light);
         }
     }
 }
