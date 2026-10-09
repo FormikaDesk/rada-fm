@@ -4,8 +4,8 @@
 Method: each program runs inside a tmux
 session (160x50, TERM=xterm-256color); "startup" is the time from launching the
 session until a known file name shows on screen (polling `tmux capture-pane`);
-"latency" is the time from sending `j`/`k` until the on-screen position counter
-changes (200 alternating keys, 30 ms apart); RSS comes from /proc.
+"latency" is the time from sending `j`/`k` until the cursor row (the one marked `▎`)
+shows another file name (200 alternating keys, 30 ms apart); RSS comes from /proc.
 
 Everything runs against isolated XDG folders under <project>/.scratch/.
 The fixture folders are only read. Point RADA_BENCH_FIXTURES at a folder holding
@@ -29,7 +29,7 @@ SPF = os.environ.get("RADA_BENCH_SPF", "spf")
 SESS = "bench"
 
 PROGS = {
-    "rada": dict(cmd=f"{RADA}/target/release/rada", exe="rada", xdg=f"{SCR}/xdg", env=""),
+    "rada": dict(cmd=os.environ.get("RADA_BENCH_BIN", f"{RADA}/target/release/rada"), exe="rada", xdg=f"{SCR}/xdg", env=""),
     "spf": dict(cmd=SPF, exe="spf", xdg=f"{SCR}/xdg_cmp", env=f"_ZO_DATA_DIR={SCR}/xdg_cmp/zoxide"),
     "yazi": dict(cmd="yazi", exe="yazi", xdg=f"{SCR}/xdg_cmp", env=f"YAZI_CONFIG_HOME={SCR}/xdg_cmp/yazi_cfg"),
 }
@@ -111,7 +111,8 @@ def startup(name, n=10):
 
 
 COUNTER = {
-    "rada": re.compile(r"(\d+)/10000 items"),
+    # The cursor row: the file name on the line marked ▎ (older builds: the "n/10000 items" counter).
+    "rada": re.compile(os.environ.get("RADA_BENCH_COUNTER", r"▎[^\n]*?(file_\d{5})")),
     "yazi": re.compile(r"(\d+)/10000"),
 }
 
