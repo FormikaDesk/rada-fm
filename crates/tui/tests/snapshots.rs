@@ -76,6 +76,9 @@ fn scene(w: u16, h: u16) -> H {
         age(&dir.join(d), 6 * 86400);
     }
     let mut h = H::new(sb, dir, w, h);
+    // The sidebar's places arrive from a worker: wait for them so that every screen is the
+    // same screen, run after run.
+    h.wait("the places", |a| !a.paths.places.is_empty());
     h.app.clock = Some(fixed_now());
     h.app.volumes.clear();
     h
