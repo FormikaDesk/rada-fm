@@ -44,6 +44,9 @@ pub enum Error {
     #[error("{} and {} are on different filesystems", display::path(.0), display::path(.1))]
     CrossDevice(PathBuf, PathBuf),
 
+    #[error("{}: {message}", display::path(.path))]
+    Archive { path: PathBuf, message: String },
+
     #[error("trash: {0}")]
     Trash(String),
 
