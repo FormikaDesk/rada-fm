@@ -1207,7 +1207,7 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
         vec![
             "Click selects · double-click opens · wheel scrolls the list or the preview.",
             "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu.",
-            "Click a folder in the path, a hint at the bottom, or a column title to sort.",
+            "Click ‹ › ↑, a folder in the path, a place in the sidebar, a hint at the bottom, or a column title.",
             "Shift+drag selects text in the terminal (the mouse belongs to rada while it runs).",
         ]
     } else {

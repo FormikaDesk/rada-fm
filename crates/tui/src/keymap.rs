@@ -523,7 +523,7 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Back, &["alt+left"]),
     (Action::Forward, &["alt+right"]),
     (Action::Parent, &["alt+up"]),
-    (Action::SwitchPane, &["tab"]),
+    (Action::SwitchPane, &["tab", "shift+tab"]),
     (Action::ToggleSidebar, &["ctrl+b"]),
 ];
 
@@ -591,7 +591,9 @@ impl Keymap {
             for k in *keys {
                 let c = Chord::parse(k).expect("built-in key");
                 if !km.by_chord.contains_key(&c) {
+                    // Bound in every preset, and shown in both columns of the help.
                     km.bind(*action, c, Scheme::Classic, false);
+                    km.bind(*action, c, Scheme::Vim, false);
                 }
             }
         }
@@ -778,9 +780,10 @@ mod tests {
             km.action_for(&ev(KeyCode::Char('?'), KeyModifiers::SHIFT)),
             Some(Action::Help)
         );
+        // Shift+Tab is Tab's twin: it also moves between the list and the sidebar.
         assert_eq!(
             km.action_for(&ev(KeyCode::BackTab, KeyModifiers::SHIFT)),
-            None
+            Some(Action::SwitchPane)
         );
     }
 

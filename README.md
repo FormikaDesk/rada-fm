@@ -16,8 +16,8 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 | | |
 |---|---|
-| **A calm interface** | No boxes around the list: a breadcrumb on top, a size bar and a coloured type dot per file, relative dates ("3 h ago"), one line of hints at the bottom. Windows (plan, errors, prompts, jump palette) float in the middle over a dimmed background; notifications come and go by themselves ("Copied 342 files — press u to undo"). It adapts to the width of the terminal: the preview hides first, then the date, the type and the size bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
-| **Keyboard *and* mouse** | Vim keys and the usual desktop shortcuts work together by default (`y` or `Ctrl+C`, `d` or `Del`, `u` or `Ctrl+Z`…). The mouse selects, opens, scrolls, sorts by column, and a right click opens a context menu that shows each shortcut. Every key can be rebound. |
+| **A calm interface** | A top bar with back / forward / parent buttons, the path (a house for home, clickable segments, a clickable `…` for a long path), a labelled filter field and a `Go to…` button; a sidebar with your standard places under their real names (Scaricati, Documenti…), bookmarks and disks; a list with a size bar and a coloured type dot per file and relative dates ("3 h ago"); a bottom bar with what is selected, the keys that make sense right now drawn as little keys, and the free space of the disk. Windows (plan, errors, prompts, jump palette) float in the middle over a dimmed background; notifications come and go by themselves ("Copied 342 files — press u to undo"). It adapts to the width of the terminal: the sidebar shrinks to icons, then goes, before the preview does; then the date, the type and the size bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
+| **Keyboard *and* mouse** | Vim keys and the usual desktop shortcuts work together by default (`y` or `Ctrl+C`, `d` or `Del`, `u` or `Ctrl+Z`…). The mouse selects, opens, scrolls, sorts by column, goes back and forward, picks places in the sidebar, and a right click opens a context menu that shows each shortcut. Every key can be rebound. |
 | **Plan window** | Copy, move, rename, bulk rename, new folder, trash, delete: all show a plan with totals and warnings first. Permanent deletion states clearly that it cannot be undone and asks you to type `yes`. |
 | **Journal + undo** | `u` undoes the last operation (with its own plan, so you see what undo will do). `U` shows the history. Undo of a copy removes exactly what the copy created; undo of a move moves back; undo of trash restores from the trash; undo of an overwrite brings the old file back. |
 | **Per-file errors** | One unreadable file does not abort a 10,000-file copy. Errors are handled per step: skip / skip all / retry / abort. |
@@ -69,12 +69,12 @@ rada ~/Pictures      # open a folder
 rada photo.png       # open its folder with the cursor on the file
 ```
 
-Move with `j` `k` or the arrow keys, open with `Enter`, go up with `Backspace`. Press `?` (or `F1`) for the full list of keys, `Ctrl+P` to jump to any folder, bookmark or disk. Select with `Space`, then copy (`Ctrl+C`), move to another folder and paste (`Ctrl+V`): a **plan** appears first, and nothing happens until you press `Enter`. Changed your mind afterwards? `Ctrl+Z` undoes it.
+Move with `j` `k` or the arrow keys, open with `Enter`, go up with `Backspace`. Press `?` (or `F1`) for the full list of keys, `Ctrl+P` to jump to any folder, bookmark or disk. `Alt+←` and `Alt+→` go back and forward like in a browser; `Tab` moves into the sidebar of places. Select with `Space`, then copy (`Ctrl+C`), move to another folder and paste (`Ctrl+V`): a **plan** appears first, and nothing happens until you press `Enter`. Changed your mind afterwards? `Ctrl+Z` undoes it.
 
 ## Usage
 
 ```sh
-rada [PATH] [--icons nerd|unicode|none] [--theme NAME] [--keymap PRESET] [--no-mouse] [--hidden]
+rada [PATH] [--icons nerd|unicode|none] [--theme NAME] [--appearance auto|light|dark] [--keymap PRESET] [--no-mouse] [--hidden]
 ```
 
 Icons default to plain Unicode markers. With a [Nerd Font](https://www.nerdfonts.com/) installed, use `--icons nerd` (or `icons = "nerd"` in the config file).
@@ -91,7 +91,9 @@ Optional config: `$XDG_CONFIG_HOME/rada/config.toml`
 
 ```toml
 icons = "nerd"        # nerd | unicode | none
-theme = "rada"        # rada | catppuccin | tokyo-night
+theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the terminal), or a fixed
+                      # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
+appearance = "auto"   # auto | light | dark: which variant a theme name takes
 show_hidden = false
 sort = "name"         # name | size | date
 reverse = false
@@ -100,6 +102,8 @@ images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
 image_max_megapixels = 50
 image_max_file_mb = 128
 mouse = true          # false: rada never captures the mouse
+sidebar = true        # the default; Ctrl+B toggles it and remembers
+hints = true          # false: no key hints in the bottom bar
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
 
 [keys]                # per action; replaces all of its keys, [] unbinds it
@@ -108,20 +112,60 @@ trash = ["d", "delete"]
 quit = "ctrl+q"
 ```
 
-State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`). Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
+State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with whether you hid the sidebar). Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
+
+## Navigation
+
+rada keeps a history of the folders you visit, like a browser. Three buttons sit at the left of the top bar: **‹** back, **›** forward and **↑** the parent folder; a button that cannot be used right now is drawn faint and does nothing. The keys are `Alt+←`, `Alt+→` and `Alt+↑`, in every key preset (checked in Ghostty: all three arrive intact). Going somewhere new after going back drops the part of the history that was "forward", as a browser does, and going back puts the cursor on the folder you came out of.
+
+The path shows a house for your home folder and a clickable segment for every folder; the current one is in the accent colour. When the path is too long for the bar its middle is folded into a `…`: click it to pick one of the folders it hides.
+
+On the right of the bar: the **filter** field (`⌕ Filter…`, click it, or press `/` or `Ctrl+F`), the **`Go to…`** button (`Ctrl+P`, the jump palette) and how many items the folder has. When the terminal gets narrow the bar gives way in a fixed order: the item count goes first, then the middle of the path is folded; the words *Filter* and *Go to* stay, and their key hints are the last thing to go.
+
+The mouse's own back and forward buttons are not used: the terminal library rada is built on does not report them. Use the buttons in the bar or `Alt+←` / `Alt+→`.
+
+## Sidebar
+
+On the left: your **places**, your **bookmarks** and your **disks**.
+
+- **Places** are your standard folders under the names your system really uses, read from `~/.config/user-dirs.dirs` on Linux: *Scaricati* and *Documenti* on an Italian desktop, *Downloads* and *Documents* elsewhere. Home, Desktop, Documents, Downloads, Pictures, Music, Videos and the Trash are listed when they exist; each has its own icon. (Windows Known Folders and the macOS equivalents come with their platform support; the engine already has the hook for them.)
+- **Bookmarks** are the ones from the config file and the ones you add with `B` or from the menu. Right-click an item (or press `B` with the keyboard on it) to add or remove it; `Del` removes the bookmark under the keyboard focus. Bookmarks from the config file can only be removed there.
+- **Devices** are your disks and USB sticks, each with a small bar of how full it is. They are listed by a background worker, never while you press a key.
+
+The place you are in is highlighted. Click an item to open it. **`Tab`** moves the keyboard into the sidebar (the focused item is drawn with the cursor colour); `↑` `↓` move, `Enter` opens and returns to the list, `Tab` or `Esc` returns to the list without opening. While the sidebar has the focus, file operations are refused rather than done to an item you cannot see.
+
+**`Ctrl+B`** shows or hides the sidebar and remembers it (`sidebar = false` in the config file sets the default). It is 26 columns wide from a terminal width of 124; from 100 to 123 columns it becomes a **column of icons** with the places only (bookmarks and disks stay reachable with `Ctrl+P`): hover an icon, or move onto it with the keyboard, and its name shows in the bottom bar. Below 100 columns it is not shown at all, so it always gives way before the preview does. A section with nothing in it does not appear.
 
 ## Themes
 
-Every colour on screen comes from a small set of named tokens (text, dim text, accent, selection, one colour per file type, success/warning/error…). Nothing is coloured by hand elsewhere; a test reads the sources and fails if it finds a hand-written colour outside `theme.rs`, and another renders every theme and checks that each cell uses only that theme's tokens.
+Every colour on screen comes from a small set of named tokens (text, dim text, accent, selection, cursor row, one colour per file type, success/warning/error…). Nothing is coloured by hand elsewhere; a test reads the sources and fails if it finds a hand-written colour outside `theme.rs`, and another renders every theme and checks that each cell uses only that theme's tokens.
 
-| `rada` (default) | `catppuccin` | `tokyo-night` |
+Three looks, each with a dark and a light variant:
+
+| | dark | light |
 |---|---|---|
-| calm azure on a cool neutral base | Catppuccin Mocha | Tokyo Night |
+| `rada` (default): calm azure on a cool neutral base | `rada-dark` | `rada-light` |
+| `catppuccin` | `catppuccin-mocha` | `catppuccin-latte` |
+| `tokyo-night` | `tokyo-night-dark` | `tokyo-night-day` |
 
 ![Catppuccin](docs/screenshots/theme-catppuccin.png)
 ![Tokyo Night](docs/screenshots/theme-tokyo-night.png)
+![rada on a light terminal](docs/screenshots/theme-rada-light.png)
 
-Choose with `theme = "…"` in the config, `--theme NAME` or `RADA_THEME`. Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working.
+The light variants use the same tokens, chosen so they read on a pale background: automatic tests check the contrast of every token against the colour it is meant to sit on (7:1 for the main text, 4.5:1 for secondary text, accents, file types and statuses). Catppuccin Latte and Tokyo Night Day are deepened where the original colours are too pale to read as text.
+
+**`theme = "auto"` is the default.** The names `auto`, `rada`, `catppuccin` and `tokyo-night` follow your terminal: rada finds out whether its background is light or dark and takes the matching variant. Name a variant (`theme = "rada-light"`) to pin it, or keep the name and set only the brightness: `appearance = "light"` / `"dark"` (`--appearance`, `RADA_APPEARANCE`). Choose with `theme = "…"` in the config, `--theme NAME` or `RADA_THEME`.
+
+How rada finds out, cheapest and safest first, without ever taking a key from you:
+
+1. what you set (`appearance`, `--appearance`, `RADA_APPEARANCE`);
+2. the environment: `COLORFGBG`, the Linux console (always dark), Terminal.app on macOS (it follows the system appearance);
+3. asking the terminal for its background colour (the standard OSC 11 query) with a 150 ms limit, before rada starts reading the keyboard. The query is followed by a request that every terminal answers, so once that answer is in, any answer to the colour question is in too and nothing can arrive late into your input. Keys you typed in that moment are replayed, not lost. rada does not ask under tmux unless `allow-passthrough` is on (then it asks through it), never under GNU screen or on a dumb terminal, and not when its input or output is not a terminal; `RADA_NO_TERM_QUERY=1` switches the question off;
+4. otherwise: the dark theme.
+
+The result will be shown by `rada doctor` when that command exists; until then it is written to the log (`RADA_LOG=info`). The Windows console is not asked in this version (it falls back to dark unless you set `appearance`).
+
+Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working; the bars and the sidebar use a slightly different tone of their own.
 
 ## Keys
 
@@ -130,7 +174,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | Action | Vim | Classic |
 |---|---|---|
 | move | `j` `k` | `↓` `↑` |
-| open · parent folder | `l` · `h` | `Enter` · `Backspace` (also `→` `←`) |
+| open · parent folder | `l` · `h` | `Enter` · `Backspace` (also `→` `←`, and `Alt+↑` in every preset) |
 | top · bottom · page | `g` `G` · `Ctrl+U` `Ctrl+D` | `Home` `End` · `PgUp` `PgDn` |
 | mark and move down | `Space` | `Space`, `Ctrl+Space`, `Ins` |
 | select all · extend selection | | `Ctrl+A` · `Shift+↑` `Shift+↓` (`Ctrl+Shift+Home/End` to the ends) |
@@ -139,12 +183,14 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | move to trash · delete permanently (type `yes`) | `d` `D` | `Del` · `Shift+Del` |
 | rename · bulk rename · new folder | `r` · `R` · `n` | `F2` · — · `Ctrl+N` |
 | undo · redo | `u` · `Ctrl+R` | `Ctrl+Z` · `Ctrl+Y` (or `Ctrl+Shift+Z`) |
+| back · forward in the folder history | `Alt+←` · `Alt+→` (both schemes) | |
 | history of operations | `U` | `F3` |
 | filter this folder | `/` | `Ctrl+F` |
 | jump palette (folders, recents, bookmarks, disks) | `m` | `Ctrl+P` `Ctrl+L` |
 | sort key · reverse · hidden files | `s` `S` `.` | |
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
-| bookmark this folder · home | `B` · `~` | |
+| bookmark this folder (or the item in the sidebar) · home | `B` · `~` | |
+| move between list and sidebar · show / hide the sidebar | `Tab` · `Ctrl+B` (both schemes) | |
 | help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
 **`Ctrl+C` copies and never quits**: the terminal is in raw mode, so it arrives as an ordinary key, and a stray `SIGINT` is ignored. Quit with `q` or `Ctrl+Q`; `SIGTERM` and closing the terminal end rada in an orderly way (the running operation is cancelled, the terminal is restored).
@@ -155,7 +201,7 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 ### Mouse
 
-Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range; click a folder in the path to go there, a column title to sort (again to reverse), an item of the hint bar to run it, a row of the palette to jump, and the buttons of any window. A right click opens a context menu with each action's shortcut. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. Drag and drop between windows is planned for a later release.
+Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: **‹ › ↑** in the top bar, a segment of the path (or the `…` that folds it, which lists the folders it hides), the **Filter** field, **Go to…**, every key in the bottom bar, an item of the sidebar (right-click it for *Open* and *Add to / Remove from bookmarks*), a column title to sort (again to reverse), a row of the palette to jump, and the buttons of any window. A right click on a file opens a context menu with each action's shortcut. In the icon-only sidebar, hovering an item shows its name in the bottom bar. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop between windows is planned for a later release.
 
 ### Keys that terminals take for themselves
 
@@ -170,8 +216,9 @@ Checked in Ghostty by sending each combination to a real window and reading what
 | `Ctrl+/` | arrives as `Ctrl+7` | not used |
 | `Ctrl+S`, `Ctrl+Q`, `Ctrl+Z` | would be flow control and job control in a normal terminal | delivered as keys (raw mode); `Ctrl+Q` quits, `Ctrl+Z` undoes |
 | `Ctrl+Space` | passed on | extra mark key |
+| `Alt+←`, `Alt+→`, `Alt+↑`, `Tab`, `Shift+Tab`, `Ctrl+B` | passed on, intact | back, forward, parent, switch between list and sidebar (both Tab keys), show / hide the sidebar |
 
-Everything else rada uses (`Ctrl+C/X/V/Z/Y/A/F/L/P/N/Q`, `Shift+Del`, `F1`–`F3`, `F7`, `Alt+↑`, `Ctrl+Shift+Z`, …) arrived intact. The window manager's own bindings (Hyprland here) all use the Super key, except `Alt+Space`, `Ctrl+Alt+Del` and `Ctrl+Shift+R`, which rada does not use. Terminals that implement the kitty keyboard protocol can tell more combinations apart; rada works with what every terminal sends.
+Everything else rada uses (`Ctrl+C/X/V/Z/Y/A/F/L/P/N/Q/B`, `Shift+Del`, `F1`–`F3`, `F7`, `Alt+←/→/↑`, `Tab`, `Ctrl+Shift+Z`, …) arrived intact. The window manager's own bindings (Hyprland here) all use the Super key, except `Alt+Space`, `Ctrl+Alt+Del` and `Ctrl+Shift+R`, which rada does not use. Terminals that implement the kitty keyboard protocol can tell more combinations apart; rada works with what every terminal sends.
 
 ## Requests as data
 
