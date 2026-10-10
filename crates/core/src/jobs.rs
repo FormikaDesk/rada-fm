@@ -218,6 +218,10 @@ impl Jobs {
         self.plan_request(OpRequest::MakeDir { parent, name })
     }
 
+    pub fn plan_mkfile(&self, parent: PathBuf, name: String) -> JobHandle {
+        self.plan_request(OpRequest::MakeFile { parent, name })
+    }
+
     pub fn plan_bulk_rename(&self, items: Vec<PathBuf>, pattern: String) -> JobHandle {
         self.plan_request(OpRequest::BulkRename {
             items,
@@ -236,6 +240,18 @@ impl Jobs {
     /// confirmed like any other.
     pub fn plan_redo(&self) -> JobHandle {
         self.plan_job(PlanSource::Redo)
+    }
+
+    /// Ask what the next undo would undo; the answer is a `JobEvent::UndoLabel`.
+    pub fn load_undo_label(&self) -> JobHandle {
+        let journal = self.journal.clone();
+        self.spawn(move |id, _c, _e, out| {
+            let label = journal
+                .as_ref()
+                .and_then(|j| j.last_undoable().ok().flatten())
+                .map(|e| e.describe());
+            let _ = out.send(CoreEvent::Job(JobEvent::UndoLabel { job: id, label }));
+        })
     }
 
     pub fn load_history(&self) -> JobHandle {

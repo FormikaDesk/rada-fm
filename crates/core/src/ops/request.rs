@@ -85,6 +85,13 @@ pub enum OpRequest {
         parent: PathBuf,
         name: String,
     },
+    /// Create an empty file.
+    MakeFile {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        parent: PathBuf,
+        name: String,
+    },
     /// Move items to the trash (recoverable).
     Trash {
         #[serde(with = "pathcodec::paths")]
@@ -189,6 +196,13 @@ impl OpRequest {
                 require_absolute(std::slice::from_ref(parent), "parent")?;
                 if name.is_empty() {
                     return Err(Error::Invalid("the folder name is empty".into()));
+                }
+                Ok(())
+            }
+            OpRequest::MakeFile { parent, name } => {
+                require_absolute(std::slice::from_ref(parent), "parent")?;
+                if name.is_empty() {
+                    return Err(Error::Invalid("the file name is empty".into()));
                 }
                 Ok(())
             }
@@ -379,6 +393,11 @@ impl Engine {
                 scan: None,
                 undo: None,
             },
+            OpRequest::MakeFile { parent, name } => Planned {
+                plan: self.plan_mkfile(parent, name.as_ref()),
+                scan: None,
+                undo: None,
+            },
             OpRequest::BulkRename {
                 items,
                 pattern,
@@ -497,7 +516,9 @@ impl Engine {
             OpRequest::Rename { path, .. } if inside(path) => {
                 refuse(path, "an archive cannot be changed")
             }
-            OpRequest::MakeDir { parent, .. } if inside(parent) => {
+            OpRequest::MakeDir { parent, .. } | OpRequest::MakeFile { parent, .. }
+                if inside(parent) =>
+            {
                 refuse(parent, "an archive cannot be changed")
             }
             OpRequest::Compress { archive, .. } if inside(archive) => {

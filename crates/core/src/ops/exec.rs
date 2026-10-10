@@ -586,6 +586,21 @@ impl Engine {
                 })
             }
 
+            Step::MakeFile { path, mode } => {
+                match fs.create_file(path, mode.unwrap_or(0o644)) {
+                    Ok(_sink) => {}
+                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                        return Err(Error::AlreadyExists(path.clone()));
+                    }
+                    Err(e) => return Err(Error::io("create file", path, e)),
+                }
+                let after = fs.lstat(path).ok().map(|m| m.fingerprint());
+                Ok(StepResult {
+                    after,
+                    ..StepResult::done()
+                })
+            }
+
             Step::FinishDir {
                 path,
                 mode,

@@ -443,6 +443,45 @@ impl Engine {
         plan.warnings = ws.finish();
         plan
     }
+
+    /// An empty file in `parent`, never over an existing name.
+    pub fn plan_mkfile(&self, parent: &Path, name: &OsStr) -> Plan {
+        let path = parent.join(name);
+        let mut plan = Plan::empty(
+            OpKind::MakeFile,
+            format!("Create file {}", display::name(name)),
+        );
+        let mut ws = WarningSet::default();
+        plan.destination = Some(parent.to_path_buf());
+        plan.totals.items = 1;
+        plan.totals.files = 1;
+        if let Err(why) = names::validate(&self.platform.path_rules(), name) {
+            ws.add_with(
+                WarningKind::InvalidName,
+                Severity::Blocking,
+                Some(&path),
+                Some(why),
+            );
+        } else if self.fs.lstat(&path).is_ok() {
+            ws.add(WarningKind::Conflict, Severity::Blocking, Some(&path));
+        } else if !self.fs.can_write(parent) {
+            ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
+        } else {
+            plan.items.push(ItemSummary {
+                path: path.clone(),
+                kind: crate::fs::FileKind::File,
+                action: ItemAction::Create,
+                files: 1,
+                dirs: 0,
+                symlinks: 0,
+                bytes: 0,
+                target: None,
+            });
+            plan.steps.push(Step::MakeFile { path, mode: None });
+        }
+        plan.warnings = ws.finish();
+        plan
+    }
 }
 
 // ---------------------------------------------------------------------- transfer builder

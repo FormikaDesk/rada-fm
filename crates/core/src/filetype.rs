@@ -283,7 +283,10 @@ mod tests {
     #[test]
     fn folders_links_and_programs() {
         assert_eq!(label("src", FileKind::Dir, false, false), "Folder");
-        assert_eq!(label("link-to-dir", FileKind::Symlink, true, false), "Folder");
+        assert_eq!(
+            label("link-to-dir", FileKind::Symlink, true, false),
+            "Folder"
+        );
         assert_eq!(label("l", FileKind::Symlink, false, false), "Link");
         assert_eq!(label("run", FileKind::File, false, true), "Program");
         assert_eq!(label("sock", FileKind::Other, false, false), "Special file");

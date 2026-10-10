@@ -61,6 +61,62 @@ pub trait Opener: Send + Sync {
     fn open(&self, path: &Path) -> Result<()>;
     /// Show the item in the system file manager.
     fn reveal(&self, path: &Path) -> Result<()>;
+    /// Open with a program the user names (a command line, which may carry options), detached
+    /// from the terminal. An empty `program` asks the system to offer its own choice, where
+    /// it has one.
+    fn open_with(&self, _path: &Path, _program: &str) -> Result<()> {
+        Err(crate::Error::Unsupported("open with"))
+    }
+    /// Open a new terminal window in `dir`.
+    fn open_terminal(&self, _dir: &Path) -> Result<()> {
+        Err(crate::Error::Unsupported("open a terminal"))
+    }
+}
+
+/// Split a command line the way a shell would for the simple cases: words separated by
+/// blanks, with single or double quotes keeping blanks inside a word.
+pub fn split_command(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut started = false;
+    for c in line.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => cur.push(c),
+            (None, '\'' | '"') => {
+                quote = Some(c);
+                started = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if started || !cur.is_empty() {
+                    words.push(std::mem::take(&mut cur));
+                    started = false;
+                }
+            }
+            (None, c) => cur.push(c),
+        }
+    }
+    if started || !cur.is_empty() {
+        words.push(cur);
+    }
+    words
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::split_command;
+
+    #[test]
+    fn a_command_line_splits_like_a_shell_would_for_simple_cases() {
+        assert_eq!(split_command("vlc --fullscreen"), ["vlc", "--fullscreen"]);
+        assert_eq!(
+            split_command(r#"  code  "my folder" 'a b' c"#),
+            ["code", "my folder", "a b", "c"]
+        );
+        assert_eq!(split_command("x ''"), ["x", ""]);
+        assert!(split_command("   ").is_empty());
+    }
 }
 
 pub trait Platform: Send + Sync {

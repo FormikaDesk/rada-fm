@@ -67,6 +67,11 @@ pub enum JobEvent {
     Recovered {
         items: Vec<crate::ops::Recovered>,
     },
+    /// What the next undo would undo, in a few words; `None` when there is nothing to undo.
+    UndoLabel {
+        job: JobId,
+        label: Option<String>,
+    },
     NothingToUndo {
         job: JobId,
     },

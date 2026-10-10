@@ -20,6 +20,8 @@ pub enum OpKind {
     Rename,
     BulkRename,
     MakeDir,
+    /// Create an empty file.
+    MakeFile,
     Trash,
     Delete,
     Undo,
@@ -37,6 +39,7 @@ impl OpKind {
             OpKind::Rename => "Rename",
             OpKind::BulkRename => "Bulk rename",
             OpKind::MakeDir => "New folder",
+            OpKind::MakeFile => "New file",
             OpKind::Trash => "Move to trash",
             OpKind::Delete => "Delete permanently",
             OpKind::Undo => "Undo",
@@ -61,6 +64,13 @@ pub enum Step {
         /// for the run): used when undo brings back a folder that was read-only.
         #[serde(default)]
         restore_mode: Option<u32>,
+    },
+    /// A new, empty file.
+    MakeFile {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        path: PathBuf,
+        mode: Option<u32>,
     },
     /// Apply the final permissions/time of a directory created earlier in the same run
     /// (after its children exist, so a read-only source dir stays writable meanwhile).
@@ -222,6 +232,7 @@ impl Step {
     pub fn path(&self) -> &Path {
         match self {
             Step::MakeDir { path, .. }
+            | Step::MakeFile { path, .. }
             | Step::FinishDir { path, .. }
             | Step::TrashItem { path }
             | Step::RemoveFile { path, .. }
@@ -238,7 +249,7 @@ impl Step {
     /// Where the step writes, if anywhere.
     pub fn destination(&self) -> Option<&Path> {
         match self {
-            Step::MakeDir { path, .. } => Some(path),
+            Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => Some(path),
             Step::CopyFile { dst, .. }
             | Step::CopySymlink { dst, .. }
             | Step::ExtractFile { dst, .. }
@@ -262,6 +273,7 @@ impl Step {
     pub fn describe(&self) -> String {
         match self {
             Step::MakeDir { path, .. } => format!("create folder {}", display::path(path)),
+            Step::MakeFile { path, .. } => format!("create file {}", display::path(path)),
             Step::FinishDir { path, .. } => format!("finish folder {}", display::path(path)),
             Step::CopyFile {
                 src,
@@ -321,6 +333,10 @@ impl Step {
             Step::MakeDir { path, .. } if result.created => {
                 Some(Step::RemoveDir { path: path.clone() })
             }
+            Step::MakeFile { path, .. } => Some(Step::RemoveFile {
+                path: path.clone(),
+                expect: result.after.clone(),
+            }),
             Step::MakeDir { .. } | Step::FinishDir { .. } => None,
             Step::CopyFile {
                 src,

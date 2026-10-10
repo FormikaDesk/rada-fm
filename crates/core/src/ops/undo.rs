@@ -48,7 +48,7 @@ impl Sim<'_> {
 
     fn apply(&mut self, step: &Step) {
         match step {
-            Step::MakeDir { path, .. } => {
+            Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => {
                 self.overlay.insert(path.clone(), true);
             }
             Step::RemoveFile { path, .. } | Step::RemoveDir { path } | Step::TrashItem { path } => {
@@ -112,7 +112,7 @@ impl Sim<'_> {
                 Ok(())
             }
             Step::RemoveDir { .. } | Step::FinishDir { .. } => Ok(()),
-            Step::MakeDir { path, .. } => {
+            Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => {
                 let parent_ok = path.parent().is_none_or(|p| self.exists(p));
                 if parent_ok {
                     Ok(())

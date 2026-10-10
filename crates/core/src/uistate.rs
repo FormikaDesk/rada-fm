@@ -1,19 +1,44 @@
 //! Small interface choices that survive a restart, kept in `ui.json` in the state folder
-//! (as opposed to `config.toml`, which only the user edits). Today: whether the sidebar
-//! is shown.
+//! (as opposed to `config.toml`, which only the user edits): whether the sidebar and the
+//! details pane are shown, the view mode, and the tabs that were open.
 //!
 //! Reading happens once at start; writing is handed to a short-lived thread so the
 //! interface never waits for the disk.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+use crate::pathcodec;
+
+/// One tab as it is remembered: where it was, and how it showed it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SavedTab {
+    #[serde(with = "pathcodec::path")]
+    pub path: PathBuf,
+    /// `details` or `icons`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view: Option<String>,
+    /// `name`, `size` or `date`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub reverse: bool,
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiState {
     /// `None` until the user has toggled it: the configuration's value then applies.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sidebar: Option<bool>,
+    /// The details pane (`Alt+P`); `None` until toggled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<bool>,
+    /// The tabs that were open when rada last ended, and which one was in front.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tabs: Vec<SavedTab>,
+    #[serde(default)]
+    pub active_tab: usize,
 }
 
 const FILE: &str = "ui.json";
@@ -67,6 +92,7 @@ mod tests {
             d.path(),
             &UiState {
                 sidebar: Some(false),
+                ..Default::default()
             },
         )
         .unwrap();
@@ -75,10 +101,46 @@ mod tests {
             d.path(),
             &UiState {
                 sidebar: Some(true),
+                ..Default::default()
             },
         )
         .unwrap();
         assert_eq!(load(d.path()).sidebar, Some(true));
+    }
+
+    #[test]
+    fn tabs_come_back_with_their_view_and_order() {
+        let d = tempfile::tempdir().unwrap();
+        let state = UiState {
+            details: Some(false),
+            tabs: vec![
+                SavedTab {
+                    path: PathBuf::from("/home/u/projects"),
+                    view: Some("icons".into()),
+                    sort: Some("date".into()),
+                    reverse: true,
+                },
+                SavedTab {
+                    path: PathBuf::from("/tmp"),
+                    view: None,
+                    sort: None,
+                    reverse: false,
+                },
+            ],
+            active_tab: 1,
+            ..Default::default()
+        };
+        save(d.path(), &state).unwrap();
+        assert_eq!(load(d.path()), state);
+    }
+
+    #[test]
+    fn a_file_from_an_older_version_still_loads() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::write(d.path().join("ui.json"), br#"{"sidebar": true}"#).unwrap();
+        let s = load(d.path());
+        assert_eq!(s.sidebar, Some(true));
+        assert!(s.tabs.is_empty());
     }
 
     #[test]

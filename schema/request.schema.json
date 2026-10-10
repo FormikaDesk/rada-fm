@@ -162,6 +162,28 @@
       ]
     },
     {
+      "description": "Create an empty file.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string",
+          "const": "make_file"
+        },
+        "parent": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "parent",
+        "name"
+      ]
+    },
+    {
       "description": "Move items to the trash (recoverable).",
       "type": "object",
       "properties": {

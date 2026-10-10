@@ -395,6 +395,11 @@
           ]
         },
         {
+          "description": "Create an empty file.",
+          "type": "string",
+          "const": "make_file"
+        },
+        {
           "description": "Take files out of an archive.",
           "type": "string",
           "const": "extract"
@@ -555,6 +560,28 @@
             "op": {
               "type": "string",
               "const": "make_dir"
+            },
+            "parent": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "parent",
+            "name"
+          ]
+        },
+        {
+          "description": "Create an empty file.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "op": {
+              "type": "string",
+              "const": "make_file"
             },
             "parent": {
               "type": "string"
@@ -808,6 +835,31 @@
             "step": {
               "type": "string",
               "const": "make_dir"
+            }
+          },
+          "required": [
+            "step",
+            "path"
+          ]
+        },
+        {
+          "description": "A new, empty file.",
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "path": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string",
+              "const": "make_file"
             }
           },
           "required": [

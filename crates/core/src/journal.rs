@@ -113,6 +113,7 @@ impl Intent {
             | Step::ExtractSymlink { dst, .. }
             | Step::Compress { dst, .. } => Intent::Create { dst: dst.clone() },
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
+            Step::MakeFile { path, .. } => Intent::Create { dst: path.clone() },
             Step::Rename { from, to } => Intent::Rename {
                 from: from.clone(),
                 to: to.clone(),
@@ -221,6 +222,29 @@ impl JournalEntry {
 
     pub fn can_retry_undo(&self) -> bool {
         self.reversible && matches!(self.undo_state, UndoState::Partial { .. })
+    }
+
+    /// The operation in a few words, as the Undo button says what it would undo:
+    /// "copy of 3 items", "new folder", "trash of 1 item".
+    pub fn describe(&self) -> String {
+        let n = self.totals.items.max(1);
+        let items = if n == 1 {
+            "1 item".to_string()
+        } else {
+            format!("{n} items")
+        };
+        match self.kind {
+            OpKind::Copy => format!("copy of {items}"),
+            OpKind::Move => format!("move of {items}"),
+            OpKind::Rename | OpKind::BulkRename => format!("rename of {items}"),
+            OpKind::MakeDir => "new folder".to_string(),
+            OpKind::MakeFile => "new file".to_string(),
+            OpKind::Trash => format!("trash of {items}"),
+            OpKind::Delete => format!("deletion of {items}"),
+            OpKind::Extract => format!("extraction of {items}"),
+            OpKind::Compress => format!("compression of {items}"),
+            OpKind::Undo => "undo".to_string(),
+        }
     }
 }
 

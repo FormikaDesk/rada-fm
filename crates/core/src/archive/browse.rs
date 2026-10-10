@@ -91,12 +91,8 @@ pub fn read_dir(
                 state: LinkState::ToFile,
             });
             let executable = c.kind == EntryKind::File && c.mode.is_some_and(|m| m & 0o111 != 0);
-            let type_label = crate::filetype::label(
-                &shown,
-                meta.kind,
-                c.kind == EntryKind::Dir,
-                executable,
-            );
+            let type_label =
+                crate::filetype::label(&shown, meta.kind, c.kind == EntryKind::Dir, executable);
             Entry {
                 sort_name: shown.to_lowercase(),
                 display: shown,
