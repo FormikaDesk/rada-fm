@@ -299,7 +299,46 @@ fn main() -> Result<()> {
         None => Arc::new(LocalFs),
     };
     let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits);
+    let layout = match cfg_file.layout.as_deref() {
+        None => rada_tui::LayoutKind::Explorer,
+        Some(n) => rada_tui::LayoutKind::parse(n)
+            .with_context(|| format!("unknown layout {n:?} (use explorer or compact)"))?,
+    };
+    let view = match cfg_file.view.as_deref() {
+        None => rada_tui::ViewMode::Details,
+        Some(n) => rada_tui::ViewMode::parse(n)
+            .with_context(|| format!("unknown view {n:?} (use details or icons)"))?,
+    };
+    let dates = match cfg_file.dates.as_deref() {
+        None => rada_tui::fmt::DateStyle::Relative,
+        Some(n) => rada_tui::fmt::DateStyle::parse(n)
+            .with_context(|| format!("unknown dates {n:?} (use relative or absolute)"))?,
+    };
+    let saved_ui = rada_core::uistate::load(&dirs.rada_state());
+    // Only folders that are still there come back.
+    let mut saved_ui = saved_ui;
+    if saved_ui.tabs.iter().any(|t| !t.path.is_dir()) {
+        let active_path = saved_ui
+            .tabs
+            .get(saved_ui.active_tab)
+            .map(|t| t.path.clone());
+        saved_ui.tabs.retain(|t| t.path.is_dir());
+        saved_ui.active_tab = active_path
+            .and_then(|p| saved_ui.tabs.iter().position(|t| t.path == p))
+            .unwrap_or(0);
+    }
     let cfg = Config {
+        start_explicit: !cli.path.is_empty(),
+        layout,
+        view,
+        dates,
+        date_format: rada_tui::fmt::DateFormat::from_env(),
+        remember_tabs: cfg_file.remember_tabs,
+        // What the user chose with Alt+P wins over the file's setting.
+        details_pane: saved_ui
+            .details
+            .or_else(|| (!cfg_file.show_details_pane).then_some(false)),
+        saved_ui: saved_ui.clone(),
         start_dir: start,
         icons,
         show_hidden: cli.hidden || cfg_file.show_hidden,
@@ -315,9 +354,7 @@ fn main() -> Result<()> {
         keymap,
         mouse,
         show_hints: cfg_file.hints,
-        sidebar: rada_core::uistate::load(&dirs.rada_state())
-            .sidebar
-            .unwrap_or(cfg_file.sidebar),
+        sidebar: saved_ui.sidebar.unwrap_or(cfg_file.sidebar),
         request,
         select,
         limits: rada_core::preview::Limits {

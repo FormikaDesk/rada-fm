@@ -107,6 +107,14 @@ pub struct Theme {
     pub mark: Color,
     /// The empty part of a size bar or progress bar.
     pub track: Color,
+    /// Background of the address and search fields.
+    pub field: Color,
+    /// Background of the command buttons.
+    pub button: Color,
+    /// A ticked checkbox.
+    pub check: Color,
+    /// The filled part of a disk bar.
+    pub disk: Color,
     pub success: Color,
     pub warn: Color,
     pub error: Color,
@@ -220,6 +228,10 @@ impl Theme {
             cursor: rgb(48, 72, 124),
             mark,
             track: rgb(36, 42, 62),
+            field: rgb(30, 32, 46),
+            button: rgb(36, 40, 59),
+            check: accent,
+            disk: accent,
             success: rgb(120, 220, 160),
             warn: rgb(240, 200, 110),
             error: rgb(255, 120, 135),
@@ -249,7 +261,12 @@ impl Theme {
 
     /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
     pub fn rada() -> Theme {
-        Theme::rada_base("rada", rgb(86, 156, 255), rgb(36, 52, 86), rgb(30, 40, 66))
+        let mut t = Theme::rada_base("rada", rgb(122, 162, 247), rgb(40, 52, 87), rgb(30, 36, 58));
+        t.cursor = rgb(51, 70, 124);
+        t.field = rgb(31, 34, 51);
+        t.button = rgb(41, 46, 66);
+        t.kinds.folder = rgb(122, 162, 247);
+        t
     }
 
     pub fn catppuccin() -> Theme {
@@ -347,6 +364,10 @@ impl Theme {
         t.muted = muted;
         t.on_accent = rgb(255, 255, 255);
         t.track = track;
+        t.field = mark;
+        t.button = selection;
+        t.check = accent;
+        t.disk = accent;
         t
     }
 
@@ -358,12 +379,14 @@ impl Theme {
             rgb(28, 34, 52),
             rgb(84, 94, 122),
             rgb(150, 158, 178),
-            rgb(35, 101, 225),
-            rgb(214, 228, 255),
-            rgb(186, 210, 252),
-            rgb(232, 240, 254),
+            rgb(37, 99, 201),
+            rgb(219, 232, 251),
+            rgb(196, 218, 248),
+            rgb(238, 243, 252),
             rgb(223, 228, 238),
         );
+        t.field = rgb(244, 246, 250);
+        t.button = rgb(235, 239, 246);
         t.success = rgb(26, 129, 77);
         t.warn = rgb(157, 102, 8);
         t.error = rgb(209, 48, 68);
@@ -381,7 +404,7 @@ impl Theme {
             config: rgb(100, 114, 146),
             binary: rgb(40, 129, 57),
             other: rgb(105, 111, 137),
-            folder: rgb(35, 101, 225),
+            folder: rgb(37, 99, 201),
             link: rgb(17, 125, 133),
         };
         t
@@ -473,6 +496,10 @@ impl Theme {
         self.cursor = Color::DarkGray;
         self.mark = Color::DarkGray;
         self.track = Color::DarkGray;
+        self.field = Color::DarkGray;
+        self.button = Color::DarkGray;
+        self.check = Color::Blue;
+        self.disk = Color::Blue;
         self.success = Color::Green;
         self.warn = Color::Yellow;
         self.error = Color::Red;
@@ -522,6 +549,10 @@ impl Theme {
                 t.cursor = f(t.cursor);
                 t.mark = f(t.mark);
                 t.track = f(t.track);
+                t.field = f(t.field);
+                t.button = f(t.button);
+                t.check = f(t.check);
+                t.disk = f(t.disk);
                 t.success = f(t.success);
                 t.warn = f(t.warn);
                 t.error = f(t.error);
@@ -609,7 +640,7 @@ impl Theme {
         if self.depth == ColorDepth::Ansi16 {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
-            Style::default().bg(self.mark)
+            Style::default().bg(self.selection)
         }
     }
 
@@ -676,6 +707,10 @@ impl Theme {
             self.cursor,
             self.mark,
             self.track,
+            self.field,
+            self.button,
+            self.check,
+            self.disk,
             self.success,
             self.warn,
             self.error,

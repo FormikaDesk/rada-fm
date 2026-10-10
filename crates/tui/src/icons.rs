@@ -267,3 +267,137 @@ pub fn icon(e: &Entry, set: IconSet, th: &Theme) -> (&'static str, Color) {
     };
     (glyph, color)
 }
+
+// ------------------------------------------------------------------------- interface icons
+
+/// The small pictures on buttons and bars (not the ones of files).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Glyph {
+    Back,
+    Forward,
+    Up,
+    Refresh,
+    Home,
+    Search,
+    New,
+    Cut,
+    Copy,
+    Paste,
+    Rename,
+    Compress,
+    Delete,
+    Undo,
+    Sort,
+    View,
+    More,
+    Pin,
+    Help,
+    Close,
+    Details,
+    Icons,
+    Eye,
+    Open,
+    Clipboard,
+    Checked,
+    Unchecked,
+    TabFolder,
+    Filter,
+}
+
+impl Glyph {
+    pub const ALL: [Glyph; 29] = [
+        Glyph::Back,
+        Glyph::Forward,
+        Glyph::Up,
+        Glyph::Refresh,
+        Glyph::Home,
+        Glyph::Search,
+        Glyph::New,
+        Glyph::Cut,
+        Glyph::Copy,
+        Glyph::Paste,
+        Glyph::Rename,
+        Glyph::Compress,
+        Glyph::Delete,
+        Glyph::Undo,
+        Glyph::Sort,
+        Glyph::View,
+        Glyph::More,
+        Glyph::Pin,
+        Glyph::Help,
+        Glyph::Close,
+        Glyph::Details,
+        Glyph::Icons,
+        Glyph::Eye,
+        Glyph::Open,
+        Glyph::Clipboard,
+        Glyph::Checked,
+        Glyph::Unchecked,
+        Glyph::TabFolder,
+        Glyph::Filter,
+    ];
+}
+
+/// The glyph for a button, in the icon set in use: a Nerd Font symbol, a plain Unicode mark
+/// that one cell holds in any font, or (without icons) a plain ASCII character where the
+/// interface cannot do without one and nothing otherwise.
+pub fn ui(set: IconSet, g: Glyph) -> &'static str {
+    let (nerd, uni, ascii) = match g {
+        Glyph::Back => ("\u{f060}", "←", "<"),
+        Glyph::Forward => ("\u{f061}", "→", ">"),
+        Glyph::Up => ("\u{f062}", "↑", "^"),
+        Glyph::Refresh => ("\u{f021}", "⟳", "@"),
+        Glyph::Home => ("\u{f015}", "⌂", ""),
+        Glyph::Search => ("\u{f002}", "⌕", ""),
+        Glyph::New => ("\u{f067}", "+", "+"),
+        Glyph::Cut => ("\u{f0c4}", "✂", ""),
+        Glyph::Copy => ("\u{f0c5}", "⧉", ""),
+        Glyph::Paste => ("\u{f0ea}", "⎘", ""),
+        Glyph::Rename => ("\u{f040}", "✎", ""),
+        Glyph::Compress => ("\u{f1c6}", "▣", ""),
+        Glyph::Delete => ("\u{f1f8}", "✗", ""),
+        Glyph::Undo => ("\u{f0e2}", "↶", ""),
+        Glyph::Sort => ("\u{f0dc}", "⇅", ""),
+        Glyph::View => ("\u{f00b}", "≣", ""),
+        Glyph::More => ("\u{f141}", "⋯", "…"),
+        Glyph::Pin => ("\u{f08d}", "⚲", ""),
+        Glyph::Help => ("\u{f128}", "?", "?"),
+        Glyph::Close => ("\u{f00d}", "✕", "x"),
+        Glyph::Details => ("\u{f03a}", "≣", "="),
+        Glyph::Icons => ("\u{f009}", "▦", "#"),
+        Glyph::Eye => ("\u{f06e}", "◉", "o"),
+        Glyph::Open => ("\u{f07c}", "▸", ">"),
+        Glyph::Clipboard => ("\u{f0ea}", "⎘", ""),
+        Glyph::Checked => ("\u{f046}", "☑", "x"),
+        Glyph::Unchecked => ("\u{f096}", "☐", "."),
+        Glyph::TabFolder => ("\u{f07b}", "▸", ""),
+        Glyph::Filter => ("\u{f0b0}", "▽", ""),
+    };
+    match set {
+        IconSet::Nerd => nerd,
+        IconSet::Unicode => uni,
+        IconSet::None => ascii,
+    }
+}
+
+#[cfg(test)]
+mod ui_glyph_tests {
+    use super::*;
+    use unicode_width::UnicodeWidthStr;
+
+    #[test]
+    fn every_interface_glyph_takes_one_cell_in_every_set() {
+        for g in Glyph::ALL {
+            for set in [IconSet::Nerd, IconSet::Unicode, IconSet::None] {
+                let s = ui(set, g);
+                assert!(
+                    s.width() <= 1,
+                    "{g:?} in {set:?} is {s:?}, {} cells wide",
+                    s.width()
+                );
+            }
+            // With a symbol font or Unicode there is always something to draw.
+            assert!(!ui(IconSet::Nerd, g).is_empty() && !ui(IconSet::Unicode, g).is_empty());
+        }
+    }
+}

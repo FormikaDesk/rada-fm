@@ -302,6 +302,28 @@ impl<'a> Bar<'a> {
         self.spans.iter().map(|s| s.content.width()).sum()
     }
 
+    /// Keep only what fits in `width` cells: whole spans, and the last one cut.
+    pub fn clip(&mut self, width: usize) {
+        let mut used = 0;
+        let mut keep = 0;
+        for (i, s) in self.spans.iter_mut().enumerate() {
+            let w = s.content.width();
+            if used + w <= width {
+                used += w;
+                keep = i + 1;
+                continue;
+            }
+            let room = width - used;
+            if room > 0 {
+                s.content = rada_core::display::truncate(&s.content, room).into();
+                keep = i + 1;
+            }
+            break;
+        }
+        self.spans.truncate(keep);
+        self.targets.retain(|(i, _)| *i < keep);
+    }
+
     pub fn append(&mut self, other: Bar<'a>) {
         let base = self.spans.len();
         self.targets

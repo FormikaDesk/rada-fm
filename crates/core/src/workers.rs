@@ -17,6 +17,33 @@ use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
 
 // ------------------------------------------------------------------------------ folders
 
+/// List the subfolders of `dir` on a thread of its own and send them as a
+/// [`CoreEvent::Complete`]. Meant for completing an address as it is typed.
+pub fn complete_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, out: Sender<CoreEvent>) {
+    let _ = std::thread::Builder::new()
+        .name("rada-complete".into())
+        .spawn(move || {
+            const LIMIT: usize = 5000;
+            let mut names: Vec<String> = fs
+                .read_dir(&dir)
+                .map(|items| {
+                    items
+                        .into_iter()
+                        .filter(|it| {
+                            it.meta.as_ref().is_ok_and(|m| m.is_dir())
+                                || (it.meta.as_ref().is_ok_and(|m| m.is_symlink())
+                                    && fs.stat(&it.path).is_ok_and(|m| m.is_dir()))
+                        })
+                        .take(LIMIT)
+                        .map(|it| crate::display::name(&it.name))
+                        .collect()
+                })
+                .unwrap_or_default();
+            names.sort_by_key(|n| n.to_lowercase());
+            let _ = out.send(CoreEvent::Complete { dir, names });
+        });
+}
+
 enum DirReq {
     Load {
         path: PathBuf,

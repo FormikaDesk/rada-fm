@@ -53,12 +53,8 @@ impl App {
         if !self.side_on {
             self.side_focus = false;
         }
-        rada_core::uistate::save_in_background(
-            self.svc.platform.dirs().rada_state(),
-            rada_core::uistate::UiState {
-                sidebar: Some(self.side_on),
-            },
-        );
+        self.saved_ui.sidebar = Some(self.side_on);
+        self.save_ui_state();
         if self.side_on && Mode::for_width(self.term_width, true) == Mode::Hidden {
             self.toast(
                 ToastKind::Info,

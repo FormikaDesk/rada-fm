@@ -27,6 +27,16 @@ pub struct Services {
     pub events: Receiver<CoreEvent>,
     pub home: PathBuf,
     pub journal_ok: bool,
+    /// Where background threads of the interface report back (see `CoreEvent::Note`).
+    pub notes: crossbeam_channel::Sender<CoreEvent>,
+    fs: Arc<dyn FsEngine>,
+}
+
+impl Services {
+    /// Ask for the subfolders of `dir`; the answer arrives as `CoreEvent::Complete`.
+    pub fn complete_dirs(&self, dir: PathBuf) {
+        rada_core::workers::complete_dirs(self.fs.clone(), dir, self.notes.clone());
+    }
 }
 
 impl Services {
@@ -54,7 +64,7 @@ impl Services {
         Services {
             jobs,
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
-            previewer: PreviewWorker::spawn(fs, tx.clone()),
+            previewer: PreviewWorker::spawn(fs.clone(), tx.clone()),
             watcher: DirWatcher::spawn(tx.clone()),
             places: PlacesStore::spawn(
                 platform.dirs().rada_state(),
@@ -65,11 +75,13 @@ impl Services {
                 ),
                 tx.clone(),
             ),
-            volumes: VolumesWorker::spawn(platform.clone(), Duration::from_secs(5), tx),
+            volumes: VolumesWorker::spawn(platform.clone(), Duration::from_secs(5), tx.clone()),
             home: platform.dirs().home.clone(),
             platform,
             events: rx,
             journal_ok,
+            notes: tx,
+            fs,
         }
     }
 }

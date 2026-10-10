@@ -25,7 +25,7 @@ use rada_core::ops::{ExtractInto, OpKind, OpRequest, Totals, WarningKind};
 use rada_core::platform::Volume;
 use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
-use crate::fmt;
+use crate::fmt::{self, DateFormat, DateStyle};
 use crate::hits::{Hits, Target};
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
@@ -34,6 +34,7 @@ use crate::nav::NavMove;
 use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 use crate::services::Services;
 use crate::theme::Theme;
+use crate::view::{LayoutKind, ViewMode};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToastKind {
@@ -49,7 +50,9 @@ pub struct Toast {
     until: Instant,
 }
 
+#[derive(Default)]
 pub enum LoadState {
+    #[default]
     Ready,
     /// Navigating: the old listing stays visible until the new one is in.
     Loading(PathBuf),
@@ -189,6 +192,12 @@ pub enum InputKind {
         dir: PathBuf,
         format: ArchiveKind,
     },
+    /// The program to open a file with.
+    OpenWith {
+        path: PathBuf,
+    },
+    /// The name of a new empty file.
+    NewFile,
 }
 
 pub struct InputView {
@@ -278,6 +287,9 @@ pub enum Modal {
     ConfirmQuit,
     Help,
     Menu(MenuView),
+    /// The preview of the item under the cursor, over the whole screen.
+    FullPreview,
+    Properties(PropsView),
 }
 
 pub struct Config {
@@ -307,6 +319,21 @@ pub struct Config {
     /// An operation handed in as data (`--request`): planned at start and shown in the
     /// usual confirmation window.
     pub request: Option<rada_core::ops::OpRequest>,
+    /// `explorer` (default) or `compact`.
+    pub layout: LayoutKind,
+    /// The details pane: `None` shows it when the terminal is wide enough.
+    pub details_pane: Option<bool>,
+    /// How folders are shown in a new tab.
+    pub view: ViewMode,
+    /// Remember the open tabs between sessions.
+    pub remember_tabs: bool,
+    /// What was remembered from the last session (tabs, panes); written back as it changes.
+    pub saved_ui: rada_core::uistate::UiState,
+    /// `start_dir` was asked for (a path on the command line): it opens in a tab of its own
+    /// beside the restored ones.
+    pub start_explicit: bool,
+    pub dates: DateStyle,
+    pub date_format: DateFormat,
 }
 
 /// A theme that follows the terminal's background: which one, and how to show it. Resolved
@@ -351,11 +378,19 @@ pub struct Demo {
     pub dest: Option<PathBuf>,
 }
 
+mod address;
 mod archives;
 mod input;
+mod menus;
+mod props;
 mod side;
+mod tabs;
 
+pub use address::AddressEdit;
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
+pub use menus::MenuKind;
+pub use props::PropsView;
+pub use tabs::TabState;
 
 pub struct App {
     pub th: Theme,
@@ -426,27 +461,93 @@ pub struct App {
     pub help_scroll: usize,
     /// Replaces the system clock when drawing relative dates (tests, screenshots).
     pub clock: Option<std::time::SystemTime>,
+
+    // ---- the explorer interface
+    /// How the folder of the front tab is shown.
+    pub view: ViewMode,
+    pub layout: LayoutKind,
+    /// The details pane: `None` follows the width of the terminal.
+    pub details: Option<bool>,
+    pub dates: DateStyle,
+    pub date_format: DateFormat,
+    pub remember_tabs: bool,
+    /// The tabs; the slot of the front one is empty, its state lives in the fields above.
+    tabs: Vec<TabState>,
+    pub active_tab: usize,
+    /// What the next undo would undo, in a few words (for the command bar).
+    pub undo_label: Option<String>,
+    /// The address bar while its text is being edited.
+    pub address: Option<AddressEdit>,
+    /// Tiles per row and rows on screen in the Icons view; set by the renderer.
+    pub grid_cols: usize,
+    pub grid_rows: usize,
+    /// Text for the system clipboard (the "copy path" command); the event loop takes it.
+    pub copied_text: Option<String>,
+    /// Date strings of the visible rows, worked out once and kept until the folder, the
+    /// clock's hour or the style changes.
+    date_cache: Vec<Option<String>>,
+    date_cache_key: (u64, usize),
+    /// What the last frame showed of the details pane.
+    pub details_shown: crate::ui::DetailsMode,
+    /// Where tabs are saved and the rest of what is remembered between sessions.
+    saved_ui: rada_core::uistate::UiState,
+    /// Layout the last frame used, for the keyboard and the tests.
+    pub screen: (u16, u16),
 }
 
 impl App {
     pub fn new(cfg: Config, svc: Services, image_ui: Option<ImageUi>) -> App {
         let decode_images = image_ui.is_some();
+        // Which folder is in front, and which others were open last time.
+        let mut saved: Vec<(PathBuf, ViewMode, SortSpec)> = Vec::new();
+        let mut active = 0;
+        if cfg.remember_tabs && !cfg.saved_ui.tabs.is_empty() {
+            for t in &cfg.saved_ui.tabs {
+                saved.push((
+                    t.path.clone(),
+                    t.view
+                        .as_deref()
+                        .and_then(ViewMode::parse)
+                        .unwrap_or(cfg.view),
+                    tabs::sort_from_saved(t, cfg.sort),
+                ));
+            }
+            active = cfg.saved_ui.active_tab.min(saved.len() - 1);
+            if cfg.start_explicit {
+                match saved.iter().position(|(p, _, _)| *p == cfg.start_dir) {
+                    Some(i) => active = i,
+                    None => {
+                        saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort));
+                        active = saved.len() - 1;
+                    }
+                }
+            }
+        } else {
+            saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort));
+        }
+        let (start_dir, view, sort) = saved[active].clone();
+        let mut tab_slots: Vec<TabState> = saved
+            .iter()
+            .map(|(p, v, s)| TabState::fresh(p.clone(), *v, *s))
+            .collect();
+        tab_slots[active] = TabState::default();
+
         let mut app = App {
             th: cfg.theme,
             icons: cfg.icons,
-            cwd: cfg.start_dir.clone(),
+            cwd: start_dir.clone(),
             archive: None,
-            listing: DirListing::new(cfg.start_dir.clone(), Vec::new(), cfg.sort),
-            load: LoadState::Loading(cfg.start_dir.clone()),
+            listing: DirListing::new(start_dir.clone(), Vec::new(), sort),
+            load: LoadState::Loading(start_dir.clone()),
             dir_gen: 0,
             visible: Vec::new(),
             cursor: 0,
             scroll: 0,
             marked: BTreeSet::new(),
             show_hidden: cfg.show_hidden,
-            sort: cfg.sort,
+            sort,
             remembered: HashMap::new(),
-            nav: crate::nav::NavHistory::new(cfg.start_dir.clone()),
+            nav: crate::nav::NavHistory::new(start_dir.clone()),
             nav_move: None,
             preview: PreviewState {
                 name: String::new(),
@@ -496,6 +597,24 @@ impl App {
             last_click: None,
             help_scroll: 0,
             clock: None,
+            view,
+            layout: cfg.layout,
+            details: cfg.details_pane,
+            dates: cfg.dates,
+            date_format: cfg.date_format,
+            remember_tabs: cfg.remember_tabs,
+            tabs: tab_slots,
+            active_tab: active,
+            undo_label: None,
+            address: None,
+            grid_cols: 4,
+            grid_rows: 3,
+            copied_text: None,
+            date_cache: Vec::new(),
+            date_cache_key: (0, 0),
+            details_shown: crate::ui::DetailsMode::Hidden,
+            saved_ui: cfg.saved_ui,
+            screen: (0, 0),
             svc,
         };
         for w in std::mem::take(&mut app.keymap.warnings) {
@@ -509,12 +628,13 @@ impl App {
             );
         }
         if let Some(name) = cfg.select {
-            app.remembered.insert(cfg.start_dir.clone(), name);
+            app.remembered.insert(start_dir.clone(), name);
         }
         app.svc.places.load();
-        app.svc.places.visit(cfg.start_dir.clone());
-        app.svc.watcher.watch(cfg.start_dir.clone());
-        app.request_dir(cfg.start_dir);
+        app.svc.places.visit(start_dir.clone());
+        app.svc.watcher.watch(start_dir.clone());
+        app.request_dir(start_dir);
+        app.svc.jobs.load_undo_label();
         if let Some(req) = cfg.request {
             let h = app.svc.jobs.plan_request(req);
             app.begin_plan("Planning", h);
@@ -573,6 +693,7 @@ impl App {
     }
 
     fn rebuild_visible(&mut self) {
+        self.date_cache.clear();
         let show = self.show_hidden;
         let terms: Vec<String> = self
             .filter
@@ -616,6 +737,22 @@ impl App {
     }
 
     fn ensure_visible(&mut self) {
+        if self.view == ViewMode::Icons {
+            // `scroll` is the first tile shown, always the start of a row.
+            let cols = self.grid_cols.max(1);
+            let rows = self.grid_rows.max(1);
+            let cursor_row = self.cursor / cols;
+            let mut first = self.scroll / cols;
+            if cursor_row < first {
+                first = cursor_row;
+            } else if cursor_row >= first + rows {
+                first = cursor_row + 1 - rows;
+            }
+            let last_row = self.visible.len().saturating_sub(1) / cols;
+            first = first.min(last_row.saturating_sub(rows - 1));
+            self.scroll = first * cols;
+            return;
+        }
         let rows = self.view_rows.max(1);
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
@@ -743,10 +880,15 @@ impl App {
         } else if e.error.is_none() {
             let path = e.path.clone();
             let platform = self.svc.platform.clone();
+            let notes = self.svc.notes.clone();
             // Spawning a process is I/O: keep it off the UI thread.
             std::thread::spawn(move || {
                 if let Err(err) = platform.opener().open(&path) {
                     tracing::warn!("open {}: {err}", path.display());
+                    let _ = notes.send(CoreEvent::Note {
+                        text: format!("cannot open {}: {err}", path.display()),
+                        error: true,
+                    });
                 }
             });
             self.toast(
@@ -779,6 +921,18 @@ impl App {
                 self.refresh_palette();
             }
             CoreEvent::Job(j) => self.on_job(j),
+            CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Note { text, error } => {
+                self.toast(
+                    if error {
+                        ToastKind::Error
+                    } else {
+                        ToastKind::Info
+                    },
+                    text,
+                    5,
+                );
+            }
         }
     }
 
@@ -1000,6 +1154,7 @@ impl App {
                     }
                 }
             }
+            JobEvent::UndoLabel { label, .. } => self.undo_label = label,
             JobEvent::NothingToUndo { job } => {
                 if self.plan_job == Some(job) {
                     self.modal = None;
@@ -1047,6 +1202,7 @@ impl App {
                     // Refresh even if live updates are unavailable.
                     self.dir_gen += 1;
                     self.svc.loader.load(self.cwd.clone(), self.dir_gen);
+                    self.svc.jobs.load_undo_label();
                 }
             }
             JobEvent::Recovered { items } => {
@@ -1449,6 +1605,30 @@ impl App {
                     conflict: ConflictPolicy::Skip,
                 });
                 self.begin_plan("Planning compression", h);
+            }
+            InputKind::NewFile => {
+                let h = self.svc.jobs.plan_mkfile(self.cwd.clone(), iv.text.clone());
+                self.begin_plan("Planning", h);
+            }
+            InputKind::OpenWith { path } => {
+                let program = iv.text.trim().to_string();
+                if program.is_empty() {
+                    self.modal = Some(Modal::Input(iv));
+                    return;
+                }
+                let (path, platform, notes) = (
+                    path.clone(),
+                    self.svc.platform.clone(),
+                    self.svc.notes.clone(),
+                );
+                std::thread::spawn(move || {
+                    if let Err(e) = platform.opener().open_with(&path, &program) {
+                        let _ = notes.send(CoreEvent::Note {
+                            text: e.to_string(),
+                            error: true,
+                        });
+                    }
+                });
             }
             InputKind::BulkRename { items } => match Pattern::parse(&iv.text) {
                 Ok(_) => {
@@ -2050,7 +2230,88 @@ impl App {
                 _ => self.modal = Some(Modal::Help),
             },
             Modal::Menu(m) => self.on_menu_key(m, key),
+            Modal::FullPreview => match key.code {
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.preview.scroll += 1;
+                    self.modal = Some(Modal::FullPreview);
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.preview.scroll = self.preview.scroll.saturating_sub(1);
+                    self.modal = Some(Modal::FullPreview);
+                }
+                KeyCode::PageDown => {
+                    self.preview.scroll += 20;
+                    self.modal = Some(Modal::FullPreview);
+                }
+                KeyCode::PageUp => {
+                    self.preview.scroll = self.preview.scroll.saturating_sub(20);
+                    self.modal = Some(Modal::FullPreview);
+                }
+                KeyCode::Char('H') => {
+                    self.dispatch(Action::ToggleHex);
+                    self.modal = Some(Modal::FullPreview);
+                }
+                // Closing is deliberate: Esc, q, Space or Enter.
+                KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
+                _ => self.modal = Some(Modal::FullPreview),
+            },
+            Modal::Properties(mut p) => match key.code {
+                KeyCode::Down | KeyCode::Char('j') => {
+                    p.scroll += 1;
+                    self.modal = Some(Modal::Properties(p));
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    p.scroll = p.scroll.saturating_sub(1);
+                    self.modal = Some(Modal::Properties(p));
+                }
+                KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
+                _ => self.modal = Some(Modal::Properties(p)),
+            },
         }
+    }
+
+    // ------------------------------------------------------------------ dates for the list
+
+    /// Work out the date text of these entries (indices into the listing), once; the list
+    /// reads them with [`date_text`](Self::date_text).
+    pub fn warm_dates(&mut self, indices: impl Iterator<Item = usize>) {
+        let hour = self
+            .now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() / 3600)
+            .unwrap_or(0);
+        let key = (hour, self.listing.all().len());
+        if self.date_cache_key != key || self.date_cache.len() != key.1 {
+            self.date_cache.clear();
+            self.date_cache.resize(key.1, None);
+            self.date_cache_key = key;
+        }
+        let now = self.now();
+        for i in indices {
+            if let Some(slot @ None) = self.date_cache.get_mut(i)
+                && let Some(e) = self.listing.all().get(i)
+            {
+                *slot = Some(fmt::explorer_date(
+                    e.mtime,
+                    now,
+                    self.dates,
+                    self.date_format,
+                ));
+            }
+        }
+    }
+
+    /// The date text of an entry that [`warm_dates`](Self::warm_dates) has seen.
+    pub fn date_text(&self, listing_index: usize) -> &str {
+        self.date_cache
+            .get(listing_index)
+            .and_then(|s| s.as_deref())
+            .unwrap_or("")
+    }
+
+    /// Take the text waiting for the system clipboard, if any.
+    pub fn take_copied_text(&mut self) -> Option<String> {
+        self.copied_text.take()
     }
 
     // ------------------------------------------------------------------ for the renderer

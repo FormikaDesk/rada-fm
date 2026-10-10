@@ -181,6 +181,8 @@ pub enum SortKey {
     Name,
     Size,
     Modified,
+    /// By the kind of file ("JPEG image"), then by name.
+    Type,
 }
 
 impl SortKey {
@@ -188,7 +190,8 @@ impl SortKey {
         match self {
             SortKey::Name => SortKey::Size,
             SortKey::Size => SortKey::Modified,
-            SortKey::Modified => SortKey::Name,
+            SortKey::Modified => SortKey::Type,
+            SortKey::Type => SortKey::Name,
         }
     }
 
@@ -197,6 +200,7 @@ impl SortKey {
             SortKey::Name => "name",
             SortKey::Size => "size",
             SortKey::Modified => "date",
+            SortKey::Type => "type",
         }
     }
 }
@@ -302,6 +306,10 @@ pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
             }
         }
         SortKey::Modified => a.mtime.cmp(&b.mtime),
+        SortKey::Type => a
+            .type_label
+            .to_lowercase()
+            .cmp(&b.type_label.to_lowercase()),
     };
     let primary = if spec.reverse {
         primary.reverse()

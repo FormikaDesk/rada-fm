@@ -8,15 +8,14 @@ use rada_core::platform::{PlaceKind, VolumeKind};
 use crate::app::App;
 use crate::icons::IconSet;
 
-/// Width of the full sidebar, and of the column of icons it shrinks to.
-pub const FULL_WIDTH: u16 = 26;
+/// Width of the full navigation pane, and of the column of icons it shrinks to.
+pub const FULL_WIDTH: u16 = 28;
 pub const RAIL_WIDTH: u16 = 5;
 
-/// Terminal widths from which the sidebar is shown in full / as icons. Below the second,
-/// it is not shown at all: it gives way before the preview does (the preview needs 88
-/// columns of its own).
-const FULL_FROM: u16 = 124;
-const RAIL_FROM: u16 = 100;
+/// Terminal widths from which the pane is shown in full / as icons. Below the second it is
+/// not shown at all.
+const FULL_FROM: u16 = 100;
+const RAIL_FROM: u16 = 60;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
@@ -51,17 +50,22 @@ impl Mode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Section {
-    Places,
-    Bookmarks,
+    /// Home, alone at the top.
+    Home,
+    /// The user's standard folders and the folders pinned by hand.
+    Pinned,
     Devices,
+    /// The trash, alone at the bottom.
+    Trash,
 }
 
 impl Section {
-    pub fn title(self) -> &'static str {
+    /// The heading over the section, if it has one.
+    pub fn title(self) -> Option<&'static str> {
         match self {
-            Section::Places => "PLACES",
-            Section::Bookmarks => "BOOKMARKS",
-            Section::Devices => "DEVICES",
+            Section::Home | Section::Trash => None,
+            Section::Pinned => Some("PINNED"),
+            Section::Devices => Some("DEVICES"),
         }
     }
 }
@@ -133,20 +137,46 @@ fn base_name(p: &Path) -> String {
         .unwrap_or_else(|| rada_core::display::path(p))
 }
 
-/// Everything the sidebar lists, in order. `places_only` is the narrow mode: bookmarks and
-/// disks are left out (they stay reachable with the jump palette).
+/// Everything the navigation pane lists, in order: Home, the pinned folders, the disks and
+/// the trash. `places_only` is the narrow mode: pinned-by-hand folders and disks are left
+/// out (they stay reachable with the jump palette).
 pub fn items(app: &App, places_only: bool) -> Vec<Item> {
     let mut out: Vec<Item> = Vec::new();
-    for p in &app.paths.places {
-        out.push(Item {
-            section: Section::Places,
-            origin: Origin::Place(p.kind),
-            name: p.name(),
-            path: p.path.clone(),
-            usage: None,
-        });
+    let place = |p: &rada_core::places::Place, section: Section| Item {
+        section,
+        origin: Origin::Place(p.kind),
+        name: p.name(),
+        path: p.path.clone(),
+        usage: None,
+    };
+    for p in app
+        .paths
+        .places
+        .iter()
+        .filter(|p| p.kind == PlaceKind::Home)
+    {
+        out.push(place(p, Section::Home));
     }
+    for p in app
+        .paths
+        .places
+        .iter()
+        .filter(|p| !matches!(p.kind, PlaceKind::Home | PlaceKind::Trash))
+    {
+        out.push(place(p, Section::Pinned));
+    }
+    let trash = |out: &mut Vec<Item>| {
+        for p in app
+            .paths
+            .places
+            .iter()
+            .filter(|p| p.kind == PlaceKind::Trash)
+        {
+            out.push(place(p, Section::Trash));
+        }
+    };
     if places_only {
+        trash(&mut out);
         return out;
     }
 
@@ -165,7 +195,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         // A bookmark in both places can be removed from the state, but would stay.
         let removable = removable && !app.config_bookmarks().contains(path);
         out.push(Item {
-            section: Section::Bookmarks,
+            section: Section::Pinned,
             origin: Origin::Bookmark { removable },
             name: base_name(path),
             path: path.clone(),
@@ -190,6 +220,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             usage,
         });
     }
+    trash(&mut out);
     out
 }
 
@@ -215,16 +246,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_sidebar_gives_way_before_the_preview_does() {
+    fn the_navigation_pane_shrinks_to_icons_and_then_goes() {
         assert_eq!(Mode::for_width(200, true), Mode::Full);
-        assert_eq!(Mode::for_width(124, true), Mode::Full);
-        assert_eq!(Mode::for_width(123, true), Mode::Rail);
-        assert_eq!(Mode::for_width(100, true), Mode::Rail);
-        assert_eq!(Mode::for_width(99, true), Mode::Hidden);
+        assert_eq!(Mode::for_width(100, true), Mode::Full);
+        assert_eq!(Mode::for_width(99, true), Mode::Rail);
+        assert_eq!(Mode::for_width(60, true), Mode::Rail);
+        assert_eq!(Mode::for_width(59, true), Mode::Hidden);
         assert_eq!(Mode::for_width(200, false), Mode::Hidden);
-        // Full or rail, the 88 columns the preview needs are still there (less the margins).
-        assert!(124 - Mode::Full.columns() - 6 >= 88);
-        assert!(100 - Mode::Rail.columns() - 6 >= 88);
+        // Whatever the pane takes, a usable list is left.
+        assert!(100 - Mode::Full.columns() >= 60);
+        assert!(60 - Mode::Rail.columns() >= 40);
     }
 
     #[test]

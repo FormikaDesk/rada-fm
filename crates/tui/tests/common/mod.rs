@@ -130,6 +130,14 @@ impl H {
             mouse: true,
             show_hints: true,
             sidebar: true,
+            layout: rada_tui::LayoutKind::Explorer,
+            details_pane: None,
+            view: rada_tui::ViewMode::Details,
+            remember_tabs: true,
+            saved_ui: Default::default(),
+            start_explicit: false,
+            dates: rada_tui::fmt::DateStyle::Relative,
+            date_format: rada_tui::fmt::DateFormat::DEFAULT,
         };
         let app = App::new(cfg, svc, images);
         let mut h = H {

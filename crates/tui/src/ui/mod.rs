@@ -1,16 +1,21 @@
 //! Drawing. A pure function of the application state: no I/O, no blocking.
 //!
-//! The look: a calm list with no boxes around it, a breadcrumb on top, one line of hints
-//! at the bottom, and temporary things (progress, notifications, windows) that appear only
-//! when there is something to say. Colours come from the theme, and the terminal's own
-//! background is left alone.
+//! The look is the one of a file manager people already know: a row of tabs, an address bar,
+//! a command bar, a navigation pane on the left, the folder in the middle, a details pane on
+//! the right, a status bar and a row of key hints. Each part gives way as the terminal
+//! narrows or shortens. Colours come from the theme, and the terminal's own background is
+//! left alone.
 
-mod footer;
-mod header;
+mod address;
+mod bottom;
+mod commands;
+mod details;
+mod grid;
 mod list;
 mod modals;
 mod preview;
 mod sidebar;
+mod tabs;
 pub mod widgets;
 
 use std::path::Path;
@@ -25,10 +30,49 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::*;
 use crate::fmt;
-use crate::hits::Target;
 use crate::sidebar::Mode;
-use crate::theme::Density;
+use crate::view::{LayoutKind, ViewMode};
 use widgets::{SPIN, dim_backdrop, pad, progress_spans};
+
+/// How the details pane is shown right now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DetailsMode {
+    Hidden,
+    /// A column on the right of the list.
+    Column,
+    /// Over the right part of the list.
+    Overlay,
+}
+
+/// Terminal width from which the details pane is a column of its own.
+const DETAILS_FROM: u16 = 140;
+/// Narrowest terminal that can show the details pane as an overlay.
+const OVERLAY_FROM: u16 = 60;
+
+/// Whether (and how) the details pane shows on a terminal `width` columns wide, given what
+/// the user chose: nothing (follow the width), on, or off.
+pub fn details_mode(width: u16, chosen: Option<bool>, layout: LayoutKind) -> DetailsMode {
+    match chosen {
+        Some(false) => DetailsMode::Hidden,
+        None if layout == LayoutKind::Compact => DetailsMode::Hidden,
+        None => {
+            if width >= DETAILS_FROM {
+                DetailsMode::Column
+            } else {
+                DetailsMode::Hidden
+            }
+        }
+        Some(true) => {
+            if width >= DETAILS_FROM {
+                DetailsMode::Column
+            } else if width >= OVERLAY_FROM {
+                DetailsMode::Overlay
+            } else {
+                DetailsMode::Hidden
+            }
+        }
+    }
+}
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
@@ -41,94 +85,114 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if let Some(bg) = th.bg {
         f.render_widget(Block::default().style(Style::default().bg(bg)), area);
     }
-    let margin = match th.density {
-        Density::Airy => 3,
-        Density::Balanced => 2,
-        Density::Dense => 1,
-    }
-    .min(area.width / 12);
+    app.term_width = area.width;
+    app.screen = (area.width, area.height);
+
+    // Top to bottom: tabs, address, commands, the body, the progress of a running operation,
+    // the status bar and the key hints. The hints go first when the terminal is short, the
+    // command bar next; the compact layout has neither, nor the address bar.
+    let explorer = app.layout == LayoutKind::Explorer;
+    let tabs_h = 1;
+    let address_h = u16::from(explorer);
+    let commands_h = u16::from(explorer && area.height >= 18);
+    let hints_h = u16::from(explorer && app.show_hints && area.height >= 24);
     let progress_h = if app.running.is_some() { 4 } else { 0 };
-    let [header, body, progress, footer] = Layout::vertical([
-        Constraint::Length(1),
+    let [
+        tabs_row,
+        address_row,
+        commands_row,
+        body,
+        progress,
+        status,
+        hints_row,
+    ] = Layout::vertical([
+        Constraint::Length(tabs_h),
+        Constraint::Length(address_h),
+        Constraint::Length(commands_h),
         Constraint::Min(3),
         Constraint::Length(progress_h),
         Constraint::Length(1),
+        Constraint::Length(hints_h),
     ])
     .areas(area);
-    let side = |r: Rect| Rect {
-        x: r.x + margin,
-        width: r.width.saturating_sub(margin * 2),
-        ..r
-    };
 
-    header::draw_header(f, app, header);
+    tabs::draw_tabs(f, app, tabs_row);
+    if address_h > 0 {
+        address::draw_address(f, app, address_row);
+    }
+    if commands_h > 0 {
+        commands::draw_commands(f, app, commands_row);
+    }
 
-    // The sidebar takes what it needs from the left; the preview comes before it when
-    // the terminal is too narrow for both.
-    app.term_width = area.width;
+    // Body: the navigation pane, the folder, and the details pane when there is room.
     app.side_mode = Mode::for_width(area.width, app.side_on);
     if app.side_mode == Mode::Hidden {
         app.side_focus = false;
     }
-    let body = if app.side_mode != Mode::Hidden {
+    let dmode = details_mode(area.width, app.details, app.layout);
+    app.details_shown = dmode;
+    let mut rest = body;
+    if app.side_mode != Mode::Hidden {
         let width = if app.side_mode == Mode::Full {
             crate::sidebar::FULL_WIDTH
         } else {
             crate::sidebar::RAIL_WIDTH
         };
-        let [side_area, divider, rest] = Layout::horizontal([
+        let [side_area, divider, others] = Layout::horizontal([
             Constraint::Length(width),
             Constraint::Length(1),
             Constraint::Min(1),
         ])
-        .areas(body);
+        .areas(rest);
         let mode = app.side_mode;
         sidebar::draw_sidebar(f, app, side_area, mode);
         let rule: Vec<Line> = (0..divider.height)
             .map(|_| Line::from(Span::styled("│", th.faint())))
             .collect();
         f.render_widget(Paragraph::new(rule), divider);
-        rest
-    } else {
-        body
-    };
-    let body = side(body);
-    // The preview needs room: it hides itself on narrow terminals.
-    if body.width >= 88 {
-        let pw = ((body.width as u32 * 36 / 100) as u16).max(30);
+        rest = others;
+    }
+    let main = if dmode == DetailsMode::Column {
+        let pw = (rest.width * 27 / 100).clamp(34, 50);
         let [left, divider, right] = Layout::horizontal([
             Constraint::Min(30),
             Constraint::Length(1),
             Constraint::Length(pw),
         ])
-        .areas(body);
-        list::draw_list(
-            f,
-            app,
-            Rect {
-                width: left.width.saturating_sub(1),
-                ..left
-            },
-        );
+        .areas(rest);
         let rule: Vec<Line> = (0..divider.height)
             .map(|_| Line::from(Span::styled("│", th.faint())))
             .collect();
         f.render_widget(Paragraph::new(rule), divider);
-        app.hits.add(right, Target::Preview);
-        preview::draw_preview(f, app, right);
+        details::draw_details(f, app, right);
+        left
     } else {
-        list::draw_list(f, app, body);
+        rest
+    };
+    match app.view {
+        ViewMode::Details => list::draw_list(f, app, main),
+        ViewMode::Icons => grid::draw_grid(f, app, main),
+    }
+    if dmode == DetailsMode::Overlay {
+        details::draw_overlay(f, app, main);
     }
     if app.running.is_some() {
-        draw_progress(f, app, side(progress));
+        draw_progress(f, app, progress);
     }
-    footer::draw_footer(f, app, footer);
-    draw_toast(f, app, area, footer);
+    bottom::draw_status(f, app, status);
+    if hints_h > 0 {
+        bottom::draw_hints(f, app, hints_row);
+    }
+    let toast_anchor = if hints_h > 0 { hints_row } else { status };
+    draw_toast(f, app, area, toast_anchor);
+    if app.address.is_some() && address_h > 0 {
+        address::draw_suggestions(f, app, address_row, area);
+    }
 
     if app.modal.is_some() {
         // Only the window is clickable while it is open.
         app.hits.clear();
-        if !matches!(app.modal, Some(Modal::Menu(_))) {
+        if !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview)) {
             dim_backdrop(f.buffer_mut(), area, th.light);
         }
         modals::draw_modal(f, app, area);

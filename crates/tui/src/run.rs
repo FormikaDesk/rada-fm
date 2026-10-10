@@ -162,6 +162,13 @@ fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result
             terminal.draw(|f| ui::draw(f, &mut app))?;
             app.dirty = false;
         }
+        // The "copy path" command: the terminal puts the text on the clipboard.
+        if let Some(text) = app.take_copied_text() {
+            use std::io::Write;
+            let out = terminal.backend_mut();
+            let _ = out.write_all(crate::clipboard::osc52(&text).as_bytes());
+            let _ = out.flush();
+        }
         if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
             app.shutdown();
         }

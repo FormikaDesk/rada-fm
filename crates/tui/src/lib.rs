@@ -4,6 +4,7 @@
 //! the keyboard and from the workers of `rada-core`.
 
 pub mod app;
+pub mod clipboard;
 pub mod fmt;
 pub mod fuzzy;
 pub mod hits;
@@ -18,9 +19,11 @@ pub mod sidebar;
 pub mod termtheme;
 pub mod theme;
 pub mod ui;
+pub mod view;
 
 pub use app::Config;
 pub use icons::IconSet;
 pub use images::{ImageMode, ImageUi};
 pub use services::Services;
 pub use theme::Theme;
+pub use view::{LayoutKind, ViewMode};

@@ -17,11 +17,17 @@ pub enum MenuCmd {
     Act(Action),
     /// Go to a folder (the hidden parts of a long path).
     Go(PathBuf),
-    /// Add a folder to the bookmarks or take it out.
+    /// Pin a folder to the navigation pane or take it out.
     Bookmark {
         path: PathBuf,
         add: bool,
     },
+    /// Open another menu in its place.
+    Sub(MenuKind),
+    SortBy(SortKey),
+    /// `true`: descending.
+    SortOrder(bool),
+    View(ViewMode),
 }
 
 pub struct MenuItem {
@@ -30,6 +36,8 @@ pub struct MenuItem {
     pub enabled: bool,
     /// Draw a separator above this entry.
     pub gap_before: bool,
+    /// A choice or a switch: whether it is on (drawn with a mark).
+    pub checked: Option<bool>,
 }
 
 impl MenuItem {
@@ -39,6 +47,7 @@ impl MenuItem {
             label: action.label().to_string(),
             enabled,
             gap_before,
+            checked: None,
         }
     }
 
@@ -48,6 +57,7 @@ impl MenuItem {
             label,
             enabled: true,
             gap_before: false,
+            checked: None,
         }
     }
 
@@ -55,12 +65,46 @@ impl MenuItem {
         MenuItem {
             cmd: MenuCmd::Bookmark { path, add },
             label: if add {
-                "Add to bookmarks".into()
+                "Pin to navigation".into()
             } else {
-                "Remove from bookmarks".into()
+                "Unpin from navigation".into()
             },
             enabled: true,
             gap_before,
+            checked: None,
+        }
+    }
+
+    /// One of several exclusive choices.
+    pub fn choice(cmd: MenuCmd, label: &str, on: bool, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd,
+            label: label.to_string(),
+            enabled: true,
+            gap_before,
+            checked: Some(on),
+        }
+    }
+
+    /// An action that is a switch, shown with its state.
+    pub fn toggle(action: Action, label: &str, on: bool, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd: MenuCmd::Act(action),
+            label: label.to_string(),
+            enabled: true,
+            gap_before,
+            checked: Some(on),
+        }
+    }
+
+    /// An entry that opens another menu.
+    pub fn sub(kind: MenuKind, label: &str, enabled: bool, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd: MenuCmd::Sub(kind),
+            label: label.to_string(),
+            enabled,
+            gap_before,
+            checked: None,
         }
     }
 }
@@ -87,12 +131,40 @@ impl App {
             self.on_modal_key(key);
             return;
         }
+        if self.address.is_some() {
+            self.on_address_key(key);
+            return;
+        }
         if self.filter.as_ref().is_some_and(|f| f.editing) {
             self.on_filter_key(key);
             return;
         }
+        // Alt+1 … Alt+9 jump to a tab.
+        if key.modifiers.contains(KeyModifiers::ALT)
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
+            && let KeyCode::Char(c @ '1'..='9') = key.code
+        {
+            self.go_tab(c as usize - '0' as usize);
+            return;
+        }
         if let Some(action) = self.keymap.action_for(&key) {
             if self.side_focus && self.on_side_action(action) {
+                self.dirty = true;
+                return;
+            }
+            // In the Icons view the arrows and h j k l move across the grid.
+            if self.view == ViewMode::Icons
+                && !self.side_focus
+                && key.modifiers.is_empty()
+                && let Some(step) = match (action, key.code) {
+                    (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(-1isize),
+                    (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(1),
+                    _ => None,
+                }
+            {
+                self.sel_anchor = None;
+                let to = (self.cursor as isize + step).max(0) as usize;
+                self.set_cursor(to);
                 self.dirty = true;
                 return;
             }
@@ -121,9 +193,19 @@ impl App {
         ) {
             self.sel_anchor = None;
         }
+        // In the Icons view, up and down are a whole row, and a page is the tiles on screen.
+        let (line, page, half) = if self.view == ViewMode::Icons {
+            let cols = self.grid_cols.max(1);
+            let screenful = (self.grid_rows.max(1) * cols)
+                .saturating_sub(cols)
+                .max(cols);
+            (cols, screenful, screenful / 2)
+        } else {
+            (1, page, page / 2)
+        };
         match action {
-            Up => self.set_cursor(self.cursor.saturating_sub(1)),
-            Down => self.set_cursor(self.cursor + 1),
+            Up => self.set_cursor(self.cursor.saturating_sub(line)),
+            Down => self.set_cursor(self.cursor + line),
             Parent => self.go_parent(),
             Back => self.go_history(true),
             Forward => self.go_history(false),
@@ -132,8 +214,8 @@ impl App {
             Last => self.set_cursor(usize::MAX),
             PageUp => self.set_cursor(self.cursor.saturating_sub(page)),
             PageDown => self.set_cursor(self.cursor + page),
-            HalfPageUp => self.set_cursor(self.cursor.saturating_sub(page / 2)),
-            HalfPageDown => self.set_cursor(self.cursor + page / 2),
+            HalfPageUp => self.set_cursor(self.cursor.saturating_sub(half)),
+            HalfPageDown => self.set_cursor(self.cursor + half),
             GoHome => {
                 let home = self.svc.home.clone();
                 self.open_dir(home);
@@ -141,8 +223,8 @@ impl App {
 
             ToggleMark => self.toggle_mark(),
             SelectAll => self.mark_all(),
-            SelectUp => self.extend_selection(self.cursor.saturating_sub(1)),
-            SelectDown => self.extend_selection(self.cursor + 1),
+            SelectUp => self.extend_selection(self.cursor.saturating_sub(line)),
+            SelectDown => self.extend_selection(self.cursor + line),
             SelectToFirst => self.extend_selection(0),
             SelectToLast => self.extend_selection(usize::MAX),
             ClearSelection => {
@@ -226,12 +308,153 @@ impl App {
             SwitchPane => self.switch_pane(),
             ToggleSidebar => self.toggle_sidebar(),
 
+            NewFile => {
+                if !self.refuse_if_busy() && !self.refuse_in_archive("create a file") {
+                    self.modal = Some(Modal::Input(InputView::new(
+                        InputKind::NewFile,
+                        String::new(),
+                    )))
+                }
+            }
+            Refresh => self.refresh(),
+            FocusAddress => self.start_address_edit(),
+            ToggleDetails => self.toggle_details(),
+            ViewDetails => self.set_view(ViewMode::Details),
+            ViewIcons => self.set_view(ViewMode::Icons),
+            ToggleView => self.set_view(self.view.other()),
+            Properties => self.open_properties(),
+            OpenWith => self.start_open_with(),
+            CopyPath => self.copy_path(),
+            OpenTerminal => self.open_terminal_here(),
+            ContextMenu => self.open_context_menu_at_cursor(),
+            NewTab => self.new_tab(),
+            CloseTab => self.close_tab(self.active_tab),
+            NextTab => self.next_tab(),
+            PrevTab => self.prev_tab(),
+
             Help => {
                 self.help_scroll = 0;
                 self.modal = Some(Modal::Help);
             }
             Quit => self.quit(),
         }
+    }
+
+    // ------------------------------------------------------------------ the explorer's own actions
+
+    /// Read the folder again.
+    pub fn refresh(&mut self) {
+        self.dir_gen += 1;
+        self.load = LoadState::Loading(self.cwd.clone());
+        self.svc.loader.load(self.cwd.clone(), self.dir_gen);
+        self.dirty = true;
+    }
+
+    pub fn set_view(&mut self, mode: ViewMode) {
+        if self.view == mode {
+            return;
+        }
+        self.view = mode;
+        self.ensure_visible();
+        self.save_ui_state();
+        self.dirty = true;
+    }
+
+    /// Whether the last frame showed the details pane.
+    pub fn details_visible(&self) -> bool {
+        self.details_shown != crate::ui::DetailsMode::Hidden
+    }
+
+    pub fn toggle_details(&mut self) {
+        let want = !self.details_visible();
+        self.details = Some(want);
+        self.saved_ui.details = Some(want);
+        self.save_ui_state();
+        if want && self.term_width < 60 {
+            self.toast(
+                ToastKind::Info,
+                "details pane on — this terminal is too narrow to show it",
+                3,
+            );
+        }
+    }
+
+    /// The renderer tells how many tiles fit across and down in the Icons view.
+    pub fn set_grid(&mut self, cols: usize, rows: usize) {
+        self.grid_cols = cols;
+        self.grid_rows = rows;
+        if self.view == ViewMode::Icons {
+            self.ensure_visible();
+        }
+    }
+
+    fn start_open_with(&mut self) {
+        let Some((path, is_dir)) = self.current().map(|e| (e.path.clone(), e.is_dir())) else {
+            return;
+        };
+        if is_dir {
+            self.toast(ToastKind::Info, "Open with… is for files", 3);
+            return;
+        }
+        if self.refuse_in_archive("open with a program") {
+            return;
+        }
+        self.modal = Some(Modal::Input(InputView::new(
+            InputKind::OpenWith { path },
+            String::new(),
+        )));
+    }
+
+    /// Put the path of the selection (or of the item under the cursor) on the system clipboard.
+    fn copy_path(&mut self) {
+        let paths = self.targets();
+        if paths.is_empty() {
+            return;
+        }
+        let text = paths
+            .iter()
+            .map(|p| rada_core::display::path(p))
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.copied_text = Some(text);
+        self.toast(
+            ToastKind::Ok,
+            if paths.len() == 1 {
+                "path copied"
+            } else {
+                "paths copied"
+            },
+            2,
+        );
+    }
+
+    fn open_terminal_here(&mut self) {
+        let dir = match &self.archive {
+            Some(a) => a.archive.parent().map(Path::to_path_buf),
+            None => Some(self.cwd.clone()),
+        };
+        let Some(dir) = dir else { return };
+        let platform = self.svc.platform.clone();
+        let notes = self.svc.notes.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = platform.opener().open_terminal(&dir) {
+                let _ = notes.send(CoreEvent::Note {
+                    text: e.to_string(),
+                    error: true,
+                });
+            }
+        });
+    }
+
+    /// Shift+F10 or the Menu key: the context menu, at the item under the cursor.
+    fn open_context_menu_at_cursor(&mut self) {
+        let at = self
+            .hits
+            .find(&Target::Row(self.cursor))
+            .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
+            .unwrap_or((8, 6));
+        let on_item = self.current().is_some();
+        self.modal = Some(Modal::Menu(self.context_menu(on_item, at)));
     }
 
     /// An outside request to stop (SIGTERM, closing the terminal): cancel and leave.
@@ -359,7 +582,9 @@ impl App {
             m.kind,
             MouseEventKind::ScrollUp
                 | MouseEventKind::ScrollDown
-                | MouseEventKind::Down(MouseButton::Left | MouseButton::Right)
+                | MouseEventKind::Down(
+                    MouseButton::Left | MouseButton::Right | MouseButton::Middle
+                )
         ) {
             return;
         }
@@ -372,6 +597,13 @@ impl App {
                 self.click(target, m.modifiers, (m.column, m.row))
             }
             MouseEventKind::Down(MouseButton::Right) => self.right_click(target, m.column, m.row),
+            MouseEventKind::Down(MouseButton::Middle) => {
+                if self.modal.is_none()
+                    && let Some(Target::Tab(i) | Target::TabClose(i)) = target
+                {
+                    self.close_tab(i);
+                }
+            }
             _ => {}
         }
     }
@@ -421,10 +653,16 @@ impl App {
             return;
         }
         self.sel_anchor = None;
-        let to = if down {
-            self.cursor + WHEEL_STEP
+        // A turn of the wheel is three rows of the list, or one row of tiles.
+        let step = if self.view == ViewMode::Icons {
+            self.grid_cols.max(1)
         } else {
-            self.cursor.saturating_sub(WHEEL_STEP)
+            WHEEL_STEP
+        };
+        let to = if down {
+            self.cursor + step
+        } else {
+            self.cursor.saturating_sub(step)
         };
         self.set_cursor(to);
     }
@@ -432,6 +670,14 @@ impl App {
     fn click(&mut self, target: Option<Target>, mods: KeyModifiers, at: (u16, u16)) {
         if self.modal.is_some() {
             return self.click_in_modal(target);
+        }
+        // A click anywhere but on the address field or its suggestions ends the editing.
+        if self.address.is_some() {
+            match &target {
+                Some(Target::Suggest(i)) => return self.pick_suggestion(*i),
+                Some(Target::Address) => return,
+                _ => self.cancel_address_edit(),
+            }
         }
         match target {
             Some(Target::Row(i)) => {
@@ -443,6 +689,38 @@ impl App {
                 self.open_dir(path)
             }
             Some(Target::Crumb(path)) => self.open_dir(path),
+            Some(Target::Check(i)) => {
+                if i < self.visible.len() {
+                    self.side_focus = false;
+                    self.set_cursor(i);
+                    if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
+                        && !self.marked.remove(&name)
+                    {
+                        self.marked.insert(name);
+                    }
+                    self.sel_anchor = Some((i, self.marked.clone()));
+                }
+            }
+            Some(Target::Tab(i)) => self.switch_tab(i),
+            Some(Target::TabClose(i)) => self.close_tab(i),
+            Some(Target::TabNew) => self.new_tab(),
+            Some(Target::TabPrev) => self.prev_tab(),
+            Some(Target::TabNext) => self.next_tab(),
+            Some(Target::Address) => self.start_address_edit(),
+            Some(Target::Menu(kind)) => {
+                let at = self
+                    .hits
+                    .find(&Target::Menu(kind))
+                    .map(|r| (r.x, r.y + 1))
+                    .unwrap_or((at.0, at.1 + 1));
+                self.open_menu(kind, at);
+            }
+            Some(Target::ViewMode(mode)) => self.set_view(mode),
+            Some(Target::FullPreview) => {
+                if self.current().is_some() {
+                    self.modal = Some(Modal::FullPreview);
+                }
+            }
             Some(Target::CrumbMore(hidden)) => {
                 // The folders folded into the "…", to pick one.
                 let items = hidden
@@ -510,11 +788,18 @@ impl App {
     fn click_in_modal(&mut self, target: Option<Target>) {
         match (&mut self.modal, target) {
             (Some(Modal::Help), _) => self.modal = None,
+            (Some(Modal::Properties(_)), Some(Target::Key(_))) => self.modal = None,
+            (Some(Modal::Properties(_)), None) => self.modal = None,
+            (Some(Modal::FullPreview), _) => self.modal = None,
             (Some(Modal::Menu(m)), Some(Target::MenuItem(i))) => {
+                let at = (
+                    m.at.0.saturating_add(2),
+                    m.at.1.saturating_add(1 + i as u16),
+                );
                 let item = m.items.get(i).map(|it| (it.cmd.clone(), it.enabled));
                 self.modal = None;
                 if let Some((cmd, true)) = item {
-                    self.run_menu(cmd);
+                    self.run_menu(cmd, at);
                 }
             }
             (Some(Modal::Menu(_)), _) => self.modal = None,
@@ -556,7 +841,7 @@ impl App {
             return;
         }
         let on_item = match target {
-            Some(Target::Row(i)) if i < self.visible.len() => {
+            Some(Target::Row(i) | Target::Check(i)) if i < self.visible.len() => {
                 let already = self
                     .entry_at(i)
                     .is_some_and(|e| self.marked.contains(&e.name));
@@ -570,63 +855,6 @@ impl App {
             _ => return,
         };
         self.modal = Some(Modal::Menu(self.context_menu(on_item, (x, y))));
-    }
-
-    pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
-        use Action::*;
-        let has_clip = self.clipboard.is_some();
-        let mut items: Vec<MenuItem> = Vec::new();
-        let mut add = |action: Action, enabled: bool, gap_before: bool| {
-            items.push(MenuItem::act(action, enabled, gap_before))
-        };
-        let ro = self.archive.is_some();
-        let on_archive = self.on_archive_item();
-        if on_item {
-            add(Open, true, false);
-            if on_archive {
-                add(ExtractHere, true, true);
-                add(ExtractToFolder, true, false);
-            }
-            add(Copy, true, !on_archive);
-            add(Cut, !ro, false);
-            add(Paste, has_clip && !ro, false);
-            add(Rename, !ro, true);
-            add(Trash, !ro, false);
-            add(DeletePermanently, !ro, false);
-            if ro {
-                add(ExtractHere, true, true);
-                add(ExtractToFolder, true, false);
-            } else {
-                add(Compress, true, true);
-            }
-            add(NewFolder, !ro, !ro && false);
-            add(SelectAll, true, false);
-        } else {
-            add(Paste, has_clip && !ro, false);
-            add(NewFolder, !ro, false);
-            if ro {
-                add(ExtractHere, true, true);
-                add(ExtractToFolder, true, false);
-            }
-            add(SelectAll, true, false);
-        }
-        add(Undo, true, true);
-        add(Redo, true, false);
-        add(Help, true, true);
-        MenuView {
-            at,
-            items,
-            selected: 0,
-        }
-    }
-
-    /// Do what a chosen menu entry says. The menu is already closed.
-    pub(super) fn run_menu(&mut self, cmd: MenuCmd) {
-        match cmd {
-            MenuCmd::Act(action) => self.dispatch(action),
-            MenuCmd::Go(path) => self.open_dir(path),
-            MenuCmd::Bookmark { path, add } => self.set_bookmark(path, add),
-        }
     }
 
     pub(super) fn on_menu_key(&mut self, mut m: MenuView, key: KeyEvent) {
@@ -645,7 +873,11 @@ impl App {
                 if let Some(it) = m.items.get(m.selected) {
                     if it.enabled {
                         let cmd = it.cmd.clone();
-                        self.run_menu(cmd);
+                        let at = (
+                            m.at.0.saturating_add(2),
+                            m.at.1.saturating_add(1 + m.selected as u16),
+                        );
+                        self.run_menu(cmd, at);
                     } else {
                         self.modal = Some(Modal::Menu(m));
                     }
@@ -676,6 +908,7 @@ impl App {
                 format!("Renamed {}", fmt::count(t.items.max(1), "item", "items"))
             }
             OpKind::MakeDir => "Folder created".to_string(),
+            OpKind::MakeFile => "File created".to_string(),
             OpKind::Trash => format!("Moved {} to the trash", what(false)),
             OpKind::Delete => format!("Deleted {} permanently", what(false)),
             OpKind::Undo => "Undone".to_string(),

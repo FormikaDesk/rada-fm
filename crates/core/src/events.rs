@@ -126,4 +126,15 @@ pub enum CoreEvent {
     /// Recent folders, bookmarks and standard places (from the places worker).
     Paths(crate::places::PathLists),
     Job(JobEvent),
+    /// The subfolders of a folder, for completing an address being typed.
+    Complete {
+        dir: PathBuf,
+        /// Names of the subfolders, sorted; empty when the folder cannot be read.
+        names: Vec<String>,
+    },
+    /// Something a background thread wants the user to know (a program that would not start).
+    Note {
+        text: String,
+        error: bool,
+    },
 }

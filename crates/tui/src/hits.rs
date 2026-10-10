@@ -39,6 +39,24 @@ pub enum Target {
     MenuItem(usize),
     /// A row of the history window.
     HistoryRow(usize),
+    /// The checkbox of a row (index into the visible entries).
+    Check(usize),
+    /// A tab, its close mark, the new-tab button and the arrows of the compact tab bar.
+    Tab(usize),
+    TabClose(usize),
+    TabNew,
+    TabPrev,
+    TabNext,
+    /// The address bar outside its segments: a click turns it into a text field.
+    Address,
+    /// A suggestion under the address field.
+    Suggest(usize),
+    /// A dropdown button of the command bar.
+    Menu(crate::app::MenuKind),
+    /// The Details / Icons buttons of the status bar.
+    ViewMode(crate::view::ViewMode),
+    /// The button of the details pane that shows the preview over the whole screen.
+    FullPreview,
     /// Inside a window but on nothing in particular.
     Window,
 }

@@ -16,7 +16,8 @@ use crate::fmt;
 use crate::icons;
 use crate::theme::{Density, Theme};
 
-pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
+/// The preview over the whole screen: the name, a line of facts, then the content.
+pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let pad = match th.density {
         Density::Airy => 3,
@@ -25,7 +26,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let inner = Rect {
         x: area.x + pad,
-        width: area.width.saturating_sub(pad + 1),
+        width: area.width.saturating_sub(pad * 2),
         ..area
     };
     if inner.width < 8 || inner.height < 4 {
@@ -51,18 +52,10 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
 
     let modified = app.current().and_then(|e| e.mtime);
     let ago = fmt::relative(modified, app.now());
-    // One or two lines of facts under the name (wrapped, never cut); then the content.
     let summary = summary_of(&app.preview.content, app.preview.hex, &ago);
     let mut sum_lines = fmt::wrap(&summary, w);
     sum_lines.truncate(2);
     let facts_rows = sum_lines.len().max(1) as u16;
-    let body = Rect {
-        y: inner.y + 1 + facts_rows + 1,
-        height: inner.height.saturating_sub(facts_rows + 2),
-        ..inner
-    };
-    let h = body.height as usize;
-
     if app.preview.image.is_some() {
         f.render_widget(
             Paragraph::new(Span::styled(ago, th.dim())),
@@ -72,16 +65,49 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 ..inner
             },
         );
-        // The picture sits right under the name and date, flush to the top.
         let top = Rect {
             y: inner.y + 2,
             height: inner.height.saturating_sub(2),
             ..inner
         };
-        draw_image_pane(f, app, top);
+        draw_image_pane(f, app, top, true);
         return;
     }
+    if !summary.is_empty() {
+        let rows: Vec<Line> = sum_lines
+            .iter()
+            .map(|l| Line::from(Span::styled(l.clone(), th.dim())))
+            .collect();
+        f.render_widget(
+            Paragraph::new(rows),
+            Rect {
+                y: inner.y + 1,
+                height: facts_rows,
+                ..inner
+            },
+        );
+    }
+    let body = Rect {
+        y: inner.y + 1 + facts_rows + 1,
+        height: inner.height.saturating_sub(facts_rows + 2),
+        ..inner
+    };
+    content(f, app, body, true);
+}
 
+/// What the file holds: text, a folder's items, a picture, an archive's summary. `full` is
+/// the whole-screen preview, which also carries the facts the details pane lists itself.
+pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
+    let th = app.th.clone();
+    let w = body.width as usize;
+    let h = body.height as usize;
+    if w < 4 || h == 0 {
+        return;
+    }
+    if app.preview.image.is_some() {
+        draw_image_pane(f, app, body, full);
+        return;
+    }
     let content = app.preview.content.clone();
     let mut lines: Vec<Line> = Vec::new();
     match &content {
@@ -144,26 +170,28 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 }
                 lines.push(Line::raw(""));
             }
-            kv(
-                &mut lines,
-                "Size",
-                &format!("{} · {} bytes", fmt::size(c.size), fmt::thousands(c.size)),
-                th.base(),
-            );
-            kv(&mut lines, "Modified", &fmt::date(c.modified), th.base());
-            if c.created.is_some() {
-                kv(&mut lines, "Created", &fmt::date(c.created), th.base());
-            }
-            kv(&mut lines, "Accessed", &fmt::date(c.accessed), th.base());
-            if let Some(m) = c.mode {
+            if full {
                 kv(
                     &mut lines,
-                    "Permissions",
-                    &format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
+                    "Size",
+                    &format!("{} · {} bytes", fmt::size(c.size), fmt::thousands(c.size)),
                     th.base(),
                 );
+                kv(&mut lines, "Modified", &fmt::date(c.modified), th.base());
+                if c.created.is_some() {
+                    kv(&mut lines, "Created", &fmt::date(c.created), th.base());
+                }
+                kv(&mut lines, "Accessed", &fmt::date(c.accessed), th.base());
+                if let Some(m) = c.mode {
+                    kv(
+                        &mut lines,
+                        "Permissions",
+                        &format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
+                        th.base(),
+                    );
+                }
+                lines.push(Line::raw(""));
             }
-            lines.push(Line::raw(""));
             lines.push(Line::from(vec![
                 Span::styled("H", th.key()),
                 Span::styled("  show the hex dump", th.dim()),
@@ -306,20 +334,6 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
     }
-    if !summary.is_empty() {
-        let rows: Vec<Line> = sum_lines
-            .iter()
-            .map(|l| Line::from(Span::styled(l.clone(), th.dim())))
-            .collect();
-        f.render_widget(
-            Paragraph::new(rows),
-            Rect {
-                y: inner.y + 1,
-                height: facts_rows,
-                ..inner
-            },
-        );
-    }
     f.render_widget(Paragraph::new(lines), body);
 }
 
@@ -396,7 +410,7 @@ fn archive_counts(files: u64, dirs: u64, links: u64) -> String {
     parts.join(", ")
 }
 
-fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
+fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) {
     use ratatui_image::{Resize, StatefulImage};
     let th = app.th.clone();
     let Some(view) = &app.preview.image else {
@@ -449,11 +463,16 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
     }
     facts.push(format!("modified {}", fmt::date(info.modified)));
     // Wrapped, never cut: on a narrow pane "70.7 KB" must not become "70.…".
-    let mut fact_lines: Vec<Line> = facts
-        .iter()
-        .flat_map(|l| fmt::wrap(l, w))
-        .map(|l| Line::from(Span::styled(l, th.base())))
-        .collect();
+    // In the details pane the facts are the properties listed below the picture.
+    let mut fact_lines: Vec<Line> = if with_facts {
+        facts
+            .iter()
+            .flat_map(|l| fmt::wrap(l, w))
+            .map(|l| Line::from(Span::styled(l, th.base())))
+            .collect()
+    } else {
+        Vec::new()
+    };
     if let Some(n) = &note {
         for l in fmt::wrap(n, w) {
             fact_lines.push(Line::from(Span::styled(l, th.fg(th.warn))));

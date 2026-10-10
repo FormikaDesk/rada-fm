@@ -17,8 +17,13 @@
 //! pdf_timeout_seconds = 8    # a PDF that takes longer to draw is given up on
 //! mouse = true                # false: no mouse capture at all
 //! keymap = "vim+classic"      # vim+classic (default) | vim | classic
-//! hints = true               # false: no key hints in the bottom bar
-//! sidebar = true             # shown by default; Ctrl+B toggles and remembers
+//! show_hints = true          # false: no row of key hints at the bottom (`hints` also works)
+//! sidebar = true             # the navigation pane; shown by default; Ctrl+B toggles and remembers
+//! layout = "explorer"        # explorer | compact (no address bar, command bar or hints)
+//! show_details_pane = true   # false: never show the details pane on its own (Alt+P still does)
+//! view = "details"           # details | icons: how a new tab shows a folder
+//! remember_tabs = true       # reopen the tabs of the last session
+//! dates = "relative"         # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm)
 //!
 //! [archives]
 //! max_extract_gb = 8         # an extraction that would write more asks for a typed "yes"
@@ -60,6 +65,11 @@ pub struct FileConfig {
     pub mouse: bool,
     pub hints: bool,
     pub sidebar: bool,
+    pub layout: Option<String>,
+    pub show_details_pane: bool,
+    pub view: Option<String>,
+    pub remember_tabs: bool,
+    pub dates: Option<String>,
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     pub keys: HashMap<String, Vec<String>>,
@@ -102,7 +112,13 @@ struct Raw {
     pdf_timeout_seconds: Option<u64>,
     mouse: Option<bool>,
     hints: Option<bool>,
+    show_hints: Option<bool>,
     sidebar: Option<bool>,
+    layout: Option<String>,
+    show_details_pane: Option<bool>,
+    view: Option<String>,
+    remember_tabs: Option<bool>,
+    dates: Option<String>,
     devices: Option<DevicesRaw>,
     archives: Option<ArchivesRaw>,
     keymap: Option<String>,
@@ -121,6 +137,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
     let key = match raw.sort.as_deref() {
         Some("size") => SortKey::Size,
         Some("date") | Some("modified") => SortKey::Modified,
+        Some("type") => SortKey::Type,
         _ => SortKey::Name,
     };
     let archives = raw.archives.unwrap_or_default();
@@ -148,8 +165,13 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         appearance: raw.appearance,
         bookmarks: raw.bookmarks.unwrap_or_default(),
         mouse: raw.mouse.unwrap_or(true),
-        hints: raw.hints.unwrap_or(true),
+        hints: raw.show_hints.or(raw.hints).unwrap_or(true),
         sidebar: raw.sidebar.unwrap_or(true),
+        layout: raw.layout,
+        show_details_pane: raw.show_details_pane.unwrap_or(true),
+        view: raw.view,
+        remember_tabs: raw.remember_tabs.unwrap_or(true),
+        dates: raw.dates,
         hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
         keys: raw
@@ -210,6 +232,22 @@ mod tests {
         let d = with_config("sidebar = true\n");
         assert_eq!(d.archive_limits, ArchiveLimits::default());
         assert_eq!(d.archive_preview_entries, 200);
+    }
+
+    #[test]
+    fn the_explorer_settings_are_read_and_have_defaults() {
+        let d = with_config("sidebar = true\n");
+        assert!(d.hints && d.show_details_pane && d.remember_tabs);
+        assert_eq!((d.layout, d.view, d.dates), (None, None, None));
+        let c = with_config(
+            "layout = \"compact\"\nshow_details_pane = false\nview = \"icons\"\nremember_tabs = false\ndates = \"absolute\"\nshow_hints = false\n",
+        );
+        assert_eq!(c.layout.as_deref(), Some("compact"));
+        assert!(!c.show_details_pane && !c.remember_tabs && !c.hints);
+        assert_eq!(c.view.as_deref(), Some("icons"));
+        assert_eq!(c.dates.as_deref(), Some("absolute"));
+        // The older name of the hints switch still works.
+        assert!(!with_config("hints = false\n").hints);
     }
 
     #[test]

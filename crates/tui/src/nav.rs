@@ -11,6 +11,12 @@ pub struct NavHistory {
     pos: usize,
 }
 
+impl Default for NavHistory {
+    fn default() -> Self {
+        NavHistory::new(PathBuf::new())
+    }
+}
+
 impl NavHistory {
     pub fn new(start: PathBuf) -> NavHistory {
         NavHistory {

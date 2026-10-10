@@ -66,6 +66,23 @@ pub enum Action {
     // the program
     Help,
     Quit,
+    // later additions: the Explorer-style interface
+    NewFile,
+    Refresh,
+    FocusAddress,
+    ToggleDetails,
+    ViewDetails,
+    ViewIcons,
+    ToggleView,
+    Properties,
+    OpenWith,
+    CopyPath,
+    OpenTerminal,
+    ContextMenu,
+    NewTab,
+    CloseTab,
+    NextTab,
+    PrevTab,
 }
 
 /// Where an action appears in the help, in this order.
@@ -75,15 +92,17 @@ pub enum Group {
     Select,
     Files,
     View,
+    Tabs,
     Program,
 }
 
 impl Group {
-    pub const ALL: [Group; 5] = [
+    pub const ALL: [Group; 6] = [
         Group::Move,
         Group::Select,
         Group::Files,
         Group::View,
+        Group::Tabs,
         Group::Program,
     ];
 
@@ -93,13 +112,14 @@ impl Group {
             Group::Select => "Selecting",
             Group::Files => "Working with files",
             Group::View => "Looking",
+            Group::Tabs => "Tabs",
             Group::Program => "The program",
         }
     }
 }
 
 impl Action {
-    pub const ALL: [Action; 47] = [
+    pub const ALL: [Action; 63] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -147,6 +167,22 @@ impl Action {
         Action::ToggleSidebar,
         Action::Help,
         Action::Quit,
+        Action::NewFile,
+        Action::Refresh,
+        Action::FocusAddress,
+        Action::ToggleDetails,
+        Action::ViewDetails,
+        Action::ViewIcons,
+        Action::ToggleView,
+        Action::Properties,
+        Action::OpenWith,
+        Action::CopyPath,
+        Action::OpenTerminal,
+        Action::ContextMenu,
+        Action::NewTab,
+        Action::CloseTab,
+        Action::NextTab,
+        Action::PrevTab,
     ];
 
     /// The name used in the configuration file.
@@ -199,6 +235,22 @@ impl Action {
             Action::ToggleSidebar => "toggle_sidebar",
             Action::Help => "help",
             Action::Quit => "quit",
+            Action::NewFile => "new_file",
+            Action::Refresh => "refresh",
+            Action::FocusAddress => "focus_address",
+            Action::ToggleDetails => "toggle_details",
+            Action::ViewDetails => "view_details",
+            Action::ViewIcons => "view_icons",
+            Action::ToggleView => "toggle_view",
+            Action::Properties => "properties",
+            Action::OpenWith => "open_with",
+            Action::CopyPath => "copy_path",
+            Action::OpenTerminal => "open_terminal",
+            Action::ContextMenu => "context_menu",
+            Action::NewTab => "new_tab",
+            Action::CloseTab => "close_tab",
+            Action::NextTab => "next_tab",
+            Action::PrevTab => "prev_tab",
         }
     }
 
@@ -248,7 +300,7 @@ impl Action {
             Action::ToggleHex => "Hex dump of a binary file",
             Action::PreviewDown => "Scroll preview down",
             Action::PreviewUp => "Scroll preview up",
-            Action::Bookmark => "Bookmark this folder",
+            Action::Bookmark => "Pin / unpin this folder",
             Action::GoHome => "Go to home",
             Action::Back => "Back to the previous folder",
             Action::Forward => "Forward to the next folder",
@@ -256,6 +308,22 @@ impl Action {
             Action::ToggleSidebar => "Show / hide the sidebar",
             Action::Help => "Help",
             Action::Quit => "Quit",
+            Action::NewFile => "New empty file",
+            Action::Refresh => "Refresh the folder",
+            Action::FocusAddress => "Edit the address",
+            Action::ToggleDetails => "Show / hide the details pane",
+            Action::ViewDetails => "View as details",
+            Action::ViewIcons => "View as icons",
+            Action::ToggleView => "Switch between Details and Icons",
+            Action::Properties => "Properties",
+            Action::OpenWith => "Open with…",
+            Action::CopyPath => "Copy the path",
+            Action::OpenTerminal => "Open a terminal here",
+            Action::ContextMenu => "Open the context menu",
+            Action::NewTab => "New tab",
+            Action::CloseTab => "Close tab",
+            Action::NextTab => "Next tab",
+            Action::PrevTab => "Previous tab",
         }
     }
 
@@ -267,9 +335,14 @@ impl Action {
             ToggleMark | SelectAll | SelectUp | SelectDown | SelectToFirst | SelectToLast
             | ClearSelection => Group::Select,
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
-            | ExtractHere | ExtractToFolder | Compress | Undo | Redo | History => Group::Files,
+            | NewFile | ExtractHere | ExtractToFolder | Compress | Undo | Redo | History
+            | Properties | OpenWith | CopyPath => Group::Files,
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
-            | PreviewUp | Bookmark | SwitchPane | ToggleSidebar => Group::View,
+            | PreviewUp | Bookmark | SwitchPane | ToggleSidebar | Refresh | FocusAddress
+            | ToggleDetails | ViewDetails | ViewIcons | ToggleView | OpenTerminal | ContextMenu => {
+                Group::View
+            }
+            NewTab | CloseTab | NextTab | PrevTab => Group::Tabs,
             Help | Quit => Group::Program,
         }
     }
@@ -352,6 +425,7 @@ impl Chord {
             "backspace" | "bs" => KeyCode::Backspace,
             "delete" | "del" => KeyCode::Delete,
             "insert" | "ins" => KeyCode::Insert,
+            "menu" | "apps" => KeyCode::Menu,
             "up" => KeyCode::Up,
             "down" => KeyCode::Down,
             "left" => KeyCode::Left,
@@ -401,6 +475,7 @@ impl fmt::Display for Chord {
             KeyCode::Backspace => f.write_str("Backspace"),
             KeyCode::Delete => f.write_str("Del"),
             KeyCode::Insert => f.write_str("Ins"),
+            KeyCode::Menu => f.write_str("Menu"),
             KeyCode::Up => f.write_str("↑"),
             KeyCode::Down => f.write_str("↓"),
             KeyCode::Left => f.write_str("←"),
@@ -494,6 +569,12 @@ const VIM: &[(Action, &[&str])] = &[
     (Action::PreviewUp, &["K"]),
     (Action::Bookmark, &["B"]),
     (Action::GoHome, &["~"]),
+    (Action::NewFile, &["N"]),
+    (Action::ToggleView, &["v"]),
+    (Action::Properties, &["i"]),
+    (Action::OpenWith, &["O"]),
+    (Action::CopyPath, &["Y"]),
+    (Action::OpenTerminal, &["t"]),
     (Action::Help, &["?"]),
     (Action::Quit, &["q"]),
 ];
@@ -502,7 +583,10 @@ const VIM: &[(Action, &[&str])] = &[
 const CLASSIC: &[(Action, &[&str])] = &[
     (Action::Up, &["up"]),
     (Action::Down, &["down"]),
-    (Action::Parent, &["backspace", "left", "alt+up"]),
+    // Backspace goes back in this scheme (Windows' way); the vim scheme keeps it for the
+    // parent folder, and where both are on, vim's meaning wins.
+    (Action::Parent, &["left", "alt+up"]),
+    (Action::Back, &["backspace", "alt+left"]),
     (Action::Open, &["enter", "right"]),
     (Action::First, &["home"]),
     (Action::Last, &["end"]),
@@ -521,7 +605,8 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::Trash, &["delete"]),
     (Action::DeletePermanently, &["shift+delete"]),
     (Action::Rename, &["f2"]),
-    (Action::NewFolder, &["ctrl+n", "f7"]),
+    (Action::NewFolder, &["ctrl+shift+n", "ctrl+n", "f7"]),
+    (Action::NewFile, &["alt+n"]),
     (Action::ExtractHere, &["ctrl+e"]),
     (Action::ExtractToFolder, &["alt+e"]),
     (Action::Compress, &["alt+z"]),
@@ -529,7 +614,11 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::Redo, &["ctrl+y", "ctrl+shift+z"]),
     (Action::History, &["f3"]),
     (Action::Filter, &["ctrl+f"]),
-    (Action::Palette, &["ctrl+p", "ctrl+l"]),
+    (Action::Palette, &["ctrl+p"]),
+    (Action::Properties, &["alt+enter"]),
+    (Action::OpenWith, &["alt+o"]),
+    (Action::CopyPath, &["ctrl+shift+c"]),
+    (Action::OpenTerminal, &["ctrl+alt+t"]),
     (Action::Help, &["f1"]),
     (Action::Quit, &["ctrl+q"]),
 ];
@@ -543,6 +632,16 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Parent, &["alt+up"]),
     (Action::SwitchPane, &["tab", "shift+tab"]),
     (Action::ToggleSidebar, &["ctrl+b"]),
+    (Action::Refresh, &["f5"]),
+    (Action::FocusAddress, &["ctrl+l", "alt+d", "f4"]),
+    (Action::ToggleDetails, &["alt+p"]),
+    (Action::ViewDetails, &["ctrl+1", "ctrl+shift+1"]),
+    (Action::ViewIcons, &["ctrl+2", "ctrl+shift+2"]),
+    (Action::ContextMenu, &["shift+f10", "menu"]),
+    (Action::NewTab, &["ctrl+t"]),
+    (Action::CloseTab, &["ctrl+w"]),
+    (Action::NextTab, &["ctrl+tab", "ctrl+pagedown"]),
+    (Action::PrevTab, &["ctrl+shift+tab", "ctrl+pageup"]),
 ];
 
 #[derive(Clone, Debug)]
@@ -852,8 +951,92 @@ mod tests {
         assert_eq!(act("ctrl+q"), Some(Action::Quit));
         assert_eq!(act("q"), Some(Action::Quit));
         assert_eq!(act("ctrl+a"), Some(Action::SelectAll));
-        assert_eq!(act("ctrl+l"), Some(Action::Palette));
+        assert_eq!(act("ctrl+p"), Some(Action::Palette));
         assert_eq!(act("f1"), Some(Action::Help));
+    }
+
+    #[test]
+    fn the_windows_keys_are_there_without_taking_anything_from_vim() {
+        let km = Keymap::default();
+        let act = |c: &str| {
+            km.action_for(&KeyEvent::new(
+                Chord::parse(c).unwrap().code,
+                Chord::parse(c).unwrap().mods,
+            ))
+        };
+        for (key, want) in [
+            ("alt+left", Action::Back),
+            ("alt+right", Action::Forward),
+            ("alt+up", Action::Parent),
+            ("f5", Action::Refresh),
+            ("ctrl+l", Action::FocusAddress),
+            ("alt+d", Action::FocusAddress),
+            ("ctrl+f", Action::Filter),
+            ("ctrl+shift+n", Action::NewFolder),
+            ("f2", Action::Rename),
+            ("delete", Action::Trash),
+            ("shift+delete", Action::DeletePermanently),
+            ("ctrl+a", Action::SelectAll),
+            ("ctrl+z", Action::Undo),
+            ("alt+enter", Action::Properties),
+            ("ctrl+t", Action::NewTab),
+            ("ctrl+w", Action::CloseTab),
+            ("ctrl+tab", Action::NextTab),
+            ("ctrl+pagedown", Action::NextTab),
+            ("ctrl+shift+tab", Action::PrevTab),
+            ("ctrl+pageup", Action::PrevTab),
+            ("shift+f10", Action::ContextMenu),
+            ("menu", Action::ContextMenu),
+            ("alt+p", Action::ToggleDetails),
+            ("ctrl+1", Action::ViewDetails),
+            ("ctrl+2", Action::ViewIcons),
+        ] {
+            assert_eq!(act(key), Some(want), "{key}");
+        }
+        // Where both schemes are on, Backspace keeps its vim meaning (the parent folder)...
+        assert_eq!(act("backspace"), Some(Action::Parent));
+        // ...and with the classic keys alone it goes back, as in Windows.
+        let classic = Keymap::new(Preset::Classic, &HashMap::new());
+        let bs = KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE);
+        assert_eq!(classic.action_for(&bs), Some(Action::Back));
+        // The vim keys are all still where they were.
+        for (key, want) in [
+            ("h", Action::Parent),
+            ("l", Action::Open),
+            ("j", Action::Down),
+            ("k", Action::Up),
+            ("y", Action::Copy),
+            ("p", Action::Paste),
+            ("d", Action::Trash),
+            ("u", Action::Undo),
+            ("v", Action::ToggleView),
+            ("/", Action::Filter),
+        ] {
+            assert_eq!(act(key), Some(want), "{key}");
+        }
+    }
+
+    #[test]
+    fn the_windows_keys_work_in_the_classic_preset_too() {
+        let classic = Keymap::new(Preset::Classic, &HashMap::new());
+        for (code, mods, want) in [
+            (KeyCode::F(5), KeyModifiers::NONE, Action::Refresh),
+            (KeyCode::Char('t'), KeyModifiers::CONTROL, Action::NewTab),
+            (
+                KeyCode::Char('l'),
+                KeyModifiers::CONTROL,
+                Action::FocusAddress,
+            ),
+            (KeyCode::Enter, KeyModifiers::ALT, Action::Properties),
+            (KeyCode::Left, KeyModifiers::ALT, Action::Back),
+            (
+                KeyCode::Char('n'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+                Action::NewFolder,
+            ),
+        ] {
+            assert_eq!(classic.action_for(&KeyEvent::new(code, mods)), Some(want));
+        }
     }
 
     #[test]
@@ -918,6 +1101,7 @@ mod tests {
                 let vim_only = matches!(
                     a,
                     Action::BulkRename
+                        | Action::ToggleView
                         | Action::Sort
                         | Action::SortReverse
                         | Action::ToggleHidden
@@ -945,7 +1129,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 47);
+        assert_eq!(Action::ALL.len(), 63);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

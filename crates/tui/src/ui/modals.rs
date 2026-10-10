@@ -44,7 +44,86 @@ fn chip<'a>(th: &Theme, text: &str, color: Color) -> Span<'a> {
     )
 }
 
+/// The preview of the item under the cursor over the whole screen.
+fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
+    let th = app.th.clone();
+    f.render_widget(Clear, area);
+    if let Some(bg) = th.bg {
+        f.render_widget(Block::default().style(Style::default().bg(bg)), area);
+    }
+    let body = Rect {
+        y: area.y + 1,
+        height: area.height.saturating_sub(2),
+        ..area
+    };
+    super::preview::draw_full(f, app, body);
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(" Esc ", th.chip().add_modifier(Modifier::BOLD)),
+            Span::styled(" close   ", th.dim()),
+            Span::styled(" ↑↓ ", th.chip().add_modifier(Modifier::BOLD)),
+            Span::styled(" scroll", th.dim()),
+        ])),
+        Rect {
+            y: area.y + area.height - 1,
+            height: 1,
+            ..area
+        },
+    );
+    app.hits.add(area, Target::Window);
+}
+
+fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &mut Hits) {
+    let key_w = p.rows.iter().map(|(k, _)| k.width()).max().unwrap_or(8) + 2;
+    let w = 80.min(area.width.saturating_sub(4));
+    let value_w = (w as usize).saturating_sub(6 + key_w).max(10);
+    let mut lines: Vec<Line> = Vec::new();
+    for (k, v) in &p.rows {
+        for (i, part) in fmt::wrap(v, value_w).into_iter().enumerate() {
+            lines.push(Line::from(vec![
+                Span::styled(pad(if i == 0 { k } else { "" }, key_w), th.dim()),
+                Span::styled(part, th.base()),
+            ]));
+        }
+    }
+    let h = (lines.len() as u16 + 6).min(area.height.saturating_sub(2));
+    let r = centered(area, w, h);
+    let inner = frame(f, th, r, th.accent);
+    let rows = inner.height.saturating_sub(3) as usize;
+    let scroll = p.scroll.min(lines.len().saturating_sub(rows));
+    let mut out = vec![
+        Line::from(vec![
+            chip(th, "Properties", th.accent),
+            Span::styled(
+                format!(
+                    "  {}",
+                    display::truncate(&p.title, inner.width as usize / 2)
+                ),
+                th.base().add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::raw(""),
+    ];
+    out.extend(lines.into_iter().skip(scroll).take(rows));
+    out.push(Line::raw(""));
+    out.push(Line::from(vec![button(th, "Esc", "Close", None, true)]));
+    f.render_widget(Paragraph::new(out), inner);
+    hits.add(
+        Rect {
+            y: inner.y + inner.height.saturating_sub(1),
+            height: 1,
+            width: 14.min(inner.width),
+            ..inner
+        },
+        Target::Key(KeyCode::Esc),
+    );
+}
+
 pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
+    if matches!(app.modal, Some(Modal::FullPreview)) {
+        draw_full_preview(f, app, area);
+        return;
+    }
     let th = app.th.clone();
     let home = app.home().to_path_buf();
     let spinner = SPIN[app.spinner % SPIN.len()];
@@ -242,6 +321,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         }
         Modal::Help => draw_help(f, &th, area, &app.keymap, app.mouse, app.help_scroll),
         Modal::Menu(m) => draw_menu(f, &th, &app.keymap, m, area, &mut app.hits),
+        Modal::Properties(p) => draw_properties(f, &th, p, area, &mut app.hits),
+        Modal::FullPreview => {}
     }
 }
 
@@ -253,6 +334,7 @@ fn verb(kind: OpKind) -> &'static str {
         OpKind::Move => "Move",
         OpKind::Rename | OpKind::BulkRename => "Rename",
         OpKind::MakeDir => "New folder",
+        OpKind::MakeFile => "New file",
         OpKind::Trash => "Trash",
         OpKind::Delete => "Delete",
         OpKind::Undo => "Undo",
@@ -332,7 +414,7 @@ fn draw_plan(
     let t = &plan.totals;
     let mut stats: Vec<(String, &str, bool)> = Vec::new();
     match plan.kind {
-        OpKind::Rename | OpKind::BulkRename | OpKind::MakeDir | OpKind::Undo => {
+        OpKind::Rename | OpKind::BulkRename | OpKind::MakeDir | OpKind::MakeFile | OpKind::Undo => {
             stats.push((
                 fmt::thousands(plan.steps.len() as u64),
                 if plan.steps.len() == 1 {
@@ -739,7 +821,7 @@ impl Bases {
                     .and_then(|d| d.parent())
                     .map(std::path::Path::to_path_buf),
             ),
-            OpKind::MakeDir => (None, plan.destination.clone()),
+            OpKind::MakeDir | OpKind::MakeFile => (None, plan.destination.clone()),
             _ => (from_items.or_else(from_steps), None),
         };
         Bases {
@@ -787,6 +869,7 @@ fn split_title(title: &str) -> (String, Option<String>) {
 fn step_label(step: &Step, b: &Bases) -> Option<String> {
     Some(match step {
         Step::MakeDir { path, .. } => format!("folder   {}", b.rel_dst(path)),
+        Step::MakeFile { path, .. } => format!("file     {}", b.rel_dst(path)),
         Step::FinishDir { .. } => return None,
         Step::CopyFile {
             dst, remove_source, ..
@@ -1004,6 +1087,11 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     let (title, hint) = match &iv.kind {
         InputKind::Rename { .. } => ("Rename", "New name"),
         InputKind::NewDir => ("New folder", "Name"),
+        InputKind::NewFile => ("New file", "Name (an empty file is created)"),
+        InputKind::OpenWith { .. } => (
+            "Open with",
+            "Program, with options if you like — for example: code, vlc --fullscreen",
+        ),
         InputKind::ExtractTo { .. } => (
             "Extract",
             "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)",
@@ -1095,8 +1183,13 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         ]));
     }
     lines.push(Line::raw(""));
+    let go = if matches!(iv.kind, InputKind::OpenWith { .. }) {
+        "Open"
+    } else {
+        "Plan"
+    };
     lines.push(Line::from(vec![
-        button(th, "Enter", "Plan", Some(th.accent), true),
+        button(th, "Enter", go, Some(th.accent), true),
         Span::raw("  "),
         button(th, "Esc", "Cancel", None, true),
     ]));
@@ -1272,15 +1365,29 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
     )));
     let mouse_lines: Vec<&str> = if mouse {
         vec![
-            "Click selects · double-click opens · wheel scrolls the list or the preview.",
-            "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu.",
-            "Click ‹ › ↑, a folder in the path, a place in the sidebar, a hint at the bottom, or a column title.",
+            "Click a name to put the cursor there · the box on the left (or Space) selects · double-click opens.",
+            "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu · wheel scrolls.",
+            "Every button of the bars is clickable and does what its key does; middle-click closes a tab.",
+            "Click the path (outside its words) to type an address; click a column title to sort by it.",
             "Shift+drag selects text in the terminal (the mouse belongs to rada while it runs).",
         ]
     } else {
         vec!["The mouse is off (mouse = false in the configuration)."]
     };
     for l in mouse_lines {
+        lines.push(Line::from(Span::styled(l, th.base())));
+    }
+    lines.push(Line::raw(""));
+    lines.push(Line::from(Span::styled(
+        "Also",
+        th.dim().add_modifier(Modifier::BOLD),
+    )));
+    for l in [
+        "Alt+1 … Alt+9 jump to a tab · Alt+P shows or hides the details pane.",
+        "Ctrl+1 / Ctrl+2 (or v) switch between Details and Icons; in Icons the arrows and h j k l move across the grid.",
+        "Backspace goes to the parent folder with the vim keys on, and back with the classic keys alone.",
+        "Shift+Del deletes for good: the plan says so, and it cannot be undone.",
+    ] {
         lines.push(Line::from(Span::styled(l, th.base())));
     }
     lines.push(Line::raw(""));
@@ -1328,10 +1435,20 @@ fn draw_menu(f: &mut Frame, th: &Theme, km: &Keymap, m: &MenuView, area: Rect, h
     let hint_w = m
         .items
         .iter()
-        .map(|i| hint_of(i).width())
+        .map(|i| {
+            hint_of(i)
+                .width()
+                .max(usize::from(matches!(i.cmd, crate::app::MenuCmd::Sub(_))))
+        })
         .max()
         .unwrap_or(0);
-    let inner_w = label_w + 3 + hint_w;
+    // A column for the mark of a choice or a switch, only in menus that have any.
+    let mark_w = if m.items.iter().any(|i| i.checked.is_some()) {
+        2
+    } else {
+        0
+    };
+    let inner_w = mark_w + label_w + 3 + hint_w;
     let w = (inner_w + 4) as u16;
     let seps = m.items.iter().filter(|i| i.gap_before).count();
     let h = (m.items.len() + seps + 2) as u16;
@@ -1361,10 +1478,23 @@ fn draw_menu(f: &mut Frame, th: &Theme, km: &Keymap, m: &MenuView, area: Rect, h
         let sel = i == m.selected;
         let row = if sel { th.selected() } else { Style::default() };
         let text_style = if it.enabled { th.base() } else { th.faint() };
-        let hint = hint_of(it);
-        let gap = inner_w.saturating_sub(it.label.width() + hint.width());
+        let hint = if matches!(it.cmd, crate::app::MenuCmd::Sub(_)) {
+            "▸".to_string()
+        } else {
+            hint_of(it)
+        };
+        let gap = inner_w.saturating_sub(mark_w + it.label.width() + hint.width());
+        let mark = match it.checked {
+            Some(true) => "✓ ",
+            Some(false) => "  ",
+            None => "",
+        };
         lines.push(Line::from(vec![
             Span::styled(" ", row),
+            Span::styled(
+                mark.to_string(),
+                th.fg(th.accent).add_modifier(Modifier::BOLD).patch(row),
+            ),
             Span::styled(it.label.clone(), text_style.patch(row)),
             Span::styled(" ".repeat(gap + 1), row),
             Span::styled(

@@ -1,6 +1,9 @@
-//! The folder list: Name, a size bar, Size, Type badge and a relative Modified column.
-
-use std::time::SystemTime;
+//! The folder as a table (the Details view): a checkbox, the icon and name, the date, the
+//! type in words and the size. The column titles are buttons that sort; the sorted one
+//! carries an arrow.
+//!
+//! What the terminal's width allows decides the columns: below 100 columns the type goes,
+//! below 60 the date goes too and only name and size remain.
 
 use rada_core::display;
 use rada_core::fs::FileKind;
@@ -13,64 +16,50 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
-use super::widgets::{SPIN, badge, bar_spans, hit_spans, pad_left};
+use super::widgets::{SPIN, hit_spans, pad, pad_left};
 use crate::app::App;
-use crate::fmt;
+use crate::fmt::{self, DateStyle};
 use crate::hits::Target;
-use crate::icons::{self, Category};
-use crate::theme::Density;
+use crate::icons::{self, Glyph};
+use crate::keymap::Action;
 
-/// Cells before the icon: the cursor bar, the mark dot, a space.
-const GUTTER: usize = 3;
+/// Cells of the checkbox column: a space, the box, a space.
+const CHECK: usize = 3;
 
 /// Which columns fit, and how wide each is.
-struct Columns {
-    icon: usize,
-    bar: usize,
-    size: usize,
-    kind: usize,
-    modified: usize,
-    gap: usize,
-    name: usize,
+pub struct Columns {
+    pub icon: usize,
+    pub date: usize,
+    pub kind: usize,
+    pub size: usize,
+    pub gap: usize,
+    pub name: usize,
 }
 
-fn columns(width: usize, icon_w: usize, density: Density) -> Columns {
-    let gap = match density {
-        Density::Airy | Density::Balanced => 2,
-        Density::Dense => 1,
+pub fn columns(area_width: usize, term_width: usize, icon_w: usize, dates: DateStyle) -> Columns {
+    let gap = 2;
+    let date_w = match dates {
+        DateStyle::Relative => 12,
+        DateStyle::Absolute => 16,
     };
-    let bar_cells = match density {
-        Density::Airy => 7,
-        Density::Balanced => 6,
-        Density::Dense => 5,
-    };
-    let (mut bar, mut size, mut kind, mut modified) = (bar_cells + 1, 9, 9, 11);
-    // Narrow terminals lose the least important columns first: the relative date goes
-    // before the type, then the size bar, then the size.
-    if width < 62 {
-        modified = 0;
-    }
-    if width < 50 {
+    let (mut date, mut kind, mut size) = (date_w, 20, 10);
+    if term_width < 100 {
         kind = 0;
     }
-    if width < 40 {
-        bar = 0;
+    if term_width < 60 || area_width < 46 {
+        date = 0;
     }
-    if width < 30 {
+    if area_width < 24 {
         size = 0;
     }
-    let fixed = GUTTER + icon_w + bar + size + kind + modified;
-    let cols = [bar, size, kind, modified]
-        .iter()
-        .filter(|c| **c > 0)
-        .count();
-    let name = width.saturating_sub(fixed + gap * cols);
+    let cols = [date, kind, size].iter().filter(|c| **c > 0).count();
+    let fixed = CHECK + icon_w + date + kind + size + 1;
+    let name = area_width.saturating_sub(fixed + gap * cols);
     Columns {
         icon: icon_w,
-        bar,
-        size,
+        date,
         kind,
-        modified,
+        size,
         gap,
         name,
     }
@@ -79,74 +68,92 @@ fn columns(width: usize, icon_w: usize, density: Density) -> Columns {
 pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let count = app.visible.len();
-    let cols = columns(area.width as usize, app.icons.width(), th.density);
+    let cols = columns(
+        area.width as usize,
+        app.term_width as usize,
+        app.icons.width(),
+        app.dates,
+    );
 
-    // Header: column labels, the sorted one in the accent colour; then a faint rule.
-    let sorted = |k: SortKey| app.sort.key == k;
+    // Column titles, on a band of their own; the sorted one carries an arrow.
+    let head_bg = Style::default().bg(th.field);
     let arrow = if app.sort.reverse { "↓" } else { "↑" };
     let label = |text: &str, k: SortKey| {
-        let t = if sorted(k) {
+        let sorted = app.sort.key == k;
+        let t = if sorted {
             format!("{text} {arrow}")
         } else {
             text.to_string()
         };
-        let st = if sorted(k) {
+        let st = if sorted {
             th.accent_style().add_modifier(Modifier::BOLD)
         } else {
             th.dim()
         };
-        (t, st)
+        (t, st.patch(head_bg))
     };
-    let gap = " ".repeat(cols.gap);
-    let mut head: Vec<Span> = vec![Span::raw(" ".repeat(GUTTER + cols.icon))];
+    let gap = || Span::styled(" ".repeat(cols.gap), head_bg);
+    let mut head: Vec<Span> = Vec::new();
     let mut head_hits: Vec<(usize, Target)> = Vec::new();
+    head_hits.push((head.len(), Target::Act(Action::SelectAll)));
+    let all_marked = !app.visible.is_empty() && app.marked.len() == app.visible.len();
+    head.push(Span::styled(
+        format!(
+            " {} ",
+            icons::ui(
+                app.icons,
+                if all_marked {
+                    Glyph::Checked
+                } else {
+                    Glyph::Unchecked
+                }
+            )
+        ),
+        if all_marked {
+            th.fg(th.check).patch(head_bg)
+        } else {
+            th.faint().patch(head_bg)
+        },
+    ));
+    head.push(Span::styled(" ".repeat(cols.icon), head_bg));
     let (t, st) = label("Name", SortKey::Name);
     head_hits.push((head.len(), Target::SortBy(SortKey::Name)));
-    head.push(Span::styled(super::widgets::pad(&t, cols.name), st));
-    if cols.bar > 0 {
-        head.push(Span::raw(gap.clone()));
-        head.push(Span::raw(" ".repeat(cols.bar)));
+    head.push(Span::styled(pad(&t, cols.name), st));
+    if cols.date > 0 {
+        head.push(gap());
+        let (t, st) = label("Date modified", SortKey::Modified);
+        head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
+        head.push(Span::styled(pad(&t, cols.date), st));
+    }
+    if cols.kind > 0 {
+        head.push(gap());
+        let (t, st) = label("Type", SortKey::Type);
+        head_hits.push((head.len(), Target::SortBy(SortKey::Type)));
+        head.push(Span::styled(pad(&t, cols.kind), st));
     }
     if cols.size > 0 {
-        head.push(Span::raw(if cols.bar > 0 {
-            String::new()
-        } else {
-            gap.clone()
-        }));
+        head.push(gap());
         let (t, st) = label("Size", SortKey::Size);
         head_hits.push((head.len(), Target::SortBy(SortKey::Size)));
         head.push(Span::styled(pad_left(&t, cols.size), st));
     }
-    if cols.kind > 0 {
-        head.push(Span::raw(gap.clone()));
+    head.push(Span::styled(" ", head_bg));
+    let drawn: usize = head.iter().map(|s| s.content.width()).sum();
+    if drawn < area.width as usize {
         head.push(Span::styled(
-            super::widgets::pad("Type", cols.kind),
-            th.dim(),
+            " ".repeat(area.width as usize - drawn),
+            head_bg,
         ));
     }
-    if cols.modified > 0 {
-        head.push(Span::raw(gap.clone()));
-        let (t, st) = label("Modified", SortKey::Modified);
-        head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
-        head.push(Span::styled(pad_left(&t, cols.modified), st));
-    }
-    if area.height < 3 {
+    if area.height < 2 {
         return;
     }
     hit_spans(&mut app.hits, area.x, area.y, &head, &head_hits);
     f.render_widget(Paragraph::new(Line::from(head)), Rect { height: 1, ..area });
-    f.render_widget(
-        Paragraph::new(Span::styled("─".repeat(area.width as usize), th.faint())),
-        Rect {
-            y: area.y + 1,
-            height: 1,
-            ..area
-        },
-    );
 
     let body = Rect {
-        y: area.y + 2,
-        height: area.height - 2,
+        y: area.y + 1,
+        height: area.height - 1,
         ..area
     };
     app.view_rows = body.height as usize;
@@ -158,6 +165,8 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
             format!("{} loading…", SPIN[app.spinner % SPIN.len()])
+        } else if app.filter.is_some() {
+            "Nothing here matches the search".to_string()
         } else if app.listing.is_empty() {
             "This folder is empty".to_string()
         } else {
@@ -174,53 +183,47 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    // Bars are proportional to the biggest file of the folder.
-    let max_size = app
-        .visible
-        .iter()
-        .filter_map(|&i| app.listing.all().get(i))
-        .filter(|e| e.kind == FileKind::File)
-        .map(|e| e.size)
-        .max()
-        .unwrap_or(0);
-    let now = app.now();
-
     app.scroll = app.scroll.min(count.saturating_sub(1));
     let rows = body.height as usize;
+    let last = (app.scroll + rows).min(count);
+    let shown: Vec<usize> = (app.scroll..last).map(|v| app.visible[v]).collect();
+    app.warm_dates(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
-    for vis in app.scroll..(app.scroll + rows).min(count) {
+    for vis in app.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
         lines.push(row(
             app,
             e,
+            app.visible[vis],
             vis == app.cursor,
             &cols,
-            max_size,
-            now,
             area.width as usize,
         ));
     }
     f.render_widget(Paragraph::new(lines), body);
-    for vis in app.scroll..(app.scroll + rows).min(count) {
+    for vis in app.scroll..last {
+        let r = Rect {
+            y: body.y + (vis - app.scroll) as u16,
+            height: 1,
+            ..body
+        };
+        app.hits.add(r, Target::Row(vis));
         app.hits.add(
             Rect {
-                y: body.y + (vis - app.scroll) as u16,
-                height: 1,
-                ..body
+                width: (CHECK as u16).min(r.width),
+                ..r
             },
-            Target::Row(vis),
+            Target::Check(vis),
         );
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn row<'a>(
     app: &App,
     e: &Entry,
+    listing_index: usize,
     is_cursor: bool,
     cols: &Columns,
-    max_size: u64,
-    now: SystemTime,
     width: usize,
 ) -> Line<'a> {
     let th = &app.th;
@@ -232,10 +235,8 @@ fn row<'a>(
     } else {
         Style::default()
     };
-    let row_bg = row_style.bg;
     let with = |s: Style| s.patch(row_style);
 
-    let cat = icons::categorize(e);
     let (glyph, gcolor) = icons::icon(e, app.icons, th);
     let broken = e
         .link
@@ -255,11 +256,20 @@ fn row<'a>(
         name_style = name_style.add_modifier(Modifier::BOLD);
     }
 
-    // Three cells: the cursor bar, the mark dot, a space. A row can have both, and the
-    // cursor's background alone must not be the only thing telling it from a marked row.
+    let check = icons::ui(
+        app.icons,
+        if marked {
+            Glyph::Checked
+        } else {
+            Glyph::Unchecked
+        },
+    );
     let mut spans: Vec<Span> = vec![
-        Span::styled(if is_cursor { "▎" } else { " " }, with(th.accent_style())),
-        Span::styled(if marked { "●" } else { " " }, with(th.accent_style())),
+        Span::styled(" ", with(Style::default())),
+        Span::styled(
+            check.to_string(),
+            with(if marked { th.fg(th.check) } else { th.faint() }),
+        ),
         Span::styled(" ", with(Style::default())),
     ];
     // On the cursor row the secondary text turns to the main colour: the stronger
@@ -293,51 +303,26 @@ fn row<'a>(
     ));
 
     let gap = || Span::styled(" ".repeat(cols.gap), with(Style::default()));
-    if cols.bar > 0 {
+    if cols.date > 0 {
         spans.push(gap());
-        if e.kind == FileKind::File && max_size > 0 {
-            let frac = e.size as f64 / max_size as f64;
-            let fill = if is_cursor { th.accent } else { cat.color(th) };
-            spans.extend(bar_spans(th, frac, cols.bar - 1, fill, row_bg));
-            spans.push(Span::styled(" ", with(Style::default())));
-        } else {
-            spans.push(Span::styled(" ".repeat(cols.bar), with(Style::default())));
-        }
-    }
-    if cols.size > 0 {
-        if cols.bar == 0 {
-            spans.push(gap());
-        }
-        let s = match e.kind {
-            FileKind::File => fmt::size(e.size),
-            FileKind::Dir => "—".to_string(),
-            FileKind::Symlink => "—".to_string(),
-            FileKind::Other => "—".to_string(),
-        };
-        let st = if e.kind == FileKind::File {
-            th.base()
-        } else {
-            th.faint()
-        };
-        spans.push(Span::styled(pad_left(&s, cols.size), with(st)));
+        let text = display::truncate(app.date_text(listing_index), cols.date);
+        spans.push(Span::styled(pad(&text, cols.date), with(dim)));
     }
     if cols.kind > 0 {
         spans.push(gap());
-        if cat == Category::Folder {
-            // The icon already says it is a folder: the word recedes.
-            spans.push(Span::styled(
-                super::widgets::pad(cat.label(), cols.kind),
-                with(th.faint()),
-            ));
-        } else {
-            spans.extend(badge(th, cat.label(), cat.color(th), cols.kind, row_bg));
-        }
+        let text = display::truncate(&e.type_label, cols.kind);
+        spans.push(Span::styled(pad(&text, cols.kind), with(dim)));
     }
-    if cols.modified > 0 {
+    if cols.size > 0 {
         spans.push(gap());
+        let s = if e.kind == FileKind::File {
+            fmt::size(e.size)
+        } else {
+            String::new()
+        };
         spans.push(Span::styled(
-            pad_left(&fmt::relative(e.mtime, now), cols.modified),
-            with(dim),
+            pad_left(&s, cols.size),
+            with(if is_cursor { th.base() } else { th.dim() }),
         ));
     }
     // Make the highlight reach the right edge.
@@ -349,4 +334,38 @@ fn row<'a>(
         ));
     }
     Line::from(spans)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn narrow_terminals_lose_the_least_important_columns_first() {
+        let rel = DateStyle::Relative;
+        let wide = columns(120, 170, 2, rel);
+        assert!(wide.kind > 0 && wide.date > 0 && wide.size > 0);
+        let mid = columns(90, 99, 2, rel);
+        assert_eq!(mid.kind, 0, "the type goes below 100 columns");
+        assert!(mid.date > 0);
+        let narrow = columns(50, 59, 2, rel);
+        assert_eq!((narrow.date, narrow.kind), (0, 0));
+        assert!(narrow.size > 0, "name and size are what stays");
+        // Absolute dates need more room than relative ones.
+        assert!(columns(120, 170, 2, DateStyle::Absolute).date > wide.date);
+    }
+
+    #[test]
+    fn the_columns_always_add_up_to_the_width() {
+        for term in [170usize, 120, 99, 80, 59, 40] {
+            let area = term.saturating_sub(30).max(24);
+            let c = columns(area, term, 2, DateStyle::Relative);
+            let n = [c.date, c.kind, c.size].iter().filter(|x| **x > 0).count();
+            assert_eq!(
+                CHECK + c.icon + c.name + c.date + c.kind + c.size + c.gap * n + 1,
+                area.max(CHECK + c.icon + c.date + c.kind + c.size + c.gap * n + 1),
+                "{term}"
+            );
+        }
+    }
 }
