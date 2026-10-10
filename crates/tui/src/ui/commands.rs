@@ -36,7 +36,6 @@ fn build<'a>(app: &App, detail: Detail, reduced: bool) -> Bar<'a> {
     let ro = app.archive.is_some();
     let has_target = !app.marked.is_empty() || app.current().is_some();
     let mut b = Bar::default();
-    b.push(Span::styled(" ", band));
 
     // New ▾: the one filled button.
     let new_icon = icons::ui(set, Glyph::New);
@@ -52,7 +51,6 @@ fn build<'a>(app: &App, detail: Detail, reduced: bool) -> Bar<'a> {
             Target::Menu(MenuKind::New),
         );
     }
-    b.push(Span::styled(" ", band));
     b.push(Span::styled("│", th.faint().patch(band)));
 
     let plain = Style::default().bg(th.mark);
@@ -65,6 +63,10 @@ fn build<'a>(app: &App, detail: Detail, reduced: bool) -> Bar<'a> {
         }
         if detail != Detail::Icons || icon.is_empty() {
             text.push_str(word);
+        }
+        // Room between buttons, when there is room to spare.
+        text.push(' ');
+        if detail == Detail::Full {
             text.push(' ');
         }
         if enabled {
@@ -164,7 +166,7 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
     let more = icons::ui(app.icons, Glyph::More);
-    let more_w = more.width() + 2;
+    let more_w = more.width() + 1;
 
     // The fullest version that fits, with room kept for the "more" button.
     let wanted = if w >= 100 {
@@ -189,9 +191,8 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = w.saturating_sub(bar.width() + more_w);
     bar.push(Span::styled(" ".repeat(gap), band));
     bar.push_hit(
-        Span::styled(format!(" {more} "), th.base().patch(band)),
+        Span::styled(format!(" {more}"), th.base().patch(band)),
         Target::Menu(MenuKind::More),
     );
-    bar.push(Span::styled(" ", band));
     bar.render(f, &mut app.hits, area);
 }

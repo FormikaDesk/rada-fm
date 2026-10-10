@@ -29,8 +29,7 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
     let Some(e) = app.current() else {
         return Vec::new();
     };
-    let tz = jiff::tz::TimeZone::system();
-    let when = |t| fmt::date_with_day(t, app.now(), app.date_format, &tz);
+    let when = |t| fmt::date_with_day(t, app.now(), app.date_format, &app.tz);
     let mut rows: Vec<(&'static str, String)> = Vec::new();
     if let Some(img) = &app.preview.image
         && app.preview.name == e.display

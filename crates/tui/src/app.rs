@@ -470,6 +470,8 @@ pub struct App {
     pub details: Option<bool>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// The time zone dates are shown in (the system's; tests pin it).
+    pub tz: jiff::tz::TimeZone,
     pub remember_tabs: bool,
     /// The tabs; the slot of the front one is empty, its state lives in the fields above.
     tabs: Vec<TabState>,
@@ -602,6 +604,7 @@ impl App {
             details: cfg.details_pane,
             dates: cfg.dates,
             date_format: cfg.date_format,
+            tz: jiff::tz::TimeZone::system(),
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
             active_tab: active,
@@ -2291,11 +2294,12 @@ impl App {
             if let Some(slot @ None) = self.date_cache.get_mut(i)
                 && let Some(e) = self.listing.all().get(i)
             {
-                *slot = Some(fmt::explorer_date(
+                *slot = Some(fmt::explorer_date_in(
                     e.mtime,
                     now,
                     self.dates,
                     self.date_format,
+                    &self.tz,
                 ));
             }
         }

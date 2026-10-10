@@ -39,7 +39,7 @@ pub struct Columns {
 pub fn columns(area_width: usize, term_width: usize, icon_w: usize, dates: DateStyle) -> Columns {
     let gap = 2;
     let date_w = match dates {
-        DateStyle::Relative => 12,
+        DateStyle::Relative => 14,
         DateStyle::Absolute => 16,
     };
     let (mut date, mut kind, mut size) = (date_w, 20, 10);
@@ -282,10 +282,7 @@ fn row<'a>(
         ));
     }
 
-    let mut shown = e.display.clone();
-    if e.is_dir() {
-        shown.push('/');
-    }
+    let shown = e.display.clone();
     let name_txt = display::truncate(&shown, cols.name);
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));

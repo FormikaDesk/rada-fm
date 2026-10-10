@@ -110,6 +110,23 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
     }
     let content = app.preview.content.clone();
     let mut lines: Vec<Line> = Vec::new();
+    // In the details pane the header already says what and how big; what is left to say
+    // is a few words about an empty or special item.
+    if !full {
+        let note = match &content {
+            Some(Preview::Empty) => Some("Empty file".to_string()),
+            Some(Preview::Dir(d)) if d.entries.is_empty() => Some("Empty folder".to_string()),
+            Some(Preview::Special(m)) => Some(m.clone()),
+            Some(Preview::Text(t)) if t.truncated => Some("Beginning of the file only".to_string()),
+            _ => None,
+        };
+        if let Some(n) = note {
+            for l in fmt::wrap(&n, w) {
+                lines.push(Line::from(Span::styled(l, th.dim())));
+            }
+            lines.push(Line::raw(""));
+        }
+    }
     match &content {
         None | Some(Preview::Image(_)) => {}
         Some(Preview::Empty) => {}

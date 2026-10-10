@@ -320,3 +320,102 @@ pub fn run_plan_and_wait(h: &mut H) {
 pub fn plan_modal(h: &mut H) {
     h.wait("a plan window", |a| matches!(a.modal, Some(Modal::Plan(_))));
 }
+
+// ---------------------------------------------------------------------------- the explorer scene
+
+use std::time::SystemTime;
+
+/// 2026-10-10 14:30 UTC: the clock of every explorer screenshot.
+pub fn demo_now() -> SystemTime {
+    SystemTime::UNIX_EPOCH + Duration::from_secs(1_791_642_600)
+}
+
+fn set_age(path: &std::path::Path, secs: u64) {
+    let t = demo_now() - Duration::from_secs(secs);
+    let f = std::fs::File::open(path).unwrap();
+    f.set_modified(t).unwrap();
+}
+
+/// `~/projects/demo` as in the prototype: folders, archives, code, a picture and a movie,
+/// with the standard places and three disks, and a clock that never moves.
+pub fn demo_scene(w: u16, h: u16) -> H {
+    let sb = Sandbox::new();
+    let home = sb.dirs.home.clone();
+    for d in ["Desktop", "Downloads", "Documents", "Pictures", "Music", "Videos"] {
+        std::fs::create_dir_all(home.join(d)).unwrap();
+    }
+    let dir = home.join("projects/demo");
+    let day = 86_400u64;
+    let put = |name: &str, size: usize, secs: u64| {
+        let p = dir.join(name);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(&p, "x".repeat(size.min(4096))).unwrap();
+        if size > 4096 {
+            let f = std::fs::OpenOptions::new().write(true).open(&p).unwrap();
+            f.set_len(size as u64).unwrap();
+        }
+        set_age(&p, secs);
+    };
+    for (d, secs) in [
+        ("assets", 3 * day),
+        ("docs", day + 3600),
+        ("scripts", 9 * day),
+        ("src", 5 * 3600),
+        ("tests", 2 * day),
+    ] {
+        let p = dir.join(d);
+        std::fs::create_dir_all(&p).unwrap();
+        set_age(&p, secs);
+    }
+    put("archive.tar.gz", 18_454_938, 8 * day);
+    put("backup.zip", 40_894_464, 97 * day);
+    put("Cargo.toml", 82, 3 * day);
+    put("data.json", 49, 6 * day);
+    put("demo.mp4", 95_420_416, 14 * day);
+    put("main.rs", 80, 20 * 60);
+    put("logo.svg", 197, 5 * day);
+    put("notes.txt", 28, day + 7200);
+    put("photo.jpg", 72_397, 3600);
+    put("README.md", 145, 3700);
+    put("report.pdf", 2_400_000, 4 * day);
+    put("screenshot.png", 5_472, day + 5000);
+    put("setup.sh", 21, 12 * day);
+    put("song.mp3", 7_800_000, 72 * day);
+    let mut h = H::new(sb, dir, w, h);
+    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.app.clock = Some(demo_now());
+    h.app.tz = jiff::tz::TimeZone::UTC;
+    // Creation times are the real ones of the sandbox: leave them out of the screenshots.
+    let entries: Vec<rada_core::model::Entry> = h.app.listing.all().to_vec();
+    h.app.listing.apply(
+        entries
+            .into_iter()
+            .map(|mut e| {
+                e.created = None;
+                rada_core::model::EntryUpdate::Upsert(e)
+            })
+            .collect(),
+    );
+    h.app.volumes = {
+        use rada_core::platform::{Volume, VolumeKind};
+        let gb = 1_000_000_000u64;
+        let v = |mount: &str, label: &str, kind, total: u64, free: u64| Volume {
+            mount_point: PathBuf::from(mount),
+            label: Some(label.into()),
+            fs_type: "ext4".into(),
+            device: "demo".into(),
+            kind,
+            drive_letter: None,
+            total: Some(total * gb),
+            available: Some(free * gb),
+            read_only: false,
+            responsive: true,
+        };
+        vec![
+            v("/", "System", VolumeKind::Fixed, 512, 197),
+            v("/mnt/data", "Data", VolumeKind::Fixed, 1000, 596),
+            v("/mnt/usb", "USB drive", VolumeKind::Removable, 64, 38),
+        ]
+    };
+    h
+}

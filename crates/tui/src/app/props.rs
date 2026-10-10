@@ -64,8 +64,7 @@ impl App {
     }
 
     fn item_properties(&self, e: &Entry) -> PropsView {
-        let tz = jiff::tz::TimeZone::system();
-        let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &tz);
+        let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &self.tz);
         let mut rows: Vec<(String, String)> = vec![
             ("Name".into(), e.display.clone()),
             ("Type".into(), e.type_label.to_string()),
