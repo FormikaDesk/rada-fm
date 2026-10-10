@@ -90,6 +90,13 @@ pub fn read_dir(
                 // Never followed, so never known: shown as an ordinary link.
                 state: LinkState::ToFile,
             });
+            let executable = c.kind == EntryKind::File && c.mode.is_some_and(|m| m & 0o111 != 0);
+            let type_label = crate::filetype::label(
+                &shown,
+                meta.kind,
+                c.kind == EntryKind::Dir,
+                executable,
+            );
             Entry {
                 sort_name: shown.to_lowercase(),
                 display: shown,
@@ -99,10 +106,12 @@ pub fn read_dir(
                 link,
                 size: if c.kind == EntryKind::File { c.size } else { 0 },
                 mtime: c.mtime,
+                created: None,
+                type_label,
                 mode: c.mode,
                 hidden: attrs.hidden,
                 readonly: true,
-                executable: c.kind == EntryKind::File && c.mode.is_some_and(|m| m & 0o111 != 0),
+                executable,
                 reparse: None,
                 error: None,
             }

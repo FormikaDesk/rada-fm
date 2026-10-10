@@ -4,6 +4,7 @@
 //! result is deterministic: equal sizes or dates never shuffle between refreshes
 //! (a known failure of other file managers). Sorting happens immediately, in memory; it never waits for I/O.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -22,6 +23,8 @@ pub struct Entry {
     pub link: Option<LinkInfo>,
     pub size: u64,
     pub mtime: Option<SystemTime>,
+    /// When it was created, where the filesystem records that.
+    pub created: Option<SystemTime>,
     pub mode: Option<u32>,
     pub hidden: bool,
     pub readonly: bool,
@@ -33,6 +36,8 @@ pub struct Entry {
     pub display: String,
     /// Case-folded form used for ordering, computed once.
     pub sort_name: String,
+    /// What kind of thing it is in words ("JPEG image"), worked out once from the name.
+    pub type_label: Cow<'static, str>,
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +70,18 @@ impl Entry {
             LinkInfo { target, state }
         });
         let shown = display::name(&name);
+        let type_label = match &link {
+            Some(l) if matches!(l.state, LinkState::Broken | LinkState::Circular) => {
+                Cow::Borrowed("Broken link")
+            }
+            Some(l) => crate::filetype::label(
+                &shown,
+                FileKind::File,
+                l.state == LinkState::ToDir,
+                attrs.executable,
+            ),
+            None => crate::filetype::label(&shown, meta.kind, false, attrs.executable),
+        };
         Entry {
             sort_name: shown.to_lowercase(),
             display: shown,
@@ -74,6 +91,8 @@ impl Entry {
             link,
             size: meta.size,
             mtime: meta.mtime,
+            created: meta.btime,
+            type_label,
             mode: meta.mode,
             hidden: attrs.hidden,
             readonly: attrs.readonly,
@@ -95,6 +114,8 @@ impl Entry {
             link: None,
             size: 0,
             mtime: None,
+            created: None,
+            type_label: Cow::Borrowed("Unreadable"),
             mode: None,
             hidden: false,
             readonly: false,

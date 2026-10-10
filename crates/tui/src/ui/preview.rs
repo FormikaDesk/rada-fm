@@ -448,7 +448,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect) {
         }
     }
     facts.push(format!("modified {}", fmt::date(info.modified)));
-    // Wrapped, never cut: on a narrow pane "70.7 KiB" must not become "70.…".
+    // Wrapped, never cut: on a narrow pane "70.7 KB" must not become "70.…".
     let mut fact_lines: Vec<Line> = facts
         .iter()
         .flat_map(|l| fmt::wrap(l, w))

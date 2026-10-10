@@ -137,9 +137,9 @@ pub fn truncate(s: &str, max: usize) -> String {
     out
 }
 
-/// Human readable size (`1.5 MiB`).
+/// Human readable size (`1.5 MB`), in powers of 1024 labelled the way Windows does.
 pub fn bytes(n: u64) -> String {
-    const UNITS: [&str; 6] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
     if n < 1024 {
         return format!("{n} B");
     }
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn byte_formatting() {
         assert_eq!(bytes(0), "0 B");
-        assert_eq!(bytes(1536), "1.50 KiB");
-        assert_eq!(bytes(10 * 1024 * 1024), "10.0 MiB");
+        assert_eq!(bytes(1536), "1.50 KB");
+        assert_eq!(bytes(10 * 1024 * 1024), "10.0 MB");
     }
 }

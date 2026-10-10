@@ -5,6 +5,7 @@ pub mod archive;
 pub mod display;
 pub mod error;
 pub mod events;
+pub mod filetype;
 pub mod fs;
 pub mod jobs;
 pub mod journal;
