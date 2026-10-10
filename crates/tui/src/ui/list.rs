@@ -36,17 +36,36 @@ pub struct Columns {
     pub name: usize,
 }
 
-pub fn columns(area_width: usize, term_width: usize, icon_w: usize, dates: DateStyle) -> Columns {
+/// What the caller decides about the table: which optional columns it may have. They follow
+/// the width of the terminal, not of the area the table is drawn in, so that every area on a
+/// screen agrees.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ListOpts {
+    pub show_type: bool,
+    pub show_date: bool,
+}
+
+impl ListOpts {
+    /// Below 100 columns the type goes, below 60 the date goes too.
+    pub fn for_terminal(term_width: usize) -> ListOpts {
+        ListOpts {
+            show_type: term_width >= 100,
+            show_date: term_width >= 60,
+        }
+    }
+}
+
+pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyle) -> Columns {
     let gap = 2;
     let date_w = match dates {
         DateStyle::Relative => 14,
         DateStyle::Absolute => 16,
     };
     let (mut date, mut kind, mut size) = (date_w, 20, 10);
-    if term_width < 100 {
+    if !opts.show_type {
         kind = 0;
     }
-    if term_width < 60 || area_width < 46 {
+    if !opts.show_date || area_width < 46 {
         date = 0;
     }
     if area_width < 24 {
@@ -65,15 +84,11 @@ pub fn columns(area_width: usize, term_width: usize, icon_w: usize, dates: DateS
     }
 }
 
-pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
+/// Draw the table of the front tab in `area` (any area: nothing here knows where it is).
+pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let th = app.th.clone();
     let count = app.visible.len();
-    let cols = columns(
-        area.width as usize,
-        app.term_width as usize,
-        app.icons.width(),
-        app.dates,
-    );
+    let cols = columns(area.width as usize, opts, app.icons.width(), app.dates);
 
     // Column titles, on a band of their own; the sorted one carries an arrow.
     let head_bg = Style::default().bg(th.field);
@@ -156,7 +171,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         height: area.height - 1,
         ..area
     };
-    app.view_rows = body.height as usize;
+    app.viewport.rows = body.height as usize;
     if body.height == 0 {
         return;
     }
@@ -228,14 +243,24 @@ fn row<'a>(
 ) -> Line<'a> {
     let th = &app.th;
     let marked = app.marked.contains(&e.name);
+    // The cursor row is solid with white text; selected rows are a quiet tone; the cursor on
+    // a selected row wins, but its tick stays.
     let row_style = if is_cursor {
-        th.selected()
+        th.cursor_row()
     } else if marked {
         th.marked()
     } else {
         Style::default()
     };
-    let with = |s: Style| s.patch(row_style);
+    // Patching the row's style over a span's own colour would lose the white text: on the
+    // cursor row the text colours are the row's.
+    let with = |s: Style| {
+        if is_cursor && th.depth != crate::theme::ColorDepth::Ansi16 {
+            Style { fg: None, ..s }.patch(row_style)
+        } else {
+            s.patch(row_style)
+        }
+    };
 
     let (glyph, gcolor) = icons::icon(e, app.icons, th);
     let broken = e
@@ -252,7 +277,7 @@ fn row<'a>(
         th.text
     };
     let mut name_style = Style::default().fg(name_color);
-    if e.is_dir() || is_cursor {
+    if e.is_dir() || is_cursor || marked {
         name_style = name_style.add_modifier(Modifier::BOLD);
     }
 
@@ -264,17 +289,32 @@ fn row<'a>(
             Glyph::Unchecked
         },
     );
+    // The leftmost cell carries a bar in the accent colour on the cursor row; the tick keeps
+    // its accent on a selected row and stays visible under the cursor.
+    let tick_style = if is_cursor && marked {
+        Style::default()
+            .fg(th.cursor_text)
+            .add_modifier(Modifier::BOLD)
+    } else if marked {
+        th.fg(th.check)
+    } else {
+        th.faint()
+    };
     let mut spans: Vec<Span> = vec![
-        Span::styled(" ", with(Style::default())),
         Span::styled(
-            check.to_string(),
-            with(if marked { th.fg(th.check) } else { th.faint() }),
+            if is_cursor { "▌" } else { " " },
+            row_style.patch(Style::default().fg(th.accent)),
         ),
+        Span::styled(check.to_string(), with(tick_style)),
         Span::styled(" ", with(Style::default())),
     ];
     // On the cursor row the secondary text turns to the main colour: the stronger
     // background would leave it too faint.
-    let dim = if is_cursor { th.base() } else { th.dim() };
+    let dim = if is_cursor {
+        Style::default()
+    } else {
+        th.dim()
+    };
     if cols.icon > 0 {
         spans.push(Span::styled(
             format!("{glyph} "),
@@ -319,7 +359,11 @@ fn row<'a>(
         };
         spans.push(Span::styled(
             pad_left(&s, cols.size),
-            with(if is_cursor { th.base() } else { th.dim() }),
+            with(if is_cursor {
+                Style::default().add_modifier(Modifier::BOLD)
+            } else {
+                th.dim()
+            }),
         ));
     }
     // Make the highlight reach the right edge.
@@ -340,23 +384,23 @@ mod tests {
     #[test]
     fn narrow_terminals_lose_the_least_important_columns_first() {
         let rel = DateStyle::Relative;
-        let wide = columns(120, 170, 2, rel);
+        let wide = columns(120, ListOpts::for_terminal(170), 2, rel);
         assert!(wide.kind > 0 && wide.date > 0 && wide.size > 0);
-        let mid = columns(90, 99, 2, rel);
+        let mid = columns(90, ListOpts::for_terminal(99), 2, rel);
         assert_eq!(mid.kind, 0, "the type goes below 100 columns");
         assert!(mid.date > 0);
-        let narrow = columns(50, 59, 2, rel);
+        let narrow = columns(50, ListOpts::for_terminal(59), 2, rel);
         assert_eq!((narrow.date, narrow.kind), (0, 0));
         assert!(narrow.size > 0, "name and size are what stays");
         // Absolute dates need more room than relative ones.
-        assert!(columns(120, 170, 2, DateStyle::Absolute).date > wide.date);
+        assert!(columns(120, ListOpts::for_terminal(170), 2, DateStyle::Absolute).date > wide.date);
     }
 
     #[test]
     fn the_columns_always_add_up_to_the_width() {
         for term in [170usize, 120, 99, 80, 59, 40] {
             let area = term.saturating_sub(30).max(24);
-            let c = columns(area, term, 2, DateStyle::Relative);
+            let c = columns(area, ListOpts::for_terminal(term), 2, DateStyle::Relative);
             let n = [c.date, c.kind, c.size].iter().filter(|x| **x > 0).count();
             assert_eq!(
                 CHECK + c.icon + c.name + c.date + c.kind + c.size + c.gap * n + 1,

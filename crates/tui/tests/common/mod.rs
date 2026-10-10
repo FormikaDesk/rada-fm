@@ -131,7 +131,8 @@ impl H {
             show_hints: true,
             sidebar: true,
             layout: rada_tui::LayoutKind::Explorer,
-            details_pane: None,
+            // Previews stay visible at the widths the older tests use.
+            details_pane: Some(true),
             view: rada_tui::ViewMode::Details,
             remember_tabs: true,
             saved_ui: Default::default(),
@@ -341,7 +342,14 @@ fn set_age(path: &std::path::Path, secs: u64) {
 pub fn demo_scene(w: u16, h: u16) -> H {
     let sb = Sandbox::new();
     let home = sb.dirs.home.clone();
-    for d in ["Desktop", "Downloads", "Documents", "Pictures", "Music", "Videos"] {
+    for d in [
+        "Desktop",
+        "Downloads",
+        "Documents",
+        "Pictures",
+        "Music",
+        "Videos",
+    ] {
         std::fs::create_dir_all(home.join(d)).unwrap();
     }
     let dir = home.join("projects/demo");
@@ -384,6 +392,7 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     let mut h = H::new(sb, dir, w, h);
     h.wait("the places", |a| !a.paths.places.is_empty());
     h.app.clock = Some(demo_now());
+    h.app.details = None;
     h.app.tz = jiff::tz::TimeZone::UTC;
     // Creation times are the real ones of the sandbox: leave them out of the screenshots.
     let entries: Vec<rada_core::model::Entry> = h.app.listing.all().to_vec();

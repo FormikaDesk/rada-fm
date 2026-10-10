@@ -74,6 +74,28 @@ pub fn details_mode(width: u16, chosen: Option<bool>, layout: LayoutKind) -> Det
     }
 }
 
+/// Rows of the command bar on a terminal `height` rows tall: three (the bar and a half-block
+/// padding above and below) while there is room, then one, then none. The padding of the
+/// hints goes before the padding of the command bar, the hints before the command bar.
+pub fn commands_height(explorer: bool, height: u16) -> u16 {
+    match (explorer, height) {
+        (false, _) => 0,
+        (true, h) if h >= 28 => 3,
+        (true, h) if h >= 18 => 1,
+        _ => 0,
+    }
+}
+
+/// Rows of the strip of hints: three, then one, then none.
+pub fn hints_height(wanted: bool, height: u16) -> u16 {
+    match (wanted, height) {
+        (false, _) => 0,
+        (true, h) if h >= 30 => 3,
+        (true, h) if h >= 24 => 1,
+        _ => 0,
+    }
+}
+
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
     if area.width < 24 || area.height < 8 {
@@ -94,8 +116,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let explorer = app.layout == LayoutKind::Explorer;
     let tabs_h = 1;
     let address_h = u16::from(explorer);
-    let commands_h = u16::from(explorer && area.height >= 18);
-    let hints_h = u16::from(explorer && app.show_hints && area.height >= 24);
+    let commands_h = commands_height(explorer, area.height);
+    let hints_h = hints_height(explorer && app.show_hints, area.height);
     let progress_h = if app.running.is_some() { 4 } else { 0 };
     let [
         tabs_row,
@@ -170,7 +192,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         rest
     };
     match app.view {
-        ViewMode::Details => list::draw_list(f, app, main),
+        ViewMode::Details => list::draw_list(
+            f,
+            app,
+            main,
+            list::ListOpts::for_terminal(area.width as usize),
+        ),
         ViewMode::Icons => grid::draw_grid(f, app, main),
     }
     if dmode == DetailsMode::Overlay {
@@ -363,4 +390,50 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
     );
     let _ = Alignment::Left;
     let _: &Path = app.home();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_short_terminal_gives_up_the_padding_then_the_hints_then_the_commands() {
+        // From tall to short: what is left of the two bars at each height.
+        let rows = |h: u16| (commands_height(true, h), hints_height(true, h));
+        assert_eq!(rows(35), (3, 3));
+        assert_eq!(rows(30), (3, 3));
+        assert_eq!(rows(29), (3, 1), "the hints' padding goes first");
+        assert_eq!(rows(28), (3, 1));
+        assert_eq!(rows(27), (1, 1), "then the command bar's");
+        assert_eq!(rows(24), (1, 1));
+        assert_eq!(rows(23), (1, 0), "then the hints");
+        assert_eq!(rows(18), (1, 0));
+        assert_eq!(rows(17), (0, 0), "then the command bar");
+        // Never more as the terminal gets shorter.
+        for h in (9..40u16).rev() {
+            let (c, k) = rows(h);
+            let (c2, k2) = rows(h - 1);
+            assert!(c2 <= c && k2 <= k);
+        }
+        assert_eq!(commands_height(false, 40), 0);
+        assert_eq!(hints_height(false, 40), 0);
+    }
+
+    #[test]
+    fn the_details_pane_follows_the_width_unless_the_user_chose() {
+        use crate::view::LayoutKind::*;
+        assert_eq!(details_mode(170, None, Explorer), DetailsMode::Column);
+        assert_eq!(details_mode(140, None, Explorer), DetailsMode::Column);
+        assert_eq!(details_mode(139, None, Explorer), DetailsMode::Hidden);
+        assert_eq!(
+            details_mode(120, Some(true), Explorer),
+            DetailsMode::Overlay
+        );
+        assert_eq!(details_mode(59, Some(true), Explorer), DetailsMode::Hidden);
+        assert_eq!(
+            details_mode(170, Some(false), Explorer),
+            DetailsMode::Hidden
+        );
+        assert_eq!(details_mode(170, None, Compact), DetailsMode::Hidden);
+    }
 }

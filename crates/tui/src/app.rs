@@ -64,6 +64,29 @@ pub struct Clip {
     pub paths: Vec<PathBuf>,
 }
 
+/// How much of the folder the area it was last drawn in can show: set by the renderer, read
+/// by the keyboard (a page is as many rows as fit). It is part of a tab's own state and says
+/// nothing about where on the screen the tab is, so a tab can be drawn in any area — one day
+/// beside another tab in a split view.
+#[derive(Clone, Copy, Debug)]
+pub struct Viewport {
+    /// Rows of the table.
+    pub rows: usize,
+    /// Tiles across and down in the Icons view.
+    pub grid_cols: usize,
+    pub grid_rows: usize,
+}
+
+impl Default for Viewport {
+    fn default() -> Self {
+        Viewport {
+            rows: 20,
+            grid_cols: 4,
+            grid_rows: 3,
+        }
+    }
+}
+
 pub struct PreviewState {
     pub name: String,
     pub content: Option<Preview>,
@@ -434,7 +457,7 @@ pub struct App {
     pub toast: Option<Toast>,
     pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
-    pub view_rows: usize,
+    pub viewport: Viewport,
     pub should_quit: bool,
     pub dirty: bool,
     pub spinner: usize,
@@ -480,9 +503,6 @@ pub struct App {
     pub undo_label: Option<String>,
     /// The address bar while its text is being edited.
     pub address: Option<AddressEdit>,
-    /// Tiles per row and rows on screen in the Icons view; set by the renderer.
-    pub grid_cols: usize,
-    pub grid_rows: usize,
     /// Text for the system clipboard (the "copy path" command); the event loop takes it.
     pub copied_text: Option<String>,
     /// Date strings of the visible rows, worked out once and kept until the folder, the
@@ -579,7 +599,7 @@ impl App {
             running: None,
             toast: None,
             watch_note: None,
-            view_rows: 20,
+            viewport: Viewport::default(),
             should_quit: false,
             dirty: true,
             spinner: 0,
@@ -610,8 +630,6 @@ impl App {
             active_tab: active,
             undo_label: None,
             address: None,
-            grid_cols: 4,
-            grid_rows: 3,
             copied_text: None,
             date_cache: Vec::new(),
             date_cache_key: (0, 0),
@@ -742,8 +760,8 @@ impl App {
     fn ensure_visible(&mut self) {
         if self.view == ViewMode::Icons {
             // `scroll` is the first tile shown, always the start of a row.
-            let cols = self.grid_cols.max(1);
-            let rows = self.grid_rows.max(1);
+            let cols = self.viewport.grid_cols.max(1);
+            let rows = self.viewport.grid_rows.max(1);
             let cursor_row = self.cursor / cols;
             let mut first = self.scroll / cols;
             if cursor_row < first {
@@ -756,7 +774,7 @@ impl App {
             self.scroll = first * cols;
             return;
         }
-        let rows = self.view_rows.max(1);
+        let rows = self.viewport.rows.max(1);
         if self.cursor < self.scroll {
             self.scroll = self.cursor;
         } else if self.cursor >= self.scroll + rows {

@@ -137,16 +137,18 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         },
     );
 
-    // The bottom: properties, a blank line, the buttons.
+    // Below the header: the preview, the buttons, then the properties.
     let mut props = properties(app);
-    let buttons_h = 1u16;
+    let buttons_h = 2u16;
     let fixed_top = 3u16;
-    let avail = inner.height.saturating_sub(fixed_top + buttons_h + 1);
+    // Blank lines: under the preview and over the properties.
+    let avail = inner.height.saturating_sub(fixed_top + 1 + buttons_h + 1);
     props.truncate(avail.min(props.len() as u16) as usize);
     let props_h = props.len() as u16;
+    let gaps = if props_h > 0 { 2 } else { 1 };
     let preview_h = inner
         .height
-        .saturating_sub(fixed_top + props_h + 1 + buttons_h + 1);
+        .saturating_sub(fixed_top + buttons_h + props_h + gaps);
 
     if preview_h >= 3 {
         let body = Rect {
@@ -158,7 +160,80 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         preview::content(f, app, body, false);
     }
 
-    let props_y = inner.y + inner.height.saturating_sub(buttons_h + 1 + props_h);
+    // Buttons, right under the preview: Open across the whole width, rounded where the font
+    // allows; under it Open with… and Preview side by side.
+    let by = inner.y + fixed_top + preview_h + 1;
+    if by + 1 < inner.y + inner.height {
+        let set = app.icons;
+        let rounded = set == icons::IconSet::Nerd;
+        let open_rect = Rect {
+            y: by,
+            height: 1,
+            ..inner
+        };
+        let on_accent = Style::default()
+            .fg(th.on_accent)
+            .bg(th.accent)
+            .add_modifier(Modifier::BOLD);
+        let label = format!("{} Open", icons::ui(set, Glyph::Open));
+        let label = label.trim().to_string();
+        let mid = w.saturating_sub(2);
+        let text = centered_text(&label, mid);
+        let line = if rounded {
+            Line::from(vec![
+                Span::styled("\u{e0b6}", Style::default().fg(th.accent)),
+                Span::styled(text, on_accent),
+                Span::styled("\u{e0b4}", Style::default().fg(th.accent)),
+            ])
+        } else {
+            Line::from(Span::styled(centered_text(&label, w), on_accent))
+        };
+        f.render_widget(Paragraph::new(line), open_rect);
+        app.hits.add(open_rect, Target::Act(Action::Open));
+
+        let row2 = Rect {
+            y: by + 1,
+            height: 1,
+            ..inner
+        };
+        let secondary = th.base().patch(Style::default().bg(th.button));
+        let preview_label = format!("{} Preview", icons::ui(set, Glyph::Eye));
+        let preview_label = preview_label.trim().to_string();
+        if e.is_dir() {
+            f.render_widget(
+                Paragraph::new(Span::styled(centered_text(&preview_label, w), secondary)),
+                row2,
+            );
+            app.hits.add(row2, Target::FullPreview);
+        } else {
+            let half = (w.saturating_sub(1)) / 2;
+            let left = Rect {
+                width: half as u16,
+                ..row2
+            };
+            let right = Rect {
+                x: row2.x + half as u16 + 1,
+                width: (w - half - 1) as u16,
+                ..row2
+            };
+            f.render_widget(
+                Paragraph::new(Span::styled(centered_text("Open with…", half), secondary)),
+                left,
+            );
+            f.render_widget(
+                Paragraph::new(Span::styled(
+                    centered_text(&preview_label, w - half - 1),
+                    secondary,
+                )),
+                right,
+            );
+            app.hits.add(left, Target::Act(Action::OpenWith));
+            app.hits.add(right, Target::FullPreview);
+        }
+    }
+
+    // Properties, at the bottom.
+    let props_y = inner.y + inner.height.saturating_sub(props_h);
     let lines: Vec<Line> = props
         .iter()
         .map(|(k, v)| {
@@ -177,50 +252,19 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             ..inner
         },
     );
+}
 
-    // Buttons.
-    let y = inner.y + inner.height - 1;
-    let set = app.icons;
-    let mut x = inner.x;
-    let mut button = |f: &mut Frame, app: &mut App, text: String, style: Style, t: Target| {
-        let wd = text.width() as u16;
-        if x + wd > inner.x + inner.width {
-            return;
-        }
-        let r = Rect {
-            x,
-            y,
-            width: wd,
-            height: 1,
-        };
-        f.render_widget(Paragraph::new(Span::styled(text, style)), r);
-        app.hits.add(r, t);
-        x += wd + 1;
-    };
-    let open_icon = icons::ui(set, Glyph::Open);
-    button(
-        f,
-        app,
-        format!(" {open_icon} Open ").replace("  ", " "),
-        th.pill(),
-        Target::Act(Action::Open),
-    );
-    if !e.is_dir() {
-        button(
-            f,
-            app,
-            " Open with… ".to_string(),
-            th.base().patch(Style::default().bg(th.button)),
-            Target::Act(Action::OpenWith),
-        );
-    }
-    button(
-        f,
-        app,
-        format!(" {} ", icons::ui(set, Glyph::Eye)),
-        th.base().patch(Style::default().bg(th.button)),
-        Target::FullPreview,
-    );
+/// `text` centred in `width` cells (cut with "…" when it does not fit).
+fn centered_text(text: &str, width: usize) -> String {
+    let t = display::truncate(text, width);
+    let w = t.width();
+    let left = width.saturating_sub(w) / 2;
+    format!(
+        "{}{}{}",
+        " ".repeat(left),
+        t,
+        " ".repeat(width.saturating_sub(w + left))
+    )
 }
 
 /// The pane as an overlay on the right of `main`: it covers part of the list.

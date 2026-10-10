@@ -77,7 +77,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
     let cols = (area.width as usize / TILE_W).max(1);
     let rows = ((area.height as usize + 1) / TILE_H).max(1);
     app.set_grid(cols, rows);
-    app.view_rows = rows;
+    app.viewport.rows = rows;
     app.hits.add(area, Target::List);
     let count = app.visible.len();
 
@@ -118,7 +118,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
             let cursor = vis == app.cursor;
             let marked = app.marked.contains(&e.name);
             let bg = if cursor {
-                th.selected()
+                th.cursor_row()
             } else if marked {
                 th.marked()
             } else {
@@ -144,7 +144,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 }
                 spans.push(Span::styled(
                     a.clone(),
-                    bg.patch(Style::default().fg(color)),
+                    Style::default().fg(color).patch(Style { fg: None, ..bg }),
                 ));
                 spans.push(Span::styled(" ".repeat(TILE_W - pad_l - ART_W), bg));
                 tile_lines[i].extend(spans);
@@ -158,14 +158,18 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 th.text
             };
-            let mut st = Style::default().fg(name_color);
-            if e.is_dir() || cursor {
+            let mut st = if cursor {
+                Style::default()
+            } else {
+                Style::default().fg(name_color)
+            };
+            if e.is_dir() || cursor || marked {
                 st = st.add_modifier(Modifier::BOLD);
             }
             let name = display::truncate(&e.display, TILE_W - 2);
             tile_lines[3].push(Span::styled(
                 format!(" {} ", centered(&name, TILE_W - 2)),
-                bg.patch(st),
+                st.patch(bg),
             ));
             tile_lines[4].push(Span::raw(" ".repeat(TILE_W)));
             app.hits.add(

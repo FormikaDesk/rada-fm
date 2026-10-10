@@ -8,15 +8,15 @@
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
-use ratatui::text::Span;
-use ratatui::widgets::Block;
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use super::widgets::{Bar, bar_spans};
 use crate::app::{App, Modal};
 use crate::fmt;
 use crate::hits::Target;
-use crate::icons::{self, Glyph};
+use crate::icons::{self, Glyph, IconSet};
 use crate::keymap::Action;
 use crate::view::{LayoutKind, ViewMode};
 
@@ -290,54 +290,95 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
     left.render(f, &mut app.hits, area);
 }
 
+/// The strip of key hints: a background of its own set apart from the status bar by a row of
+/// ▄ above and ▀ below in the strip's colour (when there are three rows), each key a pill —
+/// rounded with Nerd Font glyphs, a plain rectangle with a space on each side otherwise —
+/// and its description faint after it.
 pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
-    let band = th.band();
-    f.render_widget(Block::default().style(band), area);
+    let strip = Style::default().bg(th.panel);
     let w = area.width as usize;
+    let inner = if area.height >= 3 {
+        let edge = |glyph: &str| {
+            Paragraph::new(Line::from(Span::styled(
+                glyph.repeat(w),
+                Style::default().fg(th.panel),
+            )))
+        };
+        f.render_widget(edge("▄"), Rect { height: 1, ..area });
+        f.render_widget(
+            edge("▀"),
+            Rect {
+                y: area.y + area.height - 1,
+                height: 1,
+                ..area
+            },
+        );
+        Rect {
+            y: area.y + 1,
+            height: 1,
+            ..area
+        }
+    } else {
+        area
+    };
+    f.render_widget(Block::default().style(strip), inner);
+    let rounded = app.icons == IconSet::Nerd;
     let all = hints(app);
 
-    // As many as fit; what is left over is shared out between them.
-    let chunk = |h: &Hint| h.key.width() + 2 + 1 + h.what.width();
+    // As many as fit, two spaces from the left edge and four between groups.
+    let pill_w = |h: &Hint| h.key.width() + if rounded { 2 } else { 2 };
+    let chunk = |h: &Hint| pill_w(h) + 1 + h.what.width();
     let mut shown: Vec<&Hint> = Vec::new();
-    let mut used = 1;
+    let mut used = 2;
     for h in &all {
-        let need = chunk(h) + if shown.is_empty() { 0 } else { 3 };
+        let need = chunk(h) + if shown.is_empty() { 0 } else { 4 };
         if used + need > w {
             break;
         }
         used += need;
         shown.push(h);
     }
-    let spare = w.saturating_sub(used);
-    let extra = if shown.len() > 1 {
-        (spare / (shown.len() - 1)).min(9)
-    } else {
-        0
-    };
 
     let mut bar = Bar::default();
-    bar.push(Span::styled(" ", band));
+    bar.push(Span::styled("  ", strip));
     for (i, h) in shown.iter().enumerate() {
         if i > 0 {
-            bar.push(Span::styled(" ".repeat(3 + extra), band));
+            bar.push(Span::styled("    ", strip));
         }
-        let cap = Span::styled(
-            format!(" {} ", h.key),
-            th.chip().add_modifier(Modifier::BOLD),
-        );
-        let what = Span::styled(format!(" {}", h.what), th.dim().patch(band));
+        let key_style = Style::default()
+            .fg(th.key_text)
+            .bg(th.key_bg)
+            .add_modifier(Modifier::BOLD);
+        let edge_style = Style::default().fg(th.key_bg).bg(th.panel);
+        let (left, text, right) = if rounded {
+            (
+                Span::styled("\u{e0b6}", edge_style),
+                Span::styled(h.key.clone(), key_style),
+                Span::styled("\u{e0b4}", edge_style),
+            )
+        } else {
+            (
+                Span::styled(" ", key_style),
+                Span::styled(h.key.clone(), key_style),
+                Span::styled(" ", key_style),
+            )
+        };
+        let what = Span::styled(format!(" {}", h.what), th.dim().patch(strip));
         match &h.click {
             Some(t) => {
-                bar.push_hit(cap, t.clone());
+                bar.push_hit(left, t.clone());
+                bar.push_hit(text, t.clone());
+                bar.push_hit(right, t.clone());
                 bar.push_hit(what, t.clone());
             }
             None => {
-                bar.push(cap);
+                bar.push(left);
+                bar.push(text);
+                bar.push(right);
                 bar.push(what);
             }
         }
     }
-    let _: Style = band;
-    bar.render(f, &mut app.hits, area);
+    bar.render(f, &mut app.hits, inner);
 }

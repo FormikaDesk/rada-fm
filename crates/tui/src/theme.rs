@@ -107,6 +107,17 @@ pub struct Theme {
     pub mark: Color,
     /// The empty part of a size bar or progress bar.
     pub track: Color,
+    /// Selected rows, and the current place of the navigation pane: a quiet tone.
+    pub sel: Color,
+    /// Text on the row under the cursor (and on the cursor tile).
+    pub cursor_text: Color,
+    /// Background of the command bar.
+    pub cmdbar: Color,
+    /// Background of the strip of key hints.
+    pub panel: Color,
+    /// The pill behind a key in the hints, and the text on it.
+    pub key_bg: Color,
+    pub key_text: Color,
     /// Background of the address and search fields.
     pub field: Color,
     /// Background of the command buttons.
@@ -223,11 +234,17 @@ impl Theme {
             text_dim: rgb(138, 147, 175),
             muted: rgb(78, 85, 108),
             accent,
-            on_accent: rgb(12, 14, 24),
+            on_accent: rgb(22, 22, 30),
             selection,
             cursor: rgb(48, 72, 124),
             mark,
             track: rgb(36, 42, 62),
+            sel: rgb(34, 42, 68),
+            cursor_text: rgb(255, 255, 255),
+            cmdbar: rgb(30, 32, 48),
+            panel: rgb(21, 22, 32),
+            key_bg: rgb(59, 66, 97),
+            key_text: rgb(192, 202, 245),
             field: rgb(30, 32, 46),
             button: rgb(36, 40, 59),
             check: accent,
@@ -262,7 +279,7 @@ impl Theme {
     /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
     pub fn rada() -> Theme {
         let mut t = Theme::rada_base("rada", rgb(122, 162, 247), rgb(40, 52, 87), rgb(30, 36, 58));
-        t.cursor = rgb(51, 70, 124);
+        t.cursor = rgb(61, 89, 161);
         t.field = rgb(31, 34, 51);
         t.button = rgb(41, 46, 66);
         t.kinds.folder = rgb(122, 162, 247);
@@ -366,6 +383,12 @@ impl Theme {
         t.track = track;
         t.field = mark;
         t.button = selection;
+        t.sel = mark;
+        t.cursor_text = text;
+        t.cmdbar = mark;
+        t.panel = mark;
+        t.key_bg = selection;
+        t.key_text = text;
         t.check = accent;
         t.disk = accent;
         t
@@ -387,6 +410,13 @@ impl Theme {
         );
         t.field = rgb(244, 246, 250);
         t.button = rgb(235, 239, 246);
+        t.sel = rgb(227, 237, 251);
+        t.cursor = rgb(37, 99, 201);
+        t.cursor_text = rgb(255, 255, 255);
+        t.cmdbar = rgb(240, 243, 249);
+        t.panel = rgb(233, 237, 245);
+        t.key_bg = rgb(225, 230, 240);
+        t.key_text = rgb(28, 34, 52);
         t.success = rgb(26, 129, 77);
         t.warn = rgb(157, 102, 8);
         t.error = rgb(209, 48, 68);
@@ -496,6 +526,12 @@ impl Theme {
         self.cursor = Color::DarkGray;
         self.mark = Color::DarkGray;
         self.track = Color::DarkGray;
+        self.sel = Color::DarkGray;
+        self.cursor_text = Color::Reset;
+        self.cmdbar = Color::DarkGray;
+        self.panel = Color::DarkGray;
+        self.key_bg = Color::DarkGray;
+        self.key_text = Color::Reset;
         self.field = Color::DarkGray;
         self.button = Color::DarkGray;
         self.check = Color::Blue;
@@ -549,6 +585,12 @@ impl Theme {
                 t.cursor = f(t.cursor);
                 t.mark = f(t.mark);
                 t.track = f(t.track);
+                t.sel = f(t.sel);
+                t.cursor_text = f(t.cursor_text);
+                t.cmdbar = f(t.cmdbar);
+                t.panel = f(t.panel);
+                t.key_bg = f(t.key_bg);
+                t.key_text = f(t.key_text);
                 t.field = f(t.field);
                 t.button = f(t.button);
                 t.check = f(t.check);
@@ -636,11 +678,30 @@ impl Theme {
         }
     }
 
+    /// Selected rows: a quiet background; the name goes bold in the list.
     pub fn marked(&self) -> Style {
         if self.depth == ColorDepth::Ansi16 {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
-            Style::default().bg(self.selection)
+            Style::default().bg(self.sel)
+        }
+    }
+
+    /// The current place of the navigation pane.
+    pub fn current_place(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default().bg(self.sel)
+        }
+    }
+
+    /// The row under the cursor with its text: a solid background and white text.
+    pub fn cursor_row(&self) -> Style {
+        if self.depth == ColorDepth::Ansi16 {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default().bg(self.cursor).fg(self.cursor_text)
         }
     }
 
@@ -707,6 +768,12 @@ impl Theme {
             self.cursor,
             self.mark,
             self.track,
+            self.sel,
+            self.cursor_text,
+            self.cmdbar,
+            self.panel,
+            self.key_bg,
+            self.key_text,
             self.field,
             self.button,
             self.check,
@@ -894,7 +961,17 @@ mod tests {
             need("cursor against mark", contrast(t.cursor, t.mark), 1.2);
             // The cursor row is bold, which carries the text; its secondary text is
             // drawn in the main colour (see the list).
-            need("text on cursor", contrast(t.text, t.cursor), 5.5);
+            need(
+                "cursor_text on cursor",
+                contrast(t.cursor_text, t.cursor),
+                4.5,
+            );
+            need("text on sel", contrast(t.text, t.sel), 7.0);
+            need("sel against canvas", contrast(t.sel, c), 1.05);
+            need("key_text on key_bg", contrast(t.key_text, t.key_bg), 4.5);
+            need("text on cmdbar", contrast(t.text, t.cmdbar), 7.0);
+            need("text_dim on panel", contrast(t.text_dim, t.panel), 4.5);
+            need("on_accent on accent", contrast(t.on_accent, t.accent), 4.5);
             need("text on selection", contrast(t.text, t.selection), 7.0);
             need(
                 "text_dim on selection",

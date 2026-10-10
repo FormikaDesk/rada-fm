@@ -100,7 +100,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 let row_style = if is_focus {
                     Style::default().bg(th.cursor)
                 } else if is_current {
-                    th.chip_row()
+                    th.current_place()
                 } else if is_hover {
                     Style::default().bg(th.mark)
                 } else {

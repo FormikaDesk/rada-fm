@@ -176,7 +176,7 @@ impl App {
     pub fn dispatch(&mut self, action: Action) {
         use Action::*;
         self.dirty = true;
-        let page = self.view_rows.saturating_sub(1).max(1);
+        let page = self.viewport.rows.saturating_sub(1).max(1);
         if matches!(
             action,
             Up | Down
@@ -195,8 +195,8 @@ impl App {
         }
         // In the Icons view, up and down are a whole row, and a page is the tiles on screen.
         let (line, page, half) = if self.view == ViewMode::Icons {
-            let cols = self.grid_cols.max(1);
-            let screenful = (self.grid_rows.max(1) * cols)
+            let cols = self.viewport.grid_cols.max(1);
+            let screenful = (self.viewport.grid_rows.max(1) * cols)
                 .saturating_sub(cols)
                 .max(cols);
             (cols, screenful, screenful / 2)
@@ -381,8 +381,8 @@ impl App {
 
     /// The renderer tells how many tiles fit across and down in the Icons view.
     pub fn set_grid(&mut self, cols: usize, rows: usize) {
-        self.grid_cols = cols;
-        self.grid_rows = rows;
+        self.viewport.grid_cols = cols;
+        self.viewport.grid_rows = rows;
         if self.view == ViewMode::Icons {
             self.ensure_visible();
         }
@@ -655,7 +655,7 @@ impl App {
         self.sel_anchor = None;
         // A turn of the wheel is three rows of the list, or one row of tiles.
         let step = if self.view == ViewMode::Icons {
-            self.grid_cols.max(1)
+            self.viewport.grid_cols.max(1)
         } else {
             WHEEL_STEP
         };

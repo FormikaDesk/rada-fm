@@ -30,6 +30,7 @@ pub struct TabState {
     pub filter: Option<FilterState>,
     pub sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     pub view: ViewMode,
+    pub viewport: Viewport,
 }
 
 impl TabState {
@@ -85,6 +86,7 @@ impl App {
             filter: self.filter.take(),
             sel_anchor: self.sel_anchor.take(),
             view: self.view,
+            viewport: self.viewport,
         }
     }
 
@@ -105,6 +107,7 @@ impl App {
         self.filter = t.filter;
         self.sel_anchor = t.sel_anchor;
         self.view = t.view;
+        self.viewport = t.viewport;
     }
 
     /// Read the front tab's folder again, keeping the cursor and the selection.
