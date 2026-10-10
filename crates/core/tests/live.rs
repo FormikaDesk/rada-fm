@@ -41,8 +41,8 @@ fn wait_for<T>(
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn directory_loading_reports_the_real_error_for_unreadable_folders() {
     // Regression: "No such file or directory" instead of "Permission denied".
@@ -121,10 +121,6 @@ fn changed(rx: &Receiver<CoreEvent>, secs: u64) -> (PathBuf, Vec<PathBuf>, bool)
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
-)]
 fn files_created_removed_and_renamed_from_outside_show_up_without_any_key() {
     // Regression: an externally created file was invisible for >12 s.
     let sb = Sandbox::new();
@@ -163,10 +159,6 @@ fn files_created_removed_and_renamed_from_outside_show_up_without_any_key() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
-)]
 fn a_burst_of_changes_is_coalesced_into_few_events() {
     let sb = Sandbox::new();
     let dir = sb.mkdir("burst");
@@ -191,10 +183,6 @@ fn a_burst_of_changes_is_coalesced_into_few_events() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
-)]
 fn live_patches_update_a_sorted_listing() {
     let sb = Sandbox::new();
     let dir = sb.mkdir("live");
@@ -308,10 +296,6 @@ fn a_slow_volume_listing_never_blocks_the_caller() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "volume enumeration is implemented for Linux only; Windows and macOS are in development"
-)]
 fn the_real_volume_list_arrives_by_event() {
     let sb = Sandbox::new();
     let (tx, rx) = unbounded();
@@ -320,9 +304,17 @@ fn the_real_volume_list_arrives_by_event() {
         CoreEvent::Volumes(v) => Some(v),
         _ => None,
     });
+    #[cfg(unix)]
     assert!(
         vols.iter()
-            .any(|v| v.mount_point == std::path::Path::new("/"))
+            .any(|v| v.mount_point == std::path::Path::new("/")),
+        "{vols:?}"
+    );
+    // Windows: at least the system drive, with its letter.
+    #[cfg(windows)]
+    assert!(
+        vols.iter().any(|v| v.drive_letter.is_some() && v.total.is_some()),
+        "{vols:?}"
     );
 }
 
@@ -431,8 +423,8 @@ fn plan_then_confirm_then_run_then_undo_through_the_job_api() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn a_failure_blocks_only_the_worker_until_the_user_answers() {
     if is_root() {

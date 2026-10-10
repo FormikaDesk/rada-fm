@@ -70,8 +70,8 @@ fn navigating_into_a_folder_and_back_remembers_the_cursor() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
     if is_root() {
@@ -101,10 +101,6 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "live-update timing is validated on Linux only; Windows and macOS file watching is in development"
-)]
 fn a_file_created_from_outside_appears_without_pressing_anything() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir.clone(), 120, 30);
@@ -170,10 +166,6 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn trash_then_undo_restores_the_file() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir.clone(), 120, 30);
@@ -241,8 +233,8 @@ fn rename_asks_for_a_plan_and_bulk_rename_previews_names() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn the_screen_never_contains_control_characters_from_hostile_names_at_any_size() {
     let sb = Sandbox::new();

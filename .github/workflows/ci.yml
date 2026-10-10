@@ -2,22 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/cross-platform]
   pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Build everything and run the core tests on all three systems.
-  # Tests that are not supported yet on Windows/macOS are marked #[ignore = "<reason>"]
-  # in the source, so the reason shows up in the test output.
-  core:
-    name: core (${{ matrix.os }})
+  # Build everything and run every test on all three systems. A test that cannot run on a
+  # system is marked #[ignore = "<reason>"] in the source, so the reason shows in the output.
+  tests:
+    name: tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    # Windows and macOS: platform support is in progress, so a failure there is reported
-    # but does not fail the workflow. Linux is required.
-    continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,8 +25,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build workspace
         run: cargo build --workspace --all-targets
-      - name: Test core
-        run: cargo test -p rada-core
+      - name: Test workspace (core, interface and the program)
+        run: cargo test --workspace --no-fail-fast
 
   # Formatting, lints and the rest of the workspace (Linux).
   quality:

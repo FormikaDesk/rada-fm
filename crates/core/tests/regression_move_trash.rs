@@ -41,7 +41,7 @@ fn same_filesystem_move_is_a_rename_per_item_and_keeps_everything() {
 #[test]
 #[cfg_attr(
     not(target_os = "linux"),
-    ignore = "needs a tmpfs/disk pair; Windows and macOS support is in development"
+    ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
 )]
 fn moving_between_filesystems_copies_verifies_then_removes_the_source() {
     let sb = Sandbox::new();
@@ -93,7 +93,7 @@ fn moving_between_filesystems_copies_verifies_then_removes_the_source() {
 #[test]
 #[cfg_attr(
     not(target_os = "linux"),
-    ignore = "needs a tmpfs/disk pair; Windows and macOS support is in development"
+    ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
 )]
 fn cross_filesystem_move_never_deletes_what_it_could_not_copy() {
     if is_root() {
@@ -168,10 +168,6 @@ fn moving_onto_an_existing_folder_merges_and_removes_the_emptied_source() {
 // ---------------------------------------------------------------------------- trash (portable API)
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn trashing_a_symlink_trashes_the_link_not_its_target() {
     let sb = Sandbox::new();
     let target = sb.write("real/keep.txt", "keep me");
@@ -189,10 +185,6 @@ fn trashing_a_symlink_trashes_the_link_not_its_target() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn the_trash_refuses_the_root_and_its_own_contents() {
     let sb = Sandbox::new();
     let e = sb.engine();
@@ -218,10 +210,6 @@ fn the_trash_refuses_the_root_and_its_own_contents() {
 // ---------------------------------------------------------------------------- delete
 
 #[test]
-#[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX symlinks; Windows support is in development"
-)]
 fn permanent_delete_removes_links_but_never_their_targets() {
     let sb = Sandbox::new();
     let precious = sb.write("outside/precious.txt", "keep");
@@ -551,6 +539,6 @@ mod linux_only {
 #[cfg(not(target_os = "linux"))]
 mod linux_only {
     #[test]
-    #[ignore = "freedesktop Trash layout is Linux-only; the Windows Recycle Bin and macOS Trash backends are in development"]
+    #[ignore = "tests the freedesktop Trash layout (.trashinfo files, per-volume .Trash-uid folders), which exists on Linux only"]
     fn freedesktop_trash_suite() {}
 }

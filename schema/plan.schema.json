@@ -1373,7 +1373,24 @@
           ]
         },
         {
-          "description": "Windows Recycle Bin / macOS: an opaque identifier owned by the backend.",
+          "description": "A trash that is a folder (macOS, and the tests of every system): where the item is now.",
+          "type": "object",
+          "properties": {
+            "backend": {
+              "type": "string",
+              "const": "directory"
+            },
+            "stored": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "backend",
+            "stored"
+          ]
+        },
+        {
+          "description": "Windows Recycle Bin: an opaque identifier owned by the backend.",
           "type": "object",
           "properties": {
             "backend": {

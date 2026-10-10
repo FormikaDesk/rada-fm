@@ -60,10 +60,6 @@ fn links_fixture(sb: &Sandbox) -> PathBuf {
 }
 
 #[test]
-#[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX symlinks; Windows support is in development"
-)]
 fn symlinks_are_preserved_as_symlinks_including_broken_and_circular() {
     let sb = Sandbox::new();
     let src = links_fixture(&sb);
@@ -120,10 +116,6 @@ fn symlinks_are_preserved_as_symlinks_including_broken_and_circular() {
 }
 
 #[test]
-#[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX symlinks; Windows support is in development"
-)]
 fn a_selected_symlink_to_a_folder_is_copied_as_a_link_not_expanded() {
     let sb = Sandbox::new();
     sb.write("realdir/x.txt", "1");
@@ -138,10 +130,6 @@ fn a_selected_symlink_to_a_folder_is_copied_as_a_link_not_expanded() {
 }
 
 #[test]
-#[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX symlinks; Windows support is in development"
-)]
 fn copying_a_folder_into_itself_or_a_descendant_is_blocked() {
     let sb = Sandbox::new();
     sb.write("a/b/c.txt", "x");
@@ -169,8 +157,8 @@ fn copying_a_folder_into_itself_or_a_descendant_is_blocked() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX permissions; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn an_unreadable_file_does_not_stop_the_rest_and_the_error_has_the_full_path() {
     if is_root() {
@@ -228,8 +216,8 @@ fn an_unreadable_file_does_not_stop_the_rest_and_the_error_has_the_full_path() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX permissions; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn an_unreadable_folder_is_reported_and_siblings_still_copy() {
     if is_root() {
@@ -264,8 +252,8 @@ fn an_unreadable_folder_is_reported_and_siblings_still_copy() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "needs POSIX permissions; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn permissions_and_times_are_preserved_and_readonly_folders_can_be_filled() {
     let sb = Sandbox::new();
@@ -330,10 +318,6 @@ fn conflict_policies_skip_and_keep_both() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "overwriting moves the old file to the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn the_overwrite_policy_replaces_and_warns() {
     let sb = Sandbox::new();
     sb.write("src/same.txt", "NEW");
@@ -441,20 +425,30 @@ fn nasty_names() -> Vec<std::ffi::OsString> {
     .iter()
     .map(Into::into)
     .collect();
-    #[cfg(unix)]
+    // Names that are not text exist only on Linux; macOS and Windows refuse them.
+    #[cfg(target_os = "linux")]
     {
         v.push(os_from_bytes(b"not-utf8-\xff\xfe-name.bin"));
         v.push(os_from_bytes(b"\x80\x81\x82"));
-        v.push(os_from_bytes("long-".repeat(48).as_bytes())); // 240 bytes
     }
+    #[cfg(unix)]
+    v.push(os_from_bytes("long-".repeat(48).as_bytes())); // 240 bytes
+    // macOS keeps one of two names that differ only in how an accent is written.
+    #[cfg(target_os = "macos")]
+    v.retain(|n| n != "e\u{301}.txt");
+    // Windows refuses these: reserved characters, control characters, a trailing dot or blank.
+    #[cfg(windows)]
+    v.retain(|n| {
+        let s = n.to_string_lossy();
+        !s.chars()
+            .any(|c| "<>:\"/\\|?*".contains(c) || (c as u32) < 32)
+            && !s.ends_with(' ')
+            && !s.ends_with('.')
+    });
     v
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "macOS and Windows normalise Unicode / reject invalid names; their name rules are in development"
-)]
 fn awkward_file_names_copy_move_and_round_trip_exactly() {
     let sb = Sandbox::new();
     let names = nasty_names();
@@ -677,8 +671,8 @@ fn a_destination_that_appears_after_planning_is_never_overwritten() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "uses POSIX permissions or file names that Windows rejects; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn error_messages_use_display_escapes_for_hostile_names() {
     let sb = Sandbox::new();

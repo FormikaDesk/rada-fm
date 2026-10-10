@@ -130,10 +130,6 @@ fn undo_of_a_copy_never_touches_a_file_replaced_by_the_user() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn undoing_an_overwriting_copy_brings_the_old_file_back_from_the_trash() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -210,7 +206,7 @@ fn undo_of_a_move_refuses_to_overwrite_something_now_at_the_origin() {
 #[test]
 #[cfg_attr(
     not(target_os = "linux"),
-    ignore = "needs a tmpfs/disk pair; Windows and macOS support is in development"
+    ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
 )]
 fn undoing_a_cross_filesystem_move_goes_back_across_the_boundary() {
     let sb = Sandbox::new();
@@ -286,10 +282,6 @@ fn undoing_mkdir_removes_it_unless_it_gained_content() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn undoing_trash_restores_files_and_folders_with_their_content() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -310,10 +302,6 @@ fn undoing_trash_restores_files_and_folders_with_their_content() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn undoing_trash_refuses_to_overwrite_a_new_file_at_the_original_path() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -335,10 +323,6 @@ fn undoing_trash_refuses_to_overwrite_a_new_file_at_the_original_path() {
 }
 
 #[test]
-#[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "uses the system Trash, implemented for Linux only; Windows and macOS are in development"
-)]
 fn undoing_trash_after_the_trash_was_emptied_explains_instead_of_failing() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
@@ -467,8 +451,8 @@ fn an_interrupted_operation_can_still_be_undone() {
 
 #[test]
 #[cfg_attr(
-    not(unix),
-    ignore = "POSIX permissions; Windows support is in development"
+    windows,
+    ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
 fn journal_files_are_private_to_the_user() {
     #[cfg(unix)]
