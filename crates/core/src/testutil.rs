@@ -322,6 +322,23 @@ impl Sandbox {
         p
     }
 
+    /// Make a file hidden the way the system does it: a name that starts with a dot on Unix
+    /// (nothing to do: the caller chose the name), the hidden attribute on Windows.
+    pub fn hide(&self, rel: impl AsRef<Path>) {
+        #[cfg(windows)]
+        {
+            let p = self.path(rel);
+            let ok = std::process::Command::new("attrib")
+                .arg("+h")
+                .arg(&p)
+                .status()
+                .is_ok_and(|s| s.success());
+            assert!(ok, "cannot hide {}", p.display());
+        }
+        #[cfg(not(windows))]
+        let _ = rel;
+    }
+
     /// The folder that holds what was trashed: `files/` inside the trash in the freedesktop
     /// layout (Linux), the trash folder itself where the trash is a plain folder.
     pub fn trashed_dir(&self) -> PathBuf {

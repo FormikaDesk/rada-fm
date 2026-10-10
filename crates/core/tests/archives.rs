@@ -791,7 +791,8 @@ fn password_protected_zip_and_7z_are_recognised_with_real_tools() {
     assert!(std::fs::read_dir(&out).unwrap().next().is_none());
 }
 
-#[cfg(unix)]
+// macOS refuses a name that is not valid UTF-8.
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn names_that_are_not_text_survive_a_tar_extraction() {
     use std::os::unix::ffi::OsStrExt;

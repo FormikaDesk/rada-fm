@@ -167,7 +167,8 @@ fn a_delete_request_is_still_flagged_irreversible_and_needs_the_confirmation_flo
 fn plans_serialize_to_json_and_back_including_non_utf8_names() {
     let sb = Sandbox::new();
     sb.write("src/a.txt", "a");
-    #[cfg(unix)]
+    // macOS refuses a name that is not valid UTF-8.
+    #[cfg(all(unix, not(target_os = "macos")))]
     sb.write(
         std::path::Path::new("src").join(os_from_bytes(b"bad-\xff-name")),
         "z",

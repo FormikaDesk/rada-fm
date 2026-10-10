@@ -237,11 +237,19 @@ fn killed_inside_a_folder_after_some_files_is_coherent_too() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
+)]
 fn a_move_across_filesystems_killed_mid_file_loses_nothing() {
     crash_at("mid:tree/b.bin", true);
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
+)]
 fn a_move_killed_between_the_copy_and_the_removal_of_the_source_keeps_both_and_undo_removes_the_copy()
  {
     let o = crash_at("before_unlink:src/tree/c.txt", true);

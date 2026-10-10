@@ -22,13 +22,16 @@ fn fixed_now() -> SystemTime {
 
 fn age(path: &std::path::Path, secs: u64) {
     let t = fixed_now() - Duration::from_secs(secs);
-    let f = std::fs::File::options().write(true).open(path);
-    // Folders cannot be opened for writing; their time is not shown differently anyway.
-    if let Ok(f) = f {
-        f.set_modified(t).unwrap();
-    } else {
-        let f = std::fs::File::open(path).unwrap();
-        f.set_modified(t).unwrap();
+    // A folder is set through a read-only handle where the system allows it, and left alone
+    // where it does not (Windows): its time is not shown differently anyway.
+    let f = std::fs::File::options()
+        .write(true)
+        .open(path)
+        .or_else(|_| std::fs::File::open(path));
+    match f {
+        Ok(f) => f.set_modified(t).unwrap(),
+        Err(_) if path.is_dir() => {}
+        Err(e) => panic!("cannot set the time of {}: {e}", path.display()),
     }
 }
 
@@ -141,6 +144,10 @@ fn narrow_terminal_drops_columns_in_order() {
 }
 
 #[test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "the plan also says that attributes are not carried over on this system yet, which the Linux snapshot does not have"
+)]
 fn plan_window_names_the_folders_once() {
     let mut h = scene(120, 36);
     let home = h.app.home().to_path_buf();

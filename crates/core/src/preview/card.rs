@@ -292,6 +292,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(target_os = "linux"),
+        ignore = "reads /bin/sh as an ELF file, which only Linux has"
+    )]
     fn elf_headers_of_real_system_binaries() {
         // /bin/sh exists on every Linux machine this runs on; the header is read, not run.
         let Ok(bytes) = std::fs::read("/bin/sh") else {

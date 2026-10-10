@@ -250,15 +250,15 @@ fn the_screen_never_contains_control_characters_from_hostile_names_at_any_size()
     for n in evil {
         sb.write(Path::new("evil").join(n), "content \u{1b}[31mred\nnext");
     }
+    // macOS refuses a name that is not valid UTF-8.
+    #[cfg(all(unix, not(target_os = "macos")))]
+    std::fs::write(
+        sb.path("evil").join(os_from_bytes(b"bad\xff\xfebytes")),
+        "x",
+    )
+    .unwrap();
     #[cfg(unix)]
-    {
-        std::fs::write(
-            sb.path("evil").join(os_from_bytes(b"bad\xff\xfebytes")),
-            "x",
-        )
-        .unwrap();
-        sb.symlink("nowhere\nthere", "evil/dangling");
-    }
+    sb.symlink("nowhere\nthere", "evil/dangling");
     let dir = sb.path("evil");
     let mut h = H::new(sb, dir, 100, 30);
     h.keys("j");

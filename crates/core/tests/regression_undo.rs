@@ -380,9 +380,10 @@ fn the_journal_survives_a_restart_and_non_utf8_paths() {
     let file;
     {
         let j = sb.journal();
-        #[cfg(unix)]
+        // macOS refuses a name that is not valid UTF-8.
+        #[cfg(all(unix, not(target_os = "macos")))]
         let name = os_from_bytes(b"caf\xe9-\xff.txt");
-        #[cfg(not(unix))]
+        #[cfg(not(all(unix, not(target_os = "macos"))))]
         let name = std::ffi::OsString::from("café.txt");
         file = sb.path("src").join(&name);
         std::fs::create_dir_all(sb.path("src")).unwrap();
