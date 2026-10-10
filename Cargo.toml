@@ -3,11 +3,11 @@ resolver = "2"
 members = ["crates/core", "crates/tui", "crates/rada"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license = "MIT"
 authors = ["Alessandro Formica"]
-rust-version = "1.92"
+rust-version = "1.90"
 repository = "https://github.com/formikadesk/rada-fm"
 homepage = "https://github.com/formikadesk/rada-fm"
 readme = "README.md"

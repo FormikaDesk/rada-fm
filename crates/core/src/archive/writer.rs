@@ -130,17 +130,11 @@ pub fn write_archive<W: Write + io::Seek + Send>(
             finish_io(enc.finish().and_then(|mut w| w.flush()))
         }
         ArchiveKind::TarZst => {
-            let enc = structured_zstd::encoding::StreamingEncoder::new(
-                out,
-                structured_zstd::encoding::CompressionLevel::Default,
-            );
-            let mut enc = write_tar(enc, items, progress)?;
+            let mut enc = zstd::stream::write::Encoder::new(out, 0).map_err(ArchiveError::from)?;
             // Checksums let `zstd -t` and rada's own reader notice damage.
-            let _ = &mut enc;
-            let w = enc
-                .finish()
-                .map_err(|e| ArchiveError::Io(io::Error::other(e.to_string())))?;
-            let mut w = w;
+            enc.include_checksum(true).map_err(ArchiveError::from)?;
+            let enc = write_tar(enc, items, progress)?;
+            let mut w = enc.finish().map_err(ArchiveError::from)?;
             finish_io(w.flush())
         }
     }

@@ -49,10 +49,7 @@ impl Compression {
             Compression::Xz => {
                 Box::new(lzma_rust2::XzReader::new_mem_limit(r, true, XZ_MEMORY_KIB))
             }
-            Compression::Zstd => Box::new(
-                structured_zstd::decoding::StreamingDecoder::new(r)
-                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?,
-            ),
+            Compression::Zstd => Box::new(zstd::stream::read::Decoder::new(r)?),
         })
     }
 

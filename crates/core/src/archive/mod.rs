@@ -6,8 +6,8 @@
 //! ordinary path ends and an archive begins. Everything else in rada (breadcrumb, history,
 //! clipboard, previews) keeps working on paths.
 //!
-//! Formats are read with pure-Rust libraries wherever one exists (ZIP, tar with gzip, bzip2,
-//! xz or zstd, 7z), so the same code builds on every platform. RAR is read only through an
+//! Formats are read with libraries that build the same way on every platform (pure Rust for
+//! ZIP, gzip, bzip2, xz and 7z; the bundled official library for zstd). RAR is read only through an
 //! external program (`7z`, `7zz` or `unrar`) for licence reasons.
 
 pub mod browse;

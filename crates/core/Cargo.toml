@@ -35,13 +35,13 @@ jiff = "0.2.38"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "ico", "tiff"] }
 resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts"] }
 schemars = "1.2.2"
-# Archives: pure Rust everywhere, so the same code builds on Linux, Windows and macOS.
+# Archives: pure Rust, except zstd, which uses the official library (bundled C source, no system library needed).
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs", "bzip2", "deflate64"] }
 tar = { version = "0.4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 bzip2 = "0.6"
 lzma-rust2 = { version = "0.21", default-features = false, features = ["std", "encoder", "xz"] }
-structured-zstd = "=0.0.59"
+zstd = { version = "0.14", default-features = false }
 sevenz-rust2 = { version = "0.20", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
 
 [target.'cfg(unix)'.dependencies]

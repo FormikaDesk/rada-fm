@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-10
+
+### Changed
+- zstd (`.tar.zst`, `.zst`) now uses the `zstd` crate, bindings to the official library (its source is bundled and compiled with the build, no system library is needed), instead of the young pure-Rust `structured-zstd 0.0.59`. Reading and writing are both supported, with the same behaviour as before; archives written by rada carry a checksum and pass `zstd -t`. The other formats are still pure Rust.
+- The minimum Rust version is now 1.90 (the real minimum of the dependencies, checked with `cargo +1.90 build --workspace --locked`); 1.92 was needed only by the removed encoder.
+
 ## [0.4.0] - 2026-10-09
 
 ### Added

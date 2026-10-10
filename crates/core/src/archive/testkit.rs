@@ -266,10 +266,7 @@ pub fn compress(data: &[u8], c: Compression) -> Vec<u8> {
             e.finish().unwrap()
         }
         Compression::Zstd => {
-            let mut e = structured_zstd::encoding::StreamingEncoder::new(
-                Vec::new(),
-                structured_zstd::encoding::CompressionLevel::Fastest,
-            );
+            let mut e = zstd::stream::write::Encoder::new(Vec::new(), 1).unwrap();
             e.write_all(data).unwrap();
             e.finish().unwrap()
         }
