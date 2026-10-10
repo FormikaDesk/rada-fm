@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-10
+
+### Added
+- **Explorer look.** Tabs, an address bar, a command bar, a navigation pane, a details pane, a status bar and a row of key hints, arranged like the file managers people already know, with everything rada stands for kept: a plan before every operation, undo, vim and classic keys, light and dark themes. `layout = "compact"` hides the address bar, the command bar and the hints.
+- **Tabs.** `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab` / `Ctrl+Shift+Tab` / `Ctrl+PgDn` / `Ctrl+PgUp`, `Alt+1…9`, click, middle click. Each tab has its own folder, history, cursor, selection, sort order and view; clipboard, journal and undo are shared. Remembered between sessions (`remember_tabs`).
+- **Address bar** with clickable segments and, with `Ctrl+L` / `Alt+D` / `F4` or a click, a text field with completion from the subfolders (listed by a worker); **search** field that filters the folder (`Ctrl+F`).
+- **Command bar**: New ▾ (folder, empty file), Cut, Copy, Paste, Rename, Compress, Delete, Sort ▾, View ▾ and *Undo · copy of 3 items*, the description coming from the journal. Unusable buttons are faint; every button runs the same action as its key, through the same plan.
+- **Details view** with checkboxes and sortable Name / Date modified / Type / Size, types in plain English from a table in `rada-core` ("JPEG image", "Archive (tar.gz)", "Rust source"…), relative dates ("Today 14:03", "Yesterday", "3 days ago", "2 weeks ago", then the full date in the order of the locale; `dates = "absolute"`), and an **Icons view** (a grid with big icons, two-dimensional navigation; `Ctrl+1` / `Ctrl+2`, `v`, View ▾ or the status-bar buttons).
+- **Details pane** (`Alt+P`): a big preview, Open, Open with…, a full-screen Preview, Dimensions, exact Size, Modified, Created, Location and Permissions. A column from 140 columns, an overlay below that.
+- **Navigation pane**: Home, PINNED (your standard folders and the folders you pin, with a pin), DEVICES (a bar of how full each disk is and what is free) and Trash. Pin from the menu or with `B`.
+- **Context menus** for an item (Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / to…, Pin to navigation, Copy path, Delete, Properties) and for empty space (New, Paste, Sort by, View, Refresh, Open a terminal here); `Shift+F10` or the Menu key.
+- **New empty file** (`N`, `Alt+N`, New ▾): planned, journaled and undoable like everything else; in the JSON request as `make_file`.
+- Windows-style keys in the classic scheme, nothing taken from vim: `Alt+←` / `Alt+→` / `Alt+↑`, `F5` refresh, `Ctrl+L` / `Alt+D` address, `Ctrl+F` search, `Ctrl+Shift+N` new folder, `F2`, `Del`, `Shift+Del` (always a plan, said to be permanent), `Ctrl+A`, `Ctrl+Z`, `Alt+Enter` properties. `Ctrl+L` now edits the address (the jump palette is `Ctrl+P` and `m`); `Backspace` is *back* with the classic keys alone and still the parent folder where the vim keys are on.
+- Configuration: `layout`, `show_details_pane`, `show_hints` (the old `hints` still works), `remember_tabs`, `dates`, `view`. Sort by type.
+- Selection and cursor have a clear hierarchy: selected rows are quiet with a ticked box and a bold name, the row under the cursor is solid with white text and a bar at its left, and a ticked box stays visible under the cursor. New theme tokens for the selection, the cursor text, the command bar, the hints strip and its keys, fields, buttons, ticks and disk bars, in every theme.
+- The "copy path" command puts the path on the system clipboard through the terminal (OSC 52).
+- Tests: every screen at 170×35, 140×35, 120×30, 100×26, 80×24, 60×20 and 40×16 in both themes (text and a map of theme tokens), the Icons view, both context menus and two tabs; tabs, the address field, the command bar, checkboxes, the Icons grid, the details pane, menus, dates and the file types; the keymap for every new key.
+
+### Changed
+- Sizes are written `KB`, `MB`, `GB` (still powers of 1024), as Windows does.
+- The old preview pane is now the details pane; the preview facts of a picture or a PDF are properties, and the full-screen preview keeps them under the picture.
+- The state of a tab is kept apart from where and how it is drawn (the list and the grid are drawn into any area they are given), which leaves room for a split view in the future. Nothing of that is visible yet.
+
 ## [0.4.1] - 2026-10-10
 
 ### Changed

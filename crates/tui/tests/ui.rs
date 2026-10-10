@@ -3,6 +3,7 @@
 
 mod common;
 
+use rada_tui::hits::Target;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -358,6 +359,18 @@ fn is_block(c: char) -> bool {
     matches!(c, '▀' | '▄' | '█')
 }
 
+/// The screen without the rows of ▄ or ▀ that the bars draw as padding: what is left of the
+/// half blocks is a picture.
+fn strip_edges(s: String) -> String {
+    s.lines()
+        .filter(|l| {
+            let t = l.trim();
+            t.is_empty() || !t.chars().all(|c| c == '▄' || c == '▀')
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn an_image_is_drawn_with_its_facts_underneath() {
     let sb = Sandbox::new();
@@ -373,13 +386,13 @@ fn an_image_is_drawn_with_its_facts_underneath() {
                 Some(rada_tui::app::ImageStatus::Shown)
             )
     });
-    let mut s = h.screen();
+    let mut s = strip_edges(h.screen());
     for _ in 0..100 {
         if s.chars().filter(|c| is_block(*c)).count() > 50 {
             break;
         }
         h.pump(50);
-        s = h.screen();
+        s = strip_edges(h.screen());
     }
     assert!(
         s.chars().filter(|c| is_block(*c)).count() > 50,
@@ -430,13 +443,13 @@ fn show_photo(h: &mut H) -> String {
                 Some(rada_tui::app::ImageStatus::Shown)
             )
     });
-    let mut s = h.screen();
+    let mut s = strip_edges(h.screen());
     for _ in 0..100 {
         if s.chars().filter(|c| is_block(*c)).count() > 50 {
             break;
         }
         h.pump(50);
-        s = h.screen();
+        s = strip_edges(h.screen());
     }
     s
 }
@@ -502,7 +515,7 @@ fn a_huge_image_shows_a_clear_message_instead_of_a_picture() {
             Some(rada_tui::app::ImageStatus::TooLarge(_))
         )
     });
-    let s = h.screen();
+    let s = strip_edges(h.screen());
     assert!(s.contains("image too large to preview"), "{s}");
     assert!(s.contains("144"), "{s}");
     assert!(

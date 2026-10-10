@@ -16,6 +16,9 @@ use rada_tui::{IconSet, Services, Theme, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
+/// Adjusts the configuration before the interface starts.
+pub type Tweak = Box<dyn FnOnce(&mut Config)>;
+
 pub struct H {
     pub app: App,
     pub term: Terminal<TestBackend>,
@@ -81,6 +84,28 @@ impl H {
             Default::default(),
             None,
             limits,
+            None,
+        )
+    }
+
+    /// With the configuration adjusted by `tweak` before the interface starts.
+    pub fn with_config(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        tweak: impl FnOnce(&mut Config) + 'static,
+    ) -> H {
+        H::build_with(
+            sb,
+            start,
+            w,
+            h,
+            Some(rada_tui::ImageUi::halfblocks()),
+            Default::default(),
+            None,
+            Default::default(),
+            Some(Box::new(tweak)),
         )
     }
 
@@ -93,7 +118,17 @@ impl H {
         limits: rada_core::preview::Limits,
         request: Option<rada_core::ops::OpRequest>,
     ) -> H {
-        H::build_with(sb, start, w, h, images, limits, request, Default::default())
+        H::build_with(
+            sb,
+            start,
+            w,
+            h,
+            images,
+            limits,
+            request,
+            Default::default(),
+            None,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -106,6 +141,7 @@ impl H {
         limits: rada_core::preview::Limits,
         request: Option<rada_core::ops::OpRequest>,
         archive_limits: rada_core::archive::ArchiveLimits,
+        tweak: Option<Tweak>,
     ) -> H {
         let svc = Services::start_with(
             Arc::new(LocalFs),
@@ -113,7 +149,7 @@ impl H {
             Some(sb.journal()),
             archive_limits,
         );
-        let cfg = Config {
+        let mut cfg = Config {
             start_dir: start,
             icons: IconSet::Unicode,
             show_hidden: false,
@@ -140,6 +176,9 @@ impl H {
             dates: rada_tui::fmt::DateStyle::Relative,
             date_format: rada_tui::fmt::DateFormat::DEFAULT,
         };
+        if let Some(t) = tweak {
+            t(&mut cfg);
+        }
         let app = App::new(cfg, svc, images);
         let mut h = H {
             app,

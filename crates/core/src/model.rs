@@ -333,6 +333,9 @@ pub struct DirListing {
     spec: SortSpec,
 }
 
+/// One change to a listing. The entry is large and updates are few; boxing it would only
+/// add an allocation to every watcher event.
+#[allow(clippy::large_enum_variant)]
 pub enum EntryUpdate {
     Upsert(Entry),
     Remove(OsString),

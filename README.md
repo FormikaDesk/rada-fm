@@ -22,7 +22,7 @@ rada is young and written by one person. The parts that touch your files — pla
 
 | | |
 |---|---|
-| **A calm interface** | A top bar with back / forward / parent buttons, the path (a house for home, clickable segments, a clickable `…` for a long path), a labelled filter field and a `Go to…` button; a sidebar with your standard places under their real names (Scaricati, Documenti…), bookmarks and disks; a list with a size bar and a coloured type dot per file and relative dates ("3 h ago"); a bottom bar with what is selected, the keys that make sense right now drawn as little keys, and the free space of the disk. Floating windows (plan, errors, prompts, jump palette) appear in the middle over a dimmed background; notifications come and go by themselves ("Copied 342 files — press u to undo"). It adapts to the width of the terminal: the sidebar shrinks to icons, then goes, before the preview does; then the date, the type and the size bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
+| **Looks like what you know** | Tabs on top, an address bar with clickable segments (type a path with `Ctrl+L`, with completion), a command bar (New, Cut, Copy, Paste, Rename, Compress, Delete, Sort, View and *Undo · copy of 3 items*), a navigation pane (Home, pinned folders, disks with how full they are, Trash), the folder as a table with checkboxes and plain-English types ("JPEG image", "Archive (tar.gz)") or as a grid of icons, a details pane with a big preview and the properties, a status bar and a row of key hints. Floating windows (plan, errors, prompts, jump palette) appear in the middle over a dimmed background; notifications come and go by themselves. It adapts to the terminal: below 140 columns the details pane steps aside, below 100 the buttons lose their words and the Type column goes, below 60 only name and size remain; on a short terminal the hints go first, then the command bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
 | **Keyboard *and* mouse** | Vim keys and the usual desktop shortcuts work together by default (`y` or `Ctrl+C`, `d` or `Del`, `u` or `Ctrl+Z`…). The mouse selects, opens, scrolls, sorts by column, goes back and forward, picks places in the sidebar, and a right click opens a context menu that shows each shortcut. Every key can be rebound. |
 | **Plan window** | Copy, move, rename, bulk rename, new folder, trash, delete: all show a plan with totals and warnings first. Permanent deletion states clearly that it cannot be undone and asks you to type `yes`. |
 | **Journal + undo** | `u` undoes the last operation (with its own plan, so you see what undo will do). `U` shows the history. Undo of a copy removes exactly what the copy created; undo of a move moves back; undo of trash restores from the trash; undo of an overwrite brings the old file back. |
@@ -80,7 +80,7 @@ rada ~/Pictures      # open a folder
 rada photo.png       # open its folder with the cursor on the file
 ```
 
-Move with `j` `k` or the arrow keys, open with `Enter`, go up with `Backspace`. Press `?` (or `F1`) for the full list of keys, `Ctrl+P` to jump to any folder, bookmark or disk. `Alt+←` and `Alt+→` go back and forward like in a browser; `Tab` moves into the sidebar of places. Select with `Space`, then copy (`Ctrl+C`), move to another folder and paste (`Ctrl+V`): a **plan** appears first, and nothing happens until you press `Enter`. Changed your mind afterwards? `Ctrl+Z` undoes it.
+Move with `j` `k` or the arrow keys, open with `Enter`, go up with `Backspace` (`Alt+↑` anywhere). Press `?` (or `F1`) for the full list of keys, `Ctrl+P` to jump to any folder, bookmark or disk. `Alt+←` and `Alt+→` go back and forward like in a browser; `Tab` moves into the sidebar of places. Select with `Space`, then copy (`Ctrl+C`), move to another folder and paste (`Ctrl+V`): a **plan** appears first, and nothing happens until you press `Enter`. Changed your mind afterwards? `Ctrl+Z` undoes it.
 
 ## Usage
 
@@ -115,8 +115,13 @@ image_max_file_mb = 128
 pdf_max_file_mb = 512     # larger PDFs are not drawn
 pdf_timeout_seconds = 8   # a PDF that takes longer to draw is given up on
 mouse = true          # false: rada never captures the mouse
-sidebar = true        # the default; Ctrl+B toggles it and remembers
-hints = true          # false: no key hints in the bottom bar
+sidebar = true        # the navigation pane; Ctrl+B toggles it and remembers
+show_hints = true     # false: no row of key hints at the bottom (`hints` is the older name)
+layout = "explorer"   # explorer | compact (no address bar, command bar or hints: the most room)
+show_details_pane = true  # false: never show the details pane by itself (Alt+P still does)
+view = "details"      # details | icons: how a new tab shows a folder
+remember_tabs = true  # reopen the tabs of the last session
+dates = "relative"    # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm, in the order of your locale)
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
 
 [archives]
@@ -134,7 +139,7 @@ trash = ["d", "delete"]
 quit = "ctrl+q"
 ```
 
-State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with whether you hid the sidebar); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
+State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with the tabs that were open, whether you hid the navigation pane or the details pane, and the view of each tab); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
 
 ## Archives
 
@@ -174,31 +179,47 @@ preview_seconds = 1.5   # how long counting an archive's members may take in the
 
 What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no owner or ACLs in archives you create…), is in [docs/SAFETY.md](docs/SAFETY.md).
 
-## Navigation
+## The screen
 
-rada keeps a history of the folders you visit, like a browser. Three buttons sit at the left of the top bar: **‹** back, **›** forward and **↑** the parent folder; a button that cannot be used right now is drawn faint and does nothing. The keys are `Alt+←`, `Alt+→` and `Alt+↑`, in every key preset (checked in Ghostty: all three arrive intact). Going somewhere new after going back drops the part of the history that was "forward", as a browser does, and going back puts the cursor on the folder you came out of.
+From the top: a row of **tabs**, the **address bar**, the **command bar**, then the body — the **navigation pane**, the folder, the **details pane** — a **status bar** and a row of **key hints**. Everything drawn as a button does what its key does, through the same path: a plan first, then your confirmation, then the operation.
 
-The path shows a house for your home folder and a clickable segment for every folder; the current one is in the accent colour. When the path is too long for the bar its middle is folded into a `…`: click it to pick one of the folders it hides.
+### Tabs
 
-On the right of the bar: the **filter** field (`⌕ Filter…`, click it, or press `/` or `Ctrl+F`), the **`Go to…`** button (`Ctrl+P`, the jump palette) and how many items the folder has. When the terminal gets narrow the bar gives way in a fixed order: the item count goes first, then the middle of the path is folded; the words *Filter* and *Go to* stay, and their key hints are the last thing to go.
+`Ctrl+T` opens a tab in the current folder, `Ctrl+W` closes it (the last one is not closed: it goes back to Home), `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Ctrl+PgDn` / `Ctrl+PgUp` switch, `Alt+1` … `Alt+9` jump, a click on a tab switches and a middle click (or its ✕) closes it. Each tab has its own folder, history, cursor, selection, sort order and view; the clipboard, the journal and undo are shared. The open tabs are remembered between sessions (`remember_tabs = false` turns that off); a folder given on the command line opens in a tab of its own beside them. On a narrow terminal the tabs fold into `‹ 2/3 ›`.
 
-The mouse's own back and forward buttons are not used: the terminal library rada is built on does not report them. Use the buttons in the bar or `Alt+←` / `Alt+→`.
+### Address bar and search
 
-![The top bar with its buttons, path, filter and Go to; the bottom bar with the selection, the clipboard, the keys that fit and the free space](docs/screenshots/bars.png)
+Back `←`, forward `→`, up `↑` and refresh `⟳` sit at the left (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys). The path is clickable segment by segment, with `…` folding a long one (click it to pick a hidden folder). Click the path outside its words, or press `Ctrl+L` / `Alt+D` / `F4`, to **type an address**: `~` is your home, relative paths start at the current folder, `Tab` completes with the subfolders (listed by a background worker, never while you type), `↑` `↓` choose among the suggestions, `Enter` goes, `Esc` leaves. On the right is the **search** field (`Ctrl+F` or `/`): it filters the current folder as you type.
 
-## Sidebar
+### Command bar
 
-On the left: your **places**, your **bookmarks** and your **disks**.
+**+ New ▾** (a folder or an empty file), **Cut, Copy, Paste, Rename, Compress, Delete**, **Sort ▾**, **View ▾** and **Undo · copy of 3 items**, which says what the next undo would undo (taken from the journal). A button that cannot be used right now is faint and does nothing. Below 100 columns only the icons stay; the **⋯** at the right has the rest.
 
-- **Places** are your standard folders under the names your system really uses, read from `~/.config/user-dirs.dirs` on Linux: *Scaricati* and *Documenti* on an Italian desktop, *Downloads* and *Documents* elsewhere. Home, Desktop, Documents, Downloads, Pictures, Music, Videos and the Trash are listed when they exist; each has its own icon. (Windows Known Folders and the macOS equivalents come with their platform support; the engine already has the hook for them.)
-- **Bookmarks** are the ones from the config file and the ones you add with `B` or from the menu. Right-click an item (or press `B` with the keyboard on it) to add or remove it; `Del` removes the bookmark under the keyboard focus. Bookmarks from the config file can only be removed there.
-- **Devices** are your disks and USB sticks, each with a small bar of how full it is. They are listed by a background worker, never while you press a key.
+### The folder
 
-The place you are in is highlighted. Click an item to open it. **`Tab`** moves the keyboard into the sidebar (the focused item is drawn with the cursor colour); `↑` `↓` move, `Enter` opens and returns to the list, `Tab` or `Esc` returns to the list without opening. While the sidebar has the focus, file operations are refused rather than done to an item you cannot see.
+**Details** shows a checkbox, the icon and name (folders in the accent colour and bold), the date, the type in words and the size; the column titles sort (click again to reverse, an arrow marks the sorted one). A click on a name moves the cursor; the box on the left, or `Space`, selects; double-click or `Enter` opens. The row under the cursor is solid with white text and a bar at its left; selected rows have a quiet background, a ticked box and a bold name. Dates are relative ("Today 14:03", "Yesterday", "3 days ago", "2 weeks ago", then the full date in the order your locale uses; `dates = "absolute"` always writes it in full).
 
-**`Ctrl+B`** shows or hides the sidebar and remembers it (`sidebar = false` in the config file sets the default). It is 26 columns wide from a terminal width of 124; from 100 to 123 columns it becomes a **column of icons** with the places only (bookmarks and disks stay reachable with `Ctrl+P`): hover an icon, or move onto it with the keyboard, and its name shows in the bottom bar. Below 100 columns it is not shown at all, so it always gives way before the preview does. A section with nothing in it does not appear.
+**Icons** shows tiles with a big icon and the name under it, cut with `…`. The arrows and `h` `j` `k` `l` move in two dimensions; selection and every action are the same. Switch with **View ▾**, the two buttons at the right of the status bar, `Ctrl+1` / `Ctrl+2` (if your terminal tells them apart) or `v`.
 
-![The sidebar as a column of icons on a narrow terminal](docs/screenshots/sidebar-narrow.png)
+### Details pane
+
+The name with its icon, the type and size, a big preview (pictures, a PDF's first page, text, an archive's contents), then **Open** (full width), **Open with…** and **Preview** (the preview over the whole screen), then the properties: *Dimensions* for pictures, *Size* with the exact bytes, *Modified*, *Created* where the file system keeps it, *Location* and *Permissions*. It is a column from 140 columns; below that `Alt+P` shows it over the right of the list. `Alt+P` toggles it and the choice is remembered.
+
+### Navigation pane
+
+**Home**, then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of how full it is and what is free) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
+
+### Status bar and hints
+
+`19 items │ ☑ 3 selected · 56.7 MB │ ⎘ 2 items ready to paste` on the left; on the right the free space of the current disk and the Details / Icons buttons. Under it the **hints**: the keys that make sense now, drawn as pills and generated from your real keymap, so they follow `keymap = "vim"` and whatever you rebound. `show_hints = false` hides them; on a short terminal they go first, then the command bar.
+
+### Context menu
+
+Right click (or `Shift+F10`, or the Menu key). On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.
+
+![The explorer look](docs/screenshots/bars.png)
+
+![The navigation pane as a column of icons on a narrow terminal](docs/screenshots/sidebar-narrow.png)
 
 ## Themes
 
@@ -238,23 +259,27 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | Action | Vim | Classic |
 |---|---|---|
 | move | `j` `k` | `↓` `↑` |
-| open · parent folder | `l` · `h` | `Enter` · `Backspace` (also `→` `←`, and `Alt+↑` in every preset) |
+| open · parent folder | `l` · `h` (and `Backspace`) | `Enter` · `←` (also `→`, and `Alt+↑` in every preset; `Backspace` is *back* here) |
 | top · bottom · page | `g` `G` · `Ctrl+U` `Ctrl+D` | `Home` `End` · `PgUp` `PgDn` |
 | mark and move down | `Space` | `Space`, `Ctrl+Space`, `Ins` |
 | select all · extend selection | | `Ctrl+A` · `Shift+↑` `Shift+↓` (`Ctrl+Shift+Home/End` to the ends) |
 | clear selection, cancel the running operation, clear filter | `Esc` | `Esc` |
 | copy · cut · paste (a plan comes first) | `y` `x` `p` | `Ctrl+C` `Ctrl+X` `Ctrl+V` |
 | move to trash · delete permanently (type `yes`) | `d` `D` | `Del` · `Shift+Del` |
-| rename · bulk rename · new folder | `r` · `R` · `n` | `F2` · — · `Ctrl+N` |
+| rename · bulk rename · new folder · new file | `r` · `R` · `n` · `N` | `F2` · — · `Ctrl+Shift+N` (also `Ctrl+N`, `F7`) · `Alt+N` |
 | extract here · extract into a folder · compress | `e` · `E` · `z` | `Ctrl+E` · `Alt+E` · `Alt+Z` |
 | undo · redo | `u` · `Ctrl+R` | `Ctrl+Z` · `Ctrl+Y` (or `Ctrl+Shift+Z`) |
 | back · forward in the folder history | `Alt+←` · `Alt+→` (both schemes) | |
 | history of operations | `U` | `F3` |
 | filter this folder | `/` | `Ctrl+F` |
-| jump palette (folders, recents, bookmarks, disks) | `m` | `Ctrl+P` `Ctrl+L` |
+| jump palette (folders, recents, pinned, disks) | `m` | `Ctrl+P` |
+| edit the address · refresh | `Ctrl+L` `Alt+D` `F4` · `F5` (both schemes) | |
+| properties · open with… · copy path · terminal here | `i` · `O` · `Y` · `t` | `Alt+Enter` · `Alt+O` · `Ctrl+Shift+C` · `Ctrl+Alt+T` |
+| tabs: new · close · next · previous · jump | `Ctrl+T` `Ctrl+W` `Ctrl+Tab` `Ctrl+Shift+Tab` `Alt+1…9` (both schemes) | |
+| details pane · Details / Icons · context menu | `Alt+P` · `Ctrl+1` `Ctrl+2` or `v` · `Shift+F10` or `Menu` | |
 | sort key · reverse · hidden files | `s` `S` `.` | |
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
-| bookmark this folder (or the item in the sidebar) · home | `B` · `~` | |
+| pin this folder (or the item in the navigation pane) · home | `B` · `~` | |
 | move between list and sidebar · show / hide the sidebar | `Tab` · `Ctrl+B` (both schemes) | |
 | help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
@@ -266,7 +291,7 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 ### Mouse
 
-Click selects; double-click opens; the wheel scrolls the list (or the preview, when the pointer is over it); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: **‹ › ↑** in the top bar, a segment of the path (or the `…` that folds it, which lists the folders it hides), the **Filter** field, **Go to…**, every key in the bottom bar, an item of the sidebar (right-click it for *Open* and *Add to / Remove from bookmarks*), a column title to sort (again to reverse), a row of the palette to jump, and the buttons of any window. A right click on a file opens a context menu with each action's shortcut. In the icon-only sidebar, hovering an item shows its name in the bottom bar. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop between windows is planned for a later release.
+Click a name to put the cursor there; the box on its left (or `Space`) selects; double-click opens; the wheel scrolls (a turn is three rows, or one row of tiles); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: the tabs (middle click closes), **← → ↑ ⟳**, the path segments, the search field, every button of the command bar, a column title to sort, an item of the navigation pane (right-click for *Open* and *Pin / Unpin*), the buttons of the details pane, the Details / Icons switch, every key of the hints, a row of the palette, and the buttons of any window. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop is planned for a later release.
 
 ### Keys that terminals take for themselves
 

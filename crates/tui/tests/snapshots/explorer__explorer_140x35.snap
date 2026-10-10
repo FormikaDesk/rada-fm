@@ -1,0 +1,39 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: shot(&mut h)
+---
+ rada  ▸ demo  ✕   +                                                                                            vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                                  ⌕ Search in demo        Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  +  New ▾   │  ✂  Cut     ⧉  Copy     ⎘  Paste     ✎  Rename     ▣  Compress     ✗  Delete  │  ⇅  Sort ▾     ≣  View ▾  │  ↶  Undo        ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                Date modified   Type                        Size │ 3 items selected
+                            │ ☐ ▸ assets                3 days ago      Folder                           │ 56.6 MB in files
+ PINNED                     │ ☐ ▸ docs                  Yesterday       Folder                           │
+  ▭ Desktop               ⚲ │ ☐ ▸ scripts               9 days ago      Folder                           │
+  ▤ Documents             ⚲ │ ☐ ▸ src                   Today 09:30     Folder                           │
+  ↓ Downloads             ⚲ │ ☐ ▸ tests                 2 days ago      Folder                           │
+  ▣ Pictures              ⚲ │ ☑ · archive.tar.gz        8 days ago      Archive (tar.gz)         17.6 MB │
+  ♪ Music                 ⚲ │ ☑ · backup.zip            05/07/2026      Archive (ZIP)            39.0 MB │
+  ▶ Videos                ⚲ │ ☑ · Cargo.toml            3 days ago      Settings file               82 B │
+                            │ ☐ · data.json             6 days ago      JSON data                   49 B │
+ DEVICES                    │ ☐ · demo.mp4              2 weeks ago     MP4 video                91.0 MB │
+  ▥ System                  │ ☐ · logo.svg              5 days ago      SVG image                  197 B │
+    ━━━━━━━━━──────  183 GB │ ☐ · main.rs               Today 14:10     Rust source                 80 B │
+  ▥ Data                    │ ☐ · notes.txt             Yesterday       Text document               28 B │
+    ━━━━━━─────────  555 GB │▌☐ · photo.jpg             Today 13:30     JPEG image               70.7 KB │
+  ⏏ USB drive               │ ☐ · README.md             Today 13:28     Markdown                   145 B │
+    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf            4 days ago      PDF document             2.29 MB │
+                            │ ☐ · screenshot.png        Yesterday       PNG image                5.34 KB │
+                            │ ☐ · setup.sh              12 days ago     Shell script                21 B │
+                            │ ☐ · song.mp3              30/07/2026      MP3 audio                7.44 MB │
+                            │                                                                            │
+                            │                                                                            │
+                            │                                                                            │
+                            │                                                                            │
+                            │                                                                            │
+                            │                                                                            │
+ 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste                                             183 GB free ━━━━━━────  ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress     Ctrl+V  paste     Esc  clear
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

@@ -1,0 +1,43 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: "token_map(&mut h, &th)"
+---
+tokens: t text, d dim, m muted, A accent, o on_accent, C cursor, W cursor_text, S sel,
+M mark, B cmdbar, P panel, K key_bg, Y key_text, F field, U button, E selection, r track,
+s success, w warn, e error, k file kind, + a tint, . none
+
+text colour
+AAAAAAddtttttddttttttddd........AAAAAAAA
+.ttt.ttt..ddddddmmmddddddddmmmtttt......
+mmm..AAAAAAAAAAAAAAAAAAAAAA..dddddddddd.
+Am.AAAAAAAAA.................dddddddddd.
+Am.AAAAA.....................dddddddddd.
+Am.AAAAAAA...................dddddddddd.
+AA.kktttttttttttttt..........dddddddddd.
+AA.kktttttttttt..............dddddddddd.
+AA.kktttttttttt..............dddddddddd.
+Am.kkttttttttt...............dddddddddd.
+Am.kktttttttt................dddddddddd.
+Am.kktttttttt................dddddddddd.
+Am.kkttttttt.................dddddddddd.
+Am.kkttttttttt...............dddddddddd.
+AWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+.ttttttttmmmmmAAAAAA.ddddddddddddAAAddd.
+
+background
+MMMMMMMMMMMMMMMEEEEEEMMMMMMMMMMMMMMMMMMM
+MUUUMUUUMFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFM
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+........................................
+........................................
+........................................
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+........................................
+........................................
+........................................
+........................................
+........................................
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMEEEMMMM

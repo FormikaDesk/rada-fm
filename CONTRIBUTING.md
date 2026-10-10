@@ -77,3 +77,7 @@ Useful to know:
 Open an issue first for anything bigger than a fix, so we can agree on the direction. Pull
 requests should say what changed, how you checked it, and which of the promises in
 [docs/SAFETY.md](docs/SAFETY.md) they touch, if any.
+
+## Design note: tabs and a future split view
+
+A tab's state (`TabState` in `crates/tui/src/app/tabs.rs`: folder, history, cursor, scroll, selection, sort, view, filter and its `Viewport`) does not know where on the screen it is drawn. The list and the grid (`ui/list.rs`, `ui/grid.rs`) draw the front tab into whatever `Rect` they are given; what the terminal's width decides (which columns exist) is passed in as `ListOpts`. This is on purpose: a later release may show two tabs side by side, with one of them focused and copy / move towards the other. Keep it that way: nothing a tab remembers should depend on the layout of the screen, and nothing that draws a tab should read the whole screen's size.

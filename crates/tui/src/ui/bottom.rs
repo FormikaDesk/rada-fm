@@ -327,7 +327,8 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
     let all = hints(app);
 
     // As many as fit, two spaces from the left edge and four between groups.
-    let pill_w = |h: &Hint| h.key.width() + if rounded { 2 } else { 2 };
+    // A rounded pill has a glyph on each side, a plain one a space: two cells either way.
+    let pill_w = |h: &Hint| h.key.width() + 2;
     let chunk = |h: &Hint| pill_w(h) + 1 + h.what.width();
     let mut shown: Vec<&Hint> = Vec::new();
     let mut used = 2;

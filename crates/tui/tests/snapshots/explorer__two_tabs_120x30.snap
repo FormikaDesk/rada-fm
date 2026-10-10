@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: shot(&mut h)
+---
+ rada  ▸ demo  ✕   ▸ docs  ✕   +                                                            vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › projects › demo › docs                                             ⌕ Search in docs  Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
+                            │
+ PINNED                     │
+  ▭ Desktop               ⚲ │
+  ▤ Documents             ⚲ │
+  ↓ Downloads             ⚲ │
+  ▣ Pictures              ⚲ │                                   This folder is empty
+  ♪ Music                 ⚲ │
+  ▶ Videos                ⚲ │
+                            │
+ DEVICES                    │
+  ▥ System                  │
+    ━━━━━━━━━──────  183 GB │
+  ▥ Data                    │
+    ━━━━━━─────────  555 GB │
+  ⏏ USB drive               │
+    ━━━━━━───────── 35.4 GB │
+                            │
+                            │
+                            │
+                            │
+ 0 items                                                                                  183 GB free ━━━━━━────  ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Enter  open     Space  select     Ctrl+C  copy     Ctrl+V  paste     Del  trash     F2  rename     Ctrl+Z  undo
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

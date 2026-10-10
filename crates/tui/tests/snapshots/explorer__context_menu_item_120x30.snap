@@ -1,0 +1,39 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: shot(&mut h)
+---
+ rada  ▸ demo  ✕   +                                                                        vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                    ⌕ Search in demo  Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
+                            │ ☐ ▸ assets                               3 days ago      Folder
+ PINNED                     │ ☐ ▸ docs                                 Yesterday       Folder
+  ▭ Desktop               ⚲ │ ☐ ▸ scripts                              9 days ago      Folder
+  ▤ Documents             ⚲ │ ☐ ▸ src                                  Today 09:30     Folder
+  ↓ Downloads             ⚲ │ ☐ ▸ tests                                2 days ago      Folder
+  ▣ Pictures              ⚲ │ ☐ · archive.tar.gz                       8 days ago      Archive (tar.gz)         17.6 MB
+  ♪ Music                 ⚲ │ ☐ · backup.zip                           05/07/2026      Archive (ZIP)            39.0 MB
+  ▶ Videos                ⚲ │ ☐ · Cargo.toml                           3 days ago      Settings file               82 B
+                            │ ☐ · data.json                            6 days ago      JSON data                   49 B
+ DEVICES                    │ ☐ · demo.mp4                             2 weeks ago     MP4 video                91.0 MB
+  ▥ System                  │ ☐ · logo.svg                             5 days ago      SVG image                  197 B
+    ━━━━━━━━━──────  183 GB │ ☐ · main.rs                              Today 14:10     Rust source                 80 B
+  ▥ Data                    │ ☐ · notes.txt                            Yes╭──────────────────────────────╮         28 B
+    ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Tod│ Open                    Enter│      70.7 KB
+  ⏏ USB drive               │ ☐ · README.md                            Tod│ Open with…              Alt+o│        145 B
+    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│──────────────────────────────│      2.29 MB
+                            │ ☐ · screenshot.png                       Yes│ Cut                    Ctrl+X│      5.34 KB
+                            │ ☐ · setup.sh                             12 │ Copy                   Ctrl+C│         21 B
+                            │ ☐ · song.mp3                             30/│ Paste                  Ctrl+V│      7.44 MB
+                            │                                             │──────────────────────────────│
+                            │                                             │ Rename                     F2│
+                            │                                             │ Compress…               Alt+z│
+                            │                                             │──────────────────────────────│
+                            │                                             │ Copy the path    Ctrl+Shift+C│
+                            │                                             │──────────────────────────────│
+ 19 items                                                                 │ Move to trash             Del│━━────  ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Esc  close                                                             │ Properties          Alt+Enter│
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╰──────────────────────────────╯▀▀▀▀▀▀▀▀▀▀▀▀▀▀

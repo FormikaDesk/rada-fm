@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: shot(&mut h)
+---
+ rada  ▸ demo  ✕   +                                                                        vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                    ⌕ Search in demo  Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │     ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄         ☑ ╭───╮
+                            │     █████         █████         █████         █████         █████         │ · │
+ PINNED                     │     ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ╰───╯
+  ▭ Desktop               ⚲ │     assets         docs        scripts         src          tests      archive.tar…
+  ▤ Documents             ⚲ │
+  ↓ Downloads             ⚲ │   ☑ ╭───╮       ☑ ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮
+  ▣ Pictures              ⚲ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │
+  ♪ Music                 ⚲ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯
+  ▶ Videos                ⚲ │   backup.zip    Cargo.toml    data.json      demo.mp4      logo.svg      main.rs
+                            │
+ DEVICES                    │     ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮
+  ▥ System                  │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │
+    ━━━━━━━━━──────  183 GB │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯
+  ▥ Data                    │   notes.txt     photo.jpg     README.md     report.pdf   screenshot.…    setup.sh
+    ━━━━━━─────────  555 GB │
+  ⏏ USB drive               │     ╭───╮
+    ━━━━━━───────── 35.4 GB │     │ · │
+                            │     ╰───╯
+                            │    song.mp3
+                            │
+                            │
+ 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste                         183 GB free ━━━━━━────  ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

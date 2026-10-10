@@ -1,0 +1,51 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: "token_map(&mut h, &th)"
+---
+tokens: t text, d dim, m muted, A accent, o on_accent, C cursor, W cursor_text, S sel,
+M mark, B cmdbar, P panel, K key_bg, Y key_text, F field, U button, E selection, r track,
+s success, w warn, e error, k file kind, + a tint, . none
+
+text colour
+AAAAAAttttttttddd.ddd...............................AAAAAAAA
+.mmm.mmm.ttt.ttt..ddddddmmmddddddddmmmtttt..................
+.oooo.m.t...t...t...t...t...t.m.t...t.m.m.................tt
+Addd.mmmm..AAAAAAAAAAAAAAAAAAAA..dddddddddddddd..dddddddddd.
+.....mAm.AAAAAAAA................dddddddddddddd..dddddddddd.
+.....mAm.AAAAAA..................dddddddddddddd..dddddddddd.
+Addd.mAm.AAAAAAAAA...............dddddddddddddd..dddddddddd.
+Addd.mAm.AAAAA...................dddddddddddddd..dddddddddd.
+Addd.mAm.AAAAAAA.................dddddddddddddd..dddddddddd.
+Addd.mAA.kktttttttttttttt........dddddddddddddd..dddddddddd.
+Addd.mAA.kktttttttttt............dddddddddddddd..dddddddddd.
+Addd.mAA.kktttttttttt............dddddddddddddd..dddddddddd.
+.....mAm.kkttttttttt.............dddddddddddddd..dddddddddd.
+.....mAm.kktttttttt..............dddddddddddddd..dddddddddd.
+.....mAm.kktttttttt..............dddddddddddddd..dddddddddd.
+.....mAm.kkttttttt...............dddddddddddddd..dddddddddd.
+.....mAm.kkttttttttt.............dddddddddddddd..dddddddddd.
+.....mAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+.....mAm.kkttttttttt.............dddddddddddddd..dddddddddd.
+.ttttttttmmmmmAAAAAAAAAAAAAAA.ddddddddddddAAAAAAmmmm.AAAddd.
+
+background
+MMMMMMEEEEEEEEEEEMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+MMMMMMMMMUUUMUUUMFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFM
+BAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+......FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+......SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+......SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+......SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+......CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+............................................................
+MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMEEEMMMM

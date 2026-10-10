@@ -134,11 +134,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                     // The tick sits in the corner of the art, over its first cell.
                     let tick = icons::ui(app.icons, Glyph::Checked);
                     spans[0] = Span::styled(
-                        format!(
-                            "{}{}",
-                            " ".repeat(pad_l.saturating_sub(2)),
-                            format!("{tick} ")
-                        ),
+                        format!("{}{tick} ", " ".repeat(pad_l.saturating_sub(2))),
                         bg.patch(th.fg(th.check)),
                     );
                 }

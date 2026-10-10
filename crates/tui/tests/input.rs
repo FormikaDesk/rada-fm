@@ -648,11 +648,7 @@ fn help_shows_both_schemes_side_by_side_and_scrolls() {
     assert!(s.contains("Vim") && s.contains("Classic"), "{s}");
     let line = s
         .lines()
-        .find(|l| {
-            l.trim_start_matches(|c| c == '│' || c == ' ')
-                .starts_with("Copy  ")
-                && l.contains("Ctrl+C")
-        })
+        .find(|l| l.trim_start_matches(['│', ' ']).starts_with("Copy  ") && l.contains("Ctrl+C"))
         .unwrap_or_else(|| panic!("{s}"));
     assert!(
         line.contains('y') && line.contains("Ctrl+C"),

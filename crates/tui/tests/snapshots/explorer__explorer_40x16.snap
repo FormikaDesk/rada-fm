@@ -1,0 +1,20 @@
+---
+source: crates/tui/tests/explorer.rs
+expression: shot(&mut h)
+---
+ rada  ‹ 1/1 ›  demo  +          ? Help
+  ↑   ⟳   ⌂ Home › projects › demo
+ ☐   Name ↑                        Size
+ ☐ ▸ scripts
+ ☐ ▸ src
+ ☐ ▸ tests
+ ☑ · archive.tar.gz             17.6 MB
+ ☑ · backup.zip                 39.0 MB
+ ☑ · Cargo.toml                    82 B
+ ☐ · data.json                     49 B
+ ☐ · demo.mp4                   91.0 MB
+ ☐ · logo.svg                     197 B
+ ☐ · main.rs                       80 B
+ ☐ · notes.txt                     28 B
+▌☐ · photo.jpg                  70.7 KB
+ 19 items  │  ☑ 3 s… 183 GB free  ≣  ▦
