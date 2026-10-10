@@ -505,6 +505,27 @@ pub fn symlink(target: &Path, link: &Path) -> io::Result<()> {
     }
 }
 
+/// Set the modification time of a file or a folder. Unix takes a read-only handle for
+/// either; Windows needs the right to write attributes and the backup flag to open a folder.
+pub fn set_mtime(path: &Path, t: std::time::SystemTime) {
+    let mut o = std::fs::OpenOptions::new();
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_WRITE_ATTRIBUTES: u32 = 0x0100;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        o.access_mode(FILE_WRITE_ATTRIBUTES)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+    }
+    #[cfg(not(windows))]
+    o.read(true);
+    let f = o
+        .open(path)
+        .unwrap_or_else(|e| panic!("cannot open {} to set its time: {e}", path.display()));
+    f.set_modified(t)
+        .unwrap_or_else(|e| panic!("cannot set the time of {}: {e}", path.display()));
+}
+
 pub fn chmod(p: &Path, mode: u32) {
     #[cfg(unix)]
     {

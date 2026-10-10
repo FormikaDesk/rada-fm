@@ -203,6 +203,9 @@ impl Walker<'_, '_> {
                     Ok(_) => LinkState::ToFile,
                     #[cfg(unix)]
                     Err(e) if e.raw_os_error() == Some(libc::ELOOP) => LinkState::Circular,
+                    // ERROR_CANT_RESOLVE_FILENAME: links that lead back to themselves.
+                    #[cfg(windows)]
+                    Err(e) if e.raw_os_error() == Some(1921) => LinkState::Circular,
                     Err(_) => LinkState::Broken,
                 });
             }

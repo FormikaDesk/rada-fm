@@ -22,17 +22,7 @@ fn fixed_now() -> SystemTime {
 
 fn age(path: &std::path::Path, secs: u64) {
     let t = fixed_now() - Duration::from_secs(secs);
-    // A folder is set through a read-only handle where the system allows it, and left alone
-    // where it does not (Windows): its time is not shown differently anyway.
-    let f = std::fs::File::options()
-        .write(true)
-        .open(path)
-        .or_else(|_| std::fs::File::open(path));
-    match f {
-        Ok(f) => f.set_modified(t).unwrap(),
-        Err(_) if path.is_dir() => {}
-        Err(e) => panic!("cannot set the time of {}: {e}", path.display()),
-    }
+    set_mtime(path, t);
 }
 
 const LONG: &str = "a-very-long-file-name-that-keeps-going-and-going-until-no-column-could-hold-it-final-v7.tar.gz";

@@ -373,23 +373,7 @@ pub fn demo_now() -> SystemTime {
 
 fn set_age(path: &std::path::Path, secs: u64) {
     let t = demo_now() - Duration::from_secs(secs);
-    set_modified(path, t);
-}
-
-/// Set the modification time of a file or a folder. Windows only lets a file be opened
-/// for writing, and only lets a folder be opened at all with the backup flag.
-pub fn set_modified(path: &std::path::Path, t: SystemTime) {
-    // Unix sets the time of a folder through a read-only handle; Windows cannot open one.
-    let f = std::fs::File::options()
-        .write(true)
-        .open(path)
-        .or_else(|_| std::fs::File::open(path));
-    match f {
-        Ok(f) => f.set_modified(t).unwrap(),
-        // A folder on Windows: its time is not shown differently anyway.
-        Err(_) if path.is_dir() => {}
-        Err(e) => panic!("cannot set the time of {}: {e}", path.display()),
-    }
+    set_mtime(path, t);
 }
 
 /// `~/projects/demo` as in the prototype: folders, archives, code, a picture and a movie,

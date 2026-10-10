@@ -795,13 +795,14 @@ fn the_details_pane_shows_the_item_its_properties_and_buttons() {
         "Today, 13:30",
         "Location",
         "~/projects/demo",
-        "Permissions",
         "Open",
         "Open with…",
         "Preview",
     ] {
         assert!(s.contains(needle), "{needle}:\n{s}");
     }
+    // Windows has no permission bits to show.
+    assert!(!cfg!(unix) || s.contains("Permissions"), "{s}");
     // The buttons sit right under the preview, before the properties.
     let lines: Vec<&str> = s.lines().collect();
     let open = lines
@@ -826,23 +827,23 @@ fn the_details_pane_shows_the_item_its_properties_and_buttons() {
     assert!(h.app.modal.is_none());
     // Alt+P hides and shows it.
     h.press("alt+p");
-    assert!(!h.screen().contains("Permissions"));
+    assert!(!h.screen().contains("Location"));
     h.press("alt+p");
-    assert!(h.screen().contains("Permissions"));
+    assert!(h.screen().contains("Location"));
 }
 
 #[test]
 fn the_details_pane_is_hidden_below_140_columns_and_alt_p_shows_it_over_the_list() {
     let mut h = scene(120, 30);
     let s = h.screen();
-    assert!(!s.contains("Permissions"), "hidden by default:\n{s}");
+    assert!(!s.contains("Location"), "hidden by default:\n{s}");
     assert_eq!(h.app.details_shown, rada_tui::ui::DetailsMode::Hidden);
     h.press("alt+p");
     let s = h.screen();
-    assert!(s.contains("Permissions") && s.contains("photo.jpg"), "{s}");
+    assert!(s.contains("Location") && s.contains("photo.jpg"), "{s}");
     assert_eq!(h.app.details_shown, rada_tui::ui::DetailsMode::Overlay);
     h.press("alt+p");
-    assert!(!h.screen().contains("Permissions"));
+    assert!(!h.screen().contains("Location"));
     // Too narrow for even the overlay.
     let mut h = scene(50, 20);
     h.press("alt+p");
@@ -866,10 +867,11 @@ fn properties_copy_path_and_open_terminal_are_reachable() {
         "photo.jpg",
         "JPEG image",
         "70.7 KB (72,397 bytes)",
-        "Permissions",
     ] {
         assert!(s.contains(needle), "{needle}:\n{s}");
     }
+    // Windows has no permission bits to show.
+    assert!(!cfg!(unix) || s.contains("Permissions"), "{s}");
     h.press("esc");
     h.press("ctrl+shift+c");
     let text = h.app.copied_text.clone().expect("a path to copy");

@@ -23,14 +23,14 @@ fn members() -> Vec<Member> {
 fn in_archive(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("inside {tail}"), move |a| {
-        a.archive.is_some() && !a.is_loading() && a.cwd.to_string_lossy().ends_with(&t)
+        a.archive.is_some() && !a.is_loading() && a.cwd.ends_with(&t)
     });
 }
 
 fn at(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("in {tail}"), move |a| {
-        a.archive.is_none() && !a.is_loading() && a.cwd.to_string_lossy().ends_with(&t)
+        a.archive.is_none() && !a.is_loading() && a.cwd.ends_with(&t)
     });
 }
 

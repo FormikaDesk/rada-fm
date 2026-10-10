@@ -211,12 +211,17 @@ impl Engine {
         let mut plan = Plan::empty(OpKind::BulkRename, format!("Rename {} items", items.len()));
         let mut ws = WarningSet::default();
         let rules = self.platform.path_rules();
-        let key = |p: &Path| -> OsString {
-            if rules.case_insensitive {
-                OsString::from(p.as_os_str().to_string_lossy().to_lowercase())
-            } else {
-                p.as_os_str().to_os_string()
-            }
+        // Compared component by component: `d/2` and `d\2` are the same place on Windows.
+        let key = |p: &Path| -> Vec<OsString> {
+            p.components()
+                .map(|c| {
+                    if rules.case_insensitive {
+                        OsString::from(c.as_os_str().to_string_lossy().to_lowercase())
+                    } else {
+                        c.as_os_str().to_os_string()
+                    }
+                })
+                .collect()
         };
 
         let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
@@ -244,8 +249,8 @@ impl Engine {
             }
         }
 
-        let sources: HashSet<OsString> = pairs.iter().map(|(f, _)| key(f)).collect();
-        let mut seen: HashMap<OsString, &PathBuf> = HashMap::new();
+        let sources: HashSet<Vec<OsString>> = pairs.iter().map(|(f, _)| key(f)).collect();
+        let mut seen: HashMap<Vec<OsString>, &PathBuf> = HashMap::new();
         let mut staging = false;
         for (from, to) in &pairs {
             if seen.insert(key(to), from).is_some() {

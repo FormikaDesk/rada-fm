@@ -558,7 +558,7 @@ fn binary_files_show_a_card_and_the_hex_dump_only_on_request() {
         "{s}"
     );
     assert!(
-        s.contains("Size") && s.contains("Modified") && s.contains("Permissions"),
+        s.contains("Size") && s.contains("Modified") && (!cfg!(unix) || s.contains("Permissions")),
         "{s}"
     );
     #[cfg(unix)]
