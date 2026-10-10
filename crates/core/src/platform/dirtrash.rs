@@ -61,7 +61,9 @@ impl DirTrash {
                 return Ok(candidate);
             }
         }
-        Err(Error::Trash("the trash has too many items of that name".into()))
+        Err(Error::Trash(
+            "the trash has too many items of that name".into(),
+        ))
     }
 }
 
@@ -120,8 +122,7 @@ impl TrashBackend for DirTrash {
             return Err(Error::AlreadyExists(item.original.clone()));
         }
         if let Some(parent) = item.original.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| Error::io("create folder", parent, e))?;
+            std::fs::create_dir_all(parent).map_err(|e| Error::io("create folder", parent, e))?;
         }
         tree::move_tree(self.fs.as_ref(), stored, &item.original)
     }

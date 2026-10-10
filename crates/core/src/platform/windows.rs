@@ -217,12 +217,17 @@ mod native_volumes {
     const ANSWER_WITHIN: Duration = Duration::from_secs(3);
 
     fn wide(s: &str) -> Vec<u16> {
-        std::ffi::OsStr::new(s).encode_wide().chain(Some(0)).collect()
+        std::ffi::OsStr::new(s)
+            .encode_wide()
+            .chain(Some(0))
+            .collect()
     }
 
     fn text(buf: &[u16]) -> String {
         let end = buf.iter().position(|c| *c == 0).unwrap_or(buf.len());
-        OsString::from_wide(&buf[..end]).to_string_lossy().into_owned()
+        OsString::from_wide(&buf[..end])
+            .to_string_lossy()
+            .into_owned()
     }
 
     struct Info {
@@ -657,7 +662,11 @@ mod tests {
         assert_eq!(volume_kind_of(2), Some(VolumeKind::Removable));
         assert_eq!(volume_kind_of(4), Some(VolumeKind::Network));
         assert_eq!(volume_kind_of(5), Some(VolumeKind::Optical));
-        assert_eq!(volume_kind_of(1), None, "no root directory: nothing to list");
+        assert_eq!(
+            volume_kind_of(1),
+            None,
+            "no root directory: nothing to list"
+        );
         assert_eq!(volume_kind_of(0), None);
         assert_eq!(letters_in(0b101), vec!['A', 'C']);
         assert_eq!(letters_in(1 << 25), vec!['Z']);

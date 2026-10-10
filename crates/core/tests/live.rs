@@ -313,7 +313,8 @@ fn the_real_volume_list_arrives_by_event() {
     // Windows: at least the system drive, with its letter.
     #[cfg(windows)]
     assert!(
-        vols.iter().any(|v| v.drive_letter.is_some() && v.total.is_some()),
+        vols.iter()
+            .any(|v| v.drive_letter.is_some() && v.total.is_some()),
         "{vols:?}"
     );
 }
