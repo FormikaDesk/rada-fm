@@ -47,6 +47,18 @@ sevenz-rust2 = { version = "0.20", default-features = false, features = ["bzip2"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[target.'cfg(windows)'.dependencies]
+# Drive letters, Known Folders and ShellExecute: the Win32 calls, with no wrapper around them.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# The Recycle Bin: moving to it and putting back (the shell's own COM interfaces).
+trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded"] }
+
 [dev-dependencies]
 tempfile = "3"
 rada-core = { path = ".", features = ["testutil"] }
