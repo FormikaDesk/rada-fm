@@ -14,7 +14,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Status
 
-Version 0.4.0. **Linux is supported.** Windows and macOS are in development: the code is structured for them and compiles, but they are not supported yet and the attribute-preserving parts of a copy are stubs there.
+Version 0.5.0. **Linux is supported.** Windows and macOS are a **pre-release** on the development branch: the Recycle Bin / Trash, drives and volumes, the standard folders and opening files are implemented, and the whole test suite runs on all three systems in CI. Nobody uses them every day yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, extended attributes, resource forks) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -359,14 +359,14 @@ The suite includes regression tests for real bugs found in other terminal file m
 
 Tests never touch your real folders: each one runs in a temporary sandbox with `HOME` and all `XDG_*` variables pointing into it, and a guard fingerprints your real trash, config, state and cache before the first test and fails the test if anything under them changed.
 
-CI (GitHub Actions) checks formatting and lints, runs the whole suite and builds with the minimum Rust version on Linux, and all of that must pass. It also builds the workspace and runs the core tests on Windows and macOS, but those two jobs are allowed to fail (`continue-on-error`) while platform support is in progress. Tests that are not supported yet there are marked `#[ignore = "<reason>"]`.
+CI (GitHub Actions) checks formatting and lints and builds with the minimum Rust version on Linux, and runs the whole suite — core, interface and program — on Linux, Windows and macOS; all of it must pass. A test that cannot run on a system (POSIX permissions on Windows, a second filesystem to move across, the freedesktop trash layout, names that are not valid UTF-8 on macOS) is marked `#[ignore = "<reason>"]`, so the reason shows in the output. The tests on Windows and macOS run on GitHub's machines, with the trash kept in a folder of the sandbox: they say that the code works there, not that people have lived with it.
 
 ## Roadmap
 
 ### Next
 
 - **Fidelity and robustness**, continuing: more ways to break the engine on purpose (other filesystems, network shares, power-loss simulation), file flags and capabilities, and fewer limits in [docs/SAFETY.md](docs/SAFETY.md).
-- **Windows and macOS builds**: Recycle Bin and Trash, volumes and drive letters, junctions, attributes, with real tests on both.
+- **Windows and macOS**, from pre-release to supported: ACLs and alternate data streams on Windows, extended attributes and resource forks on macOS, junction handling, "Put Back" metadata in the Finder's trash, and people who use them every day.
 - **Easy install**: signed binaries and packages for the common distributions.
 - **Dual pane**, with tabs and layout restore.
 - **Archives**, continuing: passwords (zip and 7z), creating 7z, keeping owners and extended attributes in the archives you make.

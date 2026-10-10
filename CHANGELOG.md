@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- **Windows and macOS (pre-release).** The platform layer is real on both. Windows: the Recycle Bin (move, put back, check that an item is still in it), drive letters with type, label and free space, the Known Folders (Desktop, Documents, Downloads…, wherever they were moved), opening with the default program, `Open with…`, reveal in Explorer and a terminal in the folder, hidden and system attributes. macOS: `~/.Trash` and `/Volumes/<name>/.Trashes/<uid>` where the Finder looks, volumes from `/Volumes` with `statfs`, opening with `open(1)` (`-a` for `Open with…`, `-R` to reveal) and the terminal you are in, case- and normalisation-insensitive names. Attributes (ACLs, alternate data streams, extended attributes, resource forks) are not carried over by a copy yet, and the plan says so.
+- A trash that is a folder (`DirTrash`), used by macOS and by the tests of every system, so that no test ever puts anything in the real Recycle Bin or Trash of the machine running it.
+- CI runs the whole workspace — core, interface and program — on Linux, Windows and macOS. Tests that cannot run on a system say why with `#[ignore = "<reason>"]`.
+
+### Fixed
+- Windows: a move inside a volume was planned as copy-and-delete because the volume of a file was not known; it is a rename again. The volume, the file index and the number of links are now read from the file.
+- Windows: moving to another volume was not recognised as such (`ERROR_NOT_SAME_DEVICE`), and removing a folder that is not empty was not told apart from other errors, so undo of a folder that gained files reported a failure instead of keeping it.
+- Windows: the folder rada starts in, and the one `Open a terminal here` opens, were written `\\?\C:\…` in the address bar; they are plain paths now.
+- Windows: a link that leads back to itself is reported as circular (it was reported as broken).
+- Bulk rename compared names as text, so `d/2` and `d\2` were two different places on Windows; names are compared by component.
+- Paths under the home folder are shown as `~/a/b` on every system (they were `~/a\b` on Windows).
+- The schema files and the snapshots are checked out with `\n` line ends on every system (`.gitattributes`).
+
 ## [0.5.0] - 2026-10-10
 
 ### Added

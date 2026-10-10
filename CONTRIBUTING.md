@@ -11,9 +11,11 @@ it — so the most useful contributions are not always code.
    "what if the process dies *here*?" — is worth more than any feature. Start with
    [docs/SAFETY.md](docs/SAFETY.md), which states what is promised and what is not, and try
    to break a promise.
-2. **Windows and macOS.** The platform layer (`crates/core/src/platform/`) compiles for both
-   and is stubbed. Trash, volumes, attributes, path rules and opening files need real
-   implementations and someone who uses those systems every day.
+2. **Windows and macOS.** The platform layer (`crates/core/src/platform/`) has a real trash,
+   volumes, standard folders and opening files for both, and CI runs the whole suite on
+   them. What it needs is someone who uses those systems every day, and the parts still
+   missing: ACLs and alternate data streams (Windows), extended attributes and resource
+   forks (macOS), junctions, the Finder's "Put Back".
 3. **Packaging.** Distribution packages and a simple install path.
 4. **Terminals.** Reports of what works and what does not in your terminal: image protocols,
    keys, colours (version, terminal, `$TERM`, and what you saw).
@@ -25,7 +27,7 @@ If rada ever loses or damages a file, please say so first and keep the journal
 
 ## Build and run
 
-You need Linux and Rust 1.90 or newer ([rustup](https://rustup.rs)).
+You need Rust 1.90 or newer ([rustup](https://rustup.rs)) on Linux, or on Windows or macOS (pre-release).
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada

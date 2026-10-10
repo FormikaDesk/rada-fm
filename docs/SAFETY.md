@@ -178,9 +178,14 @@ These are real, and we would rather you read them here than discover them.
 - **Races you cause.** rada checks that a destination name is free at the moment it creates
   it, never earlier, but it cannot stop another program from changing the folder between two
   of its steps.
-- **Windows and macOS** are not supported. The platform layer compiles for both, and
-  preservation of attributes there is a documented stub: the plan says "this platform does
-  not carry attributes over" instead of pretending.
+- **Windows and macOS** are a pre-release. The engine, the journal and undo are the same
+  code and the same tests as on Linux, run in CI on both; the Recycle Bin (Windows) and
+  `~/.Trash` (macOS) are real. What is not done: preservation of attributes (ACLs and
+  alternate data streams on Windows, extended attributes and resource forks on macOS) is a
+  documented stub, and the plan says "this platform does not carry attributes over" instead
+  of pretending. A move inside a volume is a rename on every system; across volumes it is a
+  copy that is verified before the source is removed, as on Linux. Nothing here has been
+  used for long on a real machine, so keep backups.
 - **The journal is a file you own.** Anyone who can edit `journal.jsonl` can change what undo
   will propose. Undo still checks the fingerprints, and shows its plan before doing anything.
 - **Network and FUSE filesystems** may report sizes, times and links the way their server
