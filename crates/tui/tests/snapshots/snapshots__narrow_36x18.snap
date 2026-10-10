@@ -2,21 +2,21 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-  ↑   … › pro…  ⌕ Filter…   Go to…
-        Name ↑               Size
-   ──────────────────────────────
-      ▸ data/                   —
-      ▸ src/                    —
-      ▸ 目录/                   —
-      · a-very-long-f…        1 B
-      · backup.img        420 MiB
-   ▎  · Cargo.toml           42 B
-      · main.rs              37 B
-      · notes.txt        3.52 KiB
-      · README.md            73 B
-      · тест-файл.md         13 B
-      · 日本語のファ…        16 B
-      · 📷 holiday ph…        6 B
+ rada  ‹ 1/1 ›  projects  +
+  ↑   ⟳   ⌂ Home › demo › projects
+  +▾  │ ⧉   ⎘   ✗ │ ↶              ⋯
+ ☐   Name ↑                    Size
+ ☐ ▸ data
+ ☐ ▸ src
+ ☐ ▸ 目录
+ ☐ · a-very-long-file-…         1 B
+ ☐ · backup.img              420 MB
+▌☐ · Cargo.toml                42 B
+ ☐ · main.rs                   37 B
+ ☐ · notes.txt              3.52 KB
+ ☐ · README.md                 73 B
+ ☐ · тест-файл.md              13 B
+ ☐ · 日本語のファイル…         16 B
+ ☐ · 📷 holiday photos…         6 B
 
-
-    Enter  open    Space  mark
+ 12 items                     ≣  ▦

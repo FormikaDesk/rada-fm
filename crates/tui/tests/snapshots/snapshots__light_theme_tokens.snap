@@ -6,11 +6,11 @@ expression: out
   text          #1c2234
   text_dim      #545e7a
   muted         #969eb2
-  accent        #2365e1
+  accent        #2563c9
   on_accent     #ffffff
-  selection     #d6e4ff
-  cursor        #bad2fc
-  mark          #e8f0fe
+  selection     #dbe8fb
+  cursor        #2563c9
+  mark          #eef3fc
   track         #dfe4ee
   success       #1a814d
   warn          #9d6608
@@ -28,9 +28,9 @@ expression: out
   kind.config   #647292
   kind.binary   #288139
   kind.other    #696f89
-  kind.folder   #2365e1
+  kind.folder   #2563c9
   kind.link     #117d85
-  tint(accent)  #e0e9fa
+  tint(accent)  #e0e9f7
 [catppuccin-latte] canvas #eff1f5
   text          #3e4058
   text_dim      #5f6379

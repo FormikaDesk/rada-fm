@@ -155,9 +155,21 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("palette", "m", |h| {
             matches!(h.app.modal, Some(Modal::Palette(_)))
         }),
-        ("palette", "ctrl+l", |h| {
-            matches!(h.app.modal, Some(Modal::Palette(_)))
+        ("address", "ctrl+l", |h| h.app.address.is_some()),
+        ("address", "alt+d", |h| h.app.address.is_some()),
+        ("new folder", "ctrl+shift+n", |h| {
+            matches!(h.app.modal, Some(Modal::Input(_)))
         }),
+        ("new file", "N", |h| {
+            matches!(h.app.modal, Some(Modal::Input(_)))
+        }),
+        ("properties", "alt+enter", |h| {
+            matches!(h.app.modal, Some(Modal::Properties(_)))
+        }),
+        ("refresh", "f5", |h| h.app.is_loading()),
+        ("new tab", "ctrl+t", |h| h.app.tab_count() == 2),
+        ("details", "alt+p", |h| h.app.details == Some(false)),
+        ("view", "v", |h| h.app.view == rada_tui::ViewMode::Icons),
         ("palette", "ctrl+p", |h| {
             matches!(h.app.modal, Some(Modal::Palette(_)))
         }),
@@ -248,7 +260,10 @@ fn the_filter_narrows_the_list_as_you_type_and_esc_restores_it() {
     h.press("ctrl+f");
     h.keys("b.t");
     assert_eq!(h.names(), ["b.txt"]);
-    assert!(h.screen().contains("▽ b.t"));
+    assert!(
+        h.screen().contains("b.t▏"),
+        "the search field shows what is typed"
+    );
     h.press("enter"); // keep the filter, back to the list
     assert_eq!(h.names(), ["b.txt"]);
     assert!(h.app.filter.as_ref().is_some_and(|f| !f.editing));
@@ -417,7 +432,7 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     let (sb, _dir) = files();
     sb.write("w/dir/deep/x.txt", "x");
     let start = sb.path("w/dir/deep");
-    let mut h = H::new(sb, start, 140, 30);
+    let mut h = H::new(sb, start, 200, 30);
     let screen = h.screen();
     assert!(screen.contains("deep"), "{screen}");
     // Click the "dir" segment: go there.
@@ -463,24 +478,28 @@ fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
     let s = h.screen();
     for needle in [
         "Open",
+        "Open with…",
+        "Cut",
         "Copy",
         "Ctrl+C",
         "Rename",
         "F2",
+        "Compress…",
+        "Copy the path",
         "Move to trash",
         "Del",
-        "Delete permanently",
-        "Shift+Del",
+        "Properties",
+        "Alt+Enter",
     ] {
         assert!(s.contains(needle), "{needle} missing from the menu:\n{s}");
     }
     // Paste is greyed out until something is copied (it must not do anything).
-    h.click(&Target::MenuItem(3));
+    h.click(&Target::MenuItem(4));
     assert!(h.app.modal.is_none(), "the menu closes after a click");
     assert!(h.app.clipboard.is_none());
 
     h.right_click(&Target::Row(2));
-    h.click(&Target::MenuItem(1)); // Copy
+    h.click(&Target::MenuItem(3)); // Copy
     assert!(h.app.clipboard.is_some());
 
     // Keyboard works in the menu too.
@@ -629,7 +648,11 @@ fn help_shows_both_schemes_side_by_side_and_scrolls() {
     assert!(s.contains("Vim") && s.contains("Classic"), "{s}");
     let line = s
         .lines()
-        .find(|l| l.contains("Copy"))
+        .find(|l| {
+            l.trim_start_matches(|c| c == '│' || c == ' ')
+                .starts_with("Copy  ")
+                && l.contains("Ctrl+C")
+        })
         .unwrap_or_else(|| panic!("{s}"));
     assert!(
         line.contains('y') && line.contains("Ctrl+C"),

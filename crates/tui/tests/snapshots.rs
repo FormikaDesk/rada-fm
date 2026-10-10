@@ -80,6 +80,8 @@ fn scene(w: u16, h: u16) -> H {
     // same screen, run after run.
     h.wait("the places", |a| !a.paths.places.is_empty());
     h.app.clock = Some(fixed_now());
+    h.app.tz = jiff::tz::TimeZone::UTC;
+    h.app.details = Some(false);
     h.app.volumes.clear();
     h
 }
@@ -222,19 +224,18 @@ fn rows_stay_aligned_with_cjk_emoji_and_very_long_names() {
         on(&mut h, "Cargo.toml");
         let s = shot(&mut h);
         let lines: Vec<&str> = s.lines().collect();
-        // The list rows: those between the column titles' rule and the footer.
-        let rule = lines
+        // The list rows: those under the column titles, down to the status bar.
+        let head = lines.iter().position(|l| l.contains("Name")).unwrap_or(0);
+        let status = lines
             .iter()
-            .position(|l| l.trim_start_matches(' ').starts_with("────"))
-            .unwrap_or(0);
-        // Everything between the rule and the hint line at the bottom.
-        let body = &lines[rule + 1..lines.len() - 1];
+            .rposition(|l| l.contains(" items"))
+            .unwrap_or(lines.len() - 1);
+        let body = &lines[head + 1..status];
         let rows: Vec<&&str> = body.iter().filter(|l| !l.trim().is_empty()).collect();
-        assert!(rows.len() >= 10, "{w}: {s}");
+        assert!(rows.len() >= 8, "{w}: {s}");
         // Whatever the names contain (wide glyphs, emoji, very long text), the columns
-        // line up: with the preview open the divider sits in one column on every row;
-        // without it the right-aligned last column ends in one column.
-        if w >= 100 {
+        // line up: with the navigation pane the divider sits in one column on every row.
+        if w >= 60 {
             let cols: Vec<usize> = body
                 .iter()
                 .map(|l| l.split('│').next().unwrap().width())
@@ -242,12 +243,6 @@ fn rows_stay_aligned_with_cjk_emoji_and_very_long_names() {
             assert!(
                 cols.iter().all(|c| *c == cols[0]),
                 "{w}: the divider moves between rows {cols:?}:\n{s}"
-            );
-        } else if w >= 62 {
-            let ends: Vec<usize> = rows.iter().map(|l| row_width(l)).collect();
-            assert!(
-                ends.iter().all(|c| *c == ends[0]),
-                "{w}: rows end at different columns {ends:?}:\n{s}"
             );
         }
         // No row spills past the terminal.
@@ -282,11 +277,9 @@ fn relative_dates_use_the_pinned_clock() {
     let mut h = scene(130, 30);
     on(&mut h, "README.md");
     let s = shot(&mut h);
-    for needle in ["3 h ago", "2 days ago", "1 d ago", "yesterday"] {
-        // At least the style of the phrasing is stable: print what we have if none match.
-        let _ = needle;
+    for needle in ["Today 09:", "Yesterday", "2 days ago", "weeks ago"] {
+        assert!(s.contains(needle), "{needle}:\n{s}");
     }
-    assert!(s.contains(" ago") || s.contains("yesterday"), "{s}");
     assert!(
         !s.contains("2030") && !s.contains("1970"),
         "no raw timestamps: {s}"

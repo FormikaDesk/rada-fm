@@ -2,33 +2,33 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-  ‹   ›   ↑   ⌂ › demo › projects                                 ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
-     │        Name ↑                                 Size  Type        │   · notes.txt
-  ⌂  │   ───────────────────────────────────────────────────────────── │   UTF-8 · 3.52 KiB · 5 weeks ago
-     │      ▸ data/                                     —  Folder      │
-     │      ▸ src/                                      —  Folder      │     1  remember the milk
-     │      ▸ 目录/                                     —  Folder      │     2  remember the milk
+ rada  ▸ projects  ✕   +                                                          vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ Search in proj… Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
    ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
    │                                                                                                      │
    │   Delete                                                                                             │
-   │  Permanently delete 1 item                                                                           │
-   │  In    ~/demo/projects                                                                               │
-   │                                                                                                      │
-   │  1             3.52 KiB                                                                              │
-   │  file          freed                                                                                 │
-   │                                                                                                      │
-   │  ▲ PERMANENT: this cannot be undone                                                                  │
-   │                                                                                                      │
-   │  What will happen                                                                                    │
-   │  · notes.txt                                 delete                                      3.52 KiB    │
+   │  Permanently delete 1 item                                                                           │ B
+   │  In    ~/demo/projects                                                                               │MB
+   │                                                                                                      │ B
+   │  1             3.52 KB                                                                               │ B
+   │  file          freed                                                                                 │KB
+   │                                                                                                      │ B
+   │  ▲ PERMANENT: this cannot be undone                                                                  │ B
+   │                                                                                                      │ B
+   │  What will happen                                                                                    │ B
+   │  · notes.txt                                 delete                                       3.52 KB    │
    │  This cannot be undone.  Type yes to confirm: ▏                                                      │
    │                                                                                                      │
    │   Enter  Run    Esc  Cancel                                                                          │
    │                                                                                                      │
    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
-     │                                                                 │    21  remember the milk
-     │                                                                 │    22  remember the milk
-     │                                                                 │    23  remember the milk
-     │                                                                 │    24  remember the milk
-     │                                                                 │    25  remember the milk
-                                          Enter  run    Esc  cancel
+                            │
+                            │
+ 12 items                                                                                               ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Enter  run     Esc  cancel
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

@@ -2,33 +2,33 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-  ‹   ›   ↑   ⌂ › demo › projects                                           ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
-     │        Name ↑                           Size  Type          Modified   │   · Cargo.toml
-  ⌂  │   ──────────────────────────────────────────────────────────────────── │   UTF-8 · 42 B · 5 weeks ago
-     │      ▸ data/                               —  Folder      6 days ago   │
-     │      ▸ src/                                —  Folder      6 days ago   │   1  [package]
-     │      ▸ 目录/                               —  Folder      6 days ago   │   2  name = "demo"
-     │      · a-very-long-file-…  ───────       1 B  ● archive  12 days ago   │   3  version = "0.1.0"
-     │      · backup.img          ━━━━━━━   420 MiB  ● file      9 days ago   │
-     │    ● · Cargo.toml          ───────      42 B  ● config    2 days ago   │
-     │    ● · main.rs             ───────      37 B  ● code       yesterday   │
-     │   ▎  · notes.txt           ───────  3.52 KiB  ● text     5 weeks ago   │
-     │      · README.md           ───────      73 B  ● md           3 h ago   │
-     │      · тест-файл.md        ───────      13 B  ● md           1 h ago   │
-     │      · 日本語のファイル…   ───────      16 B  ● text      5 days ago   │
-     │      · 📷 holiday photos…  ───────       6 B  ● text        Nov 2028   │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
-     │                                                                        │
- ● 2 selected · 79 B          Ctrl+C  copy    Ctrl+X  cut    Del  trash    Shift+Del  delete    R  bulk rename
+ rada  ▸ projects  ✕   +                                                                    vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                                    ⌕ Search in proj… Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
+                            │ ☐ ▸ data                                 6 days ago      Folder
+                            │ ☐ ▸ src                                  6 days ago      Folder
+                            │ ☐ ▸ 目录                                 6 days ago      Folder
+                            │ ☐ · a-very-long-file-name-that-keeps-g…  12 days ago     Archive (tar.gz)             1 B
+                            │ ☐ · backup.img                           9 days ago      Disk image                420 MB
+                            │ ☑ · Cargo.toml                           2 days ago      Settings file               42 B
+                            │ ☑ · main.rs                              Yesterday       Rust source                 37 B
+                            │▌☐ · notes.txt                            5 weeks ago     Text document            3.52 KB
+                            │ ☐ · README.md                            Today 09:00     Markdown                    73 B
+                            │ ☐ · тест-файл.md                         Today 10:30     Markdown                    13 B
+                            │ ☐ · 日本語のファイル名.txt               5 days ago      Text document               16 B
+                            │ ☐ · 📷 holiday photos 🌴.txt             27/11/2028      Text document                6 B
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+ 12 items  │  ☑ 2 selected · 79 B                                                                                 ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

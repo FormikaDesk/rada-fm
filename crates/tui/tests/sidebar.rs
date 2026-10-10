@@ -90,11 +90,10 @@ fn the_full_sidebar_shows_places_under_their_real_names_and_only_those_that_exis
     let mut h = italian(150, 30);
     let s = h.screen();
     for needle in [
-        "PLACES",
+        "PINNED",
         "Home",
         "Documenti",
         "Scaricati",
-        "BOOKMARKS",
         "progetto",
         "altro",
         "DEVICES",
@@ -128,7 +127,7 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
     let buf = h.term.backend().buffer().clone();
     assert_eq!(
         buf[(r.x + 4, r.y)].bg,
-        h.app.th.selection,
+        h.app.th.sel,
         "the place we are in has its own background"
     );
     let docs = place(&h, "Documenti");
@@ -189,12 +188,9 @@ fn file_operations_are_not_done_behind_the_sidebars_back() {
 
 #[test]
 fn narrow_terminals_get_a_column_of_icons_with_the_places_only() {
-    let mut h = italian(110, 30);
+    let mut h = italian(90, 30);
     let s = h.screen();
-    assert!(
-        !s.contains("PLACES") && !s.contains("BOOKMARKS") && !s.contains("DEVICES"),
-        "{s}"
-    );
+    assert!(!s.contains("PINNED") && !s.contains("DEVICES"), "{s}");
     assert!(
         !s.contains("USB drive") && !s.contains("progetto"),
         "bookmarks and disks stay out:\n{s}"
@@ -223,7 +219,7 @@ fn narrow_terminals_get_a_column_of_icons_with_the_places_only() {
 
 #[test]
 fn in_the_icon_column_the_name_appears_in_the_bottom_bar_on_hover_and_on_focus() {
-    let mut h = italian(110, 30);
+    let mut h = italian(90, 30);
     let docs = place(&h, "Documenti");
     let (x, y) = h.where_is(&Target::Place(docs));
     h.mouse(
@@ -233,26 +229,25 @@ fn in_the_icon_column_the_name_appears_in_the_bottom_bar_on_hover_and_on_focus()
         crossterm::event::KeyModifiers::NONE,
     );
     let s = h.screen();
-    let last = s.lines().last().unwrap();
-    assert!(last.contains("▸ Documenti"), "{last}");
+    assert!(s.contains("▸ Documenti"), "{s}");
     // Away from it: gone.
     h.mouse(
         MouseEventKind::Moved,
-        90,
+        80,
         10,
         crossterm::event::KeyModifiers::NONE,
     );
-    assert!(!h.screen().lines().last().unwrap().contains("Documenti"));
+    assert!(!h.screen().contains("▸ Documenti"));
     // Keyboard focus shows it too.
     h.key(KeyCode::Tab);
     h.key(KeyCode::Up);
     let s = h.screen();
-    assert!(s.lines().last().unwrap().contains("▸ "), "{s}");
+    assert!(s.contains("▸ "), "{s}");
 }
 
 #[test]
-fn below_a_hundred_columns_the_sidebar_is_gone_and_the_preview_stays() {
-    let mut h = italian(96, 30);
+fn below_sixty_columns_the_navigation_pane_is_gone() {
+    let mut h = italian(56, 30);
     let _ = h.screen();
     assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Hidden);
     assert!(
@@ -281,7 +276,7 @@ fn ctrl_b_hides_and_shows_it_and_the_choice_is_remembered() {
     assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Full);
     h.press("ctrl+b");
     let s = h.screen();
-    assert!(!s.contains("PLACES"), "{s}");
+    assert!(!s.contains("PINNED"), "{s}");
     let file = ui_state_file(&h);
     let end = Instant::now() + Duration::from_secs(3);
     while !file.exists() && Instant::now() < end {
@@ -290,7 +285,7 @@ fn ctrl_b_hides_and_shows_it_and_the_choice_is_remembered() {
     let saved = rada_core::uistate::load(file.parent().unwrap());
     assert_eq!(saved.sidebar, Some(false), "{file:?}");
     h.press("ctrl+b");
-    assert!(h.screen().contains("PLACES"));
+    assert!(h.screen().contains("PINNED"));
 }
 
 #[test]
@@ -301,8 +296,8 @@ fn the_menu_adds_and_removes_bookmarks() {
     h.right_click(&Target::Place(docs.clone()));
     assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
     let s = h.screen();
-    assert!(s.contains("Open") && s.contains("Add to bookmarks"), "{s}");
-    assert!(!s.contains("Remove from bookmarks"), "{s}");
+    assert!(s.contains("Open") && s.contains("Pin to navigation"), "{s}");
+    assert!(!s.contains("Unpin from navigation"), "{s}");
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
     h.wait("the bookmark arrives from the worker", {
@@ -313,7 +308,7 @@ fn the_menu_adds_and_removes_bookmarks() {
     // A bookmark: Open, Remove.
     h.right_click(&Target::Place(docs.clone()));
     let s = h.screen();
-    assert!(s.contains("Remove from bookmarks"), "{s}");
+    assert!(s.contains("Unpin from navigation"), "{s}");
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
     h.wait("it is gone again", move |a| {

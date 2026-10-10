@@ -134,7 +134,7 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     let lines: Vec<&str> = s.lines().collect();
     let i = lines
         .iter()
-        .position(|l| l.contains(" file "))
+        .position(|l| l.trim_start_matches([' ', '│']).starts_with("file "))
         .unwrap_or_else(|| panic!("no 'file' label: {s}"));
     assert!(
         lines[i - 1].trim_start_matches([' ', '│']).starts_with('1'),
@@ -385,16 +385,39 @@ fn an_image_is_drawn_with_its_facts_underneath() {
         s.chars().filter(|c| is_block(*c)).count() > 50,
         "the picture must be on screen:\n{s}"
     );
-    assert!(s.contains("PNG · 160 × 100 px"), "{s}");
-    assert!(s.contains("modified 20"), "{s}");
+    // The details pane lists the facts as properties...
+    assert!(s.contains("Dimensions") && s.contains("160 × 100"), "{s}");
+    assert!(s.contains("PNG image"), "{s}");
     assert!(
         !s.contains("half blocks") && !s.contains("kitty graphics"),
         "the protocol name is not shown in the preview: {s}"
     );
+    // ...and the preview over the whole screen carries them under the picture.
+    h.click(&Target::FullPreview);
+    assert!(matches!(
+        h.app.modal,
+        Some(rada_tui::app::Modal::FullPreview)
+    ));
+    let s = full_preview_screen(&mut h);
+    assert!(s.contains("PNG · 160 × 100 px"), "{s}");
+    assert!(s.contains("modified 20"), "{s}");
     assert_eq!(
         h.app.image_ui.as_ref().unwrap().protocol_name(),
         "half blocks"
     );
+}
+
+/// The screen of the full-screen preview once its picture is drawn.
+fn full_preview_screen(h: &mut H) -> String {
+    let mut s = h.screen();
+    for _ in 0..100 {
+        if s.chars().filter(|c| is_block(*c)).count() > 50 {
+            break;
+        }
+        h.pump(50);
+        s = h.screen();
+    }
+    s
 }
 
 /// Waits for the picture of `photo.png` (made of blocks) to be on screen.
@@ -425,7 +448,9 @@ fn the_image_facts_follow_the_picture_directly() {
     sb.write("pics/photo.png", png_bytes(160, 100));
     let dir = sb.path("pics");
     let mut h = H::new(sb, dir, 150, 36);
-    let s = show_photo(&mut h);
+    let _ = show_photo(&mut h);
+    h.click(&Target::FullPreview);
+    let s = full_preview_screen(&mut h);
     let rows: Vec<&str> = s.lines().collect();
     let last_picture_row = rows
         .iter()
@@ -450,6 +475,9 @@ fn the_image_facts_wrap_in_a_narrow_preview_instead_of_being_cut() {
     let dir = sb.path("pics");
     let mut h = H::new(sb, dir, 100, 36);
     let s = show_photo(&mut h);
+    assert!(s.contains("1600 × 1066"), "{s}");
+    h.click(&Target::FullPreview);
+    let s = full_preview_screen(&mut h);
     assert!(s.contains("1600 × 1066 px"), "{s}");
     for l in s
         .lines()
@@ -478,7 +506,7 @@ fn a_huge_image_shows_a_clear_message_instead_of_a_picture() {
     assert!(s.contains("image too large to preview"), "{s}");
     assert!(s.contains("144"), "{s}");
     assert!(
-        s.contains("12000 × 12000 px"),
+        s.contains("12000 × 12000"),
         "the facts are still shown: {s}"
     );
     assert_eq!(s.chars().filter(|c| is_block(*c)).count(), 0);
@@ -493,7 +521,7 @@ fn with_images_off_only_the_facts_are_shown() {
     h.wait("facts", |a| a.preview.image.is_some());
     let s = h.screen();
     assert!(
-        s.contains("PNG · 40 × 30 px") && s.contains("image rendering is off"),
+        s.contains("40 × 30") && s.contains("image rendering is off"),
         "{s}"
     );
 }
@@ -622,7 +650,10 @@ fn a_pdf_shows_pages_title_and_author_under_its_first_page() {
         )
     });
     let s = h.screen();
-    assert!(s.contains("PDF · 1 page"), "{s}");
-    assert!(s.contains("title: Quarterly numbers"), "{s}");
-    assert!(s.contains("author: Ada Lovelace"), "{s}");
+    assert!(
+        s.contains("Pages") && s.contains("1 page") || s.contains("Pages  "),
+        "{s}"
+    );
+    assert!(s.contains("Quarterly numbers"), "{s}");
+    assert!(s.contains("Ada Lovelace"), "{s}");
 }

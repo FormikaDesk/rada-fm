@@ -2,27 +2,27 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
-  ‹   ›   ↑   ⌂ › demo › projects                                            ▽ txt▏   Go to… Ctrl+P   3 of 12
-     │        Name ↑                                 Size  Type        │   ·
-  ⌂  │   ───────────────────────────────────────────────────────────── │
-     │   ▎  · notes.txt                 ━━━━━━━  3.52 KiB  ● text      │
-     │      · 日本語のファイル名.txt    ───────      16 B  ● text      │
-     │      · 📷 holiday photos 🌴.txt  ───────       6 B  ● text      │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-     │                                                                 │
-                                          Enter  keep    Esc  clear
+ rada  ▸ projects  ✕   +                                                          vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ txt▏
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
+  ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
+                            │▌☐ · notes.txt                  5 weeks ago     Text document            3.52 KB
+                            │ ☐ · 日本語のファイル名.txt     5 days ago      Text document               16 B
+                            │ ☐ · 📷 holiday photos 🌴.txt   27/11/2028      Text document                6 B
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+                            │
+ 3 of 12 items                                                                                          ≣  ▦
+   Enter  keep     Esc  clear

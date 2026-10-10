@@ -37,6 +37,23 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
     {
         rows.push(("Dimensions", format!("{w} × {h}")));
     }
+    if let Some(img) = &app.preview.image
+        && app.preview.name == e.display
+        && let Some(d) = &img.info.doc
+    {
+        let pages = match d.pages {
+            Some(1) => "1 page".to_string(),
+            Some(n) => format!("{n} pages"),
+            None => "unknown".to_string(),
+        };
+        rows.push(("Pages", pages));
+        if let Some(t) = &d.title {
+            rows.push(("Title", t.clone()));
+        }
+        if let Some(a) = &d.author {
+            rows.push(("Author", a.clone()));
+        }
+    }
     if e.is_dir() {
         if let Some(Preview::Dir(d)) = &app.preview.content
             && app.preview.name == e.display

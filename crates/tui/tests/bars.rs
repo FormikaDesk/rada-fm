@@ -18,14 +18,25 @@ fn address_row(h: &mut H) -> String {
     lines(h).get(1).cloned().unwrap_or_default()
 }
 
-/// The status bar and the hints row: the last two lines (when the hints are shown).
+/// A row of ▄ or ▀: the padding the bars draw above and below themselves.
+fn is_edge(l: &str) -> bool {
+    !l.trim().is_empty() && l.trim().chars().all(|c| c == '▄' || c == '▀')
+}
+
+/// The lines of the screen that are not half-block padding.
+fn content_lines(h: &mut H) -> Vec<String> {
+    lines(h).into_iter().filter(|l| !is_edge(l)).collect()
+}
+
+/// The status bar: the line over the hints.
 fn status_row(h: &mut H) -> String {
-    let l = lines(h);
+    let l = content_lines(h);
     l[l.len() - 2].clone()
 }
 
+/// The hints: the last line that is not padding.
 fn hints_row(h: &mut H) -> String {
-    lines(h).last().cloned().unwrap_or_default()
+    content_lines(h).last().cloned().unwrap_or_default()
 }
 
 fn deep(w: u16) -> H {

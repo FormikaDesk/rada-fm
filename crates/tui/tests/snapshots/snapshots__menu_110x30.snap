@@ -1,35 +1,34 @@
 ---
 source: crates/tui/tests/snapshots.rs
-assertion_line: 199
 expression: shot(&mut h)
 ---
-  ‹   ›   ↑   ⌂ › demo › projects                                 ⌕ Filter… Ctrl+F   Go to… Ctrl+P   12 items
-     │        Name ↑                                 Size  Type        │   · main.rs
-  ⌂  │   ───────────────────────────────────────────────────────────── │   UTF-8 · 37 B · yesterday
-     │      ▸ data/                                     —  Folder      │
-     │      ▸ src/                                      —  Folder      │   1  fn main() {
-     │      ▸ 目录/                                     —  Folder      │   2      println!("hello");
-     │      · a-very-long-file-name-t…  ───────       1 B  ● archive   │   3  }
-     │      · backup.img                ━━━━━━━   420 MiB  ● file      │
-     │      · Cargo.toml                ───────      42 B  ● config    │
-     │   ▎  · main.rs                  ╭────────────────────────────────╮
-     │      · notes.txt                │ Open                      Enter│
-     │      · README.md                │────────────────────────────────│
-     │      · тест-файл.md             │ Copy                     Ctrl+C│
-     │      · 日本語のファイル名.txt   │ Cut                      Ctrl+X│
-     │      · 📷 holiday photos 🌴.txt │ Paste                    Ctrl+V│
-     │                                 │────────────────────────────────│
-     │                                 │ Rename                       F2│
-     │                                 │ Move to trash               Del│
-     │                                 │ Delete permanently    Shift+Del│
-     │                                 │────────────────────────────────│
-     │                                 │ Compress…                 Alt+z│
-     │                                 │ New folder               Ctrl+N│
-     │                                 │ Select all               Ctrl+A│
-     │                                 │────────────────────────────────│
-     │                                 │ Undo                     Ctrl+Z│
-     │                                 │ Redo                     Ctrl+Y│
-     │                                 │────────────────────────────────│
-     │                                 │ Help                         F1│
-     │                                 ╰────────────────────────────────╯
-                                                 Esc  close
+ rada  ▸ projects  ✕   +                                                          vim + classic keys   ? Help
+  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ Search in proj… Ctrl+F
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+  ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
+                            │ ☐ ▸ data                       6 days ago      Folder
+                            │ ☐ ▸ src                        6 days ago      Folder
+                            │ ☐ ▸ 目录                       6 days ago      Folder
+                            │ ☐ · a-very-long-file-name-th…  12 days ago     Archive (tar.gz)             1 B
+                            │ ☐ · backup.img                 9 days ago      Disk image                420 MB
+                            │ ☐ · Cargo.toml                 2 days ago      Settings file               42 B
+                            │▌☐ · main.rs                    Yesterda╭──────────────────────────────╮    37 B
+                            │ ☐ · notes.txt                  5 weeks │ Open                    Enter│ 3.52 KB
+                            │ ☐ · README.md                  Today 09│ Open with…              Alt+o│    73 B
+                            │ ☐ · тест-файл.md               Today 10│──────────────────────────────│    13 B
+                            │ ☐ · 日本語のファイル名.txt     5 days a│ Cut                    Ctrl+X│    16 B
+                            │ ☐ · 📷 holiday photos 🌴.txt   27/11/20│ Copy                   Ctrl+C│     6 B
+                            │                                        │ Paste                  Ctrl+V│
+                            │                                        │──────────────────────────────│
+                            │                                        │ Rename                     F2│
+                            │                                        │ Compress…               Alt+z│
+                            │                                        │──────────────────────────────│
+                            │                                        │ Copy the path    Ctrl+Shift+C│
+                            │                                        │──────────────────────────────│
+                            │                                        │ Move to trash             Del│
+ 12 items                                                            │──────────────────────────────│   ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│ Properties          Alt+Enter│▄▄▄▄▄▄▄▄▄
+   Esc  close                                                        ╰──────────────────────────────╯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
