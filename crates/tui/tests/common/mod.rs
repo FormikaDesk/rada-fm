@@ -1,7 +1,7 @@
 //! Shared harness: the interface driven headlessly with real workers on a sandbox.
 #![allow(dead_code)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -193,7 +193,8 @@ impl H {
     pub fn wait(&mut self, what: &str, mut done: impl FnMut(&App) -> bool) {
         let rx = self.app.events();
         let resized = self.app.image_ui.as_ref().map(|u| u.results());
-        let end = Instant::now() + Duration::from_secs(8);
+        // Generous: CI machines are slow, and a test that waits is waiting for a worker thread.
+        let end = Instant::now() + Duration::from_secs(20);
         while !done(&self.app) {
             assert!(
                 Instant::now() < end,
@@ -447,6 +448,14 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     h.app.volumes = {
         use rada_core::platform::{Volume, VolumeKind};
         let gb = 1_000_000_000u64;
+        let system_root = h
+            .app
+            .cwd
+            .ancestors()
+            .last()
+            .unwrap_or(Path::new("/"))
+            .to_string_lossy()
+            .into_owned();
         let v = |mount: &str, label: &str, kind, total: u64, free: u64| Volume {
             mount_point: PathBuf::from(mount),
             label: Some(label.into()),
@@ -460,7 +469,8 @@ pub fn demo_scene(w: u16, h: u16) -> H {
             responsive: true,
         };
         vec![
-            v("/", "System", VolumeKind::Fixed, 512, 197),
+            // The root of whatever disk the sandbox is on: "/" here, "D:\\" on Windows.
+            v(&system_root, "System", VolumeKind::Fixed, 512, 197),
             v("/mnt/data", "Data", VolumeKind::Fixed, 1000, 596),
             v("/mnt/usb", "USB drive", VolumeKind::Removable, 64, 38),
         ]

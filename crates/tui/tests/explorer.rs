@@ -875,7 +875,10 @@ fn properties_copy_path_and_open_terminal_are_reachable() {
     h.press("esc");
     h.press("ctrl+shift+c");
     let text = h.app.copied_text.clone().expect("a path to copy");
-    assert!(text.ends_with("projects/demo/photo.jpg"), "{text}");
+    assert!(
+        std::path::Path::new(&text).ends_with("projects/demo/photo.jpg"),
+        "{text}"
+    );
     assert_eq!(h.app.take_copied_text().as_deref(), Some(text.as_str()));
     assert!(h.app.copied_text.is_none());
 }

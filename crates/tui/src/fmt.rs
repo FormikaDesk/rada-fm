@@ -19,7 +19,14 @@ pub fn date(t: Option<SystemTime>) -> String {
 pub fn short_path(p: &std::path::Path, home: &std::path::Path) -> String {
     match p.strip_prefix(home) {
         Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
-        Ok(rest) => format!("~/{}", rada_core::display::path(rest)),
+        // Always with slashes after the `~`: `~/projects/demo`, not `~/projects\demo`.
+        Ok(rest) => {
+            let parts: Vec<String> = rest
+                .components()
+                .map(|c| rada_core::display::name(c.as_os_str()))
+                .collect();
+            format!("~/{}", parts.join("/"))
+        }
         Err(_) => rada_core::display::path(p),
     }
 }
