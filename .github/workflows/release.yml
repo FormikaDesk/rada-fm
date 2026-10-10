@@ -1,12 +1,15 @@
 name: Release
 
 # A tag `v*` builds the binaries and publishes them as a GitHub Release; a tag with a hyphen
-# in it (v0.6.0-rc.1) is marked as a pre-release. Run by hand (workflow_dispatch) it builds
-# and checks everything but publishes nothing: the binaries are only artifacts of the run.
+# in it (v0.6.0-rc.1) is marked as a pre-release. Run by hand (workflow_dispatch) or by a push
+# to a branch `release-dry-run/*` it builds and checks everything but publishes nothing: the
+# binaries are only artifacts of the run. (A manual run needs the file on the default branch;
+# the branch does not.)
 
 on:
   push:
     tags: ["v*"]
+    branches: ["release-dry-run/**"]
   workflow_dispatch:
 
 env:
