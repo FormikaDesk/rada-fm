@@ -5,9 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.1] - 2026-10-10
+
+The first release with ready-made binaries, and a **pre-release**: Windows and macOS have been tested by CI on GitHub's machines but not yet by people using them every day. Please report anything odd in an issue.
+
 ### Added
 - **Windows and macOS (pre-release).** The platform layer is real on both. Windows: the Recycle Bin (move, put back, check that an item is still in it), drive letters with type, label and free space, the Known Folders (Desktop, Documents, Downloads…, wherever they were moved), opening with the default program, `Open with…`, reveal in Explorer and a terminal in the folder, hidden and system attributes. macOS: `~/.Trash` and `/Volumes/<name>/.Trashes/<uid>` where the Finder looks, volumes from `/Volumes` with `statfs`, opening with `open(1)` (`-a` for `Open with…`, `-R` to reveal) and the terminal you are in, case- and normalisation-insensitive names. Attributes (ACLs, alternate data streams, extended attributes, resource forks) are not carried over by a copy yet, and the plan says so.
 - A trash that is a folder (`DirTrash`), used by macOS and by the tests of every system, so that no test ever puts anything in the real Recycle Bin or Trash of the machine running it.
+- **Binaries.** A tag `v*` builds Linux (musl, static; x86_64 and aarch64), Windows (x86_64, zip) and macOS (x86_64 and aarch64) binaries with `.github/workflows/release.yml`, checks that each one starts with `--version`, and publishes them with `SHA256SUMS` and these notes as a GitHub Release (a pre-release when the tag has a hyphen, as in `-rc.1`).
 - CI runs the whole workspace — core, interface and program — on Linux, Windows and macOS. Tests that cannot run on a system say why with `#[ignore = "<reason>"]`.
 
 ### Fixed

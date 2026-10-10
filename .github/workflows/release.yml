@@ -1,0 +1,121 @@
+name: Release
+
+# A tag `v*` builds the binaries and publishes them as a GitHub Release; a tag with a hyphen
+# in it (v0.6.0-rc.1) is marked as a pre-release. Run by hand (workflow_dispatch) it builds
+# and checks everything but publishes nothing: the binaries are only artifacts of the run.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, archive: tar.gz }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm, archive: tar.gz }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, archive: zip }
+          - { target: x86_64-apple-darwin, os: macos-15-intel, archive: tar.gz }
+          - { target: aarch64-apple-darwin, os: macos-latest, archive: tar.gz }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: musl C compiler (the zstd library is compiled with the build)
+        if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          echo "CC_${TARGET//-/_}=musl-gcc" >> "$GITHUB_ENV"
+        env:
+          TARGET: ${{ matrix.target }}
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+            echo "the tag ${GITHUB_REF_NAME} is not v$version, the version in Cargo.toml" >&2
+            exit 1
+          fi
+      - name: Build
+        run: cargo build --release --locked -p rada --target ${{ matrix.target }}
+      - name: The binary starts and says its version
+        shell: bash
+        run: |
+          exe=target/${{ matrix.target }}/release/rada
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          out=$("$exe" --version)
+          echo "$out"
+          [ "$out" = "rada ${{ steps.version.outputs.version }}" ]
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          name="rada-${{ steps.version.outputs.version }}-${{ matrix.target }}"
+          mkdir "$name"
+          exe=target/${{ matrix.target }}/release/rada
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          cp "$exe" README.md LICENSE CHANGELOG.md "$name/"
+          if [ "${{ matrix.archive }}" = zip ]; then
+            7z a "$name.zip" "$name" > /dev/null
+            echo "file=$name.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -czf "$name.tar.gz" "$name"
+            echo "file=$name.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rada-${{ matrix.target }}
+          path: ${{ steps.package.outputs.file }}
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    # Only for a tag; a manual run stops at the artifacts.
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum rada-* > SHA256SUMS && cat SHA256SUMS
+      - name: Notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## \[/ { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "no section [$version] in CHANGELOG.md" >&2
+            exit 1
+          fi
+          cat notes.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "rada ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md \
+            --verify-tag $flags

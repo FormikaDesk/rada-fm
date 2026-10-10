@@ -14,7 +14,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Status
 
-Version 0.5.0. **Linux is supported.** Windows and macOS are a **pre-release** on the development branch: the Recycle Bin / Trash, drives and volumes, the standard folders and opening files are implemented, and the whole test suite runs on all three systems in CI. Nobody uses them every day yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, extended attributes, resource forks) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.1. **Linux is supported.** Windows and macOS are a **pre-release** on the development branch: the Recycle Bin / Trash, drives and volumes, the standard folders and opening files are implemented, and the whole test suite runs on all three systems in CI. Nobody uses them every day yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, extended attributes, resource forks) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -50,9 +50,15 @@ rada is young and written by one person. The parts that touch your files — pla
 
 ![Progress counted in bytes, with throughput and time left](docs/screenshots/progress.png)
 
+## Download
+
+Binaries for Linux (static, x86_64 and aarch64), Windows (x86_64) and macOS (Intel and Apple silicon) are on the [releases page](https://github.com/formikadesk/rada-fm/releases), with a `SHA256SUMS` file. Unpack the archive and put `rada` (`rada.exe`) somewhere on your `PATH`.
+
+Windows and macOS builds are new: please report anything odd in an issue.
+
 ## Install
 
-From source. You need Linux and a Rust toolchain of version 1.92 or newer ([rustup](https://rustup.rs)).
+From source. You need a Rust toolchain of version 1.90 or newer ([rustup](https://rustup.rs)).
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada
