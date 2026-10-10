@@ -81,6 +81,26 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
     ));
     if let Some(m) = e.mode {
         rows.push(("Permissions", rada_core::preview::mode_string(m)));
+    } else {
+        // Windows has attributes where Unix has permissions.
+        let mut flags: Vec<&str> = Vec::new();
+        if e.readonly {
+            flags.push("read-only");
+        }
+        if e.hidden {
+            flags.push("hidden");
+        }
+        if e.system {
+            flags.push("system");
+        }
+        rows.push((
+            "Attributes",
+            if flags.is_empty() {
+                "normal".to_string()
+            } else {
+                flags.join(", ")
+            },
+        ));
     }
     rows
 }

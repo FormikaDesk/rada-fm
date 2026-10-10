@@ -9,7 +9,9 @@
 //! parts (drive names, drive types, attributes) are tested on every system.
 
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(windows)]
+use std::path::PathBuf;
 
 use super::attrs::{Attrs, FileAttributes, ReparseKind};
 use super::trash::{TrashBackend, TrashedItem};
@@ -523,17 +525,23 @@ impl Opener for WindowsOpener {
 pub struct WindowsPlatform {
     dirs: Dirs,
     attrs: WindowsAttributes,
-    trash: WindowsTrash,
+    trash: Box<dyn TrashBackend>,
     volumes: WindowsVolumes,
     opener: WindowsOpener,
 }
 
 impl WindowsPlatform {
     pub fn new(dirs: Dirs) -> Self {
+        Self::with_trash(dirs, Box::new(WindowsTrash))
+    }
+
+    /// A platform whose trash is `trash` (the tests give it a folder of their own, so that
+    /// nothing goes to the real Recycle Bin of the machine running them).
+    pub fn with_trash(dirs: Dirs, trash: Box<dyn TrashBackend>) -> Self {
         WindowsPlatform {
             dirs,
             attrs: WindowsAttributes,
-            trash: WindowsTrash,
+            trash,
             volumes: WindowsVolumes,
             opener: WindowsOpener,
         }
@@ -548,7 +556,7 @@ impl Platform for WindowsPlatform {
         &self.dirs
     }
     fn trash(&self) -> &dyn TrashBackend {
-        &self.trash
+        self.trash.as_ref()
     }
     fn volumes(&self) -> &dyn VolumeLister {
         &self.volumes

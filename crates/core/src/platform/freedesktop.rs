@@ -188,7 +188,7 @@ impl TrashBackend for FreedesktopTrash {
     fn contains(&self, item: &TrashedItem) -> bool {
         match &item.handle {
             TrashHandle::Freedesktop { stored, .. } => self.fs.lstat(stored).is_ok(),
-            TrashHandle::Opaque { .. } => false,
+            TrashHandle::Opaque { .. } | TrashHandle::Directory { .. } => false,
         }
     }
 }

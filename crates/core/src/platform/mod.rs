@@ -7,6 +7,7 @@
 
 pub mod attrs;
 pub mod dirs;
+pub mod dirtrash;
 pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
@@ -140,6 +141,27 @@ pub struct PlatformOptions {
     /// Replaces the built-in list of mounts kept out of the disk list (`devices.hide`).
     /// Only the Linux platform lists mounts for now.
     pub hide_devices: Option<Vec<String>>,
+}
+
+/// The platform of this system with its trash kept inside `dirs` (a folder that is `dirs`'s
+/// own): for tests, which must never put anything in the real trash of the machine. On Linux
+/// the trash already follows `XDG_DATA_HOME`, so this is [`current`].
+pub fn sandboxed(dirs: Dirs) -> Arc<dyn Platform> {
+    #[cfg(target_os = "windows")]
+    {
+        let trash = dirtrash::DirTrash::new(dirs.home_trash(), Arc::new(crate::fs::LocalFs));
+        Arc::new(windows::WindowsPlatform::with_trash(dirs, Box::new(trash)))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        #[cfg(not(target_os = "linux"))]
+        {
+            let trash = dirtrash::DirTrash::new(dirs.home_trash(), Arc::new(crate::fs::LocalFs));
+            Arc::new(macos::MacPlatform::with_trash(dirs, Box::new(trash)))
+        }
+        #[cfg(target_os = "linux")]
+        current(dirs)
+    }
 }
 
 /// The one place where the operating system is selected.

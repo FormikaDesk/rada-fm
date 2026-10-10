@@ -106,6 +106,7 @@ pub fn read_dir(
                 type_label,
                 mode: c.mode,
                 hidden: attrs.hidden,
+                system: false,
                 readonly: true,
                 executable,
                 reparse: None,

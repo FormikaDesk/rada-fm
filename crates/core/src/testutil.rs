@@ -274,7 +274,7 @@ impl Sandbox {
         ] {
             std::fs::create_dir_all(d).expect("create sandbox dir");
         }
-        let platform = platform::current(dirs.clone());
+        let platform = platform::sandboxed(dirs.clone());
         Sandbox {
             _tmp: tmp,
             root,

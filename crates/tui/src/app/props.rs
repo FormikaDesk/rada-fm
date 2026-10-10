@@ -96,6 +96,9 @@ impl App {
         if e.hidden {
             flags.push("hidden");
         }
+        if e.system {
+            flags.push("system");
+        }
         if e.readonly {
             flags.push("read-only");
         }

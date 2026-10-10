@@ -18,7 +18,13 @@ pub enum TrashHandle {
         #[schemars(with = "String")]
         info: PathBuf,
     },
-    /// Windows Recycle Bin / macOS: an opaque identifier owned by the backend.
+    /// A trash that is a folder (macOS, and the tests of every system): where the item is now.
+    Directory {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        stored: PathBuf,
+    },
+    /// Windows Recycle Bin: an opaque identifier owned by the backend.
     Opaque { id: String },
 }
 
