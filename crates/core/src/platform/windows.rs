@@ -533,6 +533,9 @@ pub struct WindowsPlatform {
     trash: Box<dyn TrashBackend>,
     volumes: WindowsVolumes,
     opener: WindowsOpener,
+    /// Tests: the standard folders come from `user-dirs.dirs` in the sandbox, not from the
+    /// shell of the machine running them.
+    sandbox_user_dirs: bool,
 }
 
 impl WindowsPlatform {
@@ -549,7 +552,15 @@ impl WindowsPlatform {
             trash,
             volumes: WindowsVolumes,
             opener: WindowsOpener,
+            sandbox_user_dirs: false,
         }
+    }
+
+    /// The standard folders are those `user-dirs.dirs` names in the config folder (the
+    /// English ones without it), whatever the real Known Folders are: for tests.
+    pub fn with_sandbox_user_dirs(mut self) -> Self {
+        self.sandbox_user_dirs = true;
+        self
     }
 }
 
@@ -577,6 +588,10 @@ impl Platform for WindowsPlatform {
         &super::fidelity::NotYet
     }
     fn user_dirs(&self) -> UserDirs {
+        if self.sandbox_user_dirs {
+            return UserDirs::from_xdg_file(&self.dirs.config, &self.dirs.home)
+                .unwrap_or_else(|| UserDirs::conventional(&self.dirs.home, "Videos"));
+        }
         // The Known Folders, as the shell has them (they may have been moved). Anything the
         // shell does not answer for falls back to the names of a default profile.
         #[cfg(windows)]

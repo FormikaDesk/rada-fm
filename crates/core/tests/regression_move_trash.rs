@@ -132,7 +132,8 @@ fn a_rename_that_hits_exdev_reports_cross_device_instead_of_losing_data() {
     sb.write("a.txt", "x");
     let fault = FaultFs::new();
     let e = sb.engine_with(fault.clone());
-    fault.fail(Op::Rename, "a.txt", 18); // EXDEV
+    // EXDEV; Windows says ERROR_NOT_SAME_DEVICE.
+    fault.fail(Op::Rename, "a.txt", if cfg!(windows) { 17 } else { 18 });
     let dest = sb.mkdir("dest");
     let (_, rep) = do_move(&e, &[sb.path("a.txt")], &dest, ConflictPolicy::Skip);
     assert_eq!(rep.failed.len(), 1);
@@ -198,7 +199,7 @@ fn the_trash_refuses_the_root_and_its_own_contents() {
     );
     let f = sb.write("t.txt", "x");
     run(&e, &e.plan_trash(&scan(&e, &[f])));
-    let stored = sb.dirs.home_trash().join("files/t.txt");
+    let stored = sb.trashed_dir().join("t.txt");
     let rep = run(&e, &e.plan_trash(&scan(&e, &[stored])));
     assert_eq!(
         rep.failed.len(),

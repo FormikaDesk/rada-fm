@@ -215,7 +215,8 @@ mod tests {
 
     fn s(raw: &str) -> (String, Option<NameIssue>) {
         let (p, i) = sanitize(raw.as_bytes(), false);
-        (p.to_string_lossy().into_owned(), i)
+        // Windows writes the separator of a path as `\`.
+        (p.to_string_lossy().replace('\\', "/"), i)
     }
 
     #[test]

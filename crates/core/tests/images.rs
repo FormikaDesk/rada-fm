@@ -32,7 +32,8 @@ fn next_for(rx: &Receiver<CoreEvent>, generation: u64, secs: u64) -> PreviewEven
 /// Wait for the final state of an image preview (skipping the header-only `Loading`).
 fn settled(rx: &Receiver<CoreEvent>, generation: u64) -> rada_core::preview::ImagePreview {
     loop {
-        let ev = next_for(rx, generation, 20);
+        // Generous: a debug build decodes a 12-megapixel JPEG slowly, and CI runs tests in parallel.
+        let ev = next_for(rx, generation, 90);
         match ev.preview {
             Preview::Image(i) if matches!(i.state, ImageState::Loading) => continue,
             Preview::Image(i) => return i,

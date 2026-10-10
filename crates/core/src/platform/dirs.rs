@@ -119,7 +119,8 @@ mod tests {
 
     #[test]
     fn relative_xdg_values_are_ignored() {
-        let d = Dirs::from_vars(vars(&[("HOME", "/h"), ("XDG_STATE_HOME", "relative/x")])).unwrap();
+        let home = if cfg!(windows) { "C:\\h" } else { "/h" };
+        let d = Dirs::from_vars(vars(&[("HOME", home), ("XDG_STATE_HOME", "relative/x")])).unwrap();
         assert!(d.state.is_absolute());
         assert_ne!(d.state, PathBuf::from("relative/x"));
     }

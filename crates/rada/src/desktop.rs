@@ -371,9 +371,10 @@ pub fn terminal_command(
 pub fn spawn_terminal(path: Option<&Path>) -> Result<()> {
     let exe = std::env::current_exe().context("cannot find the rada executable")?;
     let path = match path {
-        Some(p) => {
-            Some(std::fs::canonicalize(p).with_context(|| format!("cannot open {}", p.display()))?)
-        }
+        Some(p) => Some(
+            rada_core::fs::canonical_path(p)
+                .with_context(|| format!("cannot open {}", p.display()))?,
+        ),
         None => None,
     };
     let var = std::env::var("TERMINAL").ok();

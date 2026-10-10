@@ -132,7 +132,7 @@ pub fn disk_base() -> PathBuf {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/rada-test-tmp")
         });
     let _ = std::fs::create_dir_all(&base);
-    base.canonicalize().unwrap_or(base)
+    crate::fs::canonical_path(&base).unwrap_or(base)
 }
 
 /// Remove the scratch areas (`proc-<pid>`) that earlier test runs left in `base`
@@ -261,7 +261,7 @@ impl Sandbox {
             .prefix("sb-")
             .tempdir_in(&p.scratch)
             .expect("create sandbox");
-        let root = tmp.path().canonicalize().expect("canonicalize sandbox");
+        let root = crate::fs::canonical_path(tmp.path()).expect("canonicalize sandbox");
         let dirs = Dirs::under(&root);
         let work = root.join("work");
         for d in [
@@ -320,6 +320,17 @@ impl Sandbox {
         }
         std::fs::write(&p, content).expect("write");
         p
+    }
+
+    /// The folder that holds what was trashed: `files/` inside the trash in the freedesktop
+    /// layout (Linux), the trash folder itself where the trash is a plain folder.
+    pub fn trashed_dir(&self) -> PathBuf {
+        let t = self.dirs.home_trash();
+        if cfg!(target_os = "linux") {
+            t.join("files")
+        } else {
+            t
+        }
     }
 
     pub fn symlink(&self, target: impl AsRef<Path>, rel: impl AsRef<Path>) -> PathBuf {
@@ -465,7 +476,11 @@ pub fn symlink(target: &Path, link: &Path) -> io::Result<()> {
     }
     #[cfg(windows)]
     {
-        if target.is_dir() {
+        // A relative target is relative to the folder of the link, as it is for the system.
+        let resolved = link
+            .parent()
+            .map_or_else(|| target.to_path_buf(), |d| d.join(target));
+        if resolved.is_dir() {
             std::os::windows::fs::symlink_dir(target, link)
         } else {
             std::os::windows::fs::symlink_file(target, link)

@@ -112,7 +112,12 @@ pub fn is_exdev(e: &io::Error) -> bool {
     {
         e.raw_os_error() == Some(libc::EXDEV)
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        // ERROR_NOT_SAME_DEVICE: a rename to another volume.
+        e.raw_os_error() == Some(17)
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = e;
         false
@@ -163,7 +168,6 @@ pub fn is_not_empty(e: &io::Error) -> bool {
     }
     #[cfg(not(unix))]
     {
-        let _ = e;
-        false
+        e.kind() == io::ErrorKind::DirectoryNotEmpty
     }
 }

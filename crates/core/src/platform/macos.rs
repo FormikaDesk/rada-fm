@@ -262,6 +262,8 @@ pub struct MacPlatform {
     trash: Box<dyn TrashBackend>,
     volumes: MacVolumes,
     opener: MacOpener,
+    /// Tests: the standard folders come from `user-dirs.dirs` in the sandbox.
+    sandbox_user_dirs: bool,
 }
 
 impl MacPlatform {
@@ -287,7 +289,15 @@ impl MacPlatform {
             trash,
             volumes: MacVolumes,
             opener: MacOpener,
+            sandbox_user_dirs: false,
         }
+    }
+
+    /// The standard folders are those `user-dirs.dirs` names in the config folder (the
+    /// Finder's names without it): for tests.
+    pub fn with_sandbox_user_dirs(mut self) -> Self {
+        self.sandbox_user_dirs = true;
+        self
     }
 }
 
@@ -319,6 +329,10 @@ impl Platform for MacPlatform {
         &super::fidelity::NotYet
     }
     fn user_dirs(&self) -> UserDirs {
+        if self.sandbox_user_dirs {
+            return UserDirs::from_xdg_file(&self.dirs.config, &self.dirs.home)
+                .unwrap_or_else(|| UserDirs::conventional(&self.dirs.home, "Videos"));
+        }
         // The Finder's standard folders: they have fixed names under the home folder.
         UserDirs::conventional(&self.dirs.home, "Movies")
     }

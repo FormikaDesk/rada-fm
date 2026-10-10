@@ -43,13 +43,78 @@ impl LocalFs {
     }
 }
 
+/// On Windows the standard metadata does not say which volume a file is on, which file it is
+/// or how many names it has: the planner needs the volume to tell a rename from a copy.
+#[cfg(windows)]
+fn with_identity(mut m: FsMeta, p: &Path, follow: bool) -> FsMeta {
+    if let Some(id) = windows_identity(p, follow) {
+        m.dev = Some(id.0);
+        m.ino = Some(id.1);
+        m.nlink = Some(id.2);
+    }
+    m
+}
+
+#[cfg(not(windows))]
+fn with_identity(m: FsMeta, _p: &Path, _follow: bool) -> FsMeta {
+    m
+}
+
+/// (volume serial number, file index, number of links) of `p`, from a handle opened for
+/// nothing but its attributes. A link is looked at itself unless `follow`.
+#[cfg(windows)]
+fn windows_identity(p: &Path, follow: bool) -> Option<(u64, u64, u64)> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, CreateFileW, FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        GetFileInformationByHandle, OPEN_EXISTING,
+    };
+    let wide: Vec<u16> = p.as_os_str().encode_wide().chain(Some(0)).collect();
+    let flags = FILE_FLAG_BACKUP_SEMANTICS
+        | if follow {
+            0
+        } else {
+            FILE_FLAG_OPEN_REPARSE_POINT
+        };
+    // SAFETY: `wide` is NUL-terminated and outlives the call; the handle is closed below.
+    let h = unsafe {
+        CreateFileW(
+            wide.as_ptr(),
+            0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            flags,
+            std::ptr::null_mut(),
+        )
+    };
+    if h == INVALID_HANDLE_VALUE {
+        return None;
+    }
+    // SAFETY: `info` is plain data the call fills in; `h` is a valid handle until closed.
+    let info = unsafe {
+        let mut info: BY_HANDLE_FILE_INFORMATION = std::mem::zeroed();
+        let ok = GetFileInformationByHandle(h, &mut info) != 0;
+        CloseHandle(h);
+        ok.then_some(info)
+    }?;
+    let index = (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow);
+    Some((
+        u64::from(info.dwVolumeSerialNumber),
+        index,
+        u64::from(info.nNumberOfLinks),
+    ))
+}
+
 impl FsEngine for LocalFs {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta> {
-        fs::symlink_metadata(p).map(|m| FsMeta::from_std(&m))
+        fs::symlink_metadata(p).map(|m| with_identity(FsMeta::from_std(&m), p, false))
     }
 
     fn stat(&self, p: &Path) -> io::Result<FsMeta> {
-        fs::metadata(p).map(|m| FsMeta::from_std(&m))
+        fs::metadata(p).map(|m| with_identity(FsMeta::from_std(&m), p, true))
     }
 
     fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {

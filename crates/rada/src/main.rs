@@ -176,7 +176,7 @@ fn main() -> Result<()> {
         Some(p) => p.clone(),
         None => std::env::current_dir().context("cannot read the current folder")?,
     };
-    let start = std::fs::canonicalize(&start)
+    let start = rada_core::fs::canonical_path(&start)
         .with_context(|| format!("cannot open {}", start.display()))?;
     // Given a file, open its folder with the cursor on it.
     let (start, select) = if start.is_dir() {

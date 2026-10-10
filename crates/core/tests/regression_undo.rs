@@ -296,9 +296,14 @@ fn undoing_trash_restores_files_and_folders_with_their_content() {
     assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
     assert_eq!(snapshot(&sb.path("v1.2")), before);
     // The trash no longer holds them, and no orphaned .trashinfo remains.
-    let t = sb.dirs.home_trash();
-    assert_eq!(std::fs::read_dir(t.join("files")).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(t.join("info")).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(sb.trashed_dir()).unwrap().count(), 0);
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        std::fs::read_dir(sb.dirs.home_trash().join("info"))
+            .unwrap()
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -314,12 +319,7 @@ fn undoing_trash_refuses_to_overwrite_a_new_file_at_the_original_path() {
     assert!(up.plan.steps.is_empty());
     assert_eq!(std::fs::read_to_string(&f).unwrap(), "brand new");
     // The trashed original is still safe in the trash.
-    assert_eq!(
-        std::fs::read_dir(sb.dirs.home_trash().join("files"))
-            .unwrap()
-            .count(),
-        1
-    );
+    assert_eq!(std::fs::read_dir(sb.trashed_dir()).unwrap().count(), 1);
 }
 
 #[test]
@@ -328,8 +328,8 @@ fn undoing_trash_after_the_trash_was_emptied_explains_instead_of_failing() {
     let (e, j) = (sb.engine(), sb.journal());
     let f = sb.write("gone.txt", "x");
     let out = run_journaled(&e, &j, &e.plan_trash(&scan(&e, &[f])));
-    std::fs::remove_dir_all(sb.dirs.home_trash().join("files")).unwrap();
-    std::fs::create_dir_all(sb.dirs.home_trash().join("files")).unwrap();
+    std::fs::remove_dir_all(sb.trashed_dir()).unwrap();
+    std::fs::create_dir_all(sb.trashed_dir()).unwrap();
     let up = e.plan_undo(&j, &out.id).unwrap();
     assert_eq!(up.blocked.len(), 1);
     assert!(up.blocked[0].reason.contains("no longer in the trash"));

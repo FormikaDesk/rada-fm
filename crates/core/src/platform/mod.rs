@@ -150,14 +150,16 @@ pub fn sandboxed(dirs: Dirs) -> Arc<dyn Platform> {
     #[cfg(target_os = "windows")]
     {
         let trash = dirtrash::DirTrash::new(dirs.home_trash(), Arc::new(crate::fs::LocalFs));
-        Arc::new(windows::WindowsPlatform::with_trash(dirs, Box::new(trash)))
+        Arc::new(
+            windows::WindowsPlatform::with_trash(dirs, Box::new(trash)).with_sandbox_user_dirs(),
+        )
     }
     #[cfg(not(target_os = "windows"))]
     {
         #[cfg(not(target_os = "linux"))]
         {
             let trash = dirtrash::DirTrash::new(dirs.home_trash(), Arc::new(crate::fs::LocalFs));
-            Arc::new(macos::MacPlatform::with_trash(dirs, Box::new(trash)))
+            Arc::new(macos::MacPlatform::with_trash(dirs, Box::new(trash)).with_sandbox_user_dirs())
         }
         #[cfg(target_os = "linux")]
         current(dirs)

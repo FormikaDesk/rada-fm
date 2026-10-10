@@ -1,0 +1,4 @@
+# Same bytes on every system: the schema files and the snapshots are compared as text.
+* text=auto eol=lf
+*.png binary
+*.gif binary

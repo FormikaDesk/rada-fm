@@ -47,6 +47,13 @@ impl UserDirs {
         }
     }
 
+    /// The folders `$XDG_CONFIG_HOME/user-dirs.dirs` names, or `None` when there is no such
+    /// file (a system never localised: the caller falls back to the English names).
+    pub fn from_xdg_file(config: &Path, home: &Path) -> Option<UserDirs> {
+        let text = std::fs::read_to_string(config.join("user-dirs.dirs")).ok()?;
+        Some(UserDirs::parse_xdg(&text, home))
+    }
+
     /// In display order.
     pub fn entries(&self) -> Vec<(PlaceKind, &Path)> {
         [
@@ -134,8 +141,15 @@ fn xdg_value(raw: &str, home: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// An absolute path on every system: `/home/user`, or `C:/home/user` on Windows (written
+    /// with slashes: in the file under test a backslash is an escape).
+    fn abs(rest: &str) -> PathBuf {
+        let root = if cfg!(windows) { "C:/" } else { "/" };
+        PathBuf::from(format!("{root}{rest}"))
+    }
+
     fn home() -> PathBuf {
-        PathBuf::from("/home/user")
+        abs("home/user")
     }
 
     fn names(u: &UserDirs) -> Vec<String> {
@@ -169,21 +183,21 @@ XDG_VIDEOS_DIR="$HOME/Video"
                 "Video"
             ]
         );
-        assert_eq!(u.downloads, Some(PathBuf::from("/home/user/Scaricati")));
+        assert_eq!(u.downloads, Some(home().join("Scaricati")));
     }
 
     #[test]
     fn braces_spaces_absolute_paths_and_escapes() {
-        let text = "XDG_DOCUMENTS_DIR=\"${HOME}/My Docs\"\n\
-                    XDG_MUSIC_DIR=\"/data/Media/Music\"\n\
-                    XDG_PICTURES_DIR=\"$HOME/Foto \\\"vecchie\\\"\"\n";
-        let u = UserDirs::parse_xdg(text, &home());
-        assert_eq!(u.documents, Some(PathBuf::from("/home/user/My Docs")));
-        assert_eq!(u.music, Some(PathBuf::from("/data/Media/Music")));
-        assert_eq!(
-            u.pictures,
-            Some(PathBuf::from("/home/user/Foto \"vecchie\""))
+        let text = format!(
+            "XDG_DOCUMENTS_DIR=\"${{HOME}}/My Docs\"\n\
+             XDG_MUSIC_DIR=\"{}\"\n\
+             XDG_PICTURES_DIR=\"$HOME/Foto \\\"vecchie\\\"\"\n",
+            abs("data/Media/Music").display()
         );
+        let u = UserDirs::parse_xdg(&text, &home());
+        assert_eq!(u.documents, Some(home().join("My Docs")));
+        assert_eq!(u.music, Some(abs("data/Media/Music")));
+        assert_eq!(u.pictures, Some(home().join("Foto \"vecchie\"")));
     }
 
     #[test]
@@ -214,7 +228,7 @@ XDG_VIDEOS_DIR="$HOME/Video"
         );
         assert_eq!(
             UserDirs::conventional(&home(), "Movies").videos,
-            Some(PathBuf::from("/home/user/Movies"))
+            Some(home().join("Movies"))
         );
     }
 }

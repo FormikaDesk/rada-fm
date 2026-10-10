@@ -18,6 +18,41 @@ use serde::{Deserialize, Serialize};
 
 pub use local::LocalFs;
 
+/// [`std::fs::canonicalize`] with the path written the way people write it. On Windows the
+/// standard function answers `\\?\C:\Users\me`; that form is for the system, and showing it
+/// in an address bar or comparing it with a plain `C:\Users\me` goes wrong. Everywhere else
+/// this is `canonicalize`.
+pub fn canonical_path(p: &Path) -> io::Result<PathBuf> {
+    std::fs::canonicalize(p).map(plain_path)
+}
+
+/// `\\?\C:\x` to `C:\x`, and `\\?\UNC\server\share` to `\\server\share`; a verbatim path
+/// that has no plain form (a very long one) is left as it is.
+pub fn plain_path(p: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        let Some(Component::Prefix(prefix)) = p.components().next() else {
+            return p;
+        };
+        let text = p.to_string_lossy().into_owned();
+        let plain = match prefix.kind() {
+            Prefix::VerbatimDisk(_) => text.strip_prefix(r"\\?\").map(str::to_owned),
+            Prefix::VerbatimUNC(..) => text
+                .strip_prefix(r"\\?\UNC\")
+                .map(|rest| format!(r"\\{rest}")),
+            _ => None,
+        };
+        match plain {
+            // Past MAX_PATH only the verbatim form works.
+            Some(s) if s.len() < 248 => PathBuf::from(s),
+            _ => p,
+        }
+    }
+    #[cfg(not(windows))]
+    p
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum FileKind {
     File,
