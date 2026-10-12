@@ -751,7 +751,7 @@ fn copy_sparse(
 }
 
 /// Hash an open file from its start (holes read as zeros, which is what they are).
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn hash_fd(f: &mut File, ctl: &mut dyn CopyControl) -> io::Result<(u64, u128)> {
     use std::io::Seek;
     f.seek(io::SeekFrom::Start(0))?;
