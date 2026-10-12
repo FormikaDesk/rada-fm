@@ -137,4 +137,6 @@ pub enum CoreEvent {
         text: String,
         error: bool,
     },
+    /// The update worker: a newer version, progress, the end.
+    Update(crate::update::UpdateEvent),
 }
