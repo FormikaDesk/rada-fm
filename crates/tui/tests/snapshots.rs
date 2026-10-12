@@ -143,6 +143,11 @@ fn plan_window_names_the_folders_once() {
     let home = h.app.home().to_path_buf();
     std::fs::create_dir_all(home.join("demo/backup")).unwrap();
     std::fs::write(home.join("demo/backup/README.md"), "old").unwrap();
+    // Its date is on the screen: pinned, or the snapshot would change every day.
+    set_mtime(
+        &home.join("demo/backup/README.md"),
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_791_642_600),
+    );
     h.app.open_dir(home.join("demo/projects"));
     h.settle();
     on(&mut h, "Cargo.toml");

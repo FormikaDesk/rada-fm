@@ -332,6 +332,7 @@ impl App {
             NextTab => self.next_tab(),
             PrevTab => self.prev_tab(),
 
+            Update => self.start_update_action(),
             Help => {
                 self.help_scroll = 0;
                 self.modal = Some(Modal::Help);
@@ -631,6 +632,13 @@ impl App {
                         self.help_scroll + WHEEL_STEP
                     } else {
                         self.help_scroll.saturating_sub(WHEEL_STEP)
+                    }
+                }
+                Modal::Update(UpdateView::Offer { scroll, .. }) => {
+                    *scroll = if down {
+                        *scroll + WHEEL_STEP
+                    } else {
+                        scroll.saturating_sub(WHEEL_STEP)
                     }
                 }
                 Modal::Result(r) => {

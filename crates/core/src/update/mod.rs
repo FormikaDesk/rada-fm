@@ -308,15 +308,23 @@ pub enum Check {
 /// in between, what the last check found is answered again (if it is still newer than the
 /// running program).
 pub fn check(ctx: &Ctx, force: bool, now: u64) -> Check {
+    check_full(ctx, force, now).0
+}
+
+/// [`check`], and the release itself when the network was asked and found one.
+pub fn check_full(ctx: &Ctx, force: bool, now: u64) -> (Check, Option<Release>) {
     let mut state = CheckState::load(ctx);
     if !force && !state.due(now) {
-        return match state
+        let cached = state
             .latest
-            .filter(|n| Version::parse(&n.version).is_some_and(|v| v > ctx.current))
-        {
-            Some(n) => Check::Newer(n),
-            None => Check::UpToDate,
-        };
+            .filter(|n| Version::parse(&n.version).is_some_and(|v| v > ctx.current));
+        return (
+            match cached {
+                Some(n) => Check::Newer(n),
+                None => Check::UpToDate,
+            },
+            None,
+        );
     }
     state.last_attempt = now;
     match newest_release(ctx) {
@@ -325,13 +333,13 @@ pub fn check(ctx: &Ctx, force: bool, now: u64) -> Check {
             state.latest = found.as_ref().map(Notice::of);
             state.save(ctx);
             match found {
-                Some(r) => Check::Newer(Notice::of(&r)),
-                None => Check::UpToDate,
+                Some(r) => (Check::Newer(Notice::of(&r)), Some(r)),
+                None => (Check::UpToDate, None),
             }
         }
         Err(e) => {
             state.save(ctx);
-            Check::Failed(e)
+            (Check::Failed(e), None)
         }
     }
 }

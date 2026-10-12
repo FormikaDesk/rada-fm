@@ -66,6 +66,7 @@ pub enum Action {
     // the program
     Help,
     Quit,
+    Update,
     // later additions: the Explorer-style interface
     NewFile,
     Refresh,
@@ -119,7 +120,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 63] = [
+    pub const ALL: [Action; 64] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -183,6 +184,7 @@ impl Action {
         Action::CloseTab,
         Action::NextTab,
         Action::PrevTab,
+        Action::Update,
     ];
 
     /// The name used in the configuration file.
@@ -251,6 +253,7 @@ impl Action {
             Action::CloseTab => "close_tab",
             Action::NextTab => "next_tab",
             Action::PrevTab => "prev_tab",
+            Action::Update => "update",
         }
     }
 
@@ -324,6 +327,7 @@ impl Action {
             Action::CloseTab => "Close tab",
             Action::NextTab => "Next tab",
             Action::PrevTab => "Previous tab",
+            Action::Update => "Update rada",
         }
     }
 
@@ -343,7 +347,7 @@ impl Action {
                 Group::View
             }
             NewTab | CloseTab | NextTab | PrevTab => Group::Tabs,
-            Help | Quit => Group::Program,
+            Help | Quit | Update => Group::Program,
         }
     }
 }
@@ -642,6 +646,8 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::CloseTab, &["ctrl+w"]),
     (Action::NextTab, &["ctrl+tab", "ctrl+pagedown"]),
     (Action::PrevTab, &["ctrl+shift+tab", "ctrl+pageup"]),
+    // `U` is the history in the vim scheme, so the update has a key of its own.
+    (Action::Update, &["alt+u"]),
 ];
 
 #[derive(Clone, Debug)]
@@ -1129,7 +1135,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 63);
+        assert_eq!(Action::ALL.len(), 64);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

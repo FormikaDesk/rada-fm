@@ -16,6 +16,7 @@ mod modals;
 mod preview;
 mod sidebar;
 mod tabs;
+mod updates;
 pub mod widgets;
 
 use std::path::Path;

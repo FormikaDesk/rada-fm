@@ -214,6 +214,36 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     b
 }
 
+/// The update notice, in the longest wording that fits in `room` beside `left_width` cells of
+/// the rest of the status (which gives way, down to a few cells).
+fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Bar<'a>> {
+    let (variants, clickable) = app.update_notice()?;
+    let th = &app.th;
+    let band = th.band();
+    let failed = matches!(app.update, crate::app::UpdateStatus::Failed { .. });
+    let keep_for_count = 12.min(left_width);
+    let text = variants
+        .iter()
+        .find(|v| v.width() + 6 + keep_for_count <= room)
+        .or(variants.last())?;
+    let style = if failed {
+        th.fg(th.error)
+    } else {
+        th.accent_style()
+    }
+    .add_modifier(Modifier::BOLD)
+    .patch(band);
+    let mut b = Bar::default();
+    b.push(Span::styled("  │  ", th.faint().patch(band)));
+    let span = Span::styled(format!("↑ {text}"), style);
+    if clickable {
+        b.push_hit(span, Target::Act(Action::Update));
+    } else {
+        b.push(span);
+    }
+    Some(b)
+}
+
 /// The free space of the disk the current folder is on, with a bar of how full it is.
 fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     let th = &app.th;
@@ -282,8 +312,16 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
         right = buttons;
     }
     let mut left = status_left(app);
-    let room = w.saturating_sub(right.width() + 1);
-    left.clip(room);
+    let mut room = w.saturating_sub(right.width() + 1);
+    // A newer version (or an update at work) is worth more than the item count: it keeps its
+    // place, in the longest wording that leaves the count room to show.
+    if let Some(notice) = update_notice_bar(app, room, left.width()) {
+        room = room.saturating_sub(notice.width());
+        left.clip(room);
+        left.append(notice);
+    } else {
+        left.clip(room);
+    }
     let gap = w.saturating_sub(left.width() + right.width());
     left.push(Span::styled(" ".repeat(gap), band));
     left.append(right);

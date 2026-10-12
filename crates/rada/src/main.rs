@@ -5,6 +5,7 @@ mod demo;
 mod desktop;
 mod fonts;
 mod shell;
+mod update_cmd;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,6 +23,19 @@ enum Command {
     Setup {
         #[command(subcommand)]
         what: SetupWhat,
+    },
+    /// Look for a newer rada and install it. Reads GitHub's public list of releases and sends
+    /// nothing but `User-Agent: rada/<version>`.
+    Update {
+        /// Only say whether a newer version exists, and what is in it.
+        #[arg(long)]
+        check: bool,
+        /// Go back to the version that was running before the last update.
+        #[arg(long, conflicts_with = "check")]
+        rollback: bool,
+        /// Do not ask before installing.
+        #[arg(short, long)]
+        yes: bool,
     },
 }
 
@@ -133,6 +147,18 @@ fn main() -> Result<()> {
             println!("{l}");
         }
         return Ok(());
+    }
+    if let Some(Command::Update {
+        check,
+        rollback,
+        yes,
+    }) = &cli.command
+    {
+        let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
+        let cfg_file = config::load(&dirs);
+        let settings = cfg_file.update_settings(&dirs.home)?;
+        let ctx = update_context(&dirs, settings)?;
+        return update_cmd::run(ctx, *check, *rollback, *yes);
     }
     if cli.spawn_terminal {
         return desktop::spawn_terminal(cli.path.first().map(PathBuf::as_path));
@@ -299,6 +325,19 @@ fn main() -> Result<()> {
         None => Arc::new(LocalFs),
     };
     let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits);
+    // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
+    // screens must not depend on what GitHub says today.
+    let services = if cli.demo.is_some() {
+        services
+    } else {
+        match update_context(&dirs, cfg_file.update_settings(&dirs.home)?) {
+            Ok(ctx) => services.with_updates(ctx),
+            Err(e) => {
+                tracing::warn!("updates are off: {e}");
+                services
+            }
+        }
+    };
     let layout = match cfg_file.layout.as_deref() {
         None => rada_tui::LayoutKind::Explorer,
         Some(n) => rada_tui::LayoutKind::parse(n)
@@ -370,6 +409,20 @@ fn main() -> Result<()> {
         write_cwd(f, &outcome.last_dir).with_context(|| format!("cannot write {}", f.display()))?;
     }
     Ok(())
+}
+
+/// What an update needs to know about this program and where its files are.
+fn update_context(
+    dirs: &Dirs,
+    settings: rada_core::update::Settings,
+) -> Result<rada_core::update::Ctx> {
+    rada_core::update::Ctx::for_this_program(
+        env!("CARGO_PKG_VERSION"),
+        settings,
+        dirs.rada_state(),
+        dirs.home.clone(),
+    )
+    .map_err(anyhow::Error::msg)
 }
 
 fn write_cwd(file: &std::path::Path, dir: &std::path::Path) -> std::io::Result<()> {

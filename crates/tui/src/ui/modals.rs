@@ -322,6 +322,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         Modal::Help => draw_help(f, &th, area, &app.keymap, app.mouse, app.help_scroll),
         Modal::Menu(m) => draw_menu(f, &th, &app.keymap, m, area, &mut app.hits),
         Modal::Properties(p) => draw_properties(f, &th, p, area, &mut app.hits),
+        Modal::Update(u) => super::updates::draw_update(f, &th, u, area, &mut app.hits),
         Modal::FullPreview => {}
     }
 }

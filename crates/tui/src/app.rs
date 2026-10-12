@@ -313,6 +313,8 @@ pub enum Modal {
     /// The preview of the item under the cursor, over the whole screen.
     FullPreview,
     Properties(PropsView),
+    /// A newer version: its notes and the question, or why an update did not work.
+    Update(UpdateView),
 }
 
 pub struct Config {
@@ -408,12 +410,14 @@ mod menus;
 mod props;
 mod side;
 mod tabs;
+mod update;
 
 pub use address::AddressEdit;
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
 pub use menus::MenuKind;
 pub use props::PropsView;
 pub use tabs::TabState;
+pub use update::{UpdateStatus, UpdateView};
 
 pub struct App {
     pub th: Theme,
@@ -515,6 +519,10 @@ pub struct App {
     saved_ui: rada_core::uistate::UiState,
     /// Layout the last frame used, for the keyboard and the tests.
     pub screen: (u16, u16),
+    /// What the update worker last told.
+    pub update: UpdateStatus,
+    /// Somebody asked to look for updates and is waiting for the answer.
+    update_asked: bool,
 }
 
 impl App {
@@ -636,6 +644,8 @@ impl App {
             details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
+            update: UpdateStatus::None,
+            update_asked: false,
             svc,
         };
         for w in std::mem::take(&mut app.keymap.warnings) {
@@ -656,6 +666,10 @@ impl App {
         app.svc.watcher.watch(start_dir.clone());
         app.request_dir(start_dir);
         app.svc.jobs.load_undo_label();
+        // The daily check: the worker decides whether it is due, off this thread.
+        if let Some(u) = &app.svc.updater {
+            u.check_in_background();
+        }
         if let Some(req) = cfg.request {
             let h = app.svc.jobs.plan_request(req);
             app.begin_plan("Planning", h);
@@ -943,6 +957,7 @@ impl App {
             }
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Update(u) => self.on_update_event(u),
             CoreEvent::Note { text, error } => {
                 self.toast(
                     if error {
@@ -2276,6 +2291,7 @@ impl App {
                 KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
                 _ => self.modal = Some(Modal::FullPreview),
             },
+            Modal::Update(view) => self.on_update_key(view, key),
             Modal::Properties(mut p) => match key.code {
                 KeyCode::Down | KeyCode::Char('j') => {
                     p.scroll += 1;

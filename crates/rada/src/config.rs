@@ -31,6 +31,14 @@
 //! preview_entries = 200      # items listed in the preview of an archive
 //! preview_seconds = 1.5      # how long counting an archive's members may take there
 //!
+//! [update]
+//! check = true               # look for a newer rada (at most once a day, in the background)
+//! channel = "auto"           # auto (stable users see stable releases, pre-release users see the
+//!                            # next pre-releases too) | stable | prerelease
+//! method = "auto"            # auto | binary (download) | source (git pull + cargo build) |
+//!                            # package (rada only says which tool to use)
+//! source_dir = "~/rada-fm"   # the git checkout the `source` method updates
+//!
 //! [devices]
 //! hide = ["tmpfs", "/boot"]   # replaces the built-in list of mounts kept out of the disks
 //!                               # (a name is a filesystem type, `fuse.*` a prefix of types;
@@ -47,6 +55,7 @@ use rada_core::archive::ArchiveLimits;
 use rada_core::model::{SortKey, SortSpec};
 use rada_core::platform::Dirs;
 use rada_core::preview::ImageLimits;
+use rada_core::update::{Channel, Method, Settings};
 use serde::Deserialize;
 
 #[derive(Debug)]
@@ -73,6 +82,45 @@ pub struct FileConfig {
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     pub keys: HashMap<String, Vec<String>>,
+    /// The `[update]` section as written; [`FileConfig::update_settings`] checks it.
+    update: UpdateFile,
+}
+
+#[derive(Debug, Default, Clone)]
+struct UpdateFile {
+    check: Option<bool>,
+    channel: Option<String>,
+    method: Option<String>,
+    source_dir: Option<String>,
+}
+
+impl FileConfig {
+    /// The `[update]` section, with the choices checked.
+    pub fn update_settings(&self, home: &std::path::Path) -> anyhow::Result<Settings> {
+        use anyhow::Context;
+        let u = &self.update;
+        let channel = match u.channel.as_deref() {
+            None => Channel::Auto,
+            Some(n) => Channel::parse(n).with_context(|| {
+                format!("unknown update channel {n:?} (use auto, stable or prerelease)")
+            })?,
+        };
+        let method = match u.method.as_deref() {
+            None => Method::Auto,
+            Some(n) => Method::parse(n).with_context(|| {
+                format!("unknown update method {n:?} (use auto, binary, source or package)")
+            })?,
+        };
+        Ok(Settings {
+            check: u.check.unwrap_or(true),
+            channel,
+            method,
+            source_dir: u
+                .source_dir
+                .as_deref()
+                .map(|d| rada_tui::palette::expand(d, home)),
+        })
+    }
 }
 
 /// A key list may be written as one string or as an array.
@@ -89,6 +137,14 @@ struct ArchivesRaw {
     max_ratio: Option<u64>,
     preview_entries: Option<usize>,
     preview_seconds: Option<f32>,
+}
+
+#[derive(Deserialize, Default)]
+struct UpdateRaw {
+    check: Option<bool>,
+    channel: Option<String>,
+    method: Option<String>,
+    source_dir: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -121,6 +177,7 @@ struct Raw {
     dates: Option<String>,
     devices: Option<DevicesRaw>,
     archives: Option<ArchivesRaw>,
+    update: Option<UpdateRaw>,
     keymap: Option<String>,
     keys: Option<HashMap<String, Keys>>,
 }
@@ -142,7 +199,14 @@ pub fn load(dirs: &Dirs) -> FileConfig {
     };
     let archives = raw.archives.unwrap_or_default();
     let al = ArchiveLimits::default();
+    let update = raw.update.unwrap_or_default();
     FileConfig {
+        update: UpdateFile {
+            check: update.check,
+            channel: update.channel,
+            method: update.method,
+            source_dir: update.source_dir,
+        },
         archive_limits: ArchiveLimits {
             max_total_bytes: archives
                 .max_extract_gb
@@ -248,6 +312,36 @@ mod tests {
         assert_eq!(c.dates.as_deref(), Some("absolute"));
         // The older name of the hints switch still works.
         assert!(!with_config("hints = false\n").hints);
+    }
+
+    #[test]
+    fn the_update_section_is_read_and_checked() {
+        let home = std::path::Path::new("/home/u");
+        let d = with_config("sidebar = true\n")
+            .update_settings(home)
+            .unwrap();
+        assert!(d.check);
+        assert_eq!(
+            (d.channel, d.method, d.source_dir),
+            (Channel::Auto, Method::Auto, None)
+        );
+
+        let c = with_config(
+            "[update]\ncheck = false\nchannel = \"prerelease\"\nmethod = \"source\"\nsource_dir = \"~/rada-fm\"\n",
+        )
+        .update_settings(home)
+        .unwrap();
+        assert!(!c.check);
+        assert_eq!((c.channel, c.method), (Channel::Prerelease, Method::Source));
+        assert_eq!(c.source_dir, Some(home.join("rada-fm")));
+
+        for bad in ["channel = \"nightly\"", "method = \"magic\""] {
+            let e = with_config(&format!("[update]\n{bad}\n"))
+                .update_settings(home)
+                .unwrap_err()
+                .to_string();
+            assert!(e.contains("unknown update"), "{e}");
+        }
     }
 
     #[test]

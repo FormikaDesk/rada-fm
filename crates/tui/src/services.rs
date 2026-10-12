@@ -29,6 +29,8 @@ pub struct Services {
     pub journal_ok: bool,
     /// Where background threads of the interface report back (see `CoreEvent::Note`).
     pub notes: crossbeam_channel::Sender<CoreEvent>,
+    /// Looks for newer versions and installs them; `None` where updating makes no sense (tests).
+    pub updater: Option<rada_core::update::Updater>,
     fs: Arc<dyn FsEngine>,
 }
 
@@ -81,7 +83,15 @@ impl Services {
             events: rx,
             journal_ok,
             notes: tx,
+            updater: None,
             fs,
         }
+    }
+
+    /// Start the update worker for this program. The daily check begins when the interface
+    /// has started, not here.
+    pub fn with_updates(mut self, ctx: rada_core::update::Ctx) -> Services {
+        self.updater = Some(rada_core::update::Updater::spawn(ctx, self.notes.clone()));
+        self
     }
 }
