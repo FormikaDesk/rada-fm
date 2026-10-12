@@ -1,163 +1,21 @@
 //! Updates, against a web server of our own that stands in for GitHub: nothing here ever
 //! reaches the network, and every file written lives in the sandbox.
 
-use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::Write;
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crossbeam_channel::unbounded;
 use rada_core::events::CoreEvent;
 use rada_core::testutil::Sandbox;
+use rada_core::testweb::Server;
 use rada_core::update::{
     self, Channel, Check, CheckState, Ctx, Method, Mode, Settings, UpdateEvent, Updater, Version,
     release,
 };
 use sha2::{Digest, Sha256};
-
-// ------------------------------------------------------------------- the stand-in server
-
-#[derive(Clone)]
-struct Reply {
-    status: u16,
-    body: Vec<u8>,
-    /// Promise more bytes than are sent, then hang up (a download cut short).
-    truncate: bool,
-}
-
-#[derive(Clone, Debug)]
-struct Seen {
-    path: String,
-    headers: Vec<(String, String)>,
-}
-
-struct Server {
-    base: String,
-    routes: Arc<Mutex<HashMap<String, Reply>>>,
-    seen: Arc<Mutex<Vec<Seen>>>,
-    stop: Arc<AtomicBool>,
-}
-
-impl Server {
-    fn start() -> Server {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        listener.set_nonblocking(true).unwrap();
-        let routes: Arc<Mutex<HashMap<String, Reply>>> = Arc::default();
-        let seen: Arc<Mutex<Vec<Seen>>> = Arc::default();
-        let stop = Arc::new(AtomicBool::new(false));
-        let (r, s, st) = (routes.clone(), seen.clone(), stop.clone());
-        std::thread::spawn(move || {
-            while !st.load(Ordering::Relaxed) {
-                match listener.accept() {
-                    Ok((conn, _)) => {
-                        let (r, s) = (r.clone(), s.clone());
-                        std::thread::spawn(move || serve(conn, r, s));
-                    }
-                    Err(_) => std::thread::sleep(Duration::from_millis(5)),
-                }
-            }
-        });
-        Server {
-            base,
-            routes,
-            seen,
-            stop,
-        }
-    }
-
-    fn route(&self, path: &str, status: u16, body: impl Into<Vec<u8>>) {
-        self.routes.lock().unwrap().insert(
-            path.to_string(),
-            Reply {
-                status,
-                body: body.into(),
-                truncate: false,
-            },
-        );
-    }
-
-    fn route_truncated(&self, path: &str, body: impl Into<Vec<u8>>) {
-        self.routes.lock().unwrap().insert(
-            path.to_string(),
-            Reply {
-                status: 200,
-                body: body.into(),
-                truncate: true,
-            },
-        );
-    }
-
-    fn url(&self, path: &str) -> String {
-        format!("{}{path}", self.base)
-    }
-
-    fn requests(&self) -> Vec<Seen> {
-        self.seen.lock().unwrap().clone()
-    }
-
-    fn count(&self, path: &str) -> usize {
-        self.requests().iter().filter(|s| s.path == path).count()
-    }
-}
-
-impl Drop for Server {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-    }
-}
-
-fn serve(
-    mut conn: TcpStream,
-    routes: Arc<Mutex<HashMap<String, Reply>>>,
-    seen: Arc<Mutex<Vec<Seen>>>,
-) {
-    let _ = conn.set_nonblocking(false);
-    let _ = conn.set_read_timeout(Some(Duration::from_secs(5)));
-    let mut head = Vec::new();
-    let mut byte = [0u8; 1];
-    while !head.ends_with(b"\r\n\r\n") {
-        match conn.read(&mut byte) {
-            Ok(1) => head.push(byte[0]),
-            _ => return,
-        }
-    }
-    let text = String::from_utf8_lossy(&head).into_owned();
-    let mut lines = text.lines();
-    let first = lines.next().unwrap_or("");
-    let path = first.split_whitespace().nth(1).unwrap_or("/").to_string();
-    let headers = lines
-        .filter_map(|l| l.split_once(':'))
-        .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_string()))
-        .collect();
-    seen.lock().unwrap().push(Seen {
-        path: path.clone(),
-        headers,
-    });
-    let key = path.split('?').next().unwrap_or("").to_string();
-    let reply = routes.lock().unwrap().get(&key).cloned();
-    let reply = reply.unwrap_or(Reply {
-        status: 404,
-        body: b"not found".to_vec(),
-        truncate: false,
-    });
-    let declared = if reply.truncate {
-        reply.body.len() * 2 + 10
-    } else {
-        reply.body.len()
-    };
-    let _ = write!(
-        conn,
-        "HTTP/1.1 {} X\r\nContent-Length: {declared}\r\nConnection: close\r\n\r\n",
-        reply.status
-    );
-    let _ = conn.write_all(&reply.body);
-    let _ = conn.flush();
-}
 
 // ------------------------------------------------------------------------ release files
 

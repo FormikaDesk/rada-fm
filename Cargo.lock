@@ -1952,15 +1952,19 @@ version = "0.6.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",
+ "flate2",
  "rada-core",
  "rada-tui",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tar",
  "tempfile",
  "toml",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "zip",
 ]
 
 [[package]]
