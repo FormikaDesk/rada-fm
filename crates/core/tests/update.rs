@@ -188,6 +188,9 @@ impl World {
             .flatten()
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n != exe_name())
+            // Windows keeps the replaced program beside the new one until it is no longer
+            // running; it is removed at the next start.
+            .filter(|n| !(cfg!(windows) && n.starts_with(".rada-old-")))
             .collect()
     }
 }
