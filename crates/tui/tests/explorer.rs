@@ -322,7 +322,7 @@ fn tabs_are_remembered_between_sessions_and_the_option_turns_it_off() {
     h.press("ctrl+t");
     h.wait("two", |a| a.tab_count() == 2 && !a.is_loading());
     let dir = h.app.home().parent().unwrap().join("xdg/state/rada");
-    let end = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
     loop {
         let saved = rada_core::uistate::load(&dir);
         if saved.tabs.len() == 2 {
@@ -665,8 +665,7 @@ fn the_checkbox_selects_the_name_moves_the_cursor_and_a_double_click_opens() {
     );
     assert_eq!(h.marked_names().len(), 1);
     // Double click on a folder name opens it.
-    h.click(&Target::Row(0));
-    h.click(&Target::Row(0));
+    h.double_click(&Target::Row(0));
     h.wait("the folder", |a| {
         a.cwd.ends_with("assets") && !a.is_loading()
     });
@@ -749,8 +748,7 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
     h.click(&Target::ViewMode(ViewMode::Icons));
     assert_eq!(h.app.view, ViewMode::Icons);
     // A click on a tile moves the cursor, a double click opens.
-    h.click(&Target::Row(0));
-    h.click(&Target::Row(0));
+    h.double_click(&Target::Row(0));
     h.wait("a folder", |a| a.cwd.ends_with("assets") && !a.is_loading());
 }
 

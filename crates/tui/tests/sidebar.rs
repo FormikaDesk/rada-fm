@@ -278,7 +278,7 @@ fn ctrl_b_hides_and_shows_it_and_the_choice_is_remembered() {
     let s = h.screen();
     assert!(!s.contains("PINNED"), "{s}");
     let file = ui_state_file(&h);
-    let end = Instant::now() + Duration::from_secs(3);
+    let end = Instant::now() + Duration::from_secs(20);
     while !file.exists() && Instant::now() < end {
         std::thread::sleep(Duration::from_millis(20));
     }

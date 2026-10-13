@@ -131,7 +131,6 @@ pub struct MenuView {
     pub selected: usize,
 }
 
-const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 const WHEEL_STEP: usize = 3;
 
 impl App {
@@ -792,7 +791,7 @@ impl App {
             return;
         }
         let double =
-            matches!(self.last_click, Some((t, r)) if r == i && t.elapsed() < DOUBLE_CLICK);
+            matches!(self.last_click, Some((t, r)) if r == i && t.elapsed() < self.double_click);
         self.last_click = Some((Instant::now(), i));
         if mods.contains(KeyModifiers::CONTROL) {
             // Ctrl+click adds or removes one item and becomes the new anchor.

@@ -304,10 +304,26 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
     let t = h.app.toast.as_ref().unwrap().text.clone();
     assert!(t.contains("not an archive"), "{t}");
     assert!(h.app.archive.is_none());
+    // The first message is still up: take it away, so that what comes next is the answer to
+    // the extraction and not a left-over. The answer is a one-line message, or, when the
+    // sentence is long (it holds the whole path of the file), a window of its own: which of
+    // the two depends on where the test runs, so both are read.
+    h.app.toast = None;
     h.keys("e");
-    h.wait("the message", |a| a.modal.is_some() || a.toast.is_some());
-    let s = h.screen();
-    assert!(s.contains("not an archive"), "{s}");
+    let said = |a: &rada_tui::app::App| match &a.modal {
+        Some(Modal::Result(r)) => Some(
+            r.lines
+                .iter()
+                .map(|l| l.1.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        Some(_) => None,
+        None => a.toast.as_ref().map(|t| t.text.clone()),
+    };
+    h.wait("the answer to the extraction", |a| said(a).is_some());
+    let t = said(&h.app).unwrap();
+    assert!(t.contains("not an archive"), "{t}");
 }
 
 #[test]
@@ -321,7 +337,7 @@ fn having_a_big_archive_under_the_cursor_does_not_slow_navigation() {
     let mut h = H::new(sb, dir, 130, 30);
     // Keys and drawing, with the archive selected and its preview being worked out.
     h.app.tick();
-    let mut worst = Duration::ZERO;
+    let mut samples = Vec::new();
     let end = Instant::now() + Duration::from_millis(700);
     while Instant::now() < end {
         let t = Instant::now();
@@ -329,14 +345,14 @@ fn having_a_big_archive_under_the_cursor_does_not_slow_navigation() {
         let _ = h.screen();
         h.key(KeyCode::Up);
         let _ = h.screen();
-        worst = worst.max(t.elapsed());
+        samples.push(t.elapsed());
         // Deliver whatever the workers have said, as the real loop does.
         while let Ok(ev) = h.app.events().try_recv() {
             h.app.on_core_event(ev);
         }
     }
-    assert!(
-        worst < Duration::from_millis(100),
-        "a keypress took {worst:?}"
+    assert_never_blocked(
+        samples,
+        "keys and frames with a big archive under the cursor",
     );
 }

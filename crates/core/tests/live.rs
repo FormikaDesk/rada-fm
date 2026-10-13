@@ -37,6 +37,29 @@ fn wait_for<T>(
     }
 }
 
+/// Wait until the watcher really watches `dir`, which a test cannot tell from how long it has
+/// been since it was asked: a file is touched there until an event says it was seen. What was
+/// caused by the touching is then waited out, so that the test starts from quiet.
+fn wait_until_watching(dir: &std::path::Path, rx: &Receiver<CoreEvent>) {
+    let probe = dir.join("armed-probe");
+    let end = Instant::now() + Duration::from_secs(20);
+    let mut n = 0u32;
+    loop {
+        std::fs::write(&probe, n.to_string()).unwrap();
+        n += 1;
+        let seen = rx
+            .recv_timeout(Duration::from_millis(150))
+            .is_ok_and(|e| matches!(e, CoreEvent::Watch(WatchEvent::Changed { .. })));
+        if seen {
+            break;
+        }
+        assert!(Instant::now() < end, "the watcher never started watching");
+    }
+    std::fs::remove_file(&probe).unwrap();
+    // Quiet again: nothing more arrives for a while.
+    while rx.recv_timeout(Duration::from_millis(600)).is_ok() {}
+}
+
 // ----------------------------------------------------------------------------- folders
 
 #[test]
@@ -165,7 +188,7 @@ fn a_burst_of_changes_is_coalesced_into_few_events() {
     let (tx, rx) = unbounded();
     let w = DirWatcher::spawn(tx);
     w.watch(dir.clone());
-    std::thread::sleep(Duration::from_millis(200));
+    wait_until_watching(&dir, &rx);
     for i in 0..2000 {
         std::fs::write(dir.join(format!("f{i}")), "").unwrap();
     }
@@ -205,13 +228,17 @@ fn live_patches_update_a_sorted_listing() {
     let mut listing = DirListing::new(dir.clone(), vec![], SortSpec::default());
     loader.load(dir.clone(), 1);
     watcher.watch(dir.clone());
-    std::thread::sleep(Duration::from_millis(250));
-    sb.write("live/a.txt", "a");
-    sb.write("live/c.txt", "c");
-
-    let end = Instant::now() + Duration::from_secs(5);
+    // Written again every so often until the listing has them: a file written before the
+    // watcher was in place is missed by it, and nothing tells the test when that is over.
+    let mut written = None::<Instant>;
+    let end = Instant::now() + Duration::from_secs(20);
     while Instant::now() < end {
-        let Ok(ev) = rx.recv_timeout(Duration::from_millis(200)) else {
+        if written.is_none_or(|t| t.elapsed() > Duration::from_millis(400)) {
+            sb.write("live/a.txt", "a");
+            sb.write("live/c.txt", "c");
+            written = Some(Instant::now());
+        }
+        let Ok(ev) = rx.recv_timeout(Duration::from_millis(100)) else {
             continue;
         };
         match ev {
@@ -290,8 +317,9 @@ fn a_slow_volume_listing_never_blocks_the_caller() {
     let t = Instant::now();
     let w = VolumesWorker::spawn(p, Duration::from_secs(5), tx);
     w.refresh_now();
+    // The listing takes two seconds: waiting for it would be seen at once.
     assert!(
-        t.elapsed() < Duration::from_millis(100),
+        t.elapsed() < Duration::from_millis(1000),
         "spawn returned in {:?}",
         t.elapsed()
     );

@@ -532,6 +532,8 @@ pub struct App {
     pub filter: Option<FilterState>,
     sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
+    /// How soon a second click on the same row makes a double click.
+    pub double_click: Duration,
     pub help_scroll: usize,
     /// Replaces the system clock when drawing relative dates (tests, screenshots).
     pub clock: Option<std::time::SystemTime>,
@@ -681,6 +683,7 @@ impl App {
             filter: None,
             sel_anchor: None,
             last_click: None,
+            double_click: Duration::from_millis(400),
             help_scroll: 0,
             clock: None,
             view,

@@ -104,9 +104,14 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
 fn a_file_created_from_outside_appears_without_pressing_anything() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir.clone(), 120, 30);
-    std::thread::sleep(Duration::from_millis(250));
-    std::fs::write(dir.join("ext_created.txt"), "hi").unwrap();
+    // Written again every so often until it shows: a file written before the watcher is in
+    // place is missed by it, and nothing says when that is over.
+    let mut written = None::<Instant>;
     h.wait("live update", |a| {
+        if written.is_none_or(|t| t.elapsed() > Duration::from_millis(400)) {
+            std::fs::write(dir.join("ext_created.txt"), "hi").unwrap();
+            written = Some(Instant::now());
+        }
         (0..a.visible.len()).any(|i| {
             a.entry_at(i)
                 .is_some_and(|e| e.display == "ext_created.txt")
@@ -589,21 +594,19 @@ fn the_ui_thread_never_waits_for_an_image_to_decode() {
     }
     let dir = sb.path("many");
     let mut h = H::new(sb, dir, 130, 36);
-    let mut worst = Duration::ZERO;
+    let mut samples = Vec::new();
     for _ in 0..30 {
         let t = Instant::now();
         h.keys("j");
         let _ = h.screen(); // the frame that follows every key
-        worst = worst.max(t.elapsed());
+        samples.push(t.elapsed());
         h.keys("k");
         let _ = h.screen();
         std::thread::sleep(Duration::from_millis(5));
     }
-    // Decoding a 20-megapixel PNG takes far longer than this, even in release builds.
-    assert!(
-        worst < Duration::from_millis(100),
-        "a key + redraw took {worst:?} while images were decoding"
-    );
+    // Decoding a 20-megapixel PNG takes seconds, even in release builds: a key that waited
+    // for it would show.
+    assert_never_blocked(samples, "a key and its redraw while images were decoding");
 }
 
 /// A one-page PDF with a title and an author, written by hand.

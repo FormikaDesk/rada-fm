@@ -109,13 +109,8 @@ fn extract_from_zip(archive: &Path, inner: &str, dest: &Path) -> Result<(), Stri
 
 /// Start `program --version` and return what it printed, giving up after `limit`.
 pub fn run_version(program: &Path, limit: Duration) -> Result<String, String> {
-    let mut child = Command::new(program)
-        .arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("the new program does not start: {e}"))?;
+    let mut child =
+        spawn_version(program).map_err(|e| format!("the new program does not start: {e}"))?;
     let started = Instant::now();
     loop {
         match child.try_wait() {
@@ -137,6 +132,42 @@ pub fn run_version(program: &Path, limit: Duration) -> Result<String, String> {
             Ok(None) => std::thread::sleep(Duration::from_millis(20)),
             Err(e) => return Err(format!("cannot wait for the new program: {e}")),
         }
+    }
+}
+
+/// Start `program --version`. A program that was written a moment ago can still be "busy" for
+/// writing ("Text file busy", ETXTBSY): another process that was being started at that
+/// very moment holds a copy of the file's descriptor until it has run its own program. That
+/// passes in a few milliseconds, so it is tried again rather than reported.
+fn spawn_version(program: &Path) -> io::Result<std::process::Child> {
+    const TRIES: u32 = 40;
+    let mut tried = 0;
+    loop {
+        let started = Command::new(program)
+            .arg("--version")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn();
+        match started {
+            Err(e) if is_text_file_busy(&e) && tried < TRIES => {
+                tried += 1;
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            other => return other,
+        }
+    }
+}
+
+fn is_text_file_busy(e: &io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        e.raw_os_error() == Some(libc::ETXTBSY)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = e;
+        false
     }
 }
 
@@ -367,6 +398,32 @@ pub fn rollback(
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_still_open_for_writing_is_tried_again_not_reported_as_broken() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("rada");
+        fs::write(&exe, "#!/bin/sh\necho \"rada 9.9.9\"\n").unwrap();
+        fs::set_permissions(&exe, fs::Permissions::from_mode(0o755)).unwrap();
+        // Another process that was starting at that moment holds the file open for writing:
+        // running it fails with "Text file busy" until that is closed.
+        let writer = fs::OpenOptions::new().write(true).open(&exe).unwrap();
+        assert!(
+            Command::new(&exe)
+                .output()
+                .is_err_and(|e| is_text_file_busy(&e)),
+            "this system refuses to run a file open for writing, which is what is being tested"
+        );
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            drop(writer);
+        });
+        let said = run_version(&exe, Duration::from_secs(20)).expect("it started in the end");
+        release.join().unwrap();
+        assert_eq!(said, "rada 9.9.9");
+    }
 
     pub(crate) fn tar_gz(dir: &Path, name: &str, files: &[(&str, &[u8])]) -> PathBuf {
         let path = dir.join(name);

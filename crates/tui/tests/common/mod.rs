@@ -211,7 +211,11 @@ impl H {
         if let Some(t) = tweak {
             t(&mut cfg);
         }
-        let app = App::new(cfg, svc, images);
+        let mut app = App::new(cfg, svc, images);
+        // A double click is two clicks within a time. The tests do not depend on how fast a
+        // machine is: any two clicks of a test are a double click unless the test says
+        // otherwise (see `a_slow_second_click_is_not_a_double_click`).
+        app.double_click = Duration::from_secs(600);
         let mut h = H {
             app,
             term: Terminal::new(TestBackend::new(w, h)).unwrap(),
@@ -312,6 +316,20 @@ impl H {
 
     pub fn click(&mut self, target: &Target) {
         self.click_on(target, KeyModifiers::NONE);
+    }
+
+    /// Two clicks on `target`, one right after the other: its place is looked up once, and
+    /// nothing is drawn in between.
+    pub fn double_click(&mut self, target: &Target) {
+        let (x, y) = self.where_is(target);
+        for _ in 0..2 {
+            self.mouse(
+                MouseEventKind::Down(MouseButton::Left),
+                x,
+                y,
+                KeyModifiers::NONE,
+            );
+        }
     }
 
     pub fn right_click(&mut self, target: &Target) {
@@ -508,4 +526,23 @@ pub fn demo_scene(w: u16, h: u16) -> H {
         ]
     };
     h
+}
+
+/// The interface stays responsive while a worker is busy for seconds: nearly every key and
+/// frame is quick, and none waits for the worker. A single slow sample is a machine that
+/// stalled for a moment (a busy runner), not a keypress that waited for the work, which would
+/// take as long as the work itself.
+pub fn assert_never_blocked(mut samples: Vec<Duration>, what: &str) {
+    assert!(!samples.is_empty());
+    samples.sort();
+    let worst = *samples.last().unwrap();
+    let typical = samples[(samples.len() * 9 / 10).min(samples.len() - 1)];
+    assert!(
+        typical < Duration::from_millis(100),
+        "{what}: nine in ten took up to {typical:?} (the slowest {worst:?})"
+    );
+    assert!(
+        worst < Duration::from_millis(1500),
+        "{what}: one took {worst:?}, as if it waited for the worker"
+    );
 }

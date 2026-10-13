@@ -361,18 +361,19 @@ fn click_selects_double_click_opens() {
     assert_eq!(h.cursor_name(), "c.txt");
     assert!(h.app.modal.is_none());
     // A double click on the folder enters it.
-    let dir_row = Target::Row(0);
-    h.click(&dir_row);
-    h.click(&dir_row);
+    h.double_click(&Target::Row(0));
     h.wait("dir", |a| a.cwd.ends_with("dir") && !a.is_loading());
 }
 
 #[test]
 fn a_slow_second_click_is_not_a_double_click() {
     let mut h = harness();
+    // Two clicks are a double click when the second comes within this long after the first:
+    // a short time here, and a pause well beyond it, whatever the speed of the machine.
+    h.app.double_click = std::time::Duration::from_millis(30);
     let dir_row = Target::Row(0);
     h.click(&dir_row);
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(300));
     h.click(&dir_row);
     h.settle();
     assert!(h.app.cwd.ends_with("w"));
