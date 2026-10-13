@@ -6,6 +6,7 @@ pub mod archive;
 pub mod card;
 pub mod image;
 pub mod pdf;
+pub mod system;
 
 use std::fs::File;
 use std::io::Read;
@@ -202,6 +203,21 @@ fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits, cancel: &dyn Fn() -
     // Images are recognised by their content, never by the extension.
     if let Some(img) = image::detect(path, &buf, size, meta.mtime, &limits.image) {
         return Preview::Image(img);
+    }
+    // Documents and videos the system knows how to draw (Quick Look, the shell): by their name,
+    // since inside they are archives or containers.
+    if limits.image.decode
+        && let Some(r) = limits.image.system_renderer
+        && let Some(label) = path
+            .file_name()
+            .and_then(|n| system::thumbnail_label(&n.to_string_lossy(), r))
+    {
+        return Preview::Image(image::detect_thumbnail(
+            label,
+            size,
+            meta.mtime,
+            &limits.image,
+        ));
     }
     // So are archives: what they hold, without opening them.
     if let Some(fmt) = crate::archive::format::sniff_head(&buf) {

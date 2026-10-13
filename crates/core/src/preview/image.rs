@@ -40,8 +40,13 @@ pub struct ImageLimits {
     pub pdf_cache_max_bytes: u64,
     pub pdf_cache_max_age: Duration,
     /// Where to look for `pdftoppm`, `pdftotext` and `pdfinfo` (a `PATH`-style list); `None`
-    /// is the process's own `PATH`.
+    /// is the process's own `PATH`. The system's own tools (`sips`, `qlmanage`) are looked for
+    /// there too.
     pub pdf_tools_path: Option<OsString>,
+    /// What the system draws documents with when poppler is not there: `sips` and Quick Look
+    /// on a Mac, Windows' PDF renderer and the shell's thumbnails on Windows. `None` on
+    /// Linux; the tests set it to try the logic of another system.
+    pub system_renderer: Option<super::system::SystemRenderer>,
 }
 
 impl Default for ImageLimits {
@@ -57,6 +62,7 @@ impl Default for ImageLimits {
             pdf_cache_max_bytes: 200 << 20,
             pdf_cache_max_age: Duration::from_secs(30 * 24 * 3600),
             pdf_tools_path: None,
+            system_renderer: super::system::SystemRenderer::native(),
         }
     }
 }
@@ -70,6 +76,9 @@ pub struct ImageInfo {
     pub modified: Option<SystemTime>,
     /// For a PDF: page count, title and author, when known.
     pub doc: Option<pdf::DocFacts>,
+    /// Drawn by the system's thumbnailer (a document, a video…), not decoded: `format` then
+    /// says what kind of document it is.
+    pub thumb: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -141,6 +150,7 @@ pub(super) fn detect(
         size,
         modified,
         doc: None,
+        thumb: false,
     };
 
     if looks_like_pdf(head) {
@@ -221,7 +231,32 @@ fn looks_like_pdf(head: &[u8]) -> bool {
         .any(|w| w == b"%PDF-")
 }
 
-/// The cheap answer for a PDF: refused when too big or when no tool can read it.
+/// The cheap answer for a document the system draws a thumbnail of: nothing is asked of the
+/// system yet.
+pub(super) fn detect_thumbnail(
+    label: &str,
+    size: u64,
+    modified: Option<SystemTime>,
+    limits: &ImageLimits,
+) -> ImagePreview {
+    ImagePreview {
+        info: ImageInfo {
+            format: label.to_string(),
+            width: None,
+            height: None,
+            size,
+            modified,
+            doc: None,
+            thumb: true,
+        },
+        state: disable_if_off(ImageState::Loading, limits),
+        note: None,
+        text: Vec::new(),
+        source: None,
+    }
+}
+
+/// The cheap answer for a PDF: refused when too big or when nothing can read it.
 fn detect_pdf(mut info: ImageInfo, size: u64, limits: &ImageLimits) -> ImagePreview {
     info.format = "PDF".into();
     let tools = pdf::tools_for(limits);
@@ -234,10 +269,10 @@ fn detect_pdf(mut info: ImageInfo, size: u64, limits: &ImageLimits) -> ImagePrev
             )),
             None,
         )
-    } else if !tools.any() {
+    } else if !tools.any() && limits.system_renderer.is_none() {
         (
             ImageState::Failed("poppler is not installed".into()),
-            Some(pdf::INSTALL_HINT.to_string()),
+            Some(pdf::install_hint()),
         )
     } else {
         (ImageState::Loading, None)
@@ -389,6 +424,9 @@ pub fn load(
     limits: &ImageLimits,
     abandon: &dyn Fn() -> bool,
 ) -> ImagePreview {
+    if info.thumb {
+        return load_thumbnail(path, info, limits, abandon);
+    }
     if info.format == "PDF" {
         return load_pdf(path, info, limits, abandon);
     }
@@ -414,8 +452,46 @@ pub fn load(
     }
 }
 
-/// The first page of a PDF through poppler, with its facts; the page's text when it cannot be
-/// drawn.
+/// A document's thumbnail from the system (Quick Look, the shell).
+fn load_thumbnail(
+    path: &Path,
+    info: ImageInfo,
+    limits: &ImageLimits,
+    abandon: &dyn Fn() -> bool,
+) -> ImagePreview {
+    let rendered = match limits.system_renderer {
+        Some(r) => {
+            let mut lim = limits.clone();
+            lim.pdf_timeout = super::system::thumbnail_timeout(limits);
+            super::system::render_thumbnail(r, path, &info, &lim, abandon)
+        }
+        None => Err(pdf::PdfProblem::NoTool("a thumbnailer")),
+    };
+    let state = match rendered {
+        Ok(png) => {
+            let mut sub = info.clone();
+            sub.format = "PNG".into();
+            match load_raster(&png, limits, &mut sub) {
+                Ok(img) => ImageState::Ready(Arc::new(img)),
+                Err(e) => {
+                    let _ = std::fs::remove_file(&png);
+                    ImageState::Failed(format!("cannot decode the thumbnail: {e}"))
+                }
+            }
+        }
+        Err(p) => ImageState::Failed(p.message()),
+    };
+    ImagePreview {
+        info,
+        state,
+        note: None,
+        text: Vec::new(),
+        source: None,
+    }
+}
+
+/// The first page of a PDF, with its facts; the page's text when it cannot be drawn. Poppler
+/// when it is installed; otherwise what the system has.
 fn load_pdf(
     path: &Path,
     mut info: ImageInfo,
@@ -425,17 +501,29 @@ fn load_pdf(
     let tools = pdf::tools_for(limits);
     let mut note = None;
     let mut text = Vec::new();
-    // Facts first: they are quick, and say at once if the file needs a password.
-    let facts = pdf::facts(&tools, path, limits, abandon);
+    // Facts first: they are quick, and say at once if the file needs a password. `pdfinfo`
+    // when there is one; else read from the file itself.
+    let facts = match pdf::facts(&tools, path, limits, abandon) {
+        Err(pdf::PdfProblem::NoTool(_)) => pdf::facts_in_process(path),
+        other => other,
+    };
     let mut problem = None;
     match facts {
         Ok(f) => info.doc = Some(f),
-        Err(pdf::PdfProblem::NoTool(_)) => {}
+        Err(pdf::PdfProblem::Password) => problem = Some(pdf::PdfProblem::Password),
+        // Our own reader being puzzled is no reason to refuse a file the renderer may draw.
+        Err(pdf::PdfProblem::Damaged(_)) if tools.pdftoppm.is_none() => {}
         Err(p) => problem = Some(p),
     }
     let rendered = match problem {
         Some(p) => Err(p),
-        None => pdf::render_first_page(&tools, path, &info, limits, abandon),
+        None if tools.pdftoppm.is_some() => {
+            pdf::render_first_page(&tools, path, &info, limits, abandon)
+        }
+        None => match limits.system_renderer {
+            Some(r) => super::system::render_pdf(r, path, &info, limits, abandon),
+            None => Err(pdf::PdfProblem::NoTool("pdftoppm")),
+        },
     };
     let state = match rendered {
         Ok(png) => {
@@ -451,8 +539,8 @@ fn load_pdf(
             }
         }
         Err(p) => {
-            if matches!(p, pdf::PdfProblem::NoTool("pdftoppm")) {
-                note = Some(pdf::INSTALL_HINT.to_string());
+            if matches!(p, pdf::PdfProblem::NoTool(_)) {
+                note = Some(pdf::install_hint());
             }
             // Without the picture, the words are the next best thing.
             if !matches!(

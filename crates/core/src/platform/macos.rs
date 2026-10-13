@@ -49,10 +49,9 @@ pub struct MacAttributes;
 
 impl FileAttributes for MacAttributes {
     fn attrs(&self, name: &std::ffi::OsStr, meta: &FsMeta) -> Attrs {
-        use std::os::unix::ffi::OsStrExt;
         let mode = meta.mode.unwrap_or(0);
         Attrs {
-            hidden: name.as_bytes().first() == Some(&b'.')
+            hidden: name.as_encoded_bytes().first() == Some(&b'.')
                 || meta.os_attrs.is_some_and(|f| f & UF_HIDDEN != 0),
             system: false,
             readonly: mode & 0o222 == 0,
@@ -82,9 +81,7 @@ mod native {
         // SAFETY: NSURLIsPackageKey is a constant string provided by Foundation.
         let key = unsafe { NSURLIsPackageKey };
         let keys = NSArray::from_slice(&[key]);
-        // SAFETY: a call with a valid array of resource keys; the result is a dictionary or an
-        // error, both handled.
-        if let Ok(values) = unsafe { url.resourceValuesForKeys_error(&keys) }
+        if let Ok(values) = url.resourceValuesForKeys_error(&keys)
             && let Some(v) = values.objectForKey(key)
             && let Some(n) = v.downcast_ref::<NSNumber>()
             && n.as_bool()

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Type-check or lint the workspace for another system from Linux:
+#   scripts/xcheck clippy x86_64-pc-windows-msvc
+#   scripts/xcheck check  x86_64-apple-darwin
+# Nothing is linked, so the C library the build compiles (zstd, ring) is only a stand-in:
+# the "compiler" below writes empty object files. Needs the target installed with rustup.
+set -euo pipefail
+cmd="$1"; target="$2"; shift 2
+fake="$(mktemp -d)"
+trap 'rm -rf "$fake"' EXIT
+cat > "$fake/cc" <<'CC'
+#!/usr/bin/env bash
+out=""; prev=""
+for a in "$@"; do
+  case "$a" in -Fo*|/Fo*) out="${a#?Fo}";; esac
+  [ "$prev" = "-o" ] && out="$a"
+  case "$a" in -E|--version|-v) exec clang "$@";; esac
+  prev="$a"
+done
+[ -n "$out" ] && : > "$out"
+exit 0
+CC
+cat > "$fake/ar" <<'AR'
+#!/usr/bin/env bash
+out=""
+for a in "$@"; do
+  case "$a" in -out:*|/out:*|-OUT:*|/OUT:*) out="${a#*:}"; break;; esac
+done
+if [ -z "$out" ]; then for a in "$@"; do case "$a" in -*) ;; *) out="$a"; break;; esac; done; fi
+[ -n "$out" ] && printf '!<arch>\n' > "$out"
+exit 0
+AR
+chmod +x "$fake/cc" "$fake/ar"
+t="${target//-/_}"
+export "CC_$t=$fake/cc" "AR_$t=$fake/ar"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+if [ "$cmd" = clippy ]; then
+  cargo clippy --workspace --all-targets --target "$target" "$@" -- -D warnings
+else
+  cargo check --workspace --all-targets --target "$target" "$@"
+fi

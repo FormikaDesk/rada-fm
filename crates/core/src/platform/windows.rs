@@ -330,7 +330,7 @@ mod eject_drive {
                 )));
             }
             let allow = PREVENT_MEDIA_REMOVAL {
-                PreventMediaRemoval: 0,
+                PreventMediaRemoval: false,
             };
             control(handle, IOCTL_STORAGE_MEDIA_REMOVAL, Some(&allow));
             // A memory stick has nothing to eject: the dismount is what makes it safe.

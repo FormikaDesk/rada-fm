@@ -56,8 +56,55 @@ impl PdfProblem {
     }
 }
 
-/// What to say when poppler is missing.
+/// What to say when poppler is missing and nothing else can draw PDFs, without knowing the
+/// system.
 pub const INSTALL_HINT: &str = "to see PDFs as pictures, install poppler: `sudo pacman -S poppler`, `sudo apt install poppler-utils` or `brew install poppler`";
+
+/// The command that installs poppler on the distribution `os_release` (the text of
+/// `/etc/os-release`) describes.
+pub fn install_hint_for(os_release: Option<&str>) -> String {
+    let field = |name: &str| {
+        os_release.and_then(|t| {
+            t.lines()
+                .find_map(|l| l.strip_prefix(name))
+                .map(|v| v.trim().trim_matches('"').to_string())
+        })
+    };
+    let id = field("ID=").unwrap_or_default();
+    let like = field("ID_LIKE=").unwrap_or_default();
+    let is = |name: &str| id == name || like.split_whitespace().any(|w| w == name);
+    let cmd = if is("arch") {
+        "sudo pacman -S poppler"
+    } else if is("debian") || is("ubuntu") {
+        "sudo apt install poppler-utils"
+    } else if is("fedora") || is("rhel") || is("centos") {
+        "sudo dnf install poppler-utils"
+    } else if is("opensuse") || is("suse") {
+        "sudo zypper install poppler-tools"
+    } else if is("alpine") {
+        "sudo apk add poppler-utils"
+    } else if is("void") {
+        "sudo xbps-install poppler"
+    } else if is("gentoo") {
+        "sudo emerge app-text/poppler"
+    } else if is("nixos") {
+        "nix-env -iA nixpkgs.poppler_utils"
+    } else {
+        return INSTALL_HINT.to_string();
+    };
+    format!("to see PDFs as pictures, install poppler: `{cmd}`")
+}
+
+/// [`install_hint_for`] this system.
+pub fn install_hint() -> String {
+    if cfg!(target_os = "macos") {
+        return "to see PDFs as pictures, install poppler: `brew install poppler` or `sudo port install poppler`".into();
+    }
+    if cfg!(windows) {
+        return "to see PDFs as pictures, install poppler: `scoop install poppler`".into();
+    }
+    install_hint_for(std::fs::read_to_string("/etc/os-release").ok().as_deref())
+}
 
 // ------------------------------------------------------------------------------ tools
 
@@ -118,15 +165,16 @@ fn is_executable(p: &Path) -> bool {
 
 // ------------------------------------------------------------------------------ running a tool
 
-struct Run {
-    status_ok: bool,
-    stdout: Vec<u8>,
-    stderr: String,
+pub(super) struct Run {
+    pub(super) status_ok: bool,
+    #[allow(dead_code)]
+    pub(super) stdout: Vec<u8>,
+    pub(super) stderr: String,
 }
 
 /// Run `cmd` with a time limit, keeping at most `max_out` bytes of its output, and stop it
 /// at once when `abandon()` says so.
-fn run_limited(
+pub(super) fn run_limited(
     mut cmd: Command,
     timeout: Duration,
     max_out: usize,
@@ -188,7 +236,7 @@ fn run_limited(
 }
 
 /// A failed run, in the reader's own words, as a problem.
-fn problem_of(stderr: &str) -> PdfProblem {
+pub(super) fn problem_of(stderr: &str) -> PdfProblem {
     let lower = stderr.to_lowercase();
     if lower.contains("incorrect password") || lower.contains("password") {
         return PdfProblem::Password;
@@ -226,6 +274,52 @@ pub fn facts(
         return Err(problem_of(&run.stderr));
     }
     Ok(parse_info(&String::from_utf8_lossy(&run.stdout)))
+}
+
+/// Page count, title and author read from the PDF itself: for systems without `pdfinfo`.
+pub fn facts_in_process(path: &Path) -> Result<DocFacts, PdfProblem> {
+    match lopdf::Document::load_metadata(path) {
+        // An encrypted file loads, but says nothing: ask whether it is one.
+        Ok(m) if m.page_count == 0 && m.title.is_none() && has_encrypt_entry(path) => {
+            Err(PdfProblem::Password)
+        }
+        Ok(m) => Ok(DocFacts {
+            pages: Some(m.page_count).filter(|n| *n > 0),
+            title: m
+                .title
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty()),
+            author: m
+                .author
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty()),
+        }),
+        Err(e) => {
+            let text = e.to_string();
+            let low = text.to_lowercase();
+            if low.contains("password") || low.contains("encrypt") || low.contains("decrypt") {
+                Err(PdfProblem::Password)
+            } else {
+                Err(PdfProblem::Damaged(text))
+            }
+        }
+    }
+}
+
+/// Whether the end of the file, where the trailer is, names an `/Encrypt` dictionary.
+fn has_encrypt_entry(path: &Path) -> bool {
+    use std::io::{Seek, SeekFrom};
+    let Ok(mut f) = std::fs::File::open(path) else {
+        return false;
+    };
+    let Ok(len) = f.seek(SeekFrom::End(0)) else {
+        return false;
+    };
+    let from = len.saturating_sub(16 * 1024);
+    let mut tail = Vec::new();
+    f.seek(SeekFrom::Start(from)).is_ok()
+        && f.read_to_end(&mut tail).is_ok()
+        && tail.windows(8).any(|w| w == b"/Encrypt")
 }
 
 pub(super) fn parse_info(text: &str) -> DocFacts {
@@ -276,6 +370,18 @@ pub fn first_page_text(
 /// Where the picture of `path`'s first page is (or will be) in the cache: it changes when the
 /// file, its size or its time change.
 pub fn cache_file(dir: &Path, path: &Path, info: &ImageInfo, edge: u32) -> PathBuf {
+    cache_file_tagged(dir, path, info, edge, "pdf-v1")
+}
+
+/// [`cache_file`] for a picture made by a particular way of drawing (`tag`), so that the
+/// same file drawn by poppler and by the system's renderer are kept apart.
+pub fn cache_file_tagged(
+    dir: &Path,
+    path: &Path,
+    info: &ImageInfo,
+    edge: u32,
+    tag: &str,
+) -> PathBuf {
     let mut key: Vec<u8> = Vec::new();
     key.extend_from_slice(path.as_os_str().as_encoded_bytes());
     key.extend_from_slice(&info.size.to_le_bytes());
@@ -286,7 +392,7 @@ pub fn cache_file(dir: &Path, path: &Path, info: &ImageInfo, edge: u32) -> PathB
         key.extend_from_slice(&d.subsec_nanos().to_le_bytes());
     }
     key.extend_from_slice(&edge.to_le_bytes());
-    key.extend_from_slice(b"pdf-v1");
+    key.extend_from_slice(tag.as_bytes());
     dir.join(format!("pdf-{:016x}.png", xxh3_64(&key)))
 }
 

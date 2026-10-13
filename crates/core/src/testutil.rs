@@ -1009,6 +1009,47 @@ pub fn os(s: &str) -> &OsStr {
     OsStr::new(s)
 }
 
+/// A small, valid PDF: `pages` pages of Helvetica text (`<text> <page number>`), with a title
+/// and an author.
+pub fn sample_pdf(title: &str, author: &str, pages: usize, text: &str) -> Vec<u8> {
+    let mut objs: Vec<String> = Vec::new();
+    let kids: Vec<String> = (0..pages).map(|i| format!("{} 0 R", 3 + i * 2)).collect();
+    objs.push("<< /Type /Catalog /Pages 2 0 R >>".into());
+    objs.push(format!(
+        "<< /Type /Pages /Kids [{}] /Count {pages} >>",
+        kids.join(" ")
+    ));
+    for i in 0..pages {
+        objs.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents {} 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>",
+            4 + i * 2
+        ));
+        let s = format!("BT /F1 24 Tf 20 100 Td ({text} {}) Tj ET", i + 1);
+        objs.push(format!("<< /Length {} >>\nstream\n{s}\nendstream", s.len()));
+    }
+    objs.push(format!("<< /Title ({title}) /Author ({author}) >>"));
+    let mut out = b"%PDF-1.4\n".to_vec();
+    let mut offs = Vec::new();
+    for (i, o) in objs.iter().enumerate() {
+        offs.push(out.len());
+        out.extend(format!("{} 0 obj\n{o}\nendobj\n", i + 1).bytes());
+    }
+    let x = out.len();
+    out.extend(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).bytes());
+    for o in offs {
+        out.extend(format!("{o:010} 00000 n \n").bytes());
+    }
+    out.extend(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R /Info {} 0 R >>\nstartxref\n{x}\n%%EOF\n",
+            objs.len() + 1,
+            objs.len()
+        )
+        .bytes(),
+    );
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
