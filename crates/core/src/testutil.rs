@@ -142,7 +142,7 @@ const OPENERS: &[&str] = &[
 /// The system's search tools. A test never asks the real index of whoever runs it: each name
 /// is a script that finds nothing (the search falls back to walking the sandbox).
 #[cfg(unix)]
-const SEARCHERS: &[&str] = &["mdfind", "baloosearch", "baloosearch6"];
+const SEARCHERS: &[&str] = &["mdfind", "baloosearch", "baloosearch6", "osascript"];
 
 /// Write the stand-ins into `bin`: scripts that add a line to `log` and fail.
 #[cfg(unix)]
@@ -181,6 +181,15 @@ fn install_opener_traps(scratch: &Path) -> PathBuf {
     if let Ok(path) = std::env::join_paths(dirs) {
         // SAFETY: executed once, before any sandbox exists (see `process`).
         unsafe { std::env::set_var("PATH", path) };
+    }
+    // The applications and MIME types of the machine running the tests are none of their
+    // business: the system folders of the freedesktop.org lists are empty ones.
+    let empty = scratch.join("system-xdg");
+    let _ = std::fs::create_dir_all(&empty);
+    // SAFETY: as above.
+    unsafe {
+        std::env::set_var("XDG_DATA_DIRS", &empty);
+        std::env::set_var("XDG_CONFIG_DIRS", &empty);
     }
     launches
 }

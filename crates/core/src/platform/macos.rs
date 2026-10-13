@@ -358,6 +358,10 @@ impl VolumeLister for MacVolumes {
 struct MacOpener {
     /// Off for the platform tests use: no test starts a window of the system.
     quick_look: bool,
+    /// Where to find `osascript`, which asks Launch Services for the applications of a file;
+    /// `None`: in `PATH`.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    osascript: Option<std::path::PathBuf>,
 }
 
 #[cfg(unix)]
@@ -393,6 +397,13 @@ mod native_open {
         let mut c = Command::new("open");
         c.arg("-R").arg(path);
         detach(c, "start open -R for", path)
+    }
+
+    /// `open -a <application> <file>`.
+    pub fn open_with_app(path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
+        let mut c = Command::new("open");
+        c.arg("-a").arg(&app.exec).arg(path);
+        detach(c, "start open -a for", path)
     }
 
     pub fn open_with(path: &Path, program: &str) -> Result<()> {
@@ -449,6 +460,37 @@ impl Opener for MacOpener {
     #[cfg(unix)]
     fn open_with(&self, path: &Path, program: &str) -> Result<()> {
         native_open::open_with(path, program)
+    }
+    #[cfg(unix)]
+    fn open_with_app(&self, path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
+        native_open::open_with_app(path, app)
+    }
+    #[cfg(unix)]
+    fn apps_for(&self, path: &Path) -> crate::platform::OpenChoices {
+        use crate::platform::openwith;
+        let program = self
+            .osascript
+            .clone()
+            .unwrap_or_else(|| std::path::PathBuf::from("osascript"));
+        let args = vec![
+            "-l".to_string(),
+            "JavaScript".to_string(),
+            "-e".to_string(),
+            openwith::LAUNCH_SERVICES_SCRIPT.to_string(),
+            path.to_string_lossy().into_owned(),
+        ];
+        let out = crate::tagsearch::run_tool(
+            &program,
+            &args,
+            std::time::Duration::from_secs(10),
+            &|| false,
+        );
+        crate::platform::OpenChoices {
+            kind: self.kind_of(path),
+            apps: out
+                .map(|o| openwith::parse_launch_services(&o))
+                .unwrap_or_default(),
+        }
     }
     #[cfg(unix)]
     fn open_terminal(&self, dir: &Path) -> Result<()> {
@@ -511,7 +553,10 @@ impl MacPlatform {
             attrs: attrs(),
             trash,
             volumes: MacVolumes,
-            opener: MacOpener { quick_look: true },
+            opener: MacOpener {
+                quick_look: true,
+                osascript: None,
+            },
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             tags: super::tags::XattrTags::finder(),
             sandbox_user_dirs: false,

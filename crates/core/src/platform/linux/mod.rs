@@ -37,12 +37,13 @@ impl LinuxPlatform {
 
     /// Use a customised trash backend (tests).
     pub fn with_trash(dirs: Dirs, trash: FreedesktopTrash) -> Self {
+        let app_dirs = super::openwith::AppDirs::from_env(&dirs.data, &dirs.config);
         LinuxPlatform {
             dirs,
             trash,
             volumes: mounts::LinuxVolumes::new(),
             attrs: UnixAttributes,
-            opener: open::XdgOpener,
+            opener: open::XdgOpener::new(app_dirs),
             fidelity: fidelity::LinuxFidelity,
             tags: super::tags::XattrTags::freedesktop(),
         }

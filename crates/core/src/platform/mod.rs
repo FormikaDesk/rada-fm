@@ -15,6 +15,7 @@ pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
 pub mod macos;
+pub mod openwith;
 pub mod tags;
 pub mod trash;
 pub mod userdirs;
@@ -34,6 +35,7 @@ pub use access::AccessDenied;
 pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use fidelity::{AttrOutcome, DestSupport, Fidelity, NotYet, Preserve, SourceAttrs};
+pub use openwith::{OpenApp, OpenChoices};
 pub use tags::{Tag, TagColor, TagStore};
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use userdirs::{PlaceKind, UserDirs};
@@ -73,6 +75,24 @@ pub trait Opener: Send + Sync {
     /// it has one.
     fn open_with(&self, _path: &Path, _program: &str) -> Result<()> {
         Err(crate::Error::Unsupported("open with"))
+    }
+    /// What kind of file `path` is, as the key of "always use this program for this kind": a
+    /// MIME type on Linux, the extension elsewhere. `None` where nothing says.
+    fn kind_of(&self, path: &Path) -> Option<String> {
+        path.extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .filter(|e| !e.is_empty())
+    }
+    /// The programs installed on this system that can open `path`, the system's own choice
+    /// first, and the kind of file they were found for. Reads the disk (and on a Mac asks
+    /// Launch Services): call it from a worker. Empty where the system has no such list.
+    fn apps_for(&self, _path: &Path) -> OpenChoices {
+        OpenChoices::default()
+    }
+    /// Open `path` with one of the programs [`apps_for`](Self::apps_for) listed, detached from
+    /// the terminal.
+    fn open_with_app(&self, _path: &Path, _app: &OpenApp) -> Result<()> {
+        Err(crate::Error::Unsupported("open with an application"))
     }
     /// Open a new terminal window in `dir`.
     fn open_terminal(&self, _dir: &Path) -> Result<()> {

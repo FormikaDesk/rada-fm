@@ -224,6 +224,8 @@ pub struct Recording {
 
 struct Recorder {
     log: CallLog,
+    /// What can open a file is the platform's own to say; launching it is not done.
+    inner: Arc<dyn Platform>,
 }
 
 impl Recorder {
@@ -243,6 +245,15 @@ impl Opener for Recorder {
     fn open_with(&self, path: &Path, program: &str) -> Result<()> {
         self.note(format!("open_with {program} {}", path.display()))
     }
+    fn kind_of(&self, path: &Path) -> Option<String> {
+        self.inner.opener().kind_of(path)
+    }
+    fn apps_for(&self, path: &Path) -> crate::platform::OpenChoices {
+        self.inner.opener().apps_for(path)
+    }
+    fn open_with_app(&self, path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
+        self.note(format!("open_with_app {} {}", app.id, path.display()))
+    }
     fn open_terminal(&self, dir: &Path) -> Result<()> {
         self.note(format!("open_terminal {}", dir.display()))
     }
@@ -254,8 +265,11 @@ impl Opener for Recorder {
 impl Recording {
     pub fn new(inner: Arc<dyn Platform>, log: CallLog) -> Recording {
         Recording {
+            opener: Recorder {
+                log,
+                inner: inner.clone(),
+            },
             inner,
-            opener: Recorder { log },
         }
     }
 }

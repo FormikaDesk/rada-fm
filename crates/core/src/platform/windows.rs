@@ -683,6 +683,173 @@ mod native_open {
     }
 }
 
+/// The programs the shell associates with a file's extension (what Explorer's "Open with"
+/// lists), through `SHAssocEnumHandlers`; and starting a file with one of them, as Explorer
+/// does, through the handler's invoker.
+#[cfg(windows)]
+mod native_apps {
+    use windows::Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, CoInitializeEx, CoTaskMemFree, CoUninitialize, IBindCtx,
+        IDataObject,
+    };
+    use windows::Win32::UI::Shell::{
+        ASSOC_FILTER, ASSOC_FILTER_NONE, ASSOC_FILTER_RECOMMENDED, ASSOCF_NONE,
+        ASSOCSTR_EXECUTABLE, AssocQueryStringW, BHID_DataObject, IAssocHandler, IShellItem,
+        SHAssocEnumHandlers, SHCreateItemFromParsingName,
+    };
+    use windows::core::{HSTRING, PWSTR};
+
+    use super::*;
+    use crate::platform::{OpenApp, OpenChoices};
+
+    /// Run `f` with COM started on this thread (the shell's objects want an apartment).
+    fn with_com<T>(f: impl FnOnce() -> T) -> T {
+        // SAFETY: balanced with `CoUninitialize` below when it succeeded.
+        let started = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_ok();
+        let out = f();
+        if started {
+            // SAFETY: this thread started COM above.
+            unsafe { CoUninitialize() };
+        }
+        out
+    }
+
+    /// A string the shell allocated, copied and freed.
+    fn take(p: PWSTR) -> String {
+        if p.is_null() {
+            return String::new();
+        }
+        // SAFETY: a NUL-terminated string from the shell, freed once with the task allocator.
+        let s = unsafe { p.to_string() }.unwrap_or_default();
+        unsafe { CoTaskMemFree(Some(p.0 as *const core::ffi::c_void)) };
+        s
+    }
+
+    fn handlers(ext: &str, filter: ASSOC_FILTER) -> Vec<IAssocHandler> {
+        // SAFETY: plain calls into the shell with a valid wide string.
+        let Ok(list) = (unsafe { SHAssocEnumHandlers(&HSTRING::from(ext), filter) }) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for _ in 0..200 {
+            let mut slot: [Option<IAssocHandler>; 1] = [None];
+            let mut got = 0u32;
+            // SAFETY: one slot, and a place for the count.
+            let r = unsafe { list.Next(&mut slot, Some(&mut got)) };
+            match slot[0].take() {
+                Some(h) if r.is_ok() && got > 0 => out.push(h),
+                _ => break,
+            }
+        }
+        out
+    }
+
+    /// The program Windows opens this extension with (its path), if it says.
+    fn default_program(ext: &str) -> Option<String> {
+        let mut buf = vec![0u16; 1024];
+        let mut len = buf.len() as u32;
+        // SAFETY: a buffer of `len` wide characters.
+        let r = unsafe {
+            AssocQueryStringW(
+                ASSOCF_NONE,
+                ASSOCSTR_EXECUTABLE,
+                &HSTRING::from(ext),
+                &HSTRING::from("open"),
+                Some(PWSTR(buf.as_mut_ptr())),
+                &mut len,
+            )
+        };
+        if r.is_err() || len == 0 {
+            return None;
+        }
+        let n = (len as usize).min(buf.len());
+        Some(
+            String::from_utf16_lossy(&buf[..n])
+                .trim_end_matches('\0')
+                .to_string(),
+        )
+    }
+
+    pub fn apps_for(path: &Path) -> OpenChoices {
+        let Some(ext) = path.extension() else {
+            return OpenChoices::default();
+        };
+        let ext = format!(".{}", ext.to_string_lossy());
+        let apps = with_com(|| {
+            let default = default_program(&ext)
+                .and_then(|p| {
+                    Path::new(&p)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_lowercase())
+                })
+                .unwrap_or_default();
+            let mut apps: Vec<OpenApp> = Vec::new();
+            for h in handlers(&ext, ASSOC_FILTER_RECOMMENDED) {
+                // SAFETY: the handler is alive; the strings are taken and freed.
+                let (id, name) = unsafe {
+                    (
+                        take(h.GetName().unwrap_or_default()),
+                        take(h.GetUIName().unwrap_or_default()),
+                    )
+                };
+                if id.is_empty() || apps.iter().any(|a| a.id == id) {
+                    continue;
+                }
+                let is_default = !default.is_empty() && id.to_lowercase().ends_with(&default);
+                apps.push(OpenApp {
+                    name: if name.is_empty() { id.clone() } else { name },
+                    exec: id.clone(),
+                    id,
+                    terminal: false,
+                    is_default,
+                    source: None,
+                    icon: None,
+                });
+            }
+            apps
+        });
+        OpenChoices {
+            kind: Some(ext.to_lowercase()),
+            apps,
+        }
+    }
+
+    pub fn open_with_app(path: &Path, app: &OpenApp) -> Result<()> {
+        let ext = path
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy()))
+            .unwrap_or_default();
+        let failed = |why: String| Error::io("open", path, std::io::Error::other(why));
+        with_com(|| {
+            let handler = handlers(&ext, ASSOC_FILTER_NONE)
+                .into_iter()
+                // SAFETY: the handler is alive; the string is taken and freed.
+                .find(|h| unsafe { take(h.GetName().unwrap_or_default()) } == app.id)
+                .ok_or_else(|| {
+                    failed(format!(
+                        "{} is not associated with this kind of file any more",
+                        app.name
+                    ))
+                })?;
+            // SAFETY: the item and the data object are COM objects owned here.
+            unsafe {
+                let item: IShellItem = SHCreateItemFromParsingName(
+                    &HSTRING::from(path.as_os_str()),
+                    None::<&IBindCtx>,
+                )
+                .map_err(|e| failed(e.message()))?;
+                let data: IDataObject = item
+                    .BindToHandler(None::<&IBindCtx>, &BHID_DataObject)
+                    .map_err(|e| failed(e.message()))?;
+                let invoker = handler
+                    .CreateInvoker(&data)
+                    .map_err(|e| failed(e.message()))?;
+                invoker.Invoke().map_err(|e| failed(e.message()))
+            }
+        })
+    }
+}
+
 impl Opener for WindowsOpener {
     #[cfg(windows)]
     fn open(&self, path: &Path) -> Result<()> {
@@ -703,6 +870,14 @@ impl Opener for WindowsOpener {
     #[cfg(windows)]
     fn open_with(&self, path: &Path, program: &str) -> Result<()> {
         native_open::open_with(path, program)
+    }
+    #[cfg(windows)]
+    fn apps_for(&self, path: &Path) -> crate::platform::OpenChoices {
+        native_apps::apps_for(path)
+    }
+    #[cfg(windows)]
+    fn open_with_app(&self, path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
+        native_apps::open_with_app(path, app)
     }
     #[cfg(windows)]
     fn open_terminal(&self, dir: &Path) -> Result<()> {
