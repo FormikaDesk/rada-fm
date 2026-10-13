@@ -352,3 +352,27 @@ fn the_bookmark_key_works_on_the_item_in_the_sidebar_and_delete_removes_a_bookma
     h.press("B");
     h.wait("removed", move |a| !a.paths.bookmarks.contains(&docs));
 }
+
+#[test]
+fn a_bookmark_of_a_folder_the_pane_already_lists_is_not_listed_again() {
+    let mut h = italian(130, 40);
+    let docs = h
+        .app
+        .side_items()
+        .into_iter()
+        .find(|i| i.name == "Documenti")
+        .expect("Documenti is a standard place")
+        .path;
+    // Pinned by hand (the same folder, written with a trailing slash) and in the configuration.
+    h.app.paths.bookmarks.push(docs.join(""));
+    h.app
+        .paths
+        .bookmarks
+        .push(PathBuf::from(format!("{}/", docs.display())));
+    let names: Vec<String> = h.app.side_items().into_iter().map(|i| i.name).collect();
+    assert_eq!(
+        names.iter().filter(|n| *n == "Documenti").count(),
+        1,
+        "{names:?}"
+    );
+}
