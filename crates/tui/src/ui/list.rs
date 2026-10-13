@@ -203,6 +203,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let last = (app.scroll + rows).min(count);
     let shown: Vec<usize> = (app.scroll..last).map(|v| app.visible[v]).collect();
     app.warm_dates(shown.iter().copied());
+    app.want_folder_sizes(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
     for vis in app.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
@@ -372,7 +373,7 @@ fn row<'a>(
         let s = if e.kind == FileKind::File {
             fmt::size(e.size)
         } else {
-            String::new()
+            app.folder_size_text(e, cols.size)
         };
         spans.push(Span::styled(
             pad_left(&s, cols.size),

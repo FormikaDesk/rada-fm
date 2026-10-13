@@ -27,6 +27,10 @@
 //! view = "details"           # details | icons: how a new tab shows a folder
 //! remember_tabs = true       # reopen the tabs of the last session
 //! dates = "relative"         # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm)
+//! folder_sizes = "auto"      # auto (count the folders on screen in the background) | items
+//!                            # (only how many items each holds, no walk below) | off
+//! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"
+//! folder_size_entries = 200000   # ...or after this many files and folders
 //!
 //! [archives]
 //! max_extract_gb = 8         # an extraction that would write more asks for a typed "yes"
@@ -55,6 +59,7 @@
 use std::collections::HashMap;
 
 use rada_core::archive::ArchiveLimits;
+use rada_core::foldersize::{SizeLimits, SizeMode, SizeSettings};
 use rada_core::model::{SortKey, SortSpec};
 use rada_core::platform::Dirs;
 use rada_core::preview::ImageLimits;
@@ -82,6 +87,9 @@ pub struct FileConfig {
     pub view: Option<String>,
     pub remember_tabs: bool,
     pub dates: Option<String>,
+    folder_sizes: Option<String>,
+    folder_size_seconds: Option<f32>,
+    folder_size_entries: Option<u64>,
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     /// macOS: ask the terminal to report the Cmd key.
@@ -100,6 +108,30 @@ struct UpdateFile {
 }
 
 impl FileConfig {
+    /// `folder_sizes` and its limits, with the choice checked.
+    pub fn folder_size_settings(&self) -> anyhow::Result<SizeSettings> {
+        use anyhow::Context;
+        let d = SizeLimits::default();
+        let mode = match self.folder_sizes.as_deref() {
+            None => SizeMode::Auto,
+            Some(n) => SizeMode::parse(n)
+                .with_context(|| format!("unknown folder_sizes {n:?} (use auto, items or off)"))?,
+        };
+        Ok(SizeSettings {
+            mode,
+            limits: SizeLimits {
+                max_time: self
+                    .folder_size_seconds
+                    .map(|s| std::time::Duration::from_secs_f32(s.clamp(0.1, 120.0)))
+                    .unwrap_or(d.max_time),
+                max_entries: self
+                    .folder_size_entries
+                    .map(|n| n.clamp(1_000, 100_000_000))
+                    .unwrap_or(d.max_entries),
+            },
+        })
+    }
+
     /// The `[update]` section, with the choices checked.
     pub fn update_settings(&self, home: &std::path::Path) -> anyhow::Result<Settings> {
         use anyhow::Context;
@@ -181,6 +213,9 @@ struct Raw {
     view: Option<String>,
     remember_tabs: Option<bool>,
     dates: Option<String>,
+    folder_sizes: Option<String>,
+    folder_size_seconds: Option<f32>,
+    folder_size_entries: Option<u64>,
     devices: Option<DevicesRaw>,
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
@@ -244,6 +279,9 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         view: raw.view,
         remember_tabs: raw.remember_tabs.unwrap_or(true),
         dates: raw.dates,
+        folder_sizes: raw.folder_sizes,
+        folder_size_seconds: raw.folder_size_seconds,
+        folder_size_entries: raw.folder_size_entries,
         hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
         cmd_keys: raw.cmd_keys.unwrap_or(true),
@@ -351,6 +389,38 @@ mod tests {
                 .to_string();
             assert!(e.contains("unknown update"), "{e}");
         }
+    }
+
+    #[test]
+    fn folder_sizes_are_read_checked_and_default_to_auto() {
+        let d = with_config("sidebar = true\n")
+            .folder_size_settings()
+            .unwrap();
+        assert_eq!(d, SizeSettings::default());
+        assert_eq!(d.mode, SizeMode::Auto);
+        let c = with_config(
+            "folder_sizes = \"items\"\nfolder_size_seconds = 0.5\nfolder_size_entries = 50000\n",
+        )
+        .folder_size_settings()
+        .unwrap();
+        assert_eq!(c.mode, SizeMode::Items);
+        assert_eq!(c.limits.max_time, std::time::Duration::from_millis(500));
+        assert_eq!(c.limits.max_entries, 50_000);
+        let off = with_config("folder_sizes = \"off\"\n")
+            .folder_size_settings()
+            .unwrap();
+        assert_eq!(off.mode, SizeMode::Off);
+        // A limit that would make the count useless is raised, an absurd one is lowered.
+        let tiny = with_config("folder_size_entries = 3\nfolder_size_seconds = 0\n")
+            .folder_size_settings()
+            .unwrap();
+        assert_eq!(tiny.limits.max_entries, 1_000);
+        assert!(tiny.limits.max_time >= std::time::Duration::from_millis(100));
+        let e = with_config("folder_sizes = \"always\"\n")
+            .folder_size_settings()
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("unknown folder_sizes"), "{e}");
     }
 
     #[test]

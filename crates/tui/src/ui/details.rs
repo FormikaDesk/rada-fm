@@ -171,8 +171,10 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         Paragraph::new(Line::from(head)),
         Rect { height: 1, ..inner },
     );
+    app.want_folder_sizes(app.current_index().into_iter());
     let sub = if e.is_dir() {
-        e.type_label.to_string()
+        app.folder_summary(&e)
+            .unwrap_or_else(|| e.type_label.to_string())
     } else {
         format!("{} · {}", e.type_label, fmt::size(e.size))
     };

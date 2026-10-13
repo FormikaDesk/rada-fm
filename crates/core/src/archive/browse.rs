@@ -101,6 +101,7 @@ pub fn read_dir(
                 kind: meta.kind,
                 link,
                 size: if c.kind == EntryKind::File { c.size } else { 0 },
+                dir_size: None,
                 mtime: c.mtime,
                 created: None,
                 type_label,

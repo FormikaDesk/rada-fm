@@ -350,7 +350,8 @@ fn main() -> Result<()> {
         Some(s) => Arc::new(s),
         None => Arc::new(LocalFs),
     };
-    let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits);
+    let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits)
+        .with_folder_sizes(cfg_file.folder_size_settings()?);
     // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
     // screens must not depend on what GitHub says today.
     let services = if cli.demo.is_some() {

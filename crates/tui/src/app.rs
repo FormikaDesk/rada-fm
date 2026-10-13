@@ -440,6 +440,8 @@ mod input;
 mod menus;
 mod props;
 mod side;
+mod sizes;
+pub use sizes::FolderSizeView;
 mod tabs;
 mod update;
 
@@ -542,6 +544,8 @@ pub struct App {
     pub details: Option<bool>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// What is known of the size of folders (see `sizes.rs`).
+    pub(crate) folder_sizes: sizes::Sizes,
     /// The time zone dates are shown in (the system's; tests pin it).
     pub tz: jiff::tz::TimeZone,
     pub remember_tabs: bool,
@@ -684,6 +688,7 @@ impl App {
             details: cfg.details_pane,
             dates: cfg.dates,
             date_format: cfg.date_format,
+            folder_sizes: Default::default(),
             tz: jiff::tz::TimeZone::system(),
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
@@ -1065,6 +1070,7 @@ impl App {
             CoreEvent::Preview(p) => self.on_preview(p),
             CoreEvent::Volumes(v) => {
                 self.volumes = if self.demo_volumes { demo_volumes() } else { v };
+                self.folder_sizes.set_volumes(&self.volumes);
                 self.refresh_palette();
             }
             CoreEvent::Paths(p) => {
@@ -1073,6 +1079,7 @@ impl App {
             }
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Size(s) => self.on_size_event(s),
             CoreEvent::Update(u) => self.on_update_event(u),
             CoreEvent::Ejected {
                 mount,
@@ -1147,6 +1154,7 @@ impl App {
                                 self.listing.all().iter().map(|e| e.name.clone()).collect();
                             self.marked.retain(|n| existing.contains(n));
                         }
+                        self.sync_folder_sizes();
                         self.rebuild_visible();
                         self.restore_cursor(keep);
                         self.load = LoadState::Ready;
@@ -1169,6 +1177,7 @@ impl App {
                 }
                 let keep = self.cursor_name();
                 self.listing.apply(updates);
+                self.sync_folder_sizes();
                 let existing: BTreeSet<OsString> =
                     self.listing.all().iter().map(|e| e.name.clone()).collect();
                 self.marked.retain(|n| existing.contains(n));
@@ -1186,6 +1195,7 @@ impl App {
                 if dir != self.cwd {
                     return;
                 }
+                self.forget_folder_sizes(&dir, &paths, rescan);
                 self.dir_gen += 1;
                 // A full read in progress is answered only for the newest request: a patch
                 // would supersede it and leave the folder "loading" for good, so a change

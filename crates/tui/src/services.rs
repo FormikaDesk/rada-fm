@@ -7,6 +7,7 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, unbounded};
 use rada_core::archive::ArchiveLimits;
 use rada_core::events::CoreEvent;
+use rada_core::foldersize::{SizeMode, SizeSettings, SizeWorker};
 use rada_core::fs::FsEngine;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
@@ -20,6 +21,12 @@ pub struct Services {
     pub jobs: Jobs,
     pub loader: DirLoader,
     pub previewer: PreviewWorker,
+    /// Counts the size of the folders on screen.
+    pub sizes: SizeWorker,
+    /// Whether and how far folders are counted (off until [`with_folder_sizes`] says).
+    ///
+    /// [`with_folder_sizes`]: Services::with_folder_sizes
+    pub size_settings: SizeSettings,
     pub watcher: DirWatcher,
     pub volumes: VolumesWorker,
     pub places: PlacesStore,
@@ -67,6 +74,11 @@ impl Services {
             jobs,
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn(fs.clone(), tx.clone()),
+            sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
+            size_settings: SizeSettings {
+                mode: SizeMode::Off,
+                ..SizeSettings::default()
+            },
             watcher: DirWatcher::spawn(tx.clone()),
             places: {
                 let standard = with_extra_places(
@@ -95,6 +107,12 @@ impl Services {
             updater: None,
             fs,
         }
+    }
+
+    /// Count the size of folders as the configuration says.
+    pub fn with_folder_sizes(mut self, settings: SizeSettings) -> Services {
+        self.size_settings = settings;
+        self
     }
 
     /// Start the update worker for this program. The daily check begins when the interface

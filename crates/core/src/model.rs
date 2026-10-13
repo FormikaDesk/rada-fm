@@ -22,6 +22,9 @@ pub struct Entry {
     pub kind: FileKind,
     pub link: Option<LinkInfo>,
     pub size: u64,
+    /// For a folder, the bytes counted below it in the background, once known. Only the
+    /// ordering by size reads it.
+    pub dir_size: Option<u64>,
     pub mtime: Option<SystemTime>,
     /// When it was created, where the filesystem records that.
     pub created: Option<SystemTime>,
@@ -110,6 +113,7 @@ impl Entry {
             kind: meta.kind,
             link,
             size: meta.size,
+            dir_size: None,
             mtime: meta.mtime,
             created: meta.btime,
             type_label,
@@ -136,6 +140,7 @@ impl Entry {
             kind: FileKind::Other,
             link: None,
             size: 0,
+            dir_size: None,
             mtime: None,
             created: None,
             type_label: Cow::Borrowed("Unreadable"),
@@ -329,6 +334,17 @@ fn os_bytes_cmp(a: &OsString, b: &OsString) -> Ordering {
     }
 }
 
+/// What the ordering by size looks at. A folder's own size means nothing; the count below
+/// it is used once it is known, and until then it stands for an empty one. One key for
+/// everything keeps the order total, whatever is known at the moment.
+fn size_key(e: &Entry) -> u64 {
+    if e.is_dir() {
+        e.dir_size.unwrap_or(0)
+    } else {
+        e.size
+    }
+}
+
 pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
     if spec.dirs_first {
         // A package sorts with the files, as in the Finder.
@@ -350,14 +366,7 @@ pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
     };
     let primary = match spec.key {
         SortKey::Name => by_name(),
-        SortKey::Size => {
-            // Folders have no size of their own: keep them in name order.
-            if a.is_dir() && b.is_dir() {
-                Ordering::Equal
-            } else {
-                a.size.cmp(&b.size)
-            }
-        }
+        SortKey::Size => size_key(a).cmp(&size_key(b)),
         SortKey::Modified => a.mtime.cmp(&b.mtime),
         SortKey::Type => a
             .type_label
@@ -415,6 +424,26 @@ impl DirListing {
 
     pub fn all(&self) -> &[Entry] {
         &self.entries
+    }
+
+    /// Give the folders the sizes counted for them (`size_of` is asked for each folder's
+    /// path). The listing is ordered again when the order depends on them and something
+    /// changed; returns whether it did.
+    pub fn set_folder_sizes(&mut self, size_of: impl Fn(&Entry) -> Option<u64>) -> bool {
+        let mut changed = false;
+        for e in self.entries.iter_mut().filter(|e| e.is_dir()) {
+            let known = size_of(e);
+            if known != e.dir_size {
+                e.dir_size = known;
+                changed = true;
+            }
+        }
+        let reorder = changed && self.spec.key == SortKey::Size;
+        if reorder {
+            let spec = self.spec;
+            sort_entries(&mut self.entries, &spec);
+        }
+        reorder
     }
 
     pub fn len(&self) -> usize {
@@ -571,6 +600,50 @@ mod tests {
         assert_eq!(names(&v), ["big", "mid", "small"]);
         sort_entries(&mut v, &by(SortKey::Modified, false));
         assert_eq!(names(&v), ["big", "mid", "small"]);
+    }
+
+    #[test]
+    fn folders_sort_by_the_size_counted_below_them_once_it_is_known() {
+        let spec = SortSpec {
+            key: SortKey::Size,
+            reverse: false,
+            dirs_first: true,
+            natural: true,
+        };
+        let mut l = DirListing::new(
+            PathBuf::from("/d"),
+            vec![
+                e("a", FileKind::Dir, 4096, 1),
+                e("b", FileKind::Dir, 4096, 1),
+                e("c", FileKind::Dir, 4096, 1),
+                e("file", FileKind::File, 5, 1),
+            ],
+            spec,
+        );
+        // Nothing counted yet: the folders stay in name order, before the files.
+        assert_eq!(names(l.all()), ["a", "b", "c", "file"]);
+        let sizes = |name: &str| match name {
+            "a" => Some(900),
+            "c" => Some(10),
+            _ => None,
+        };
+        assert!(l.set_folder_sizes(|e| sizes(&e.display)));
+        // b is not counted yet and stands for an empty folder.
+        assert_eq!(names(l.all()), ["b", "c", "a", "file"]);
+        assert!(!l.set_folder_sizes(|e| sizes(&e.display)), "nothing new");
+        l.set_sort(SortSpec {
+            reverse: true,
+            ..spec
+        });
+        assert_eq!(names(l.all()), ["a", "c", "b", "file"]);
+        // Other orders never move because of a count.
+        l.set_sort(SortSpec {
+            key: SortKey::Name,
+            reverse: false,
+            ..spec
+        });
+        assert!(!l.set_folder_sizes(|_| Some(1)));
+        assert_eq!(names(l.all()), ["a", "b", "c", "file"]);
     }
 
     #[test]

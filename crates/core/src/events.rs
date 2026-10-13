@@ -140,6 +140,8 @@ pub enum CoreEvent {
         text: String,
         error: bool,
     },
+    /// The size of a folder on screen, counted in the background.
+    Size(crate::foldersize::SizeEvent),
     /// The update worker: a newer version, progress, the end.
     Update(crate::update::UpdateEvent),
     /// The font offered at the first start was installed (a sentence to show), or why not.
