@@ -166,7 +166,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         && !matches!(item.origin, Origin::Device(_));
                     let lock = match app.icons {
                         icons::IconSet::Nerd => "\u{f023}",
-                        icons::IconSet::Unicode => "⊘",
+                        icons::IconSet::UnicodeIcons | icons::IconSet::UnicodeStd => "⊘",
                         icons::IconSet::None => "!",
                     };
                     let pin_w = if item.locked || (pinned && !pin.is_empty()) {

@@ -16,13 +16,16 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use crate::app::{App, Config};
+use crate::caps::{ImagePlan, Profile, TermCaps};
+use crate::compat::{CompatBackend, Rendering};
+use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi};
 use crate::services::Services;
 use crate::ui;
 
-type Term = Terminal<CrosstermBackend<Stdout>>;
+type Term = Terminal<CompatBackend<CrosstermBackend<Stdout>>>;
 
-fn enter(mouse: bool) -> io::Result<Term> {
+fn enter(mouse: bool, rendering: Rendering) -> io::Result<Term> {
     // Raw mode: Ctrl+C, Ctrl+Z, Ctrl+Q and Ctrl+S reach the program as ordinary keys
     // instead of signals or flow control.
     enable_raw_mode()?;
@@ -31,7 +34,7 @@ fn enter(mouse: bool) -> io::Result<Term> {
     if mouse {
         execute!(out, EnableMouseCapture)?;
     }
-    Terminal::new(CrosstermBackend::new(out))
+    Terminal::new(CompatBackend::new(CrosstermBackend::new(out), rendering))
 }
 
 /// Whether the terminal was asked to report keys the extended way (see [`ask_for_cmd_keys`]).
@@ -93,8 +96,10 @@ pub struct Outcome {
     pub last_dir: std::path::PathBuf,
 }
 
-/// Run the interface until the user quits.
-pub fn run(cfg: Config, svc: Services) -> io::Result<Outcome> {
+/// Run the interface until the user quits. `caps` is what the terminal can do
+/// ([`TermCaps::detect_here`]): it decides how the interface reaches the terminal, never
+/// what the interface is.
+pub fn run(mut cfg: Config, svc: Services, caps: TermCaps) -> io::Result<Outcome> {
     // Always restore the terminal, even on a panic.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -102,20 +107,38 @@ pub fn run(cfg: Config, svc: Services) -> io::Result<Outcome> {
         default_hook(info);
     }));
 
+    for line in caps.describe() {
+        tracing::info!("terminal — {line}");
+    }
+    // A terminal without mouse reports is never asked for them.
+    cfg.mouse = cfg.mouse && caps.mouse;
     let mouse = cfg.mouse;
-    let mut terminal = enter(mouse)?;
-    let result = event_loop(&mut terminal, cfg, svc);
+    // Without a symbol font the interface is drawn the same and its glyphs are replaced
+    // on the way out, like the colours.
+    let rendering = match cfg.icons {
+        IconSet::UnicodeStd => caps.rendering().with_std_glyphs(),
+        _ => caps.rendering(),
+    };
+    let mut terminal = enter(mouse, rendering)?;
+    let result = event_loop(&mut terminal, cfg, svc, &caps);
     leave();
     let _ = std::panic::take_hook();
     result
 }
 
-fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result<Outcome> {
+fn event_loop(
+    terminal: &mut Term,
+    mut cfg: Config,
+    svc: Services,
+    caps: &TermCaps,
+) -> io::Result<Outcome> {
+    let basic = caps.profile == Profile::Basic;
     // The terminal is asked about its background before anything else reads the keyboard,
     // and before the graphics query below (one question at a time). Keys the user typed in
     // the meantime are given back and replayed.
     let mut replay: Vec<crossterm::event::KeyEvent> = Vec::new();
-    if let Some(a) = cfg.adaptive.take() {
+    // The basic profile asks the terminal nothing: the theme stays the dark stand-in.
+    if let Some(a) = cfg.adaptive.take().filter(|_| !basic) {
         let t = std::time::Instant::now();
         let detection = crate::termtheme::detect_here(None);
         let light = detection.appearance.is_light();
@@ -131,10 +154,17 @@ fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result
     }
     // Terminal graphics are detected now: the query needs raw mode and must finish
     // before the keyboard reader starts.
+    // Asking may take a moment: what was typed meanwhile is replayed too.
+    let mut asked = |(ui, leftover): (ImageUi, Vec<u8>)| {
+        replay.extend(crate::termtheme::keys_from_bytes(&leftover));
+        ui
+    };
+    use ratatui_image::picker::ProtocolType;
     let image_ui = match cfg.image_mode {
+        ImageMode::Auto if caps.images == ImagePlan::Off => None,
         ImageMode::Auto => {
             let t = std::time::Instant::now();
-            let ui = ImageUi::detect();
+            let ui = asked(ImageUi::detect(caps));
             tracing::info!(
                 "terminal graphics: {} (detected in {:?})",
                 ui.protocol_name(),
@@ -143,21 +173,25 @@ fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result
             Some(ui)
         }
         ImageMode::Halfblocks => Some(ImageUi::halfblocks()),
-        ImageMode::Kitty => Some(ImageUi::with_protocol(
-            ratatui_image::picker::ProtocolType::Kitty,
-        )),
-        ImageMode::Sixel => Some(ImageUi::with_protocol(
-            ratatui_image::picker::ProtocolType::Sixel,
-        )),
-        ImageMode::Iterm2 => Some(ImageUi::with_protocol(
-            ratatui_image::picker::ProtocolType::Iterm2,
-        )),
+        ImageMode::Kitty => Some(asked(ImageUi::for_protocol(
+            ProtocolType::Kitty,
+            caps.may_query,
+        ))),
+        ImageMode::Sixel => Some(asked(ImageUi::for_protocol(
+            ProtocolType::Sixel,
+            caps.may_query,
+        ))),
+        ImageMode::Iterm2 => Some(asked(ImageUi::for_protocol(
+            ProtocolType::Iterm2,
+            caps.may_query,
+        ))),
         ImageMode::Off => None,
     };
     if let Some(u) = &image_ui {
         tracing::debug!("image protocol in use: {}", u.protocol_name());
     }
-    let cmd_keys = cfg.cmd_keys && ask_for_cmd_keys();
+    // Asking for the Cmd key starts with a question to the terminal: not where none is asked.
+    let cmd_keys = cfg.cmd_keys && caps.may_query && ask_for_cmd_keys();
     let mut app = App::new(cfg, svc, image_ui);
     app.keymap.prefer_cmd = cmd_keys;
     tracing::info!("Cmd key reported by the terminal: {cmd_keys}");
@@ -192,12 +226,10 @@ fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result
             terminal.draw(|f| ui::draw(f, &mut app))?;
             app.dirty = false;
         }
-        // The "copy path" command: the terminal puts the text on the clipboard.
+        // The "copy path" command: the terminal puts the text on the clipboard, or the
+        // system's own clipboard program does where the terminal would not.
         if let Some(text) = app.take_copied_text() {
-            use std::io::Write;
-            let out = terminal.backend_mut();
-            let _ = out.write_all(crate::clipboard::osc52(&text).as_bytes());
-            let _ = out.flush();
+            crate::clipboard::copy(&text, caps.osc52, basic, terminal.backend_mut().inner_mut());
         }
         if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
             app.shutdown();

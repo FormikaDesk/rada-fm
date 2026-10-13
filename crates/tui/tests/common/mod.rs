@@ -181,7 +181,7 @@ impl H {
         let svc = Services::start_with(fs, platform, Some(sb.journal()), archive_limits);
         let mut cfg = Config {
             start_dir: start,
-            icons: IconSet::Unicode,
+            icons: IconSet::UnicodeIcons,
             show_hidden: false,
             sort: SortSpec::default(),
             theme: Theme::rada(),

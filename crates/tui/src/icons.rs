@@ -1,7 +1,10 @@
 //! File categories, their icons and badges. Colours come from the theme's tokens.
 //!
 //! Nerd Font glyphs need a patched font: without one they render as boxes, so the
-//! fallback is a small set of plain Unicode markers.
+//! fallback is a set of Unicode markers (`unicode-icons`), which in turn needs a symbol
+//! font somewhere on the system; where there is none, `unicode-std` draws the same
+//! markers with the few glyphs every monospace font has (the replacing is done where
+//! cells are written to the terminal, see `compat.rs`).
 
 use rada_core::fs::FileKind;
 use rada_core::model::Entry;
@@ -12,18 +15,39 @@ use crate::theme::Theme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IconSet {
+    /// Nerd Font symbols: the terminal's font must be a patched one.
     Nerd,
-    Unicode,
+    /// Unicode symbols (arrows, dingbats, technical marks): drawn from the system's
+    /// symbol font where the terminal's own font lacks them.
+    UnicodeIcons,
+    /// The same marks with only the glyphs every monospace font has.
+    UnicodeStd,
     None,
 }
 
 impl IconSet {
+    /// The names for the configuration and the command line.
+    pub const NAMES: [&'static str; 4] = ["nerd", "unicode-icons", "unicode-std", "none"];
+
     pub fn parse(s: &str) -> Option<IconSet> {
-        match s.to_ascii_lowercase().as_str() {
+        match s.to_ascii_lowercase().replace('_', "-").as_str() {
             "nerd" | "nerdfont" | "nerd-font" | "on" | "true" | "1" => Some(IconSet::Nerd),
-            "unicode" | "plain" => Some(IconSet::Unicode),
+            // `unicode` is the name this set had before there were two.
+            "unicode-icons" | "unicode" | "icons" | "plain" => Some(IconSet::UnicodeIcons),
+            "unicode-std" | "unicode-standard" | "std" | "standard" | "safe" => {
+                Some(IconSet::UnicodeStd)
+            }
             "none" | "off" | "ascii" | "false" | "0" => Some(IconSet::None),
             _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            IconSet::Nerd => "nerd",
+            IconSet::UnicodeIcons => "unicode-icons",
+            IconSet::UnicodeStd => "unicode-std",
+            IconSet::None => "none",
         }
     }
 
@@ -377,7 +401,7 @@ pub fn ui(set: IconSet, g: Glyph) -> &'static str {
     };
     match set {
         IconSet::Nerd => nerd,
-        IconSet::Unicode => uni,
+        IconSet::UnicodeIcons | IconSet::UnicodeStd => uni,
         IconSet::None => ascii,
     }
 }
@@ -388,9 +412,24 @@ mod ui_glyph_tests {
     use unicode_width::UnicodeWidthStr;
 
     #[test]
+    fn the_sets_are_named_and_the_old_name_still_works() {
+        for name in IconSet::NAMES {
+            assert_eq!(IconSet::parse(name).map(IconSet::name), Some(name));
+        }
+        assert_eq!(IconSet::parse("unicode"), Some(IconSet::UnicodeIcons));
+        assert_eq!(IconSet::parse("Unicode_Std"), Some(IconSet::UnicodeStd));
+        assert_eq!(IconSet::parse("emoji"), None);
+    }
+
+    #[test]
     fn every_interface_glyph_takes_one_cell_in_every_set() {
         for g in Glyph::ALL {
-            for set in [IconSet::Nerd, IconSet::Unicode, IconSet::None] {
+            for set in [
+                IconSet::Nerd,
+                IconSet::UnicodeIcons,
+                IconSet::UnicodeStd,
+                IconSet::None,
+            ] {
                 let s = ui(set, g);
                 assert!(
                     s.width() <= 1,
@@ -399,7 +438,7 @@ mod ui_glyph_tests {
                 );
             }
             // With a symbol font or Unicode there is always something to draw.
-            assert!(!ui(IconSet::Nerd, g).is_empty() && !ui(IconSet::Unicode, g).is_empty());
+            assert!(!ui(IconSet::Nerd, g).is_empty() && !ui(IconSet::UnicodeIcons, g).is_empty());
         }
     }
 }

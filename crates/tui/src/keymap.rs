@@ -676,14 +676,16 @@ const MAC: &[(Action, &[&str])] = &[
 const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Palette, &["ctrl+p"]),
     (Action::Help, &["f1"]),
-    (Action::Back, &["alt+left"]),
-    (Action::Forward, &["alt+right"]),
+    // Alt is not delivered by every terminal (Terminal.app keeps Option for accents unless
+    // told otherwise): what has an Alt key here has one without it too.
+    (Action::Back, &["alt+left", "ctrl+o"]),
+    (Action::Forward, &["alt+right", "ctrl+g"]),
     (Action::Parent, &["alt+up"]),
     (Action::SwitchPane, &["tab", "shift+tab"]),
     (Action::ToggleSidebar, &["ctrl+b"]),
     (Action::Refresh, &["f5"]),
     (Action::FocusAddress, &["ctrl+l", "alt+d", "f4"]),
-    (Action::ToggleDetails, &["alt+p"]),
+    (Action::ToggleDetails, &["alt+p", "f6"]),
     (Action::ViewDetails, &["ctrl+1", "ctrl+shift+1"]),
     (Action::ViewIcons, &["ctrl+2", "ctrl+shift+2"]),
     (Action::ContextMenu, &["shift+f10", "menu"]),
@@ -1391,5 +1393,31 @@ mod tests {
         assert_eq!(vim.hint(Action::Copy).as_deref(), Some("y"));
         assert_eq!(km.keys_text(Action::Copy, Scheme::Vim), "y");
         assert_eq!(km.keys_text(Action::Copy, Scheme::Classic), "Ctrl+C");
+    }
+
+    /// Alt chords are not delivered by every terminal, and Ctrl+Shift ones are told apart
+    /// from plain Ctrl only by terminals with a keyboard protocol of their own: by default
+    /// nothing may depend on either.
+    #[test]
+    fn every_action_has_a_key_that_every_terminal_delivers() {
+        let km = Keymap::default();
+        let portable = |c: Chord| {
+            !c.mods.contains(KeyModifiers::ALT)
+                && !c.mods.contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+        };
+        // Three later actions have only an Alt key (and Cmd on a Mac) by design; they are
+        // also in the menus and the palette. Listed here so that the list does not grow
+        // unnoticed.
+        let alt_only = [Action::Update, Action::QuickLook, Action::ShowPackage];
+        let missing: Vec<&str> = Action::ALL
+            .into_iter()
+            .filter(|a| !alt_only.contains(a))
+            .filter(|a| !km.bindings(*a).iter().any(|b| portable(b.chord)))
+            .map(Action::id)
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "only Alt or Ctrl+Shift keys: {missing:?}"
+        );
     }
 }
