@@ -243,6 +243,7 @@ impl JournalEntry {
             OpKind::Delete => format!("deletion of {items}"),
             OpKind::Extract => format!("extraction of {items}"),
             OpKind::Compress => format!("compression of {items}"),
+            OpKind::SetTags => format!("tag change of {items}"),
             OpKind::Undo => "undo".to_string(),
         }
     }

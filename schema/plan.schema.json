@@ -323,6 +323,11 @@
           "description": "Left alone: the name already exists, or it is already where it should be.",
           "type": "string",
           "const": "Skip"
+        },
+        {
+          "description": "Its tags change.",
+          "type": "string",
+          "const": "Retag"
         }
       ]
     },
@@ -408,6 +413,11 @@
           "description": "Put files into a new archive.",
           "type": "string",
           "const": "compress"
+        },
+        {
+          "description": "Change the tags of files (the Finder's tags on macOS, `user.xdg.tags` on Linux).",
+          "type": "string",
+          "const": "set_tags"
         }
       ]
     },
@@ -709,6 +719,31 @@
             "sources",
             "archive",
             "format"
+          ]
+        },
+        {
+          "description": "Change the tags of items: add, remove, toggle, clear or replace them.",
+          "type": "object",
+          "properties": {
+            "change": {
+              "$ref": "#/$defs/TagChange"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "op": {
+              "type": "string",
+              "const": "set_tags"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "items",
+            "change"
           ]
         },
         {
@@ -1307,7 +1342,162 @@
             "step",
             "item"
           ]
+        },
+        {
+          "description": "Replace the tags of a file or folder. `before` is what it has now, checked when the\nstep runs: tags changed in the meantime are left alone, so that undo never overwrites\nwhat somebody did after the operation.",
+          "type": "object",
+          "properties": {
+            "after": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tag"
+              }
+            },
+            "before": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tag"
+              }
+            },
+            "path": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string",
+              "const": "set_tags"
+            }
+          },
+          "required": [
+            "step",
+            "path",
+            "before",
+            "after"
+          ]
         }
+      ]
+    },
+    "Tag": {
+      "description": "One tag: a name, and the colour it is drawn in when it has one.",
+      "type": "object",
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TagColor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "TagChange": {
+      "description": "What to do to the tags of the items.",
+      "oneOf": [
+        {
+          "description": "Give every item this tag (those that have it are left alone).",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "add"
+            },
+            "tag": {
+              "$ref": "#/$defs/Tag"
+            }
+          },
+          "required": [
+            "how",
+            "tag"
+          ]
+        },
+        {
+          "description": "Take the tag called `name` off every item.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "remove"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "how",
+            "name"
+          ]
+        },
+        {
+          "description": "Take the tag off if every item has it, give it to every item otherwise: what clicking\na colour in the menu does.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "toggle"
+            },
+            "tag": {
+              "$ref": "#/$defs/Tag"
+            }
+          },
+          "required": [
+            "how",
+            "tag"
+          ]
+        },
+        {
+          "description": "Remove all tags.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "clear"
+            }
+          },
+          "required": [
+            "how"
+          ]
+        },
+        {
+          "description": "Replace the tags of every item with exactly these.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "set"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tag"
+              }
+            }
+          },
+          "required": [
+            "how",
+            "tags"
+          ]
+        }
+      ]
+    },
+    "TagColor": {
+      "description": "The Finder's colours, as the menu lists them.",
+      "type": "string",
+      "enum": [
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "gray"
       ]
     },
     "Totals": {
@@ -1507,6 +1697,11 @@
           "description": "This platform does not carry extended attributes and ACLs over yet.",
           "type": "string",
           "const": "AttributesNotKept"
+        },
+        {
+          "description": "Items that cannot be given tags (a link, a system with no tags).",
+          "type": "string",
+          "const": "CannotTag"
         },
         {
           "description": "An undo step was refused because the item changed since the operation.",

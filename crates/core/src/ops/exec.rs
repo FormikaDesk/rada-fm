@@ -916,6 +916,28 @@ impl Engine {
                 self.platform.trash().restore(item)?;
                 Ok(StepResult::done())
             }
+
+            Step::SetTags {
+                path,
+                before,
+                after,
+            } => {
+                let store = self
+                    .platform
+                    .tags()
+                    .ok_or(Error::Unsupported("tags on this system"))?;
+                // What the item has now must be what the plan saw: tags changed since are not
+                // overwritten.
+                let now = store.read(path)?;
+                if now != *before {
+                    return Err(Error::Modified {
+                        path: path.clone(),
+                        reason: "its tags changed".into(),
+                    });
+                }
+                store.write(path, after)?;
+                Ok(StepResult::done())
+            }
         }
     }
 }

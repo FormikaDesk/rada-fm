@@ -111,6 +111,7 @@ pub fn read_dir(
                 executable,
                 reparse: None,
                 package: false,
+                tags: Vec::new(),
                 error: None,
             }
         })

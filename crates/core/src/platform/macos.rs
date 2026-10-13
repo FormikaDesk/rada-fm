@@ -134,6 +134,54 @@ mod native {
     }
 }
 
+/// What a copy keeps on macOS: the Finder's tags (and nothing else of the extended attributes
+/// yet, which the plan says before anything is copied).
+pub struct MacFidelity;
+
+impl super::Fidelity for MacFidelity {
+    fn implemented(&self) -> bool {
+        false
+    }
+    fn destination_support(&self, dir: &Path) -> super::DestSupport {
+        super::fidelity::NotYet.destination_support(dir)
+    }
+    fn source_attributes(&self, path: &Path) -> super::SourceAttrs {
+        super::fidelity::NotYet.source_attributes(path)
+    }
+    fn can_set_owner(&self, uid: u32, gid: u32) -> bool {
+        super::fidelity::NotYet.can_set_owner(uid, gid)
+    }
+    fn copy_attributes(
+        &self,
+        src: &Path,
+        dst: &Path,
+        what: super::Preserve,
+        _owner: Option<(u32, u32)>,
+    ) -> super::AttrOutcome {
+        let mut outcome = super::AttrOutcome::default();
+        if !what.xattrs {
+            return outcome;
+        }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        {
+            use super::tags::xattr;
+            const TAGS: &str = "com.apple.metadata:_kMDItemUserTags";
+            match xattr::get(src, TAGS) {
+                Ok(Some(value)) => {
+                    if xattr::set(dst, TAGS, &value).is_err() {
+                        outcome.note("the tags");
+                    }
+                }
+                Ok(None) => {}
+                Err(_) => outcome.note("the tags"),
+            }
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let _ = (src, dst);
+        outcome
+    }
+}
+
 /// The folders and disks worth looking up: the standard places and the few the system names.
 pub fn name_candidates(places: &[std::path::PathBuf], home: &Path) -> Vec<std::path::PathBuf> {
     let mut out: Vec<std::path::PathBuf> = places.to_vec();
@@ -422,6 +470,8 @@ pub struct MacPlatform {
     trash: Box<dyn TrashBackend>,
     volumes: MacVolumes,
     opener: MacOpener,
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    tags: super::tags::XattrTags,
     /// Tests: the standard folders come from `user-dirs.dirs` in the sandbox.
     sandbox_user_dirs: bool,
 }
@@ -449,6 +499,8 @@ impl MacPlatform {
             trash,
             volumes: MacVolumes,
             opener: MacOpener { quick_look: true },
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            tags: super::tags::XattrTags::finder(),
             sandbox_user_dirs: false,
         }
     }
@@ -486,8 +538,18 @@ impl Platform for MacPlatform {
     }
     fn fidelity(&self) -> &dyn super::Fidelity {
         // Extended attributes, resource forks and ACLs are not carried over yet; the plan
-        // says so before anything is copied.
-        &super::fidelity::NotYet
+        // says so before anything is copied. The Finder's tags are the exception.
+        &MacFidelity
+    }
+    fn tags(&self) -> Option<&dyn super::TagStore> {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        {
+            Some(&self.tags)
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        {
+            None
+        }
     }
     fn user_dirs(&self) -> UserDirs {
         if self.sandbox_user_dirs {

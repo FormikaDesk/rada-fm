@@ -11,6 +11,7 @@ pub mod rename;
 pub mod request;
 pub mod runner;
 pub mod scan;
+pub mod tags;
 pub mod undo;
 
 pub use archives::ExtractInto;
@@ -25,5 +26,6 @@ pub use recover::Recovered;
 pub use rename::{Pattern, Preview};
 pub use request::{OpRequest, Planned, plan_to_json};
 pub use runner::RunOutcome;
+pub use tags::TagChange;
 pub use scan::{LinkState, Scan, ScanControl, ScanNode, ScanProgress};
 pub use undo::{Blocked, UndoPlan};

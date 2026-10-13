@@ -930,6 +930,7 @@ impl App {
             OpKind::Undo => "Undone".to_string(),
             OpKind::Extract => format!("Extracted {}", what(true)),
             OpKind::Compress => "Archive created".to_string(),
+            OpKind::SetTags => format!("Tags changed on {}", fmt::count(t.items.max(1), "item", "items")),
         };
         let tail = match r.kind {
             OpKind::Undo => self

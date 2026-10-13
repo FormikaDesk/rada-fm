@@ -29,6 +29,8 @@ pub enum OpKind {
     Extract,
     /// Put files into a new archive.
     Compress,
+    /// Change the tags of files (the Finder's tags on macOS, `user.xdg.tags` on Linux).
+    SetTags,
 }
 
 impl OpKind {
@@ -45,6 +47,7 @@ impl OpKind {
             OpKind::Undo => "Undo",
             OpKind::Extract => "Extract",
             OpKind::Compress => "Compress",
+            OpKind::SetTags => "Change tags",
         }
     }
 }
@@ -225,6 +228,25 @@ pub enum Step {
     Restore {
         item: TrashedItem,
     },
+    /// Replace the tags of a file or folder. `before` is what it has now, checked when the
+    /// step runs: tags changed in the meantime are left alone, so that undo never overwrites
+    /// what somebody did after the operation.
+    SetTags {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        path: PathBuf,
+        before: Vec<crate::platform::Tag>,
+        after: Vec<crate::platform::Tag>,
+    },
+}
+
+/// Tag names for a sentence: `Red, Work`, or `none`.
+pub fn tag_names(tags: &[crate::platform::Tag]) -> String {
+    if tags.is_empty() {
+        "none".to_string()
+    } else {
+        tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ")
+    }
 }
 
 impl Step {
@@ -236,6 +258,7 @@ impl Step {
             | Step::FinishDir { path, .. }
             | Step::TrashItem { path }
             | Step::RemoveFile { path, .. }
+            | Step::SetTags { path, .. }
             | Step::RemoveDir { path } => path,
             Step::Compress { dst, .. } => dst,
             Step::ExtractFile { src, .. } | Step::ExtractSymlink { src, .. } => src,
@@ -320,6 +343,12 @@ impl Step {
             Step::RemoveFile { path, .. } => format!("delete {}", display::path(path)),
             Step::RemoveDir { path } => format!("remove folder {}", display::path(path)),
             Step::Restore { item } => format!("restore {}", display::path(&item.original)),
+            Step::SetTags { path, before, after } => format!(
+                "tags of {}: {} -> {}",
+                display::path(path),
+                tag_names(before),
+                tag_names(after)
+            ),
         }
     }
 
@@ -433,6 +462,11 @@ impl Step {
                 })
             }
             // Permanent deletion and restore are not reversed here.
+            Step::SetTags { path, before, after } => Some(Step::SetTags {
+                path: path.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            }),
             Step::RemoveFile { .. } | Step::Restore { .. } => None,
         }
     }
@@ -531,6 +565,8 @@ pub enum WarningKind {
     OwnerNotKept,
     /// This platform does not carry extended attributes and ACLs over yet.
     AttributesNotKept,
+    /// Items that cannot be given tags (a link, a system with no tags).
+    CannotTag,
     InvalidName,
     Missing,
     Merge,
@@ -717,8 +753,13 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
             plural(n, "item", "items")
         ),
         WarningKind::AttributesNotKept => {
-            "extended attributes and ACLs are not preserved on this platform yet".to_string()
+            "extended attributes and ACLs are not preserved on this platform yet (tags are, where the system has them)"
+                .to_string()
         }
+        WarningKind::CannotTag => format!(
+            "{} cannot carry tags here and will be left as they are{extra}",
+            plural(n, "item", "items")
+        ),
         WarningKind::InvalidName => format!("invalid name{extra}"),
         WarningKind::Missing => format!("{} no longer exist", plural(n, "item", "items")),
         WarningKind::Merge => format!(
@@ -827,6 +868,8 @@ pub enum ItemAction {
     Delete,
     Rename,
     Create,
+    /// Its tags change.
+    Retag,
 }
 
 impl ItemAction {
@@ -842,6 +885,7 @@ impl ItemAction {
             ItemAction::Delete => "delete",
             ItemAction::Rename => "rename",
             ItemAction::Create => "create",
+            ItemAction::Retag => "retag",
         }
     }
 }

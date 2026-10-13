@@ -35,6 +35,8 @@ pub struct Entry {
     /// A folder the system treats as one thing, like a file (a macOS `.app` or
     /// `.photoslibrary`): it is opened with its program, and entered only on request.
     pub package: bool,
+    /// The tags it carries (the Finder's on macOS, `user.xdg.tags` on Linux).
+    pub tags: Vec<crate::platform::Tag>,
     /// Set when the entry itself could not be inspected.
     pub error: Option<String>,
     /// Escaped for display (control characters, bidi, invalid bytes made visible).
@@ -80,6 +82,11 @@ impl Entry {
             };
             LinkInfo { target, state }
         });
+        // One attribute read per entry, in the worker. A link has no tags of its own.
+        let tags = match platform.tags() {
+            Some(store) if meta.kind != FileKind::Symlink => store.read(&path).unwrap_or_default(),
+            _ => Vec::new(),
+        };
         let shown = display::name(&name);
         let package = meta.kind == FileKind::Dir && platform.attributes().is_package(&path, meta);
         let type_label = match &link {
@@ -113,6 +120,7 @@ impl Entry {
             executable: attrs.executable,
             reparse: attrs.reparse,
             package,
+            tags,
             error: None,
         }
     }
@@ -138,6 +146,7 @@ impl Entry {
             executable: false,
             reparse: None,
             package: false,
+            tags: Vec::new(),
             error: Some(error),
         }
     }

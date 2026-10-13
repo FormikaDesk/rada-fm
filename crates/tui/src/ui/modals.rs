@@ -359,12 +359,17 @@ fn verb(kind: OpKind) -> &'static str {
         OpKind::Undo => "Undo",
         OpKind::Extract => "Extract",
         OpKind::Compress => "Compress",
+        OpKind::SetTags => "Tags",
     }
 }
 
 fn action_color(th: &Theme, a: ItemAction) -> Color {
     match a {
-        ItemAction::Copy | ItemAction::Move | ItemAction::Create | ItemAction::Rename => th.accent,
+        ItemAction::Copy
+        | ItemAction::Move
+        | ItemAction::Create
+        | ItemAction::Rename
+        | ItemAction::Retag => th.accent,
         ItemAction::Merge | ItemAction::KeepBoth => th.kinds.vector,
         ItemAction::Skip | ItemAction::Overwrite => th.warn,
         ItemAction::Trash | ItemAction::Delete => th.error,
@@ -433,7 +438,12 @@ fn draw_plan(
     let t = &plan.totals;
     let mut stats: Vec<(String, &str, bool)> = Vec::new();
     match plan.kind {
-        OpKind::Rename | OpKind::BulkRename | OpKind::MakeDir | OpKind::MakeFile | OpKind::Undo => {
+        OpKind::Rename
+        | OpKind::BulkRename
+        | OpKind::MakeDir
+        | OpKind::MakeFile
+        | OpKind::SetTags
+        | OpKind::Undo => {
             stats.push((
                 fmt::thousands(plan.steps.len() as u64),
                 if plan.steps.len() == 1 {
@@ -937,6 +947,16 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
         Step::RemoveFile { path, .. } => format!("delete   {}", b.rel_src(path)),
         Step::RemoveDir { path } => format!("remove   {}/", b.rel_src(path)),
         Step::Restore { item } => format!("restore  {}", b.rel_src(&item.original)),
+        Step::SetTags {
+            path,
+            before,
+            after,
+        } => format!(
+            "tags     {}: {} → {}",
+            b.rel_src(path),
+            rada_core::ops::tag_names(before),
+            rada_core::ops::tag_names(after)
+        ),
     })
 }
 

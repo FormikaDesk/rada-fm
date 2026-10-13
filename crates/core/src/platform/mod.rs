@@ -7,6 +7,7 @@
 
 pub mod access;
 pub mod attrs;
+pub mod bplist;
 pub mod dirs;
 pub mod dirtrash;
 pub mod eject;
@@ -16,6 +17,7 @@ pub mod freedesktop;
 pub mod macos;
 pub mod trash;
 pub mod userdirs;
+pub mod tags;
 pub mod volumes;
 pub mod windows;
 
@@ -33,6 +35,7 @@ pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use fidelity::{AttrOutcome, DestSupport, Fidelity, NotYet, Preserve, SourceAttrs};
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
+pub use tags::{Tag, TagColor, TagStore};
 pub use userdirs::{PlaceKind, UserDirs};
 pub use volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
 
@@ -160,6 +163,10 @@ pub trait Platform: Send + Sync {
     /// those that exist.
     fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
         Vec::new()
+    }
+    /// Where tags are kept on this system; `None` where they are not supported (Windows).
+    fn tags(&self) -> Option<&dyn TagStore> {
+        None
     }
     /// When opening `path` failed with `err`: whether the system is waiting for the person's
     /// consent, and what to tell them.

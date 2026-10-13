@@ -301,6 +301,31 @@
       ]
     },
     {
+      "description": "Change the tags of items: add, remove, toggle, clear or replace them.",
+      "type": "object",
+      "properties": {
+        "change": {
+          "$ref": "#/$defs/TagChange"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "op": {
+          "type": "string",
+          "const": "set_tags"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "items",
+        "change"
+      ]
+    },
+    {
       "description": "Undo a journal entry (the most recent undoable one when `entry` is omitted).",
       "type": "object",
       "properties": {
@@ -399,6 +424,130 @@
             "name"
           ]
         }
+      ]
+    },
+    "Tag": {
+      "description": "One tag: a name, and the colour it is drawn in when it has one.",
+      "type": "object",
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TagColor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "TagChange": {
+      "description": "What to do to the tags of the items.",
+      "oneOf": [
+        {
+          "description": "Give every item this tag (those that have it are left alone).",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "add"
+            },
+            "tag": {
+              "$ref": "#/$defs/Tag"
+            }
+          },
+          "required": [
+            "how",
+            "tag"
+          ]
+        },
+        {
+          "description": "Take the tag called `name` off every item.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "remove"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "how",
+            "name"
+          ]
+        },
+        {
+          "description": "Take the tag off if every item has it, give it to every item otherwise: what clicking\na colour in the menu does.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "toggle"
+            },
+            "tag": {
+              "$ref": "#/$defs/Tag"
+            }
+          },
+          "required": [
+            "how",
+            "tag"
+          ]
+        },
+        {
+          "description": "Remove all tags.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "clear"
+            }
+          },
+          "required": [
+            "how"
+          ]
+        },
+        {
+          "description": "Replace the tags of every item with exactly these.",
+          "type": "object",
+          "properties": {
+            "how": {
+              "type": "string",
+              "const": "set"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Tag"
+              }
+            }
+          },
+          "required": [
+            "how",
+            "tags"
+          ]
+        }
+      ]
+    },
+    "TagColor": {
+      "description": "The Finder's colours, as the menu lists them.",
+      "type": "string",
+      "enum": [
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "purple",
+        "gray"
       ]
     }
   }

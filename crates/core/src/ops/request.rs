@@ -20,6 +20,7 @@ use super::plan::{ConflictPolicy, Plan};
 use super::planner::TransferOptions;
 use super::rename::Pattern;
 use super::scan::{Scan, ScanControl};
+use super::tags::TagChange;
 use super::undo::UndoPlan;
 use crate::archive::{self, ArchiveKind};
 use crate::journal::Journal;
@@ -136,6 +137,13 @@ pub enum OpRequest {
         #[serde(default)]
         conflict: ConflictPolicy,
     },
+    /// Change the tags of items: add, remove, toggle, clear or replace them.
+    SetTags {
+        #[serde(with = "pathcodec::paths")]
+        #[schemars(with = "Vec<String>")]
+        items: Vec<PathBuf>,
+        change: TagChange,
+    },
     /// Undo a journal entry (the most recent undoable one when `entry` is omitted).
     Undo {
         #[serde(default)]
@@ -230,6 +238,10 @@ impl OpRequest {
             } => {
                 require_absolute(sources, "sources")?;
                 require_absolute(std::slice::from_ref(archive), "archive")
+            }
+            OpRequest::SetTags { items, change } => {
+                require_absolute(items, "items")?;
+                change.validate()
             }
             OpRequest::Undo { .. } => Ok(()),
         }
@@ -398,6 +410,11 @@ impl Engine {
                 scan: None,
                 undo: None,
             },
+            OpRequest::SetTags { items, change } => Planned {
+                plan: self.plan_set_tags(items, change),
+                scan: None,
+                undo: None,
+            },
             OpRequest::BulkRename {
                 items,
                 pattern,
@@ -509,6 +526,10 @@ impl Engine {
                     None => Ok(()),
                 }
             }
+            OpRequest::SetTags { items, .. } => match items.iter().find(|p| inside(p)) {
+                Some(p) => refuse(p, "an archive cannot be changed"),
+                None => Ok(()),
+            },
             OpRequest::BulkRename { items, .. } => match items.iter().find(|p| inside(p)) {
                 Some(p) => refuse(p, "an archive cannot be changed"),
                 None => Ok(()),

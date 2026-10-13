@@ -20,6 +20,7 @@ pub struct LinuxPlatform {
     attrs: UnixAttributes,
     opener: open::XdgOpener,
     fidelity: fidelity::LinuxFidelity,
+    tags: super::tags::XattrTags,
 }
 
 impl LinuxPlatform {
@@ -43,6 +44,7 @@ impl LinuxPlatform {
             attrs: UnixAttributes,
             opener: open::XdgOpener,
             fidelity: fidelity::LinuxFidelity,
+            tags: super::tags::XattrTags::freedesktop(),
         }
     }
 }
@@ -71,6 +73,9 @@ impl Platform for LinuxPlatform {
     }
     fn fidelity(&self) -> &dyn super::Fidelity {
         &self.fidelity
+    }
+    fn tags(&self) -> Option<&dyn super::TagStore> {
+        Some(&self.tags)
     }
     fn user_dirs(&self) -> UserDirs {
         // xdg-user-dirs: `$XDG_CONFIG_HOME/user-dirs.dirs`. Without it the system has

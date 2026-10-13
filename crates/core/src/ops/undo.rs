@@ -84,6 +84,7 @@ impl Sim<'_> {
             Step::Restore { item } => {
                 self.overlay.insert(item.original.clone(), true);
             }
+            Step::SetTags { .. } => {}
             Step::ExtractFile { dst, .. }
             | Step::ExtractSymlink { dst, .. }
             | Step::Compress { dst, .. } => {
@@ -169,6 +170,27 @@ impl Sim<'_> {
                     ))
                 } else {
                     Ok(())
+                }
+            }
+            Step::SetTags { path, before, .. } => {
+                if !self.exists(path) {
+                    return Err(format!("{} is no longer there", display::path(path)));
+                }
+                let now = self
+                    .engine
+                    .platform
+                    .tags()
+                    .and_then(|s| s.read(path).ok());
+                match now {
+                    Some(now) if now == *before => Ok(()),
+                    Some(_) => Err(format!(
+                        "the tags of {} changed after the operation",
+                        display::path(path)
+                    )),
+                    None => Err(format!(
+                        "the tags of {} cannot be read",
+                        display::path(path)
+                    )),
                 }
             }
             // Never recorded as an inverse: extraction and compression are undone by removing
