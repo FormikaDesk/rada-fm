@@ -168,6 +168,15 @@ pub trait Platform: Send + Sync {
     }
 }
 
+/// Keep the name the system shows for `path` only if it is not the name on disk.
+pub fn only_different(path: &Path, shown: String) -> Option<(std::path::PathBuf, String)> {
+    let on_disk = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned());
+    (!shown.is_empty() && shown != on_disk).then(|| (path.to_path_buf(), shown))
+}
+
 /// Choices of the user that reach the platform layer.
 #[derive(Clone, Debug, Default)]
 pub struct PlatformOptions {

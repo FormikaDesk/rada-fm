@@ -197,6 +197,152 @@ pub fn letters_in(mask: u32) -> Vec<char> {
         .collect()
 }
 
+/// The names Explorer shows (the shell's display names), which are the localized ones:
+/// "Documenti", "Disco locale (C:)".
+#[cfg(windows)]
+pub mod shell_names {
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::Path;
+
+    use windows_sys::Win32::UI::Shell::{SHFILEINFOW, SHGFI_DISPLAYNAME, SHGetFileInfoW};
+
+    /// What Explorer calls this folder or drive, or `None` if the shell does not say.
+    pub fn display_name(path: &Path) -> Option<String> {
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        // SAFETY: SHFILEINFOW is plain data for which all-zero is a valid empty value.
+        let mut info: SHFILEINFOW = unsafe { std::mem::zeroed() };
+        // SAFETY: `wide` is NUL-terminated and outlives the call; `info` is the size passed.
+        let got = unsafe {
+            SHGetFileInfoW(
+                wide.as_ptr(),
+                0,
+                &mut info,
+                std::mem::size_of::<SHFILEINFOW>() as u32,
+                SHGFI_DISPLAYNAME,
+            )
+        };
+        if got == 0 {
+            return None;
+        }
+        let end = info
+            .szDisplayName
+            .iter()
+            .position(|c| *c == 0)
+            .unwrap_or(info.szDisplayName.len());
+        let name = String::from_utf16_lossy(&info.szDisplayName[..end]);
+        (!name.is_empty()).then_some(name)
+    }
+}
+
+/// Safely removing a drive without administrator rights: lock the volume (it fails if a
+/// program has a file open on it), dismount it, and ask the drive to let the media go.
+#[cfg(windows)]
+mod eject_drive {
+    use std::os::windows::ffi::OsStrExt;
+    use std::time::Duration;
+
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE,
+    };
+    use windows_sys::Win32::Storage::FileSystem::{
+        CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    };
+    use windows_sys::Win32::System::IO::DeviceIoControl;
+    use windows_sys::Win32::System::Ioctl::{
+        FSCTL_DISMOUNT_VOLUME, FSCTL_LOCK_VOLUME, IOCTL_STORAGE_EJECT_MEDIA,
+        IOCTL_STORAGE_MEDIA_REMOVAL, PREVENT_MEDIA_REMOVAL,
+    };
+
+    use crate::{Error, Result};
+
+    fn control(
+        handle: *mut std::ffi::c_void,
+        code: u32,
+        input: Option<&PREVENT_MEDIA_REMOVAL>,
+    ) -> bool {
+        let mut returned = 0u32;
+        let (ptr, len) = match input {
+            Some(i) => (
+                i as *const PREVENT_MEDIA_REMOVAL as *const std::ffi::c_void,
+                std::mem::size_of::<PREVENT_MEDIA_REMOVAL>() as u32,
+            ),
+            None => (std::ptr::null(), 0),
+        };
+        // SAFETY: `handle` is an open volume handle; the input is either null with length 0
+        // or points to a live PREVENT_MEDIA_REMOVAL of the length given; there is no output.
+        unsafe {
+            DeviceIoControl(
+                handle,
+                code,
+                ptr,
+                len,
+                std::ptr::null_mut(),
+                0,
+                &mut returned,
+                std::ptr::null_mut(),
+            ) != 0
+        }
+    }
+
+    pub fn eject(letter: char) -> Result<()> {
+        let path: Vec<u16> = std::ffi::OsStr::new(&format!(r"\\.\{letter}:"))
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        // SAFETY: a NUL-terminated wide path; the other arguments are plain values or null.
+        let handle = unsafe {
+            CreateFileW(
+                path.as_ptr(),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                std::ptr::null(),
+                OPEN_EXISTING,
+                0,
+                std::ptr::null_mut(),
+            )
+        };
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(Error::Invalid(format!(
+                "Windows would not let rada open drive {letter}: ({}). Use \"Safely Remove Hardware\" in the taskbar.",
+                std::io::Error::last_os_error()
+            )));
+        }
+        let result = (|| {
+            // A program with a file open on the drive makes the lock fail: try a few times,
+            // since a background scan often lets go within a second.
+            let mut locked = false;
+            for _ in 0..4 {
+                if control(handle, FSCTL_LOCK_VOLUME, None) {
+                    locked = true;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(400));
+            }
+            if !locked {
+                return Err(Error::Invalid(format!(
+                    "the drive is busy: a program still has a file or a folder on {letter}: open. Close it and try again."
+                )));
+            }
+            if !control(handle, FSCTL_DISMOUNT_VOLUME, None) {
+                return Err(Error::Invalid(format!(
+                    "Windows could not dismount {letter}: ({})",
+                    std::io::Error::last_os_error()
+                )));
+            }
+            let allow = PREVENT_MEDIA_REMOVAL {
+                PreventMediaRemoval: 0,
+            };
+            control(handle, IOCTL_STORAGE_MEDIA_REMOVAL, Some(&allow));
+            // A memory stick has nothing to eject: the dismount is what makes it safe.
+            control(handle, IOCTL_STORAGE_EJECT_MEDIA, None);
+            Ok(())
+        })();
+        // SAFETY: closing the handle opened above, once.
+        unsafe { CloseHandle(handle) };
+        result
+    }
+}
+
 struct WindowsVolumes;
 
 #[cfg(windows)]
@@ -231,6 +377,8 @@ mod native_volumes {
     }
 
     struct Info {
+        /// What Explorer calls the drive ("Local Disk (C:)", localized).
+        shell_name: Option<String>,
         label: String,
         fs_type: String,
         total: Option<u64>,
@@ -261,6 +409,11 @@ mod native_volumes {
         let sized =
             unsafe { GetDiskFreeSpaceExW(w.as_ptr(), &mut avail, &mut total, &mut free) } != 0;
         Info {
+            shell_name: if ok {
+                super::shell_names::display_name(Path::new(root))
+            } else {
+                None
+            },
             label: if ok { text(&label) } else { String::new() },
             fs_type: if ok { text(&fs) } else { String::new() },
             total: sized.then_some(total),
@@ -295,10 +448,18 @@ mod native_volumes {
                 .spawn(move || {
                     let _ = tx.send(query(&r));
                 });
-            let (label, fs_type, total, available, read_only, responsive) =
+            let (shell_name, label, fs_type, total, available, read_only, responsive) =
                 match rx.recv_timeout(ANSWER_WITHIN) {
-                    Ok(i) => (i.label, i.fs_type, i.total, i.available, i.read_only, true),
-                    Err(_) => (String::new(), String::new(), None, None, false, false),
+                    Ok(i) => (
+                        i.shell_name,
+                        i.label,
+                        i.fs_type,
+                        i.total,
+                        i.available,
+                        i.read_only,
+                        true,
+                    ),
+                    Err(_) => (None, String::new(), String::new(), None, None, false, false),
                 };
             // An optical drive with no disc has nothing to show.
             if kind == VolumeKind::Optical && responsive && fs_type.is_empty() {
@@ -306,7 +467,8 @@ mod native_volumes {
             }
             out.push(Volume {
                 mount_point: PathBuf::from(&root),
-                label: Some(drive_display_name(&label, kind, letter)),
+                // Explorer's own words when the shell has them; else made the same way.
+                label: Some(shell_name.unwrap_or_else(|| drive_display_name(&label, kind, letter))),
                 fs_type,
                 device: format!("{letter}:"),
                 kind,
@@ -322,6 +484,27 @@ mod native_volumes {
 }
 
 impl VolumeLister for WindowsVolumes {
+    fn can_eject(&self, v: &Volume) -> bool {
+        cfg!(windows)
+            && v.drive_letter.is_some()
+            && matches!(v.kind, VolumeKind::Removable | VolumeKind::Optical)
+    }
+
+    fn eject(&self, v: &Volume) -> Result<()> {
+        #[cfg(windows)]
+        {
+            match v.drive_letter {
+                Some(letter) => eject_drive::eject(letter),
+                None => Err(Error::Unsupported("eject")),
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = v;
+            Err(Error::Unsupported("eject"))
+        }
+    }
+
     #[cfg(windows)]
     fn list(&self) -> Result<Vec<Volume>> {
         native_volumes::list()
@@ -610,6 +793,33 @@ impl Platform for WindowsPlatform {
         #[cfg(not(windows))]
         UserDirs::conventional(&self.dirs.home, "Videos")
     }
+    fn display_names(&self, places: &[std::path::PathBuf]) -> Vec<(std::path::PathBuf, String)> {
+        if self.sandbox_user_dirs {
+            return Vec::new();
+        }
+        #[cfg(windows)]
+        {
+            // The Known Folders and the drives, as Explorer names them.
+            let mut paths: Vec<std::path::PathBuf> = places.to_vec();
+            paths.push(self.dirs.home.clone());
+            if let Ok(vols) = native_volumes::list() {
+                paths.extend(vols.into_iter().map(|v| v.mount_point));
+            }
+            paths.sort();
+            paths.dedup();
+            paths
+                .into_iter()
+                .filter_map(|p| {
+                    shell_names::display_name(&p).and_then(|n| super::only_different(&p, n))
+                })
+                .collect()
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = places;
+            Vec::new()
+        }
+    }
     fn path_rules(&self) -> PathRules {
         PathRules {
             case_insensitive: true,
@@ -669,6 +879,59 @@ mod tests {
             drive_display_name("", VolumeKind::Network, 'Z'),
             "Network Drive (Z:)"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_shell_names_the_system_drive_the_way_explorer_does() {
+        let name = shell_names::display_name(Path::new("C:\\")).expect("the shell names C:");
+        assert!(name.ends_with("(C:)"), "{name}");
+        // A folder with nothing localized about it keeps its name.
+        let tmp = std::env::temp_dir();
+        let shown = shell_names::display_name(&tmp).unwrap_or_default();
+        assert!(!shown.is_empty());
+        // The drive list carries the same words.
+        let vols = native_volumes::list().unwrap();
+        let c = vols
+            .iter()
+            .find(|v| v.drive_letter == Some('C'))
+            .expect("C:");
+        assert_eq!(c.label.as_deref(), Some(name.as_str()));
+        // And the names asked for a place are only the ones that differ from the disk's.
+        let got = WindowsPlatform::new(Dirs::under(&tmp)).display_names(&[]);
+        assert!(
+            got.iter()
+                .any(|(p, n)| p == Path::new("C:\\") && *n == name),
+            "{got:?}"
+        );
+        assert!(
+            got.iter()
+                .all(|(p, n)| p.file_name().is_none_or(|f| f.to_string_lossy() != *n))
+        );
+    }
+
+    #[test]
+    fn no_removable_means_no_eject_entry_and_a_stick_has_one() {
+        let v = |kind, letter| Volume {
+            mount_point: std::path::PathBuf::from("E:\\"),
+            label: None,
+            fs_type: "FAT32".into(),
+            device: "E:".into(),
+            kind,
+            drive_letter: letter,
+            total: None,
+            available: None,
+            read_only: false,
+            responsive: true,
+        };
+        let l = WindowsVolumes;
+        assert_eq!(
+            l.can_eject(&v(VolumeKind::Removable, Some('E'))),
+            cfg!(windows)
+        );
+        assert!(!l.can_eject(&v(VolumeKind::Fixed, Some('C'))));
+        assert!(!l.can_eject(&v(VolumeKind::Network, Some('Z'))));
+        assert!(!l.can_eject(&v(VolumeKind::Removable, None)));
     }
 
     #[test]

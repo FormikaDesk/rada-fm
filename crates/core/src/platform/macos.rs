@@ -19,7 +19,10 @@ use super::attrs::{Attrs, ReparseKind};
 use super::dirtrash::DirTrash;
 use super::trash::TrashBackend;
 use super::volumes::{Volume, VolumeKind, VolumeLister};
-use super::{AccessDenied, Dirs, FileAttributes, Opener, PathRules, PlaceKind, Platform, UserDirs};
+use super::{
+    AccessDenied, Dirs, FileAttributes, Opener, PathRules, PlaceKind, Platform, UserDirs,
+    only_different,
+};
 use crate::fs::{FileKind, FsMeta, LocalFs};
 use crate::{Error, Result};
 
@@ -151,15 +154,6 @@ pub fn name_candidates(places: &[std::path::PathBuf], home: &Path) -> Vec<std::p
         }
     }
     out
-}
-
-/// Keep the names that differ from the name on disk.
-pub fn only_different(path: &Path, shown: String) -> Option<(std::path::PathBuf, String)> {
-    let on_disk = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "/".to_string());
-    (!shown.is_empty() && shown != on_disk).then(|| (path.to_path_buf(), shown))
 }
 
 /// The folder a volume's own trash is, for an item under `/Volumes/<name>/`.
