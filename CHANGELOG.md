@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.3] - 2026-10-13
+
+A release of interface polish, a softer light theme, folder sizes and the first fixes from using rada on a Mac. Still a **pre-release**.
+
+### Added
+- **The size of folders.** The Size column now shows how big a folder is, counted in the background and only for the folders you can see: it shows `···` while it counts, and a figure when it is done (`> 3.2 GB` when the count had to stop early). The details pane says `12 items · 4.8 MB` for a folder, and sorting by size uses the figure once it is known. rada does not follow links, does not leave the disk the folder is on, and never counts `/proc`, `/sys`, `/dev` or a network share; it gives up after a time or a number of entries you can set. Opening another folder stops the counting. In the configuration: `folder_sizes = "auto"` (the default), `"items"` (only how many items each folder holds, which is quick) or `"off"`, with `folder_size_seconds` and `folder_size_entries` for the limits.
+- **Two new light themes, easier on the eyes.** `rada-light` (also what `theme = "auto"` takes on a light terminal) is now "paper": a warm off-white instead of pure white. `nebbia-light` ("mist") is the same with a cool grey-blue paper. Both paint their own background (on a 16-colour terminal the terminal's own background is kept). Automatic tests check the contrast of the main text (7:1), of the secondary text and the accent (4.5:1) on the background, the strip of hints, the fields and the selected rows, for every theme, light and dark.
+- **Half a row of air** between the tabs and the address row, and **rounded address and search fields** with Nerd Font icons (plain rectangles without them). When the window is short, this row is the first thing to go.
+- `RADA_TAG_LANGUAGE` chooses by hand the language the names of the seven tag colours are written in.
+
+### Changed
+- The buttons of the details pane are separate pills: *Open* across the pane, a blank row, then *Open with…* and *Preview* side by side (and *Quick Look* below them on a Mac, or in place of *Preview* when the pane is short). A blank row is kept between the last property and the status bar.
+- The preview of a folder in the details pane leaves out what the list leaves out (`.DS_Store`, `.localized`, anything the system hides) and follows the *Hidden files* setting.
+- A folder that is both a standard place and a bookmark is listed once in the sidebar (and a standard folder that two settings name is one entry).
+- `tag:red` in the search field also finds a colour by the name your system gives it (`tag:rosso`).
+
+### Fixed
+- **Tags on a Mac in another language.** A colour chosen in rada showed right for a moment and then became a grey dot, because the Finder in Italian calls blue "Blu" and gives a tag called "Blue" no colour. The seven colours are now written with the names your system uses, with the colour number the Finder writes after them (`Blu` and `4`), and a tag's colour is read from that number.
+- **Rada.app on a Mac opened two windows**, each with rada. It started Ghostty with `-e`, for which Ghostty asks "Allow Ghostty to execute …?" on every start (its author keeps that question on purpose, for security) and, started through `open`, runs the command twice. The command is now the `initial-command` of the settings file of rada's window: one window, one rada. The README says what is left of the question.
+- macOS: a folder called `Chrome Apps.localized` is shown as `Chrome Apps`, as the Finder shows it (Properties keeps the real name).
+- The update check that starts the downloaded program (`--version`) tries again when the program is still "busy" for writing, which rarely failed an update for no reason (and, in tests, a build now and then).
+- Tests that depended on how fast the machine was, or on how long a path was, now wait for the state they need (a double click, the watcher being ready, an extraction's answer). The same commit used to fail different tests on different runs of the continuous integration.
+
 ## [0.6.0-rc.2] - 2026-10-13
 
 The release of the first real try-out on a Mac. Still a **pre-release**: Windows and macOS are tested by CI on GitHub's machines and, for macOS, by one real Mac; please report what looks odd.
