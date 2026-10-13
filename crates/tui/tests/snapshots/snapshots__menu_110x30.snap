@@ -13,22 +13,22 @@ expression: shot(&mut h)
                             │ ☐ ▸ 目录                       6 days ago      Folder
                             │ ☐ · a-very-long-file-name-th…  12 days ago     Archive (tar.gz)             1 B
                             │ ☐ · backup.img                 9 days ago      Disk image                420 MB
-                            │ ☐ · Cargo.toml                 2 days ago      Settings file               42 B
-                            │▌☐ · main.rs                    Yesterda╭──────────────────────────────╮    37 B
-                            │ ☐ · notes.txt                  5 weeks │ Open                    Enter│ 3.52 KB
-                            │ ☐ · README.md                  Today 09│ Open with…              Alt+o│    73 B
-                            │ ☐ · тест-файл.md               Today 10│──────────────────────────────│    13 B
-                            │ ☐ · 日本語のファイル名.txt     5 days a│ Cut                    Ctrl+X│    16 B
-                            │ ☐ · 📷 holiday photos 🌴.txt   27/11/20│ Copy                   Ctrl+C│     6 B
-                            │                                        │ Paste                  Ctrl+V│
+                            │ ☐ · Cargo.toml                 2 days a╭──────────────────────────────╮    42 B
+                            │▌☐ · main.rs                    Yesterda│ Open                    Enter│    37 B
+                            │ ☐ · notes.txt                  5 weeks │ Open with…              Alt+o│ 3.52 KB
+                            │ ☐ · README.md                  Today 09│──────────────────────────────│    73 B
+                            │ ☐ · тест-файл.md               Today 10│ Cut                    Ctrl+X│    13 B
+                            │ ☐ · 日本語のファイル名.txt     5 days a│ Copy                   Ctrl+C│    16 B
+                            │ ☐ · 📷 holiday photos 🌴.txt   27/11/20│ Paste                  Ctrl+V│     6 B
                             │                                        │──────────────────────────────│
                             │                                        │ Rename                     F2│
                             │                                        │ Compress…               Alt+z│
                             │                                        │──────────────────────────────│
+                            │                                        │ Tags                        ▸│
+                            │                                        │──────────────────────────────│
                             │                                        │ Copy the path    Ctrl+Shift+C│
                             │                                        │──────────────────────────────│
-                            │                                        │ Move to trash             Del│
- 12 items                                                            │──────────────────────────────│   ≣  ▦
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│ Properties          Alt+Enter│▄▄▄▄▄▄▄▄▄
-   Esc  close                                                        ╰──────────────────────────────╯
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ 12 items                                                            │ Move to trash             Del│   ≣  ▦
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄
+   Esc  close                                                        │ Properties          Alt+Enter│
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╰──────────────────────────────╯▀▀▀▀▀▀▀▀▀

@@ -40,14 +40,23 @@ pub fn desktop(dirs: &Dirs, o: &DesktopOptions) -> Result<Vec<String>> {
                 "--default-file-manager is for Linux desktops: Windows keeps Explorer as the folder handler"
             );
         }
-        let local = dirs.data.clone();
+        // Windows' own folders for a person's application data, not the XDG variables a
+        // developer may have set: that is where Windows Terminal and the Start menu look.
+        let known = |var: &str, fallback: &str| -> std::path::PathBuf {
+            std::env::var_os(var)
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.is_absolute())
+                .unwrap_or_else(|| dirs.home.join(fallback))
+        };
+        let local = known("LOCALAPPDATA", "AppData/Local");
+        let roaming = known("APPDATA", "AppData/Roaming");
         let platform = rada_core::platform::current(dirs.clone());
         let desktop_dir = platform
             .user_dirs()
             .desktop
             .unwrap_or_else(|| dirs.home.join("Desktop"));
         let setup = crate::winsetup::WinSetup {
-            start_menu: dirs.config.join("Microsoft/Windows/Start Menu/Programs"),
+            start_menu: roaming.join("Microsoft/Windows/Start Menu/Programs"),
             desktop_dir,
             windows_terminal: crate::winsetup::find_windows_terminal(&local),
             local_app_data: local,

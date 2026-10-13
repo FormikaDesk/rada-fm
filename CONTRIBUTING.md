@@ -14,8 +14,8 @@ it — so the most useful contributions are not always code.
 2. **Windows and macOS.** The platform layer (`crates/core/src/platform/`) has a real trash,
    volumes, standard folders and opening files for both, and CI runs the whole suite on
    them. What it needs is someone who uses those systems every day, and the parts still
-   missing: ACLs and alternate data streams (Windows), extended attributes and resource
-   forks (macOS), junctions, the Finder's "Put Back".
+   missing: ACLs and alternate data streams (Windows), extended attributes other than tags
+   and resource forks (macOS), junctions, the Finder's "Put Back".
 3. **Packaging.** Distribution packages and a simple install path.
 4. **Terminals.** Reports of what works and what does not in your terminal: image protocols,
    keys, colours (version, terminal, `$TERM`, and what you saw).
@@ -36,8 +36,13 @@ cargo run -p rada -- ~/some/folder        # run it
 cargo build --release                     # target/release/rada
 ```
 
-PDF previews use poppler (`pdftoppm`, `pdfinfo`, `pdftotext`); without it they fall back to
-text and say how to install it.
+PDF previews use poppler (`pdftoppm`, `pdftotext`) on Linux, and the system's own tools on
+macOS (`sips`, Quick Look) and Windows (`Windows.Data.Pdf`); without them they fall back to
+text and say how to install poppler.
+
+To check the code for another system without leaving Linux: `scripts/xcheck clippy
+x86_64-pc-windows-msvc` or `x86_64-apple-darwin` (the targets must be installed with
+`rustup target add`; nothing is linked or run, and CI is what actually runs the tests there).
 
 ## Run the tests
 

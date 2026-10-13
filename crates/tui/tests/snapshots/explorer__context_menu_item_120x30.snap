@@ -18,18 +18,18 @@ expression: shot(&mut h)
   ▶ Videos                ⚲ │ ☐ · Cargo.toml                           3 days ago      Settings file               82 B
                             │ ☐ · data.json                            6 days ago      JSON data                   49 B
  DEVICES                    │ ☐ · demo.mp4                             2 weeks ago     MP4 video                91.0 MB
-  ▥ System                  │ ☐ · logo.svg                             5 days ago      SVG image                  197 B
-    ━━━━━━━━━──────  183 GB │ ☐ · main.rs                              Today 14:10     Rust source                 80 B
-  ▥ Data                    │ ☐ · notes.txt                            Yes╭──────────────────────────────╮         28 B
-    ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Tod│ Open                    Enter│      70.7 KB
-  ⏏ USB drive               │ ☐ · README.md                            Tod│ Open with…              Alt+o│        145 B
-    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│──────────────────────────────│      2.29 MB
-                            │ ☐ · screenshot.png                       Yes│ Cut                    Ctrl+X│      5.34 KB
-                            │ ☐ · setup.sh                             12 │ Copy                   Ctrl+C│         21 B
-                            │ ☐ · song.mp3                             30/│ Paste                  Ctrl+V│      7.44 MB
-                            │                                             │──────────────────────────────│
-                            │                                             │ Rename                     F2│
+  ▥ System                  │ ☐ · logo.svg                             5 d╭──────────────────────────────╮        197 B
+    ━━━━━━━━━──────  183 GB │ ☐ · main.rs                              Tod│ Open                    Enter│         80 B
+  ▥ Data                    │ ☐ · notes.txt                            Yes│ Open with…              Alt+o│         28 B
+    ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Tod│──────────────────────────────│      70.7 KB
+  ⏏ USB drive               │ ☐ · README.md                            Tod│ Cut                    Ctrl+X│        145 B
+    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│ Copy                   Ctrl+C│      2.29 MB
+                            │ ☐ · screenshot.png                       Yes│ Paste                  Ctrl+V│      5.34 KB
+                            │ ☐ · setup.sh                             12 │──────────────────────────────│         21 B
+                            │ ☐ · song.mp3                             30/│ Rename                     F2│      7.44 MB
                             │                                             │ Compress…               Alt+z│
+                            │                                             │──────────────────────────────│
+                            │                                             │ Tags                        ▸│
                             │                                             │──────────────────────────────│
                             │                                             │ Copy the path    Ctrl+Shift+C│
                             │                                             │──────────────────────────────│

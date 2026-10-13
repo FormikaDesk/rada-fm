@@ -14,7 +14,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Status
 
-Version 0.6.0-rc.1. **Linux is supported.** Windows and macOS are a **pre-release** on the development branch: the Recycle Bin / Trash, drives and volumes, the standard folders and opening files are implemented, and the whole test suite runs on all three systems in CI. Nobody uses them every day yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, extended attributes, resource forks) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.2. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -34,7 +34,7 @@ rada is young and written by one person. The parts that touch your files — pla
 | **Live** | The folder view updates by itself (inotify via `notify`), with debouncing. Sorting is stable and deterministic and applies instantly. |
 | **Nothing blocks the UI** | All I/O happens in worker threads; the interface thread only draws and handles keys. Volumes are listed by a worker, never on a keypress, with a timeout per mount so a hung network share cannot freeze anything. |
 | **Real image previews** | PNG, JPEG (with EXIF rotation), GIF (first frame), WebP, BMP and SVG are drawn with the best protocol the terminal offers: Kitty graphics (Ghostty, kitty), iTerm2 images (WezTerm, iTerm2), Sixel (foot), or coloured half blocks everywhere else. Decoding and resizing run in worker threads, so browsing a folder of photos never delays a keypress. Below the picture: format, pixel size, weight and date. Images that are too big are refused from the header alone, with a clear message. |
-| **PDF previews** | The first page of a PDF is drawn like an image, with page count, title and author below it. It needs poppler (`pdftoppm`, `pdfinfo`; `pdftotext` for a text fallback): without it you get the text of the first page and a hint on how to install it. Password-protected and damaged files say so. Drawing runs in a worker with a time limit and is stopped the moment you move to another file; pages are cached in `$XDG_CACHE_HOME/rada/previews` and pruned by age and size. |
+| **PDF and document previews** | The first page of a PDF is drawn like an image, with page count, title and author below it — with **no program to install on macOS and Windows** (macOS draws it with `sips`, Windows with its own PDF renderer). On Linux poppler (`pdftoppm`; `pdftotext` for a text fallback) does it, and when it is missing the message gives the install command for your distribution. On macOS Quick Look draws Office documents, Pages, Numbers, Keynote, RTF and videos (the picture the Finder shows); on Windows the shell's thumbnails do, when Windows has a handler for the type. Password-protected and damaged files say so. Drawing runs in a worker with a time limit and is stopped the moment you move to another file; pages are cached in the cache folder and pruned by age and size. |
 | **Archives** | `Enter` on a zip, tar (`.gz` `.bz2` `.xz` `.zst`), 7z or RAR opens it like a read-only folder; the path reads `photos.zip › 2024`, and text and pictures inside are previewed. Extract here or into a folder, or compress a selection, always with a plan, byte progress, cancel and undo. Paths that climb out of the destination, links that lead out, password-protected files and decompression bombs are stopped or confirmed first. See [Archives](#archives). |
 | **Real disks only** | The sidebar lists real disks, partitions, removable drives and network shares, not `tmpfs`, `proc`, `binderfs`, snap loops, bind-mount duplicates or `/boot/efi`. The list is configurable (`[devices] hide`). |
 | **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
@@ -52,9 +52,15 @@ rada is young and written by one person. The parts that touch your files — pla
 
 ## Download
 
-Binaries for Linux (static, x86_64 and aarch64), Windows (x86_64) and macOS (Intel and Apple silicon) are on the [releases page](https://github.com/formikadesk/rada-fm/releases), with a `SHA256SUMS` file. Unpack the archive and put `rada` (`rada.exe`) somewhere on your `PATH`.
+Binaries for Linux (static, x86_64 and aarch64), Windows (x86_64) and macOS (Intel and Apple silicon) are on the [releases page](https://github.com/formikadesk/rada-fm/releases), with a `SHA256SUMS` file. Unpack the archive and put `rada` (`rada.exe`) somewhere on your `PATH` (on a Mac, `~/.local/bin` or `/usr/local/bin` will do; no Homebrew is needed). Once it is installed, rada can [update itself](#updates).
 
 Windows and macOS builds are new: please report anything odd in an issue.
+
+### On a Mac
+
+- **Use [Ghostty](https://ghostty.org)** if you can: rada draws pictures with the kitty graphics protocol, the icons work with no font to install (Ghostty ships a Nerd Font symbols fallback, which rada detects), and Ghostty passes the Cmd key on (see [macOS](#macos)). iTerm2, WezTerm, kitty and Terminal also work, with less.
+- **Allow your terminal to see your folders.** macOS asks before a program may read the Desktop, Documents, Downloads, iCloud Drive or an external disk, once per terminal. If you said no — or a folder just shows "Operation not permitted" — rada says "macOS has not given *Ghostty* access to *Documents*" and a button opens *System Settings → Privacy & Security → Files & Folders* for you; switch the terminal on there, or give it *Full Disk Access* to cover everything. Then quit the terminal and start it again.
+- `rada setup desktop` makes **Rada.app** in `~/Applications`: a click opens rada in Ghostty (iTerm2 or Terminal if that is not installed). See [Desktop integration](#desktop-integration).
 
 ## Install
 
@@ -76,7 +82,7 @@ Optional: make your shell follow rada's last folder (`v` instead of `rada`):
 eval "$(rada --init bash)"        # also: zsh, fish, nushell, powershell
 ```
 
-Optional: add rada to your application menu, see [Desktop integration](#desktop-integration).
+Optional: add rada to your application menu (Linux), the Applications folder (macOS) or the Start menu (Windows) — see [Desktop integration](#desktop-integration) — and install a font for the icons with `rada setup font`.
 
 ## First steps
 
@@ -129,10 +135,18 @@ view = "details"      # details | icons: how a new tab shows a folder
 remember_tabs = true  # reopen the tabs of the last session
 dates = "relative"    # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm, in the order of your locale)
 keymap = "vim+classic"   # vim+classic (default) | vim | classic
+natural_sort = true   # file2 before file10, capitals and small letters mixed (as the Finder and Explorer do)
+cmd_keys = true       # macOS: ask the terminal to report the Cmd key, for Cmd+C/V/X and friends
 
 [archives]
 max_extract_gb = 8        # an extraction that would write more asks for a typed "yes"
 max_ratio = 200           # ...and so does one that unpacks this many times its size
+
+[update]
+check = true              # look for a newer rada, at most once a day, in the background
+channel = "auto"          # auto | stable | prerelease (see Updates)
+method = "auto"           # auto | binary | source | package
+source_dir = "~/rada-fm"  # the git checkout the `source` method updates
 
 [devices]
 hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
@@ -184,6 +198,64 @@ preview_seconds = 1.5   # how long counting an archive's members may take in the
 ```
 
 What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no owner or ACLs in archives you create…), is in [docs/SAFETY.md](docs/SAFETY.md).
+
+## Updates
+
+rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.2`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
+
+When one exists the status bar says **New version X available — press Alt+U to update** (click it too). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later. From the command line:
+
+```sh
+rada update --check     # only say whether a newer version exists, and what is in it
+rada update             # show the notes, ask, update
+rada update --rollback  # go back to the version that was running before
+```
+
+How it updates depends on how this copy got here (`method = "auto"`, or choose):
+
+| | |
+|---|---|
+| **binary** — downloaded from the releases | downloads the archive for this system and processor (Intel or Apple silicon on a Mac; under Rosetta, the native one), checks it against the release's `SHA256SUMS`, starts the new program once with `--version`, then replaces the running one atomically (on Windows the running file is renamed out of the way first). The old one is kept for `--rollback`. A file rada writes has no macOS quarantine flag; rada checks and clears it anyway. |
+| **source** — built from a git checkout (`source_dir`, or the checkout the program sits in) | in that folder: stops with an explanation unless the working tree is clean and the branch is `main`; `git pull --ff-only`; `cargo build --release --locked`; puts the new program in place of the running one; `cargo clean`. Progress shows in the status bar, the interface stays usable, and if a step fails the old program is untouched and the log (`$XDG_STATE_HOME/rada/update/last.log`) can be opened from the window. |
+| **package** — installed by a package manager (a system path, the AUR, Scoop, Homebrew) | touches nothing and says which tool to use. |
+
+## macOS
+
+What a Mac user expects of a file manager, as far as a terminal allows:
+
+- **Permissions.** When macOS refuses a folder until you allow it, rada says so in words and opens the right page of System Settings (see [On a Mac](#on-a-mac)); the sidebar marks the folders that are waiting.
+- **Packages.** `.app`, `.bundle`, `.framework`, `.photoslibrary`, `.pages`, `.numbers`, `.key`, `.rtfd` and every folder the system treats as a package (asked of Launch Services, with the Finder's bundle bit as a second opinion — not guessed from the name) behave like files: `Enter` opens them with their program, they sort among the files, and the right-click menu has *Show package contents* (`Alt+↓`) to go inside.
+- **Hidden like in the Finder.** `.DS_Store`, `._*` files, `.localized` and every folder flagged hidden (`~/Library`) stay out of sight until you show hidden files (`.`, or `Cmd+Shift+.`).
+- **Names as the Finder shows them.** The sidebar and the breadcrumbs say *Scrivania*, *Documenti*, *Macintosh HD*, the way your language has them; **Properties** and **Copy path** still give the real path.
+- **Natural order** everywhere: `file2` before `file10`, capitals mixed with small letters (`natural_sort = false` for letter by letter).
+- **Eject** in the right-click menu of a disk and with `Del` on it in the sidebar: a confirmation, then `diskutil eject`; a busy disk says who is using it ("Finder (process 412)…") and can be tried again. **iCloud Drive** is in the sidebar when it is there.
+- **Quick Look**: *Quick Look* in the item's menu, a button under *Preview* in the details pane, `Alt+Y` (and `Cmd+Y`), and `Q` in the full-screen preview. `Space` still means *select*.
+- **Previews without poppler**: PDFs, Office documents, Pages, Numbers, Keynote, RTF and videos, see above.
+- **Tags**: the Finder's own, see [Tags](#tags).
+
+**The Cmd key.** On a Mac, rada's classic scheme also answers `Cmd+C`, `Cmd+V`, `Cmd+X`, `Cmd+Backspace` (to the trash), `Cmd+I` (properties), `Cmd+O` (open), `Cmd+↑` (parent), `Cmd+[` and `Cmd+]` (back and forward), `Cmd+Shift+.` (hidden files), `Cmd+Z` / `Cmd+Shift+Z`, `Cmd+Y` (Quick Look), `Cmd+A` and `Cmd+Shift+N`. Two things must be true for that, and rada only controls the first:
+
+1. *The terminal reports the Cmd key.* That is the kitty keyboard protocol: **Ghostty**, kitty and WezTerm (with `enable_kitty_keyboard = true`) and iTerm2 (with "Report keys using CSI u" on) do; **Terminal.app does not**. rada asks for it on a Mac (`cmd_keys = false` stops that) and shows `Cmd+…` in its hints only when the terminal answered.
+2. *The terminal does not keep the key for itself.* Ghostty binds `Cmd+C`, `Cmd+V`, `Cmd+Z`, `Cmd+Shift+Z`, `Cmd+A`, `Cmd+Backspace`, `Cmd+↑`, `Cmd+[` and `Cmd+]` (checked against its source; the others rada uses are free). In the window `Rada.app` opens, a settings file frees them with `keybind = super+c=unbind` and so on. In **your own** Ghostty window those keys still belong to Ghostty until you add the same lines to your config (`~/Library/Application Support/com.mitchellh.ghostty/config`; the list is in `Rada.app/Contents/Resources/rada-ghostty.conf`). The Ctrl keys work everywhere.
+
+Things that do **not** work: `Cmd+Q`, `Cmd+W`, `Cmd+T`, `Cmd+N` and the rest of the terminal's own shortcuts stay the terminal's; the Dock shows the terminal's icon; Finder-style drag and drop and "Put Back" from the trash are not there; ACLs, resource forks and extended attributes other than tags are not carried over by a copy.
+
+## Windows
+
+- **Names as Explorer shows them.** The sidebar and the breadcrumbs use the shell's display names for the Known Folders and the drives ("Documenti", "Disco locale (C:)"), not the names on disk; the real path stays in Properties and *Copy path*.
+- **Eject** for removable drives (the right-click menu, `Del` in the sidebar): rada locks the volume — it fails with "a program still has a file open" if one does —, dismounts it and asks the drive to release the media, all without administrator rights. Fixed disks and network drives have no such entry.
+- **PDF previews** use Windows' own renderer (`Windows.Data.Pdf`, Windows 10 and later) and other documents the shell's thumbnails, when Windows has a handler for the type. No program to install. The choice of the system renderer over a bundled one is explained in the [changelog](CHANGELOG.md).
+- **Not supported**: tags (the menu entry is absent), ACLs and alternate data streams in copies.
+
+## Tags
+
+The Finder's tags on macOS (the extended attribute `com.apple.metadata:_kMDItemUserTags`, with the seven standard colours), and `user.xdg.tags` on Linux (the convention Dolphin and Baloo use: tag names separated by commas, no colours; a tag called "Red" is drawn red). Windows has no tags and offers nothing.
+
+- **See them**: coloured dots after the name in the Details view and under the name in the Icons view (three at most, then `+`), and a *Tags* row in the details pane.
+- **Change them**: the right-click menu has *Tags ▸* with the seven colours, the other tags the selected items already carry, *New tag…* and *Remove all tags*. A tag is ticked when every selected item has it, and choosing it takes it off from all; otherwise it is given to all. It works on a selection.
+- **Like everything else rada does to files**, a change of tags shows a **plan** first (what each item had and will have), is written to the **journal** and can be **undone** — and undo leaves tags alone that someone changed after the operation. In the JSON requests it is `set_tags`.
+- **Copies and moves keep them** (on macOS only the tags are carried over: the rest of the extended attributes is not done yet, and the plan still says so).
+- **Find them**: type `tag:red` (or any part of a tag's name, or `tag:` alone for "anything tagged") in the search field; other words still match names.
 
 ## The screen
 
@@ -287,6 +359,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
 | pin this folder (or the item in the navigation pane) · home | `B` · `~` | |
 | move between list and sidebar · show / hide the sidebar | `Tab` · `Ctrl+B` (both schemes) | |
+| update rada · Quick Look (macOS) · show package contents (macOS) | `Alt+U` · `Alt+Y` · `Alt+↓` (both schemes) | |
 | help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
 **`Ctrl+C` copies and never quits**: the terminal is in raw mode, so it arrives as an ordinary key, and a stray `SIGINT` is ignored. Quit with `q` or `Ctrl+Q`; `SIGTERM` and closing the terminal end rada in an orderly way (the running operation is cancelled, the terminal is restored).
@@ -329,19 +402,25 @@ rada --schema request            # print the JSON Schema (also: plan)
 rada --request job.json          # plan it and open the usual confirmation window (`-` reads stdin)
 ```
 
-Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `trash`, `delete`, `undo`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
+Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `make_file`, `trash`, `delete`, `extract`, `compress`, `set_tags`, `undo`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
 
 ## Desktop integration
 
-Linux only. Everything is installed for your user, nothing needs root, and nothing is done unless you ask.
+Everything is installed for your user, nothing needs administrator rights, and nothing is done unless you ask. `rada setup desktop --remove` takes away exactly what was installed.
 
 ```sh
-rada setup desktop                        # launcher entry and icons for this user
-rada setup desktop --default-file-manager # also make rada the program that opens folders
-rada setup desktop --remove               # take away exactly what was installed
+rada setup desktop            # launcher, icon and (where it applies) the window's own identity
+rada setup desktop --desktop  # macOS and Windows: also a launcher on the Desktop
+rada setup font               # download and install JetBrainsMono Nerd Font Mono for this user
 ```
 
-`setup desktop` writes `rada.desktop` to `~/.local/share/applications` and the icon to `~/.local/share/icons/hicolor` (SVG, and PNG at 48, 128 and 256 px), updates the desktop database when `update-desktop-database` is available, and prints each file it wrote. The entry does not claim folders, so a plain setup never changes what opens them. With `--default-file-manager` the entry declares `inode/directory` and it uses `xdg-mime` to set rada as the handler; the previous handler is remembered and `--remove` puts it back. The launcher entry runs `rada --spawn-terminal`, which opens rada in a new terminal window, choosing in this order `xdg-terminal-exec`, `$TERMINAL`, then the first one found of ghostty, kitty, foot, alacritty, wezterm, konsole, gnome-terminal, xterm. The files to install by hand (for packagers) are in `packaging/linux/`.
+**Linux.** `setup desktop` writes `rada.desktop` to `~/.local/share/applications` and the icon to `~/.local/share/icons/hicolor` (SVG, and PNG at 48, 128 and 256 px), updates the desktop database when `update-desktop-database` is available, and prints each file it wrote. The entry declares `StartupWMClass=com.formikadesk.rada`, and `rada --spawn-terminal` (what the entry runs) starts the terminal with that identity — `ghostty --class=`, `kitty --class`, `alacritty --class`, `wezterm start --class`, `foot --app-id` — so a bar or workspace switcher shows **rada's icon** and not the terminal's. The entry does not claim folders, so a plain setup never changes what opens them; with `--default-file-manager` it declares `inode/directory` and uses `xdg-mime` to set rada as the handler (the previous handler is remembered and `--remove` puts it back). `--spawn-terminal` chooses, in this order, `xdg-terminal-exec`, `$TERMINAL`, then the first of ghostty, kitty, foot, alacritty, wezterm, konsole, gnome-terminal, xterm. The files for packagers are in `packaging/linux/`.
+
+**macOS.** `setup desktop` makes `~/Applications/Rada.app`, built from files only (no code to sign): an `Info.plist`, rada's icon as a real `.icns` at every size, and a small launcher that opens rada in **Ghostty** if it is installed — in a 180×45 window with its own settings, which hand the Cmd keys back to rada (see [macOS](#macos)) — else in **iTerm2**, else in **Terminal**. `--desktop` adds a link on the Desktop. **Known limit:** while rada runs, the Dock shows the terminal's icon, not rada's: a window belongs to the program that draws it.
+
+**Windows.** `setup desktop` puts a shortcut with rada's icon in the Start menu (`--desktop`: on the Desktop too). If Windows Terminal is installed it adds a profile "rada" as a *fragment* (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\rada\`, the way Windows Terminal asks programs to add profiles, without editing your own settings) with the icon and — once the font is installed — the Nerd Font, and the shortcut opens that profile; otherwise the shortcut starts `rada.exe` itself, whose icon is built into the program, so the taskbar shows it.
+
+**Font.** Icons need a [Nerd Font](https://www.nerdfonts.com/) in the terminal. `rada setup font` downloads **JetBrainsMono Nerd Font Mono** (Nerd Fonts v3.4.0, the four faces and the licence; every file is checked against a SHA-256 written in rada's source, and nothing is installed unless all match) and installs it for your account: `~/.local/share/fonts` and `fc-cache` on Linux, `~/Library/Fonts` on macOS, your own fonts folder and the per-user list in the registry on Windows. Then choose "JetBrainsMono Nerd Font Mono" in your terminal's font setting. The font is under the SIL Open Font License 1.1; the licence is installed beside it. At the first start where the icons would not draw, rada **offers** to do this — once, and only if you say yes. In **Ghostty** nothing is needed: its bundled symbols fallback draws the icons, and rada detects it and does not offer.
 
 ## How it is built
 

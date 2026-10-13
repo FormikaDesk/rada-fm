@@ -215,7 +215,7 @@ impl App {
     /// The entries of the Tags submenu: the seven colours, the other tags the items carry, a
     /// new tag, and removing them all. A tag is ticked when every item has it.
     pub(super) fn tag_menu_items(&self) -> Vec<MenuItem> {
-        use rada_core::platform::{Tag, TagColor};
+        use rada_core::platform::{Tag, TagColor as Hue};
         let targets = self.tag_targets();
         let everyone = |name: &str| {
             !targets.is_empty()
@@ -223,7 +223,7 @@ impl App {
                     .iter()
                     .all(|e| e.tags.iter().any(|t| t.is_called(name)))
         };
-        let mut items: Vec<MenuItem> = TagColor::ALL
+        let mut items: Vec<MenuItem> = Hue::ALL
             .into_iter()
             .map(|c| {
                 MenuItem::choice(
@@ -238,8 +238,7 @@ impl App {
         let mut others: Vec<Tag> = Vec::new();
         for e in &targets {
             for t in &e.tags {
-                if TagColor::from_name(&t.name).is_none()
-                    && !others.iter().any(|o| o.is_called(&t.name))
+                if Hue::from_name(&t.name).is_none() && !others.iter().any(|o| o.is_called(&t.name))
                 {
                     others.push(t.clone());
                 }

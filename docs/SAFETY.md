@@ -183,7 +183,10 @@ These are real, and we would rather you read them here than discover them.
   `~/.Trash` (macOS) are real. What is not done: preservation of attributes (ACLs and
   alternate data streams on Windows, extended attributes and resource forks on macOS) is a
   documented stub, and the plan says "this platform does not carry attributes over" instead
-  of pretending. A move inside a volume is a rename on every system; across volumes it is a
+  of pretending. The one exception is **tags**: on macOS a copy or a move carries the
+  Finder's tags over (and only them, of the extended attributes). A change of tags is an
+  ordinary operation, with a plan, a journal entry and an undo that refuses to overwrite
+  tags somebody changed after it. A move inside a volume is a rename on every system; across volumes it is a
   copy that is verified before the source is removed, as on Linux. Nothing here has been
   used for long on a real machine, so keep backups.
 - **The journal is a file you own.** Anyone who can edit `journal.jsonl` can change what undo
