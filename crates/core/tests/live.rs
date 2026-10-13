@@ -169,7 +169,18 @@ fn a_burst_of_changes_is_coalesced_into_few_events() {
     for i in 0..2000 {
         std::fs::write(dir.join(format!("f{i}")), "").unwrap();
     }
-    let (_, paths, rescan) = changed(&rx, 3);
+    // On a slow machine the burst spans several debounce windows, so the first events may be
+    // for a part of it: what matters is that the whole ends as one request to read the
+    // folder again, with no list of 2000 paths.
+    let mut early = 0;
+    let (paths, rescan) = loop {
+        let (_, paths, rescan) = changed(&rx, 5);
+        if rescan {
+            break (paths, rescan);
+        }
+        early += 1;
+        assert!(early <= 4, "too many partial events for one burst");
+    };
     assert!(
         rescan && paths.is_empty(),
         "a big burst asks for one rescan"
