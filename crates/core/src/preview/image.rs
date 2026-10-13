@@ -393,6 +393,38 @@ fn load_svg(
         .ok_or_else(|| "bad SVG canvas".into())
 }
 
+/// An SVG drawn square at `edge` pixels (its longer side), transparent where it has no
+/// ink: for the icons rada makes from its own logo.
+pub fn render_svg(data: &[u8], edge: u32) -> Result<RgbaImage, String> {
+    let opt = resvg::usvg::Options {
+        fontdb: fonts(),
+        ..Default::default()
+    };
+    let tree = resvg::usvg::Tree::from_data(data, &opt).map_err(|e| e.to_string())?;
+    let size = tree.size();
+    let (sw, sh) = (size.width(), size.height());
+    if !(sw.is_finite() && sh.is_finite()) || sw <= 0.0 || sh <= 0.0 {
+        return Err("the SVG has no usable size".into());
+    }
+    let scale = edge as f32 / sw.max(sh);
+    let (w, h) = (
+        ((sw * scale).round() as u32).max(1),
+        ((sh * scale).round() as u32).max(1),
+    );
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h).ok_or("cannot allocate the SVG canvas")?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
+    let mut raw = Vec::with_capacity((w * h * 4) as usize);
+    for p in pixmap.pixels() {
+        let c = p.demultiply();
+        raw.extend_from_slice(&[c.red(), c.green(), c.blue(), c.alpha()]);
+    }
+    RgbaImage::from_raw(w, h, raw).ok_or_else(|| "bad SVG canvas".into())
+}
+
 fn load_raster(
     path: &Path,
     limits: &ImageLimits,

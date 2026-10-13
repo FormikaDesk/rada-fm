@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 pub use archive::ArchivePreview;
 pub use card::{ExecInfo, FileCard, mode_string};
-pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker};
+pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker, render_svg};
 
 use crate::display;
 use crate::fs::{FileKind, FsEngine, FsMeta, SpecialKind};

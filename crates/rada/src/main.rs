@@ -4,6 +4,9 @@ mod config;
 mod demo;
 mod desktop;
 mod fonts;
+mod icons;
+mod macapp;
+mod setup;
 mod shell;
 mod update_cmd;
 
@@ -50,6 +53,9 @@ enum SetupWhat {
         /// remembered, and `--remove` restores it).
         #[arg(long)]
         default_file_manager: bool,
+        /// Also put a launcher on the Desktop (macOS and Windows).
+        #[arg(long)]
+        desktop: bool,
     },
 }
 
@@ -126,22 +132,21 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    if let Some(Command::Setup {
-        what: SetupWhat::Desktop {
-            remove,
-            default_file_manager,
-        },
-    }) = &cli.command
-    {
+    if let Some(Command::Setup { what }) = &cli.command {
         let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
-        let setup = desktop::Setup::from_env(&dirs)?;
-        if *remove && *default_file_manager {
-            anyhow::bail!("--remove and --default-file-manager cannot be used together");
-        }
-        let lines = if *remove {
-            setup.remove()?
-        } else {
-            setup.install(*default_file_manager)?
+        let lines = match what {
+            SetupWhat::Desktop {
+                remove,
+                default_file_manager,
+                desktop,
+            } => setup::desktop(
+                &dirs,
+                &setup::DesktopOptions {
+                    remove: *remove,
+                    default_file_manager: *default_file_manager,
+                    desktop: *desktop,
+                },
+            )?,
         };
         for l in lines {
             println!("{l}");

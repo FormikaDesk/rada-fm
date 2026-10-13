@@ -10,6 +10,7 @@ Exec=rada --spawn-terminal %F
 Icon=rada
 Terminal=false
 StartupNotify=false
+StartupWMClass=com.formikadesk.rada
 Categories=System;FileTools;FileManager;Utility;
 MimeType=inode/directory;
 Keywords=files;folders;file manager;explorer;browser;terminal;tui;undo;trash;

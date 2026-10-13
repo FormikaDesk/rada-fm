@@ -286,50 +286,79 @@ fn launcher_entry(template: &str, exe: &Path, claims_folders: bool) -> String {
 
 // ------------------------------------------------------------------------ terminal launcher
 
+/// The identity rada's window has: the name a bar or a workspace switcher matches to an icon.
+pub const APP_ID: &str = "com.formikadesk.rada";
+
 /// One terminal emulator and how it is told to run a command.
 struct Terminal {
     program: &'static str,
-    /// Arguments that go between the program and the command to run.
+    /// Arguments right after the program (a subcommand).
+    subcommand: &'static [&'static str],
+    /// How the window is given its own identity (class on X11, app-id on Wayland); `{}` is
+    /// replaced by [`APP_ID`]. Empty for a terminal with no such option that we know of.
+    identity: &'static [&'static str],
+    /// Arguments that go between the options and the command to run.
     before: &'static [&'static str],
 }
 
 const TERMINALS: &[Terminal] = &[
     Terminal {
         program: "ghostty",
+        subcommand: &[],
+        identity: &["--class={}"],
         before: &["-e"],
     },
     Terminal {
         program: "kitty",
+        subcommand: &[],
+        identity: &["--class", "{}"],
         before: &[],
     },
     Terminal {
         program: "foot",
+        subcommand: &[],
+        identity: &["--app-id={}"],
         before: &[],
     },
     Terminal {
         program: "alacritty",
+        subcommand: &[],
+        identity: &["--class", "{}"],
         before: &["-e"],
     },
     Terminal {
         program: "wezterm",
-        before: &["start", "--"],
+        subcommand: &["start"],
+        identity: &["--class", "{}"],
+        before: &["--"],
     },
     Terminal {
         program: "konsole",
+        subcommand: &[],
+        identity: &[],
         before: &["-e"],
     },
     Terminal {
         program: "gnome-terminal",
+        subcommand: &[],
+        identity: &[],
         before: &["--"],
     },
     Terminal {
         program: "xterm",
+        subcommand: &[],
+        identity: &[],
         before: &["-e"],
     },
 ];
 
+fn identity_args(t: &Terminal) -> Vec<String> {
+    t.identity.iter().map(|a| a.replace("{}", APP_ID)).collect()
+}
+
 /// The command line that opens `rada` (at `path`) in a new terminal window, chosen in
-/// this order: `xdg-terminal-exec`, `$TERMINAL`, then the first installed of a list.
+/// this order: `xdg-terminal-exec`, `$TERMINAL`, then the first installed of a list. The
+/// window gets rada's own identity ([`APP_ID`]) where the terminal can be told to.
 pub fn terminal_command(
     exe: &Path,
     path: Option<&Path>,
@@ -353,8 +382,18 @@ pub fn terminal_command(
             && installed(&prog)
         {
             // The usual convention: `-e COMMAND…` (kitty and foot take it bare, but
-            // also accept `-e`).
+            // also accept `-e`). A terminal we know gets its identity first, so that
+            // options the person wrote after it win.
+            let known = TERMINALS.iter().find(|k| {
+                Path::new(&prog)
+                    .file_name()
+                    .is_some_and(|n| n.to_string_lossy() == k.program)
+            });
             let mut prefix = vec![prog];
+            if let Some(k) = known {
+                prefix.extend(k.subcommand.iter().map(|s| s.to_string()));
+                prefix.extend(identity_args(k));
+            }
             prefix.extend(words);
             prefix.push("-e".into());
             return Some(with(prefix));
@@ -362,6 +401,8 @@ pub fn terminal_command(
     }
     TERMINALS.iter().find(|t| installed(t.program)).map(|t| {
         let mut prefix = vec![t.program.to_string()];
+        prefix.extend(t.subcommand.iter().map(|s| s.to_string()));
+        prefix.extend(identity_args(t));
         prefix.extend(t.before.iter().map(|s| s.to_string()));
         with(prefix)
     })
@@ -437,15 +478,25 @@ mod tests {
         let no_xte = ["kitty", "ghostty", "xterm"];
         assert_eq!(
             picks(Some("kitty"), &no_xte).unwrap(),
-            ["kitty", "-e", "/usr/bin/rada", "/tmp/x"]
+            [
+                "kitty",
+                "--class",
+                "com.formikadesk.rada",
+                "-e",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
-        // $TERMINAL with its own arguments, and one that is not installed.
+        // $TERMINAL with its own arguments after rada's identity, so that they win; and one
+        // that is not installed.
         assert_eq!(
-            picks(Some("alacritty --class rada"), &["alacritty"]).unwrap(),
+            picks(Some("alacritty --class mine"), &["alacritty"]).unwrap(),
             [
                 "alacritty",
                 "--class",
-                "rada",
+                "com.formikadesk.rada",
+                "--class",
+                "mine",
                 "-e",
                 "/usr/bin/rada",
                 "/tmp/x"
@@ -455,21 +506,74 @@ mod tests {
         // The fixed list is tried in its order: ghostty before kitty.
         assert_eq!(
             picks(None, &no_xte).unwrap(),
-            ["ghostty", "-e", "/usr/bin/rada", "/tmp/x"]
+            [
+                "ghostty",
+                "--class=com.formikadesk.rada",
+                "-e",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
-        assert_eq!(picks(None, &["xterm"]).unwrap()[0], "xterm");
-        assert_eq!(
-            picks(None, &["foot"]).unwrap(),
-            ["foot", "/usr/bin/rada", "/tmp/x"]
-        );
-        assert_eq!(
-            picks(None, &["wezterm"]).unwrap(),
-            ["wezterm", "start", "--", "/usr/bin/rada", "/tmp/x"]
-        );
+        assert!(picks(None, &["xterm"]).unwrap().ends_with(&[
+            "-e".into(),
+            "/usr/bin/rada".into(),
+            "/tmp/x".into()
+        ]));
         assert!(picks(None, &[]).is_none());
         // No path: just the program.
         let c = terminal_command(Path::new("/r"), None, None, &|n| n == "foot").unwrap();
-        assert_eq!(c, ["foot", "/r"]);
+        assert_eq!(c, ["foot", "--app-id=com.formikadesk.rada", "/r"]);
+    }
+
+    #[test]
+    fn each_terminal_is_given_rada_s_identity_the_way_it_takes_one() {
+        let one = |term: &str| picks(None, &[term]).unwrap();
+        assert_eq!(
+            one("ghostty"),
+            ["ghostty", "--class=com.formikadesk.rada", "-e", "/usr/bin/rada", "/tmp/x"]
+        );
+        assert_eq!(
+            one("kitty"),
+            ["kitty", "--class", "com.formikadesk.rada", "/usr/bin/rada", "/tmp/x"]
+        );
+        assert_eq!(
+            one("alacritty"),
+            ["alacritty", "--class", "com.formikadesk.rada", "-e", "/usr/bin/rada", "/tmp/x"]
+        );
+        // The class goes to `wezterm start`, before the `--` that ends its options.
+        assert_eq!(
+            one("wezterm"),
+            ["wezterm", "start", "--class", "com.formikadesk.rada", "--", "/usr/bin/rada", "/tmp/x"]
+        );
+        assert_eq!(
+            one("foot"),
+            ["foot", "--app-id=com.formikadesk.rada", "/usr/bin/rada", "/tmp/x"]
+        );
+        // The others are started as before.
+        assert_eq!(one("konsole"), ["konsole", "-e", "/usr/bin/rada", "/tmp/x"]);
+        assert_eq!(one("gnome-terminal"), ["gnome-terminal", "--", "/usr/bin/rada", "/tmp/x"]);
+        assert_eq!(one("xterm"), ["xterm", "-e", "/usr/bin/rada", "/tmp/x"]);
+        // xdg-terminal-exec chooses for itself.
+        assert_eq!(
+            picks(None, &["xdg-terminal-exec", "foot"]).unwrap(),
+            ["xdg-terminal-exec", "/usr/bin/rada", "/tmp/x"]
+        );
+    }
+
+    #[test]
+    fn a_terminal_named_in_the_terminal_variable_by_its_path_is_recognised() {
+        let c = picks(Some("/opt/bin/foot --fullscreen"), &["/opt/bin/foot"]).unwrap();
+        assert_eq!(
+            c,
+            [
+                "/opt/bin/foot",
+                "--app-id=com.formikadesk.rada",
+                "--fullscreen",
+                "-e",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
+        );
     }
 
     #[test]
@@ -505,6 +609,7 @@ mod tests {
             "Comment=A safe harbor for your files",
             "Exec=rada --spawn-terminal %F",
             "Icon=rada",
+            "StartupWMClass=com.formikadesk.rada",
             "Terminal=false",
             "Categories=System;FileTools;FileManager;Utility;",
             "MimeType=inode/directory;",
