@@ -14,7 +14,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ## Status
 
-Version 0.6.0-rc.3. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.4. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -206,9 +206,11 @@ What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no ow
 
 ## Updates
 
-rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.3`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
+rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.4`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
 
-When one exists the status bar says **New version X available — press Alt+U to update** (click it too). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later. From the command line:
+When one exists you see it twice: a pill in the accent colour in the tab bar, **↑ Update to X**, and the status bar, **New version X available — press Alt+U to update** (click either). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later.
+
+The status bar always shows the version that is running, **v0.6.0-rc.4 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
 
 ```sh
 rada update --check     # only say whether a newer version exists, and what is in it
@@ -256,7 +258,9 @@ Things that do **not** work: `Cmd+Q`, `Cmd+W`, `Cmd+T`, `Cmd+N` and the rest of 
 
 The Finder's tags on macOS (the extended attribute `com.apple.metadata:_kMDItemUserTags`, with the seven standard colours), and `user.xdg.tags` on Linux (the convention Dolphin and Baloo use: tag names separated by commas, no colours; a tag called "Red" is drawn red). Windows has no tags and offers nothing.
 
-- **See them**: coloured dots after the name in the Details view and under the name in the Icons view (three at most, then `+`), and a *Tags* row in the details pane.
+- **See them**: coloured dots after the name in the Details view and under the name in the Icons view (three at most, then `+2` for two more), and a *Tags* row in the details pane.
+- **The TAGS section of the navigation pane** always lists the seven colours, in the Finder's order and called what your system calls them (*Rosso, Arancione, Giallo, Verde, Blu, Viola, Grigio* on an Italian Mac), then the tags of your own that rada has seen on the items of the folders you opened in this session. Clicking one opens **Tag: Blu**: everything that carries it, wherever it is (Spotlight on a Mac; Baloo's `baloosearch` on Linux; when neither has anything to say, a walk of your home folder in the background that skips hidden folders and gives up after 30 seconds or half a million items; none on Windows). Each row says which folder the item is in. The list takes the operations of any list of items — open, copy, cut, rename, trash, tags, properties, compress, *Open with…* — and refuses what would make something *in* it (new folder or file, paste); `Up` goes back where you came from. A colour matches the tags of that colour under any of its names (a *Blue* made on an English machine is in *Blu*), but not a tag of your own that happens to be blue.
+- **The Finder's number is the colour.** The seven colours are written as the Finder writes them (`Blu` and `4`; a tag with none as `Lavoro` and `0`), and read back from the number, never from the name.
 - **Change them**: the right-click menu has *Tags ▸* with the seven colours, the other tags the selected items already carry, *New tag…* and *Remove all tags*. A tag is ticked when every selected item has it, and choosing it takes it off from all; otherwise it is given to all. It works on a selection.
 - **Like everything else rada does to files**, a change of tags shows a **plan** first (what each item had and will have), is written to the **journal** and can be **undone** — and undo leaves tags alone that someone changed after the operation. In the JSON requests it is `set_tags`.
 - **Copies and moves keep them** (on macOS only the tags are carried over: the rest of the extended attributes is not done yet, and the plan still says so).
@@ -295,6 +299,15 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 ### Status bar and hints
 
 `19 items │ ☑ 3 selected · 56.7 MB │ ⎘ 2 items ready to paste` on the left; on the right the free space of the current disk and the Details / Icons buttons. Under it the **hints**: the keys that make sense now, drawn as pills and generated from your real keymap, so they follow `keymap = "vim"` and whatever you rebound. `show_hints = false` hides them; on a short terminal they go first, then the command bar.
+
+### Open with…
+
+`Alt+O` (`O` in the vim keys), the button of the details pane or the context menu. The window lists the **programs installed on the system that can open this kind of file**: the system's choice first (marked *default*), the programs you used lately after it, then the others by name. Type to filter by the words of the name; `↑` `↓` and `Enter` (or a click) start the highlighted one. The last line, **Other program…**, is the free field of a command with its options (`code`, `vlc --fullscreen`; on a Mac an application's name), filled with what you had typed.
+
+- **Linux**: the `.desktop` files of `$XDG_DATA_HOME/applications` and `$XDG_DATA_DIRS` whose `MimeType` fits the file's type (from the shared MIME database, the types it is a kind of included: a Rust file is also a text file) and what `mimeinfo.cache` and `mimeapps.list` add; the default is the one `mimeapps.list` names; hidden entries and those whose program is not installed are left out. A program starts with its `Exec` line, the field codes (`%f %F %u %U %i %c %k`) filled in, in a terminal if it says `Terminal=true`.
+- **macOS**: the applications Launch Services knows for the file (asked through `osascript`), the default first; they start with `open -a`.
+- **Windows**: the programs the shell associates with the extension (what Explorer's *Open with* lists); they start through the shell, like a double click on that choice.
+- **Always use this for this kind of file** (`Tab`, or click the box): rada then opens files of that type with it when you press `Enter`. It is kept **in rada's own state** (`open_with.json`, with the programs used lately) and **never changes the system's defaults**; choosing the program again and unticking the box goes back.
 
 ### Context menu
 

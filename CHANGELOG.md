@@ -5,9 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-Terminal profiles and three icon sets, by @chrias (pull request #1): thank you.
+
+## [0.6.0-rc.4] - 2026-10-13
+
+A release in which tags have a place of their own, updates can be seen, "Open with…" knows what is installed, and the terminal profiles and icon sets of @chrias (pull request #1) join the line: thank you. Still a **pre-release**.
 
 ### Added
+- **Tags in the navigation pane.** A **TAGS** section lists the seven colours always, in the Finder's order and called what your system calls them, then the tags of your own that rada has seen in the folders you opened. A click opens **Tag: Blu**, the items that carry it wherever they are: Spotlight (`mdfind`) on a Mac, Baloo (`baloosearch`) on Linux, and a walk of the home folder in the background (hidden folders skipped, 30 seconds or half a million items at most) where the index has nothing to say; none on Windows. The list has the operations of any list of items and refuses what would create something in it; each row names its folder. A colour is found under any of its names, a tag of your own that is blue is another tag.
+- **Updates can be seen.** A pill in the accent colour in the tab bar, **↑ Update to X**, clickable like `Alt+U`. The status bar always shows `v<version> ⟳`; a click looks for a newer version at once and says *rada is up to date*, or opens the release notes. **Help ▾** is now a menu: the keys, *Check for updates* and *About rada* (version, channel, mode of updating).
+- **Open with… knows what is installed.** The window lists the programs that can open the file, the system's choice first and those used lately after it, filtered as you type, with **Other program…** (the free field of before) at the end. Linux reads the `.desktop` files with a compatible `MimeType`, `mimeinfo.cache` and `mimeapps.list`, and starts a program with its `Exec` line, in a terminal for `Terminal=true`; macOS asks Launch Services and opens with `open -a`; Windows lists the programs the shell associates with the extension. *Always use this for this kind of file* is kept in rada's own state and never touches the system's defaults.
+
+### Changed
+- The dots after a name are three at most, then **+N** for the N more (it was a bare `+`).
+- The Finder's colour number is always written, `0` for a tag with no colour, so what the Finder reads is what rada meant.
+- The Help button opens a menu; `F1` and `?` still open the keys directly.
+
+### Fixed
+- Rename on an item of a list of tagged items started from its whole path instead of its name.
+
+### Terminal profiles and icon sets (by @chrias, pull request #1)
+
+Thank you, @chrias.
+
+#### Added
 - **Two terminal profiles, chosen before anything is drawn** (`crates/tui/src/caps.rs`). *Modern* is the same interface on Windows Terminal, Terminal.app, GNOME Terminal and Konsole, with what only some of them offer (24-bit colour, Sixel, the clipboard sequence) used where it exists. *Basic* is one fixed fallback for plain terminals (`TERM` empty, `dumb`, `linux`, `vt100`…, or a non-UTF-8 locale): ASCII glyphs, 16 colours, no mouse, no pictures, no terminal queries. `profile = "auto" | "modern" | "basic"`, `--profile`, `RADA_PROFILE`. The README has the table of what each terminal supports.
 - `rada doctor` prints the profile and every capability, with the reason.
 - The basic profile is a backend in front of the real one (`compat.rs`) that replaces the interface's glyphs with ASCII ones of the same width: the interface itself is drawn once, the same way. A test reads the sources and fails when a glyph has no stand-in.
@@ -17,11 +37,10 @@ Terminal profiles and three icon sets, by @chrias (pull request #1): thank you.
 - Nerd Font detection reads Windows Terminal's `settings.json` and Konsole's profiles.
 - **Three icon sets with a fallback between them.** `nerd` when the terminal is set to use a Nerd Font; `unicode-icons` (the former `unicode`, still accepted under that name) when the system has a symbol font for the terminal to draw the rarer symbols from (Segoe UI Symbol, Apple Symbols, DejaVu Sans, Noto Sans Symbols…); `unicode-std` otherwise, which draws the same marks with only the 46 glyphs that every default monospace font has. `icons = "auto"` walks that chain; `rada doctor` prints the result.
 
-### Changed
+#### Changed
 - Windows: colours are 24-bit (the console sets neither `TERM` nor `COLORTERM`, so they were the 16 ANSI ones); pictures are Sixel in Windows Terminal, with the cell size asked to the terminal because the system does not report it; a theme that follows the background now asks the console for its colour, as on Unix.
 - Pictures drawn with half blocks are brought down to 256 or 16 colours where the terminal has no more (Terminal.app before macOS 26).
 - GNOME Terminal and Terminal.app are no longer asked about graphics at start: they have none.
-
 
 ## [0.6.0-rc.3] - 2026-10-13
 
