@@ -583,7 +583,18 @@ fn palette_rows_are_clickable() {
     h.keys("dir");
     let s = h.screen();
     assert!(s.contains("dir"), "{s}");
-    h.click(&Target::PaletteRow(0));
+    // Which result comes first is the fuzzy search's business and depends on the letters of
+    // the folder the test runs in (any path with a d, an i and an r after it matches "dir"):
+    // the row of the folder `dir` is looked for, not assumed.
+    let row = match &h.app.modal {
+        Some(Modal::Palette(p)) => p
+            .hits
+            .iter()
+            .position(|hit| p.items[hit.item].path.ends_with("dir"))
+            .expect("the folder dir is among the results"),
+        _ => panic!("{s}"),
+    };
+    h.click(&Target::PaletteRow(row));
     h.wait("moved", |a| a.cwd.ends_with("dir") && !a.is_loading());
     assert!(h.app.modal.is_none());
 }

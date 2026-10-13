@@ -52,7 +52,10 @@ struct Attrs2 {
 
 impl FileAttributes for Attrs2 {
     fn attrs(&self, name: &OsStr, meta: &FsMeta) -> Attrs {
-        self.inner.attributes().attrs(name, meta)
+        let mut a = self.inner.attributes().attrs(name, meta);
+        // The Finder hides dot files, whatever the machine the stand-in runs on does.
+        a.hidden |= name.to_string_lossy().starts_with('.');
+        a
     }
     fn shown_name(&self, name: &OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
         // The Finder's rule, as the real Mac attributes have it.

@@ -410,12 +410,14 @@ mod tests {
         // Another process that was starting at that moment holds the file open for writing:
         // running it fails with "Text file busy" until that is closed.
         let writer = fs::OpenOptions::new().write(true).open(&exe).unwrap();
-        assert!(
-            Command::new(&exe)
-                .output()
-                .is_err_and(|e| is_text_file_busy(&e)),
-            "this system refuses to run a file open for writing, which is what is being tested"
-        );
+        if !Command::new(&exe)
+            .output()
+            .is_err_and(|e| is_text_file_busy(&e))
+        {
+            // This system runs a file that is open for writing (macOS does): there is no
+            // refusal to get over.
+            return;
+        }
         let release = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(150));
             drop(writer);
