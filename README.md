@@ -116,6 +116,7 @@ Optional config: `$XDG_CONFIG_HOME/rada/config.toml`
 icons = "nerd"        # nerd | unicode | none
 theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the terminal), or a fixed
                       # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
+                      # | nebbia-light
 appearance = "auto"   # auto | light | dark: which variant a theme name takes
 show_hidden = false
 sort = "name"         # name | size | date
@@ -310,6 +311,9 @@ Three looks, each with a dark and a light variant:
 | `rada` (default): calm azure on a cool neutral base | `rada-dark` | `rada-light` |
 | `catppuccin` | `catppuccin-mocha` | `catppuccin-latte` |
 | `tokyo-night` | `tokyo-night-dark` | `tokyo-night-day` |
+| (only light) | | `nebbia-light` |
+
+`rada-light` is "paper": a warm off-white background instead of pure white, which is easier on the eyes. `nebbia-light` ("mist") is the same idea with a cool grey-blue paper. Both paint their own background; on a 16-colour terminal the terminal's background is kept.
 
 ![Catppuccin](docs/screenshots/theme-catppuccin.png)
 ![Tokyo Night](docs/screenshots/theme-tokyo-night.png)

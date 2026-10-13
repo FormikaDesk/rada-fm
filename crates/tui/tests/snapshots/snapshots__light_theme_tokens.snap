@@ -2,35 +2,35 @@
 source: crates/tui/tests/snapshots.rs
 expression: out
 ---
-[rada-light] canvas #ffffff
-  text          #1c2234
-  text_dim      #545e7a
-  muted         #969eb2
-  accent        #2563c9
+[rada-light] canvas #f6f3ee
+  text          #3a3632
+  text_dim      #6a6359
+  muted         #a39a8d
+  accent        #3b659f
   on_accent     #ffffff
-  selection     #dbe8fb
-  cursor        #2563c9
-  mark          #eef3fc
-  track         #dfe4ee
-  success       #1a814d
-  warn          #9d6608
-  error         #d13044
-  kind.code     #96680d
-  kind.markup   #8952d2
-  kind.text     #67718d
-  kind.doc      #bb4b32
-  kind.image    #8952d6
-  kind.vector   #1178b4
-  kind.audio    #c33e85
-  kind.video    #cd375b
-  kind.archive  #996618
-  kind.data     #107d6a
-  kind.config   #647292
-  kind.binary   #288139
-  kind.other    #696f89
-  kind.folder   #2563c9
-  kind.link     #117d85
-  tint(accent)  #e0e9f7
+  selection     #f6f3ee
+  cursor        #476fa8
+  mark          #ebe6de
+  track         #d9d2c6
+  success       #4b7438
+  warn          #8c5f16
+  error         #a8454c
+  kind.code     #9e5826
+  kind.markup   #77559e
+  kind.text     #6a6359
+  kind.doc      #a8454c
+  kind.image    #77559e
+  kind.vector   #77559e
+  kind.audio    #a8454c
+  kind.video    #a8454c
+  kind.archive  #8c5f16
+  kind.data     #8c5f16
+  kind.config   #6a6359
+  kind.binary   #4b7438
+  kind.other    #6a6359
+  kind.folder   #3b659f
+  kind.link     #2c6e7d
+  tint(accent)  #dbdfe2
 [catppuccin-latte] canvas #eff1f5
   text          #3e4058
   text_dim      #5f6379

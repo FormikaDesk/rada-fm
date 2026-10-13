@@ -9,7 +9,7 @@
 //!                           # Finder and Explorer do); false: letter by letter
 //! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:
 //!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
-//!                            # | tokyo-night-dark | tokyo-night-day
+//!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light
 //! appearance = "auto"        # auto | light | dark: which variant a theme name uses
 //! bookmarks = ["~/projects", "/mnt/data"]
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off

@@ -153,6 +153,8 @@ enum Family {
     Rada,
     Catppuccin,
     TokyoNight,
+    /// Only a light variant of its own; the dark one is rada's.
+    Nebbia,
 }
 
 impl Family {
@@ -164,19 +166,22 @@ impl Family {
             (Family::Catppuccin, true) => Theme::catppuccin_latte(),
             (Family::TokyoNight, false) => Theme::tokyo_night(),
             (Family::TokyoNight, true) => Theme::tokyo_night_day(),
+            (Family::Nebbia, false) => Theme::rada(),
+            (Family::Nebbia, true) => Theme::nebbia_light(),
         }
     }
 }
 
 impl Theme {
     /// Every built-in theme: three for dark terminals, then their light counterparts.
-    pub const NAMES: [&'static str; 6] = [
+    pub const NAMES: [&'static str; 7] = [
         "rada",
         "catppuccin",
         "tokyo-night",
         "rada-light",
         "catppuccin-latte",
         "tokyo-night-day",
+        "nebbia-light",
     ];
 
     /// The family a name belongs to, and whether the name pins a variant: `catppuccin-latte`
@@ -193,6 +198,7 @@ impl Theme {
             "tokyo-night" | "tokyonight" | "tokyo" => (Family::TokyoNight, Adaptive),
             "tokyo-night-dark" => (Family::TokyoNight, Exact { light: false }),
             "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, Exact { light: true }),
+            "nebbia-light" | "nebbia" | "mist" => (Family::Nebbia, Exact { light: true }),
             _ => return None,
         })
     }
@@ -331,7 +337,7 @@ impl Theme {
         );
         t.cursor = rgb(56, 66, 108);
         t.text = rgb(192, 202, 245);
-        t.text_dim = rgb(130, 139, 184);
+        t.text_dim = rgb(135, 144, 187);
         t.muted = rgb(68, 75, 106);
         t.on_accent = rgb(22, 22, 30);
         t.success = rgb(158, 206, 106);
@@ -394,50 +400,87 @@ impl Theme {
         t
     }
 
-    /// The default theme for a light terminal: the azure accent, deepened to read on white.
-    pub fn rada_light() -> Theme {
-        let mut t = Theme::light_base(
-            "rada-light",
-            rgb(255, 255, 255),
-            rgb(28, 34, 52),
-            rgb(84, 94, 122),
-            rgb(150, 158, 178),
-            rgb(37, 99, 201),
-            rgb(219, 232, 251),
-            rgb(196, 218, 248),
-            rgb(238, 243, 252),
-            rgb(223, 228, 238),
-        );
-        t.field = rgb(244, 246, 250);
-        t.button = rgb(235, 239, 246);
-        t.sel = rgb(227, 237, 251);
-        t.cursor = rgb(37, 99, 201);
+    /// A light theme painted on a tinted paper instead of white, from the hex values of its
+    /// tokens: `[bg, panel, bar, field, border, text, dim, muted, accent, sel, cursor, key,
+    /// button, tab (the active tab and the other chips), check]` and the colours of the file
+    /// types `[yellow, green, red, purple, cyan, orange]`. Pure white tires the eyes; the
+    /// paper keeps the text sharp and the bars a step apart.
+    fn paper(name: &'static str, tokens: [u32; 15], types: [u32; 6]) -> Theme {
+        let c = |v: u32| rgb((v >> 16) as u8, (v >> 8) as u8, v as u8);
+        let [
+            bg,
+            panel,
+            bar,
+            field,
+            border,
+            text,
+            dim,
+            muted,
+            accent,
+            sel,
+            cursor,
+            key,
+            button,
+            tab,
+            check,
+        ] = tokens.map(c);
+        let [yellow, green, red, purple, cyan, orange] = types.map(c);
+        let mut t = Theme::light_base(name, bg, text, dim, muted, accent, tab, cursor, bar, border);
+        t.bg = Some(bg);
+        t.field = field;
+        t.button = button;
+        t.sel = sel;
         t.cursor_text = rgb(255, 255, 255);
-        t.cmdbar = rgb(240, 243, 249);
-        t.panel = rgb(233, 237, 245);
-        t.key_bg = rgb(225, 230, 240);
-        t.key_text = rgb(28, 34, 52);
-        t.success = rgb(26, 129, 77);
-        t.warn = rgb(157, 102, 8);
-        t.error = rgb(209, 48, 68);
+        t.cmdbar = bar;
+        t.panel = panel;
+        t.key_bg = key;
+        t.key_text = text;
+        t.check = check;
+        t.success = green;
+        t.warn = yellow;
+        t.error = red;
         t.kinds = KindColors {
-            code: rgb(150, 104, 13),
-            markup: rgb(137, 82, 210),
-            text: rgb(103, 113, 141),
-            doc: rgb(187, 75, 50),
-            image: rgb(137, 82, 214),
-            vector: rgb(17, 120, 180),
-            audio: rgb(195, 62, 133),
-            video: rgb(205, 55, 91),
-            archive: rgb(153, 102, 24),
-            data: rgb(16, 125, 106),
-            config: rgb(100, 114, 146),
-            binary: rgb(40, 129, 57),
-            other: rgb(105, 111, 137),
-            folder: rgb(37, 99, 201),
-            link: rgb(17, 125, 133),
+            code: orange,
+            markup: purple,
+            text: dim,
+            doc: red,
+            image: purple,
+            vector: purple,
+            audio: red,
+            video: red,
+            archive: yellow,
+            data: yellow,
+            config: dim,
+            binary: green,
+            other: dim,
+            folder: accent,
+            link: cyan,
         };
         t
+    }
+
+    /// The default theme for a light terminal, "paper": warm off-white, a muted blue accent.
+    pub fn rada_light() -> Theme {
+        Theme::paper(
+            "rada-light",
+            [
+                0xf6f3ee, 0xeeeae3, 0xebe6de, 0xe5e0d7, 0xd9d2c6, 0x3a3632, 0x6a6359, 0xa39a8d,
+                0x3b659f, 0xe2e7ee, 0x476fa8, 0xe3ddd3, 0xe5e0d7, 0xf6f3ee, 0x476fa8,
+            ],
+            [0x8c5f16, 0x4b7438, 0xa8454c, 0x77559e, 0x2c6e7d, 0x9e5826],
+        )
+    }
+
+    /// "Mist": the same idea with cool grey-blue paper.
+    pub fn nebbia_light() -> Theme {
+        Theme::paper(
+            "nebbia-light",
+            [
+                0xeef0f3, 0xe6e9ee, 0xe3e6eb, 0xdde1e7, 0xd0d5dd, 0x343a46, 0x5d6474, 0x9aa3b2,
+                0x3e63a8, 0xdfe6f2, 0x4a6fb3, 0xd9dee6, 0xdde1e7, 0xeef0f3, 0x4469b0,
+            ],
+            [0x86621c, 0x3c7346, 0xa2485a, 0x6f5499, 0x2a6a80, 0x975a2a],
+        )
     }
 
     /// Catppuccin Latte, with the bright accents deepened where the original is too pale
@@ -517,6 +560,8 @@ impl Theme {
 
     /// Plain 16-colour theme for terminals that offer nothing more.
     fn ansi16(mut self) -> Theme {
+        // Sixteen colours have no paper: the terminal's own background stays.
+        self.bg = None;
         self.text = Color::Reset;
         self.text_dim = Color::Gray;
         self.muted = Color::DarkGray;
@@ -984,7 +1029,12 @@ mod tests {
             need("muted on canvas", contrast(t.muted, c), 1.9);
             need("accent on canvas", contrast(t.accent, c), 4.5);
             need("on_accent on accent", contrast(t.on_accent, t.accent), 4.5);
-            need("selection against canvas", contrast(t.selection, c), 1.15);
+            // The chips sit on the bars; the active tab of a paper theme is the canvas itself.
+            need(
+                "selection against its bar",
+                contrast(t.selection, t.mark),
+                1.05,
+            );
             need("mark against canvas", contrast(t.mark, c), 1.05);
             need("track against canvas", contrast(t.track, c), 1.1);
             need("cursor against canvas", contrast(t.cursor, c), 1.4);
@@ -1042,6 +1092,42 @@ mod tests {
                     contrast(col, t.tint(col)),
                     3.0,
                 );
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn every_theme_reads_on_every_surface_it_is_drawn_on() {
+        // WCAG: the main text 7:1 on the background, the secondary text and the accent 4.5:1
+        // on the background, the strip of hints, the fields and the selected rows; the text on
+        // the cursor row 4.5:1.
+        let mut failures = Vec::new();
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let surfaces = [
+                ("bg", t.canvas),
+                ("panel", t.panel),
+                ("field", t.field),
+                ("sel", t.sel),
+            ];
+            let r = contrast(t.text, t.canvas);
+            if r < 7.0 {
+                failures.push(format!("{n}: text on bg is {r:.2}:1, needs 7:1"));
+            }
+            for (what, color) in [("text_dim", t.text_dim), ("accent", t.accent)] {
+                for (on, bg) in surfaces {
+                    let r = contrast(color, bg);
+                    if r < 4.5 {
+                        failures.push(format!("{n}: {what} on {on} is {r:.2}:1, needs 4.5:1"));
+                    }
+                }
+            }
+            let r = contrast(t.cursor_text, t.cursor);
+            if r < 4.5 {
+                failures.push(format!(
+                    "{n}: text on the cursor row is {r:.2}:1, needs 4.5:1"
+                ));
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
