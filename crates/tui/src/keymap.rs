@@ -370,7 +370,11 @@ pub struct Chord {
 
 impl Chord {
     pub fn new(code: KeyCode, mods: KeyModifiers) -> Chord {
-        let mut mods = mods & (KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SHIFT);
+        let mut mods = mods
+            & (KeyModifiers::CONTROL
+                | KeyModifiers::ALT
+                | KeyModifiers::SHIFT
+                | KeyModifiers::SUPER);
         let code = match code {
             KeyCode::Char(c) if c.is_alphabetic() => {
                 // Terminals disagree on shifted letters: `G`, `G`+SHIFT and `g`+SHIFT all
@@ -379,7 +383,7 @@ impl Chord {
                 let shifted = mods.contains(KeyModifiers::SHIFT) || c.is_uppercase();
                 let lower = c.to_lowercase().next().unwrap_or(c);
                 let upper = c.to_uppercase().next().unwrap_or(c);
-                if mods.contains(KeyModifiers::CONTROL) {
+                if mods.intersects(KeyModifiers::CONTROL | KeyModifiers::SUPER) {
                     mods.set(KeyModifiers::SHIFT, shifted);
                     KeyCode::Char(lower)
                 } else if shifted {
@@ -423,6 +427,7 @@ impl Chord {
         let mut mods = KeyModifiers::NONE;
         for m in mods_part.split('+').filter(|m| !m.is_empty()) {
             mods |= match m.to_ascii_lowercase().as_str() {
+                "cmd" | "command" | "super" | "win" => KeyModifiers::SUPER,
                 "ctrl" | "control" | "c" => KeyModifiers::CONTROL,
                 "alt" | "meta" | "opt" | "option" => KeyModifiers::ALT,
                 "shift" | "s" => KeyModifiers::SHIFT,
@@ -467,6 +472,9 @@ impl Chord {
 impl fmt::Display for Chord {
     /// The form shown in help and hints: `Ctrl+C`, `Shift+Del`, `G`, `F2`, `↑`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.mods.contains(KeyModifiers::SUPER) {
+            f.write_str("Cmd+")?;
+        }
         if self.mods.contains(KeyModifiers::CONTROL) {
             f.write_str("Ctrl+")?;
         }
@@ -478,7 +486,11 @@ impl fmt::Display for Chord {
         }
         match self.code {
             KeyCode::Char(' ') => f.write_str("Space"),
-            KeyCode::Char(c) if self.mods.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char(c)
+                if self
+                    .mods
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::SUPER) =>
+            {
                 write!(f, "{}", c.to_ascii_uppercase())
             }
             KeyCode::Char(c) => write!(f, "{c}"),
@@ -636,6 +648,30 @@ const CLASSIC: &[(Action, &[&str])] = &[
     (Action::Quit, &["ctrl+q"]),
 ];
 
+/// The Mac's own shortcuts, added to the classic scheme on macOS. They reach rada only from a
+/// terminal that reports the Cmd key (the kitty keyboard protocol: Ghostty, kitty, WezTerm,
+/// iTerm2 with the option on) and that does not keep the key for itself; the Ghostty
+/// settings `rada setup desktop` writes free the ones Ghostty would keep.
+const MAC: &[(Action, &[&str])] = &[
+    (Action::Copy, &["cmd+c"]),
+    (Action::Cut, &["cmd+x"]),
+    (Action::Paste, &["cmd+v"]),
+    (Action::Trash, &["cmd+backspace"]),
+    (Action::DeletePermanently, &["cmd+alt+backspace"]),
+    (Action::Properties, &["cmd+i"]),
+    (Action::Open, &["cmd+o"]),
+    (Action::Parent, &["cmd+up"]),
+    (Action::Back, &["cmd+["]),
+    (Action::Forward, &["cmd+]"]),
+    // Cmd+Shift+. in the Finder; the terminal reports the dot or the sign above it.
+    (Action::ToggleHidden, &["cmd+.", "cmd+>"]),
+    (Action::Undo, &["cmd+z"]),
+    (Action::Redo, &["cmd+shift+z"]),
+    (Action::QuickLook, &["cmd+y"]),
+    (Action::NewFolder, &["cmd+shift+n"]),
+    (Action::SelectAll, &["cmd+a"]),
+];
+
 /// Keys that mean the same in both schemes and are bound whatever the preset.
 const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Palette, &["ctrl+p"]),
@@ -687,6 +723,8 @@ pub struct Keymap {
     pub preset: Preset,
     /// Problems found in the configuration (shown once at start).
     pub warnings: Vec<String>,
+    /// The terminal reports the Cmd key: hints show those shortcuts first.
+    pub prefer_cmd: bool,
 }
 
 impl Default for Keymap {
@@ -700,11 +738,17 @@ impl Keymap {
     /// An override replaces *all* the keys of that action; an empty list unbinds it.
     /// A key given to an action is taken away from any other action.
     pub fn new(preset: Preset, overrides: &HashMap<String, Vec<String>>) -> Keymap {
+        Keymap::new_for(preset, overrides, cfg!(target_os = "macos"))
+    }
+
+    /// [`new`](Self::new), with the Mac's Cmd shortcuts in the classic scheme if `mac`.
+    pub fn new_for(preset: Preset, overrides: &HashMap<String, Vec<String>>, mac: bool) -> Keymap {
         let mut km = Keymap {
             by_chord: HashMap::new(),
             by_action: HashMap::new(),
             preset,
             warnings: Vec::new(),
+            prefer_cmd: false,
         };
         for (scheme, table) in [(Scheme::Vim, VIM), (Scheme::Classic, CLASSIC)] {
             if !preset.has(scheme) {
@@ -716,6 +760,18 @@ impl Keymap {
                         *action,
                         Chord::parse(k).expect("built-in key"),
                         scheme,
+                        false,
+                    );
+                }
+            }
+        }
+        if mac && preset.has(Scheme::Classic) {
+            for (action, keys) in MAC {
+                for k in *keys {
+                    km.bind(
+                        *action,
+                        Chord::parse(k).expect("built-in key"),
+                        Scheme::Classic,
                         false,
                     );
                 }
@@ -826,13 +882,23 @@ impl Keymap {
     /// Prefers the classic one when both exist (it is the more readable).
     pub fn hint(&self, action: Action) -> Option<String> {
         let list = self.bindings(action);
+        let cmd = |b: &&Binding| b.chord.mods.contains(KeyModifiers::SUPER);
         list.iter()
             .find(|b| b.custom)
+            // The Mac's own shortcut first when the terminal delivers it, never otherwise.
+            .or_else(|| {
+                if self.prefer_cmd {
+                    list.iter().find(cmd)
+                } else {
+                    None
+                }
+            })
             .or_else(|| {
                 list.iter()
-                    .filter(|b| b.classic)
+                    .filter(|b| b.classic && !cmd(b))
                     .min_by_key(|b| nav_rank(b.chord))
             })
+            .or_else(|| list.iter().find(|b| !cmd(b)))
             .or_else(|| list.first())
             .map(|b| b.chord.to_string())
     }
@@ -853,7 +919,9 @@ impl Keymap {
 /// A bare printable key or a capital: what vim users type.
 fn is_vim_like(c: Chord) -> bool {
     matches!(c.code, KeyCode::Char(_))
-        && !c.mods.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        && !c
+            .mods
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER)
 }
 
 /// Which of several shortcuts reads best in a hint: ordinary keys first, then Enter,
@@ -1139,6 +1207,117 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn mac_keymap() -> Keymap {
+        Keymap::new_for(Preset::VimClassic, &HashMap::new(), true)
+    }
+
+    #[test]
+    fn cmd_is_a_modifier_that_parses_and_reads_back() {
+        let c = Chord::parse("cmd+shift+z").unwrap();
+        assert!(c.mods.contains(KeyModifiers::SUPER | KeyModifiers::SHIFT));
+        assert_eq!(c.to_string(), "Cmd+Shift+Z");
+        assert_eq!(
+            Chord::parse("command+c").unwrap(),
+            Chord::parse("super+c").unwrap()
+        );
+        assert_eq!(
+            Chord::parse("cmd+backspace").unwrap().to_string(),
+            "Cmd+Backspace"
+        );
+        // Cmd+[ and Cmd+] are keys of their own.
+        assert_eq!(Chord::parse("cmd+[").unwrap().code, KeyCode::Char('['));
+        assert_ne!(
+            Chord::parse("cmd+c").unwrap(),
+            Chord::parse("ctrl+c").unwrap()
+        );
+    }
+
+    #[test]
+    fn the_macs_cmd_shortcuts_are_in_the_classic_scheme_on_a_mac() {
+        let km = mac_keymap();
+        let a = |code, mods| km.action_for(&ev(code, mods));
+        let cmd = KeyModifiers::SUPER;
+        assert_eq!(a(KeyCode::Char('c'), cmd), Some(Action::Copy));
+        assert_eq!(a(KeyCode::Char('x'), cmd), Some(Action::Cut));
+        assert_eq!(a(KeyCode::Char('v'), cmd), Some(Action::Paste));
+        assert_eq!(a(KeyCode::Backspace, cmd), Some(Action::Trash));
+        assert_eq!(a(KeyCode::Char('i'), cmd), Some(Action::Properties));
+        assert_eq!(a(KeyCode::Char('o'), cmd), Some(Action::Open));
+        assert_eq!(a(KeyCode::Up, cmd), Some(Action::Parent));
+        assert_eq!(a(KeyCode::Char('['), cmd), Some(Action::Back));
+        assert_eq!(a(KeyCode::Char(']'), cmd), Some(Action::Forward));
+        assert_eq!(a(KeyCode::Char('z'), cmd), Some(Action::Undo));
+        assert_eq!(
+            a(KeyCode::Char('Z'), cmd | KeyModifiers::SHIFT),
+            Some(Action::Redo)
+        );
+        // Cmd+Shift+. shows the hidden files, whether the terminal says the dot or the sign.
+        assert_eq!(
+            a(KeyCode::Char('.'), cmd | KeyModifiers::SHIFT),
+            Some(Action::ToggleHidden)
+        );
+        assert_eq!(
+            a(KeyCode::Char('>'), cmd | KeyModifiers::SHIFT),
+            Some(Action::ToggleHidden)
+        );
+        // The Ctrl keys keep working beside them.
+        assert_eq!(
+            a(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            Some(Action::Copy)
+        );
+    }
+
+    #[test]
+    fn the_cmd_shortcuts_are_only_for_a_mac_and_only_for_the_classic_scheme() {
+        let cmd_c = ev(KeyCode::Char('c'), KeyModifiers::SUPER);
+        assert_eq!(
+            Keymap::new_for(Preset::VimClassic, &HashMap::new(), false).action_for(&cmd_c),
+            None
+        );
+        assert_eq!(
+            Keymap::new_for(Preset::Vim, &HashMap::new(), true).action_for(&cmd_c),
+            None
+        );
+        assert_eq!(
+            Keymap::new_for(Preset::Classic, &HashMap::new(), true).action_for(&cmd_c),
+            Some(Action::Copy)
+        );
+        // The help lists them with the classic keys.
+        let km = mac_keymap();
+        assert!(
+            km.keys_text(Action::Copy, Scheme::Classic)
+                .contains("Cmd+C")
+        );
+        assert!(!km.keys_text(Action::Copy, Scheme::Vim).contains("Cmd"));
+    }
+
+    #[test]
+    fn hints_show_cmd_only_when_the_terminal_delivers_it() {
+        let mut km = mac_keymap();
+        assert_eq!(km.hint(Action::Copy).as_deref(), Some("Ctrl+C"));
+        assert_eq!(km.hint(Action::Back).as_deref(), Some("Alt+←"));
+        km.prefer_cmd = true;
+        assert_eq!(km.hint(Action::Copy).as_deref(), Some("Cmd+C"));
+        // An action with no Cmd shortcut keeps its hint.
+        assert_eq!(km.hint(Action::Rename).as_deref(), Some("F2"));
+    }
+
+    #[test]
+    fn a_cmd_key_can_be_rebound_in_the_configuration() {
+        let mut o = HashMap::new();
+        o.insert("copy".to_string(), vec!["cmd+j".to_string()]);
+        let km = Keymap::new_for(Preset::VimClassic, &o, true);
+        assert_eq!(
+            km.action_for(&ev(KeyCode::Char('j'), KeyModifiers::SUPER)),
+            Some(Action::Copy)
+        );
+        assert_eq!(
+            km.action_for(&ev(KeyCode::Char('c'), KeyModifiers::SUPER)),
+            None
+        );
+        assert!(km.warnings.is_empty(), "{:?}", km.warnings);
     }
 
     #[test]

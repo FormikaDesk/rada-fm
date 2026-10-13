@@ -19,6 +19,7 @@
 //! pdf_timeout_seconds = 8    # a PDF that takes longer to draw is given up on
 //! mouse = true                # false: no mouse capture at all
 //! keymap = "vim+classic"      # vim+classic (default) | vim | classic
+//! cmd_keys = true            # macOS: ask the terminal to report Cmd, for Cmd+C/V/X… (classic keys)
 //! show_hints = true          # false: no row of key hints at the bottom (`hints` also works)
 //! sidebar = true             # the navigation pane; shown by default; Ctrl+B toggles and remembers
 //! layout = "explorer"        # explorer | compact (no address bar, command bar or hints)
@@ -83,6 +84,8 @@ pub struct FileConfig {
     pub dates: Option<String>,
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
+    /// macOS: ask the terminal to report the Cmd key.
+    pub cmd_keys: bool,
     pub keys: HashMap<String, Vec<String>>,
     /// The `[update]` section as written; [`FileConfig::update_settings`] checks it.
     update: UpdateFile,
@@ -182,6 +185,7 @@ struct Raw {
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
     keymap: Option<String>,
+    cmd_keys: Option<bool>,
     keys: Option<HashMap<String, Keys>>,
 }
 
@@ -242,6 +246,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         dates: raw.dates,
         hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
+        cmd_keys: raw.cmd_keys.unwrap_or(true),
         keys: raw
             .keys
             .unwrap_or_default()

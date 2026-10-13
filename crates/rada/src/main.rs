@@ -391,6 +391,7 @@ fn main() -> Result<()> {
         }),
         image_mode,
         keymap,
+        cmd_keys: cfg_file.cmd_keys,
         mouse,
         show_hints: cfg_file.hints,
         sidebar: saved_ui.sidebar.unwrap_or(cfg_file.sidebar),

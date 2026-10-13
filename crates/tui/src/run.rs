@@ -4,7 +4,10 @@ use std::io::{self, Stdout};
 use std::time::Duration;
 
 use crossbeam_channel::{select, unbounded};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyboardEnhancementFlags,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -31,7 +34,31 @@ fn enter(mouse: bool) -> io::Result<Term> {
     Terminal::new(CrosstermBackend::new(out))
 }
 
+/// Whether the terminal was asked to report keys the extended way (see [`ask_for_cmd_keys`]).
+static ENHANCED_KEYS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// On a Mac, ask a terminal that speaks the kitty keyboard protocol to report the Cmd key.
+/// `true` when it will. The protocol is asked for nowhere else: other systems' keys already
+/// work, and every terminal reads the protocol a little differently.
+fn ask_for_cmd_keys() -> bool {
+    if !cfg!(target_os = "macos")
+        || !crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false)
+    {
+        return false;
+    }
+    let pushed = execute!(
+        io::stdout(),
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+    )
+    .is_ok();
+    ENHANCED_KEYS.store(pushed, std::sync::atomic::Ordering::Relaxed);
+    pushed
+}
+
 fn leave() {
+    if ENHANCED_KEYS.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        let _ = execute!(io::stdout(), PopKeyboardEnhancementFlags);
+    }
     let _ = execute!(io::stdout(), DisableMouseCapture);
     let _ = disable_raw_mode();
     let _ = execute!(io::stdout(), LeaveAlternateScreen);
@@ -130,7 +157,10 @@ fn event_loop(terminal: &mut Term, mut cfg: Config, svc: Services) -> io::Result
     if let Some(u) = &image_ui {
         tracing::debug!("image protocol in use: {}", u.protocol_name());
     }
+    let cmd_keys = cfg.cmd_keys && ask_for_cmd_keys();
     let mut app = App::new(cfg, svc, image_ui);
+    app.keymap.prefer_cmd = cmd_keys;
+    tracing::info!("Cmd key reported by the terminal: {cmd_keys}");
     for key in replay {
         app.on_key(key);
     }

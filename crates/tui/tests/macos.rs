@@ -467,3 +467,81 @@ fn the_full_screen_preview_offers_quick_look_on_q() {
         "it stays open"
     );
 }
+
+// ------------------------------------------------------------------------------ Cmd keys
+
+fn with_cmd_keys() -> H {
+    let (sb, dir) = sandbox_with_files();
+    H::with_config(sb, dir, 140, 30, |c| {
+        c.keymap = rada_tui::keymap::Keymap::new_for(
+            rada_tui::keymap::Preset::VimClassic,
+            &Default::default(),
+            true,
+        );
+    })
+}
+
+fn cmd(h: &mut H, code: KeyCode, extra: crossterm::event::KeyModifiers) {
+    h.app.on_key(crossterm::event::KeyEvent::new(
+        code,
+        crossterm::event::KeyModifiers::SUPER | extra,
+    ));
+}
+
+#[test]
+fn cmd_c_cmd_v_and_cmd_backspace_work_like_in_the_finder() {
+    use crossterm::event::KeyModifiers as M;
+    let mut h = with_cmd_keys();
+    h.keys("j"); // a.txt
+    cmd(&mut h, KeyCode::Char('c'), M::NONE);
+    assert!(h.app.clipboard.is_some(), "Cmd+C copies");
+    cmd(&mut h, KeyCode::Backspace, M::NONE);
+    plan_modal(&mut h); // a plan to trash it, as with Del
+}
+
+#[test]
+fn cmd_shift_dot_shows_the_hidden_files_and_cmd_i_the_properties() {
+    use crossterm::event::KeyModifiers as M;
+    let mut h = with_cmd_keys();
+    assert!(!h.names().contains(&".hidden".to_string()));
+    cmd(&mut h, KeyCode::Char('.'), M::SHIFT);
+    assert!(
+        h.names().contains(&".hidden".to_string()),
+        "{:?}",
+        h.names()
+    );
+    cmd(&mut h, KeyCode::Char('i'), M::NONE);
+    assert!(matches!(h.app.modal, Some(Modal::Properties(_))));
+}
+
+#[test]
+fn cmd_up_goes_to_the_parent_and_cmd_brackets_go_back_and_forward() {
+    use crossterm::event::KeyModifiers as M;
+    let mut h = with_cmd_keys();
+    let start = h.app.cwd.clone();
+    cmd(&mut h, KeyCode::Up, M::NONE);
+    h.wait("parent", |a| a.cwd != start && !a.is_loading());
+    cmd(&mut h, KeyCode::Char('['), M::NONE);
+    h.wait("back", |a| a.cwd == start && !a.is_loading());
+    cmd(&mut h, KeyCode::Char(']'), M::NONE);
+    h.wait("forward", |a| a.cwd != start && !a.is_loading());
+}
+
+#[test]
+fn without_the_mac_table_cmd_does_nothing() {
+    let (sb, dir) = sandbox_with_files();
+    let mut h = H::with_config(sb, dir, 140, 30, |c| {
+        c.keymap = rada_tui::keymap::Keymap::new_for(
+            rada_tui::keymap::Preset::VimClassic,
+            &Default::default(),
+            false,
+        );
+    });
+    h.keys("j");
+    cmd(
+        &mut h,
+        KeyCode::Char('c'),
+        crossterm::event::KeyModifiers::NONE,
+    );
+    assert!(h.app.clipboard.is_none());
+}

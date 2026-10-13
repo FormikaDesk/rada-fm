@@ -192,6 +192,7 @@ impl H {
             bookmarks: Vec::new(),
             demo: None,
             keymap: Default::default(),
+            cmd_keys: false,
             request,
             mouse: true,
             show_hints: true,

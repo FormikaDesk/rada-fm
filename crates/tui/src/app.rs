@@ -338,6 +338,8 @@ pub struct Config {
     pub bookmarks: Vec<PathBuf>,
     pub demo: Option<Demo>,
     pub keymap: Keymap,
+    /// On a Mac, ask the terminal to report the Cmd key (`cmd_keys` in the configuration).
+    pub cmd_keys: bool,
     /// Mouse capture on/off (`mouse = false` in the configuration).
     pub mouse: bool,
     /// Key hints in the bottom bar (`hints = false` hides them).

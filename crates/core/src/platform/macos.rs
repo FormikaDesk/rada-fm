@@ -561,6 +561,102 @@ mod tests {
         assert_eq!(terminal_app(None), "Terminal");
     }
 
+    #[cfg(unix)]
+    fn meta_with(kind: FileKind, flags: Option<u32>) -> FsMeta {
+        FsMeta {
+            kind,
+            special: None,
+            size: 0,
+            mtime: None,
+            atime: None,
+            ctime: None,
+            btime: None,
+            mode: Some(0o755),
+            dev: None,
+            ino: None,
+            nlink: None,
+            uid: None,
+            gid: None,
+            blocks: None,
+            readonly: false,
+            os_attrs: flags,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_finder_hides_dot_files_and_folders_flagged_hidden() {
+        use std::ffi::OsStr;
+        let a = MacAttributes;
+        let hidden = |name: &str, flags: Option<u32>| {
+            a.attrs(OsStr::new(name), &meta_with(FileKind::Dir, flags))
+                .hidden
+        };
+        // The files macOS litters folders with are dot files.
+        for name in [
+            ".DS_Store",
+            "._photo.jpg",
+            ".localized",
+            ".Trashes",
+            ".fseventsd",
+        ] {
+            assert!(hidden(name, Some(0)), "{name}");
+        }
+        // ~/Library has an ordinary name and the hidden flag.
+        assert!(hidden("Library", Some(UF_HIDDEN | 0x40)));
+        assert!(!hidden("Library", Some(0x40)));
+        assert!(!hidden("Documents", Some(0)));
+        assert!(!hidden("Documents", None));
+    }
+
+    #[test]
+    fn a_folder_the_finder_marked_as_a_bundle_is_a_package() {
+        let mut info = [0u8; 32];
+        assert!(!finder_info_marks_bundle(&info));
+        info[8] = 0x20; // kHasBundle, high byte of the flags
+        assert!(finder_info_marks_bundle(&info));
+        info[8] = 0x40; // some other flag
+        assert!(!finder_info_marks_bundle(&info));
+        assert!(!finder_info_marks_bundle(&[0u8; 4]));
+    }
+
+    #[test]
+    fn only_names_that_differ_from_the_name_on_disk_are_kept() {
+        assert_eq!(
+            only_different(Path::new("/Users/a/Desktop"), "Scrivania".into()),
+            Some((
+                std::path::PathBuf::from("/Users/a/Desktop"),
+                "Scrivania".into()
+            ))
+        );
+        assert_eq!(
+            only_different(Path::new("/Users/a/Desktop"), "Desktop".into()),
+            None
+        );
+        assert_eq!(
+            only_different(Path::new("/"), "Macintosh HD".into())
+                .unwrap()
+                .1,
+            "Macintosh HD"
+        );
+        assert_eq!(only_different(Path::new("/"), "/".into()), None);
+        assert_eq!(only_different(Path::new("/x"), String::new()), None);
+    }
+
+    #[test]
+    fn the_places_looked_up_include_the_startup_disk_and_icloud() {
+        let home = Path::new("/Users/a");
+        let got = name_candidates(&[home.join("Desktop"), home.to_path_buf()], home);
+        assert!(got.contains(&std::path::PathBuf::from("/")));
+        assert!(got.contains(&std::path::PathBuf::from("/Applications")));
+        assert!(got.contains(&icloud_drive(home)));
+        // No duplicates.
+        let mut sorted = got.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), got.len());
+    }
+
     #[test]
     fn filesystems_are_classed_as_kinds_of_volume() {
         assert_eq!(kind_of_fs("apfs", true), VolumeKind::Fixed);
