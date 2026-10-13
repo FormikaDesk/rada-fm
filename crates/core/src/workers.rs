@@ -201,6 +201,16 @@ pub struct PreviewWorker {
 
 impl PreviewWorker {
     pub fn spawn(fs: Arc<dyn FsEngine>, out: Sender<CoreEvent>) -> PreviewWorker {
+        PreviewWorker::spawn_with(fs, None, out)
+    }
+
+    /// [`spawn`](Self::spawn), with the platform whose rules say what is hidden: the preview
+    /// of a folder then leaves out what the list leaves out.
+    pub fn spawn_with(
+        fs: Arc<dyn FsEngine>,
+        platform: Option<Arc<dyn Platform>>,
+        out: Sender<CoreEvent>,
+    ) -> PreviewWorker {
         let (tx, rx) = unbounded::<PreviewReq>();
         let images = ImageWorker::spawn(out.clone());
         std::thread::Builder::new()
@@ -216,8 +226,13 @@ impl PreviewWorker {
                     // Reading inside an archive can take long: a newer request waiting means
                     // the answer is no longer wanted.
                     let superseded = || !rx.is_empty();
-                    let preview =
-                        preview::generate_with(fs.as_ref(), &req.path, &req.limits, &superseded);
+                    let preview = preview::generate_in(
+                        fs.as_ref(),
+                        platform.as_ref().map(|p| p.attributes()),
+                        &req.path,
+                        &req.limits,
+                        &superseded,
+                    );
                     // Decoding is slow: the header-only answer goes out first, the pixels
                     // follow. The decoder is only started once the header has been sent:
                     // started before, it could finish first, and the header (still

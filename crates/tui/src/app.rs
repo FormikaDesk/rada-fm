@@ -931,9 +931,11 @@ impl App {
         }
         self.previewed = Some(path.clone());
         self.preview_gen += 1;
-        self.svc
-            .previewer
-            .request(path, self.preview_gen, self.limits.clone());
+        let limits = Limits {
+            show_hidden: self.show_hidden,
+            ..self.limits.clone()
+        };
+        self.svc.previewer.request(path, self.preview_gen, limits);
     }
 
     // ------------------------------------------------------------------ navigation

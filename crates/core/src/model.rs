@@ -90,7 +90,13 @@ impl Entry {
             Some(store) if meta.kind != FileKind::Symlink => store.read(&path).unwrap_or_default(),
             _ => Vec::new(),
         };
-        let shown = display::name(&name);
+        // What the system's file manager calls it, when that is not the name on the disk.
+        let shown = display::name(
+            &platform
+                .attributes()
+                .shown_name(&name, meta)
+                .unwrap_or_else(|| name.clone()),
+        );
         let package = meta.kind == FileKind::Dir && platform.attributes().is_package(&path, meta);
         let type_label = match &link {
             Some(l) if matches!(l.state, LinkState::Broken | LinkState::Circular) => {

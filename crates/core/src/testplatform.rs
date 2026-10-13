@@ -54,6 +54,10 @@ impl FileAttributes for Attrs2 {
     fn attrs(&self, name: &OsStr, meta: &FsMeta) -> Attrs {
         self.inner.attributes().attrs(name, meta)
     }
+    fn shown_name(&self, name: &OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
+        // The Finder's rule, as the real Mac attributes have it.
+        crate::platform::macos::localized_folder_name(name, meta.is_dir())
+    }
     fn is_package(&self, path: &Path, meta: &FsMeta) -> bool {
         meta.is_dir()
             && self

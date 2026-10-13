@@ -11,7 +11,10 @@
 //! ```
 //!
 //! The terminal is Ghostty if it is installed (a window of 180×45 with the Cmd keys let
-//! through, see [`ghostty_config`]), else iTerm2, else Terminal. The Dock shows the
+//! through, see [`ghostty_config`]), else iTerm2, else Terminal. Ghostty is not given rada
+//! with `-e`: on a Mac that makes it ask "Allow Ghostty to execute…?" (a question Ghostty
+//! keeps for every command given that way, for security) and, run through `open`, start the
+//! command twice. The command is its `initial-command` instead, in the settings file. The Dock shows the
 //! terminal's icon while rada runs, not rada's: a window belongs to the program that draws it.
 
 use std::path::{Path, PathBuf};
@@ -81,7 +84,7 @@ impl MacSetup {
         write(&contents.join("Resources/rada.icns"), ICON, false)?;
         write(
             &contents.join("Resources/rada-ghostty.conf"),
-            ghostty_config().as_bytes(),
+            ghostty_config(&self.exe).as_bytes(),
             false,
         )?;
         write(
@@ -302,7 +305,7 @@ found() (
   return 1
 )
 if found Ghostty; then
-  exec open -n -a Ghostty --args --config-file="$RES/rada-ghostty.conf" -e "$RADA"
+  exec open -n -a Ghostty --args --config-file="$RES/rada-ghostty.conf"
 elif found iTerm; then
   exec open -a iTerm "$RES/rada.command"
 else
@@ -325,15 +328,20 @@ pub fn command_script(exe: &Path) -> String {
 /// same keys the way the Finder does, so the ones Ghostty binds by default are unbound here;
 /// `unbind` hands the key back to the program (documented in Ghostty's keybind reference).
 /// Keys Ghostty does not bind (Cmd+X, Cmd+I, Cmd+O, Cmd+Y, Cmd+Shift+N, Cmd+.) need nothing.
-pub fn ghostty_config() -> String {
+///
+/// The window's one command is `initial-command` (only the first terminal Ghostty opens runs
+/// it, once), written as `shell:` and a quoted path so that any folder name works.
+pub fn ghostty_config(exe: &Path) -> String {
     let mut out = format!(
         "# Written by `rada setup desktop`. Ghostty reads it only for the window Rada.app opens.\n\
+         initial-command = shell:{}\n\
          window-width = {WINDOW_COLUMNS}\n\
          window-height = {WINDOW_ROWS}\n\
          # This window is rada's: closing it ends this Ghostty.\n\
          quit-after-last-window-closed = true\n\
          \n\
-         # The Mac shortcuts of rada's classic keys, given back to the program:\n"
+         # The Mac shortcuts of rada's classic keys, given back to the program:\n",
+        sh_quote(exe)
     );
     for (key, what) in GHOSTTY_UNBIND {
         out.push_str(&format!("keybind = {key}=unbind\n"));
@@ -378,7 +386,7 @@ mod tests {
 
     #[test]
     fn the_ghostty_settings_free_the_keys_rada_uses() {
-        let c = ghostty_config();
+        let c = ghostty_config(Path::new("/Users/me/.cargo/bin/rada"));
         assert!(
             c.contains("window-width = 180\nwindow-height = 45\n"),
             "{c}"
@@ -407,6 +415,29 @@ mod tests {
                 .all(|l| l.ends_with("=unbind"))
         );
         assert!(!c.contains("clear"));
+    }
+
+    #[test]
+    fn ghostty_gets_rada_once_through_its_settings_and_not_with_dash_e() {
+        // `-e` makes Ghostty ask for a confirmation on every launch and, through `open`,
+        // run the command twice; `initial-command` runs it once in the first window.
+        let exe = Path::new("/Users/Jo O'Neil/bin/rada");
+        let c = ghostty_config(exe);
+        assert_eq!(
+            c.lines()
+                .filter(|l| l.starts_with("initial-command"))
+                .count(),
+            1,
+            "{c}"
+        );
+        assert!(
+            c.contains(r"initial-command = shell:'/Users/Jo O'\''Neil/bin/rada'"),
+            "{c}"
+        );
+        let launcher = launcher_script(exe);
+        let ghostty_line = launcher.lines().find(|l| l.contains("-a Ghostty")).unwrap();
+        assert!(!ghostty_line.contains(" -e "), "{ghostty_line}");
+        assert!(!ghostty_line.contains("initial-command"), "{ghostty_line}");
     }
 
     #[test]
@@ -595,8 +626,6 @@ for a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n",
                 "Ghostty",
                 "--args",
                 "--config-file=<Resources>/rada-ghostty.conf",
-                "-e",
-                "/Users/me/.cargo/bin/rada"
             ]
         );
         assert_eq!(

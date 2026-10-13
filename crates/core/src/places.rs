@@ -66,10 +66,46 @@ pub fn with_extra_places(mut standard: Vec<Place>, extra: Vec<(PlaceKind, PathBu
         .iter()
         .position(|p| p.kind == PlaceKind::Trash)
         .unwrap_or(standard.len());
-    for (i, (kind, path)) in extra.into_iter().enumerate() {
-        standard.insert(at + i, Place { kind, path });
+    let mut put = 0;
+    for (kind, path) in extra {
+        // A place a system names twice is listed once.
+        if standard.iter().any(|p| same_folder(&p.path, &path)) {
+            continue;
+        }
+        standard.insert(at + put, Place { kind, path });
+        put += 1;
     }
     standard
+}
+
+/// Whether two paths name the same folder as far as their spelling goes: the same
+/// components, and on a system that ignores case (macOS, Windows) the same letters whatever
+/// their case.
+pub fn same_folder(a: &Path, b: &Path) -> bool {
+    same_folder_with(a, b, cfg!(any(windows, target_os = "macos")))
+}
+
+/// [`same_folder`], with the case rule given.
+pub fn same_folder_with(a: &Path, b: &Path, ignore_case: bool) -> bool {
+    let mut x = a.components();
+    let mut y = b.components();
+    loop {
+        match (x.next(), y.next()) {
+            (None, None) => return true,
+            (Some(p), Some(q)) => {
+                let (p, q) = (p.as_os_str(), q.as_os_str());
+                let same = if ignore_case {
+                    p.to_string_lossy().to_lowercase() == q.to_string_lossy().to_lowercase()
+                } else {
+                    p == q
+                };
+                if !same {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
 }
 
 /// The standard places a system defines, whether or not they exist yet: Home first, then
@@ -79,10 +115,16 @@ pub fn standard_places(home: &Path, user: &UserDirs, trash: &Path) -> Vec<Place>
         kind: PlaceKind::Home,
         path: home.to_path_buf(),
     }];
-    v.extend(user.entries().into_iter().map(|(kind, p)| Place {
-        kind,
-        path: p.to_path_buf(),
-    }));
+    // Two user folders that are the same place (a system that points Videos at Movies and
+    // Movies again, a custom setup) are one entry, the first.
+    for (kind, p) in user.entries() {
+        if !v.iter().any(|x| same_folder(&x.path, p)) {
+            v.push(Place {
+                kind,
+                path: p.to_path_buf(),
+            });
+        }
+    }
     v.push(Place {
         kind: PlaceKind::Trash,
         path: trash.to_path_buf(),
@@ -211,5 +253,61 @@ fn write(dir: &Path, file: &Path, list: &[PathBuf]) {
     let tmp = file.with_extension("json.tmp");
     if std::fs::write(&tmp, json).is_ok() {
         let _ = std::fs::rename(&tmp, file);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::platform::UserDirs;
+
+    fn names(v: &[Place]) -> Vec<(PlaceKind, String)> {
+        v.iter()
+            .map(|p| (p.kind, p.path.display().to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn a_user_folder_that_is_listed_twice_is_one_place() {
+        let home = Path::new("/Users/me");
+        // Videos and Movies: on a Mac both are ~/Movies.
+        let mut u = UserDirs::conventional(home, "Movies");
+        u.music = Some(home.join("Movies"));
+        let v = standard_places(home, &u, &home.join(".Trash"));
+        let movies: Vec<_> = v.iter().filter(|p| p.path == home.join("Movies")).collect();
+        assert_eq!(movies.len(), 1, "{:?}", names(&v));
+        assert_eq!(v.first().map(|p| p.kind), Some(PlaceKind::Home));
+        assert_eq!(v.last().map(|p| p.kind), Some(PlaceKind::Trash));
+    }
+
+    #[test]
+    fn the_folders_a_system_adds_are_not_repeated_either() {
+        let home = Path::new("/Users/me");
+        let std = standard_places(
+            home,
+            &UserDirs::conventional(home, "Movies"),
+            &home.join(".Trash"),
+        );
+        let n = std.len();
+        let same = vec![(PlaceKind::ICloud, home.join("Movies"))];
+        assert_eq!(with_extra_places(std.clone(), same).len(), n);
+        let new = vec![(PlaceKind::ICloud, home.join("iCloud"))];
+        let with = with_extra_places(std, new);
+        assert_eq!(with.len(), n + 1);
+        assert_eq!(
+            with[with.len() - 2].kind,
+            PlaceKind::ICloud,
+            "before the trash"
+        );
+    }
+
+    #[test]
+    fn spelling_decides_and_a_system_that_ignores_case_ignores_it_here_too() {
+        let (a, b) = (Path::new("/Users/me/Movies"), Path::new("/users/ME/movies"));
+        assert!(same_folder_with(a, b, true));
+        assert!(!same_folder_with(a, b, false));
+        assert!(same_folder_with(a, Path::new("/Users/me/Movies/"), false));
+        assert!(!same_folder_with(a, Path::new("/Users/me/Movies/x"), true));
+        assert!(!same_folder_with(a, Path::new("/Users/me"), true));
     }
 }

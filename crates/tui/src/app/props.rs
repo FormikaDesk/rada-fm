@@ -66,7 +66,7 @@ impl App {
     fn item_properties(&self, e: &Entry) -> PropsView {
         let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &self.tz);
         let mut rows: Vec<(String, String)> = vec![
-            ("Name".into(), e.display.clone()),
+            ("Name".into(), rada_core::display::name(&e.name)),
             ("Type".into(), e.type_label.to_string()),
             (
                 "Location".into(),

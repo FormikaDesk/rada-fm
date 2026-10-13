@@ -307,6 +307,8 @@ impl App {
                 self.show_hidden = !self.show_hidden;
                 self.rebuild_visible();
                 self.restore_cursor(keep);
+                // A folder's preview lists what the list lists.
+                self.previewed = None;
                 self.request_preview();
             }
             ToggleHex => {

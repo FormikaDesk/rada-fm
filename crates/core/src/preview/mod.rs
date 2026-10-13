@@ -27,6 +27,10 @@ pub struct Limits {
     pub max_line_chars: usize,
     pub hex_bytes: usize,
     pub dir_entries: usize,
+    /// List hidden items in the preview of a folder, as the list shows them (the setting
+    /// "hidden files"). What is hidden is the system's rule: dot files, and on a Mac or
+    /// Windows what is flagged hidden.
+    pub show_hidden: bool,
     /// How many things at the top of an archive its preview lists.
     pub archive_entries: usize,
     /// How long counting an archive's members may take before the preview gives a lower bound.
@@ -42,6 +46,7 @@ impl Default for Limits {
             max_line_chars: 2000,
             hex_bytes: 512,
             dir_entries: 300,
+            show_hidden: false,
             archive_entries: 200,
             archive_seconds: 1.5,
             image: ImageLimits::default(),
@@ -107,6 +112,18 @@ pub fn generate_with(
     limits: &Limits,
     cancel: &dyn Fn() -> bool,
 ) -> Preview {
+    generate_in(fs, None, path, limits, cancel)
+}
+
+/// [`generate_with`], with the system's rules for what is hidden (`attrs`); without them only
+/// names that begin with a dot are.
+pub fn generate_in(
+    fs: &dyn FsEngine,
+    attrs: Option<&dyn crate::platform::FileAttributes>,
+    path: &Path,
+    limits: &Limits,
+    cancel: &dyn Fn() -> bool,
+) -> Preview {
     if let Some(loc) = crate::archive::locate(fs, path)
         && !loc.inner.as_os_str().is_empty()
     {
@@ -117,13 +134,14 @@ pub fn generate_with(
         Err(e) => return Preview::Error(crate::Error::io("read", path, e).to_string()),
     };
     match meta.kind {
-        FileKind::Dir => dir_preview(path, limits),
+        FileKind::Dir => dir_preview(path, limits, attrs),
         FileKind::Symlink => {
             let target = fs.read_link(path).unwrap_or_default();
             let (state, inner) = match fs.stat(path) {
-                Ok(m) if m.is_dir() => {
-                    (LinkState::ToDir, Some(Box::new(dir_preview(path, limits))))
-                }
+                Ok(m) if m.is_dir() => (
+                    LinkState::ToDir,
+                    Some(Box::new(dir_preview(path, limits, attrs))),
+                ),
                 Ok(m) if m.is_file() => (
                     LinkState::ToFile,
                     Some(Box::new(file_preview(path, &m, limits, cancel))),
@@ -153,17 +171,28 @@ pub fn generate_with(
     }
 }
 
-fn dir_preview(path: &Path, limits: &Limits) -> Preview {
+fn dir_preview(
+    path: &Path,
+    limits: &Limits,
+    attrs: Option<&dyn crate::platform::FileAttributes>,
+) -> Preview {
     let rd = match std::fs::read_dir(path) {
         Ok(rd) => rd,
         Err(e) => return Preview::Error(crate::Error::io("read folder", path, e).to_string()),
     };
     let mut entries = Vec::new();
     let mut truncated = false;
+    // Hidden items are skipped without counting, but a folder of nothing else is not read
+    // to its end.
+    let mut seen = 0usize;
     for e in rd.flatten() {
-        if entries.len() >= limits.dir_entries {
+        seen += 1;
+        if entries.len() >= limits.dir_entries || seen > limits.dir_entries.saturating_mul(20) {
             truncated = true;
             break;
+        }
+        if !limits.show_hidden && is_hidden(&e, attrs) {
+            continue;
         }
         let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
         entries.push((display::name(&e.file_name()), is_dir));
@@ -173,6 +202,19 @@ fn dir_preview(path: &Path, limits: &Limits) -> Preview {
             .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase()))
     });
     Preview::Dir(DirPreview { entries, truncated })
+}
+
+/// Whether the list would hide this entry: the system's rule when it is known, else a name
+/// that begins with a dot.
+fn is_hidden(e: &std::fs::DirEntry, attrs: Option<&dyn crate::platform::FileAttributes>) -> bool {
+    let name = e.file_name();
+    match attrs {
+        Some(a) => match e.path().symlink_metadata() {
+            Ok(m) => a.attrs(&name, &FsMeta::from_std(&m)).hidden,
+            Err(_) => name.to_string_lossy().starts_with('.'),
+        },
+        None => name.to_string_lossy().starts_with('.'),
+    }
 }
 
 fn open_nonblocking(path: &Path) -> std::io::Result<File> {
@@ -570,6 +612,80 @@ mod tests {
         }
         assert!(matches!(pv(&sb, "empty"), Preview::Empty));
         assert!(matches!(pv(&sb, "missing"), Preview::Error(_)));
+    }
+
+    fn names_in(p: Preview) -> Vec<String> {
+        match p {
+            Preview::Dir(d) => d.entries.into_iter().map(|e| e.0).collect(),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_preview_of_a_folder_leaves_out_what_the_list_hides() {
+        let sb = Sandbox::new();
+        for f in ["Doc.txt", ".DS_Store", ".localized", "._Doc.txt"] {
+            sb.write(format!("d/{f}"), "x");
+        }
+        sb.mkdir("d/.hidden-dir");
+        sb.mkdir("d/Visible");
+        let at = |show_hidden| {
+            let limits = Limits {
+                show_hidden,
+                ..Limits::default()
+            };
+            names_in(generate(&LocalFs, &sb.path("d"), &limits))
+        };
+        assert_eq!(at(false), ["Visible", "Doc.txt"], "the rule of the list");
+        assert_eq!(
+            at(true).len(),
+            6,
+            "with hidden files on, the preview lists them too: {:?}",
+            at(true)
+        );
+    }
+
+    #[test]
+    fn the_systems_own_rule_decides_what_is_hidden() {
+        use crate::platform::{Attrs, FileAttributes};
+        // A system that hides one ordinary name (a flag on the disk) and no dot files.
+        struct Flagged;
+        impl FileAttributes for Flagged {
+            fn attrs(&self, name: &std::ffi::OsStr, _: &FsMeta) -> Attrs {
+                Attrs {
+                    hidden: name == "Library",
+                    ..Attrs::default()
+                }
+            }
+        }
+        let sb = Sandbox::new();
+        sb.mkdir("d/Library");
+        sb.mkdir("d/Documents");
+        sb.write("d/.profile", "x");
+        let got = names_in(generate_in(
+            &LocalFs,
+            Some(&Flagged),
+            &sb.path("d"),
+            &Limits::default(),
+            &|| false,
+        ));
+        assert_eq!(got, ["Documents".to_string(), ".profile".to_string()]);
+    }
+
+    #[test]
+    fn a_folder_of_nothing_but_hidden_files_is_not_read_to_its_end() {
+        let sb = Sandbox::new();
+        for i in 0..200 {
+            sb.write(format!("d/.h{i}"), "x");
+        }
+        let limits = Limits {
+            dir_entries: 5,
+            ..Limits::default()
+        };
+        match generate(&LocalFs, &sb.path("d"), &limits) {
+            Preview::Dir(d) => assert!(d.entries.is_empty() && d.truncated),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[cfg(unix)]

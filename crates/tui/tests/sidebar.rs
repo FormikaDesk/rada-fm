@@ -339,21 +339,16 @@ fn the_bookmark_key_works_on_the_item_in_the_sidebar_and_delete_removes_a_bookma
         let d = docs.clone();
         move |a| a.paths.bookmarks.contains(&d)
     });
-    // Delete on that item, now a bookmark... it is listed twice (as a place and as a
-    // bookmark): the place cannot be removed, the bookmark can.
+    // The folder is already listed as a place: bookmarking it does not list it a second
+    // time, and Delete on the place (which is not a bookmark entry) takes nothing away.
+    let listed = |h: &H| h.app.side_items().iter().filter(|i| i.path == docs).count();
+    assert_eq!(listed(&h), 1, "once, as the place");
     h.key(KeyCode::Delete);
     assert!(
         h.app.paths.bookmarks.contains(&docs),
         "a place is not a bookmark entry"
     );
-    let items = h.app.side_items();
-    let bm = items
-        .iter()
-        .position(|i| {
-            matches!(i.origin, rada_tui::sidebar::Origin::Bookmark { .. }) && i.path == docs
-        })
-        .unwrap();
-    h.app.side_cursor = bm;
-    h.key(KeyCode::Delete);
+    // The key again takes the bookmark off.
+    h.press("B");
     h.wait("removed", move |a| !a.paths.bookmarks.contains(&docs));
 }

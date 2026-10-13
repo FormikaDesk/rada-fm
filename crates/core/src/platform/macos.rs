@@ -63,6 +63,18 @@ impl FileAttributes for MacAttributes {
     fn is_package(&self, path: &Path, meta: &FsMeta) -> bool {
         meta.kind == FileKind::Dir && native::is_package(path)
     }
+
+    fn shown_name(&self, name: &std::ffi::OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
+        localized_folder_name(name, meta.kind == FileKind::Dir)
+    }
+}
+
+/// A folder called `Chrome Apps.localized` is shown by the Finder as `Chrome Apps`. Only a
+/// folder, and only when something is left of the name (`.localized` itself is a file the
+/// Finder hides, and stays as it is).
+pub fn localized_folder_name(name: &std::ffi::OsStr, is_dir: bool) -> Option<std::ffi::OsString> {
+    let base = name.to_str()?.strip_suffix(".localized")?;
+    (is_dir && !base.is_empty()).then(|| base.into())
 }
 
 /// The parts that call into the system.
@@ -642,6 +654,26 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn a_localized_folder_is_shown_without_the_suffix() {
+        use std::ffi::OsStr;
+        let shown = |n: &str, dir| localized_folder_name(OsStr::new(n), dir);
+        assert_eq!(
+            shown("Chrome Apps.localized", true),
+            Some("Chrome Apps".into())
+        );
+        assert_eq!(
+            shown("Applications.localized", true),
+            Some("Applications".into())
+        );
+        // A file keeps its name, and so does the hidden `.localized` marker itself.
+        assert_eq!(shown("Notes.localized", false), None);
+        assert_eq!(shown(".localized", false), None);
+        assert_eq!(shown(".localized", true), None);
+        assert_eq!(shown("localized", true), None);
+        assert_eq!(shown("Photos.localized.bak", true), None);
+    }
+
     #[test]
     fn the_finder_hides_dot_files_and_folders_flagged_hidden() {
         use std::ffi::OsStr;

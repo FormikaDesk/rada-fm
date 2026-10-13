@@ -73,7 +73,7 @@ impl Services {
         Services {
             jobs,
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
-            previewer: PreviewWorker::spawn(fs.clone(), tx.clone()),
+            previewer: PreviewWorker::spawn_with(fs.clone(), Some(platform.clone()), tx.clone()),
             sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
             size_settings: SizeSettings {
                 mode: SizeMode::Off,

@@ -549,3 +549,61 @@ fn without_the_mac_table_cmd_does_nothing() {
     );
     assert!(h.app.clipboard.is_none());
 }
+
+// ---------------------------------------------------------------------------- the Finder's names
+
+#[test]
+fn a_localized_folder_is_shown_without_its_suffix_and_properties_keeps_the_real_name() {
+    let sb = Sandbox::new();
+    sb.write("d/Chrome Apps.localized/.localized", "");
+    sb.write("d/Chrome Apps.localized/App.txt", "a");
+    sb.write("d/Notes.localized", "a file called like that");
+    let dir = sb.path("d");
+    let (_, sys) = mac(&sb, MacLikeSpec::default());
+    let mut h = H::with_system(sb, dir, 140, 36, sys, |_| {});
+    let s = h.screen();
+    let rows: Vec<&str> = s.lines().collect();
+    assert!(
+        rows.iter()
+            .any(|l| l.contains("▸ Chrome Apps ") || l.contains("Chrome Apps  ")),
+        "{s}"
+    );
+    assert!(
+        !rows.iter().any(|l| l.contains("Chrome Apps.localized")),
+        "the folder's suffix is not shown:\n{s}"
+    );
+    // A file keeps its name.
+    assert!(rows.iter().any(|l| l.contains("Notes.localized")), "{s}");
+    // The real name is in Properties.
+    h.keys("g");
+    h.press("alt+enter");
+    let p = h.screen();
+    assert!(p.contains("Chrome Apps.localized"), "{p}");
+}
+
+#[test]
+fn the_preview_of_a_folder_hides_what_the_list_hides_until_hidden_files_are_shown() {
+    let sb = Sandbox::new();
+    sb.write("d/Apps/.DS_Store", "x");
+    sb.write("d/Apps/.localized", "");
+    sb.write("d/Apps/Mail.txt", "m");
+    let dir = sb.path("d");
+    let (_, sys) = mac(&sb, MacLikeSpec::default());
+    let mut h = H::with_system(sb, dir, 170, 36, sys, |_| {});
+    h.app.details = Some(true);
+    let in_preview = |a: &rada_tui::app::App| match &a.preview.content {
+        Some(rada_core::preview::Preview::Dir(d)) => {
+            Some(d.entries.iter().map(|e| e.0.clone()).collect::<Vec<_>>())
+        }
+        _ => None,
+    };
+    h.wait("the folder preview", |a| in_preview(a).is_some());
+    assert_eq!(in_preview(&h.app).unwrap(), ["Mail.txt"]);
+    assert!(!h.screen().contains(".DS_Store"));
+    // Hidden files on (the "." key): the preview follows the list.
+    h.press(".");
+    h.wait("the preview with hidden files", |a| {
+        in_preview(a).is_some_and(|v| v.len() == 3)
+    });
+    assert!(h.screen().contains(".DS_Store"));
+}

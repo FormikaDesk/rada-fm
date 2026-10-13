@@ -197,7 +197,15 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         .map(|p| (p, false))
         .chain(state_bookmarks.iter().map(|p| (p, true)))
     {
-        if seen.contains(&path) {
+        // A bookmark of a folder the pane already lists as a standard place (Movies, say) is
+        // not listed a second time.
+        if seen.contains(&path)
+            || app
+                .paths
+                .places
+                .iter()
+                .any(|p| rada_core::places::same_folder(&p.path, path))
+        {
             continue;
         }
         seen.push(path);
