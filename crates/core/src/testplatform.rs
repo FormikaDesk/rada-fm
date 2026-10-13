@@ -249,7 +249,13 @@ impl Opener for Recorder {
         self.inner.opener().kind_of(path)
     }
     fn apps_for(&self, path: &Path) -> crate::platform::OpenChoices {
-        self.inner.opener().apps_for(path)
+        // Only the Linux list is read from folders the tests own; the other systems' lists are
+        // asked of the system itself (Launch Services, the shell), which a test leaves alone.
+        if self.inner.name() == "linux" {
+            self.inner.opener().apps_for(path)
+        } else {
+            crate::platform::OpenChoices::default()
+        }
     }
     fn open_with_app(&self, path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
         self.note(format!("open_with_app {} {}", app.id, path.display()))

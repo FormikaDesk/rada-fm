@@ -101,6 +101,10 @@ fn shot(h: &mut H) -> String {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn main_screen() {
     let mut h = scene(120, 30);
     on(&mut h, "README.md");
@@ -108,6 +112,10 @@ fn main_screen() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn main_screen_with_marks_shows_the_selection_summary() {
     let mut h = scene(120, 30);
     on(&mut h, "Cargo.toml");
@@ -163,6 +171,10 @@ fn plan_window_names_the_folders_once() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn plan_for_permanent_delete_asks_for_the_word() {
     let mut h = scene(110, 30);
     on(&mut h, "notes.txt");
@@ -172,6 +184,10 @@ fn plan_for_permanent_delete_asks_for_the_word() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn rename_prompt() {
     let mut h = scene(100, 26);
     on(&mut h, "main.rs");
@@ -180,6 +196,10 @@ fn rename_prompt() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn palette_modal() {
     let mut h = scene(110, 30);
     h.press("ctrl+p");
@@ -188,6 +208,10 @@ fn palette_modal() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn help_lists_both_schemes() {
     let mut h = scene(110, 56);
     h.press("F1");
@@ -208,6 +232,10 @@ fn context_menu() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn filter_box_in_the_header() {
     let mut h = scene(110, 24);
     h.press("ctrl+f");
@@ -416,6 +444,10 @@ fn light_theme_tokens() {
 /// The main screen in a light theme, each cell reduced to the token that colours it:
 /// which parts of the screen use which colour, as two grids (text colour, background).
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
 fn main_screen_token_map_in_a_light_theme() {
     use rada_tui::theme::ColorDepth;
     use ratatui::style::Color;

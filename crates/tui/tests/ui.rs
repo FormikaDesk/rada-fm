@@ -134,14 +134,13 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     assert!(s.contains("Copy 1 item"), "{s}");
     // The totals stack a number over its label.
     let lines: Vec<&str> = s.lines().collect();
+    // The text inside the window: after its left border, whatever the pane behind it holds.
+    let inside = |l: &str| l.split('│').nth(1).unwrap_or("").trim_start().to_string();
     let i = lines
         .iter()
-        .position(|l| l.trim_start_matches([' ', '│']).starts_with("file "))
+        .position(|l| inside(l).starts_with("file "))
         .unwrap_or_else(|| panic!("no 'file' label: {s}"));
-    assert!(
-        lines[i - 1].trim_start_matches([' ', '│']).starts_with('1'),
-        "{s}"
-    );
+    assert!(inside(lines[i - 1]).starts_with('1'), "{s}");
     assert!(s.contains("What will happen"), "{s}");
     assert!(
         !dest.join("a.txt").exists(),
