@@ -222,6 +222,113 @@ pub fn query_background(
     })
 }
 
+// ------------------------------------------------------------------------------ the cell size
+
+/// What the terminal says about drawing pictures.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CellQuery {
+    /// Width and height of one character cell, in pixels.
+    pub cell: Option<(u16, u16)>,
+    /// The terminal lists Sixel among its attributes.
+    pub sixel: bool,
+    /// Everything that was not an answer: the user's keys.
+    pub leftover: Vec<u8>,
+    /// The terminal answered the attributes request.
+    pub completed: bool,
+}
+
+const CELL_QUERY: &[u8] = b"\x1b[16t\x1b[14t";
+
+/// Take the first `ESC [ params final` out of `buf`; its parameter bytes.
+fn take_csi(buf: &mut Vec<u8>, last: u8) -> Option<Vec<u8>> {
+    let mut from = 0;
+    while let Some(at) = buf[from..].windows(2).position(|w| w == b"\x1b[") {
+        let start = from + at;
+        let body = start + 2;
+        let len = buf[body..]
+            .iter()
+            .position(|b| !(0x30..=0x3f).contains(b))
+            .unwrap_or(buf.len() - body);
+        if buf.get(body + len) == Some(&last) {
+            let params = buf[body..body + len].to_vec();
+            buf.drain(start..body + len + 1);
+            return Some(params);
+        }
+        from = body;
+    }
+    None
+}
+
+fn numbers(params: &[u8]) -> Vec<u32> {
+    String::from_utf8_lossy(params)
+        .trim_start_matches('?')
+        .split(';')
+        .filter_map(|n| n.parse().ok())
+        .collect()
+}
+
+/// Ask for the size of a character cell in pixels (needed to draw a picture at the right
+/// size) and whether the terminal draws Sixel. `grid` is the terminal's size in columns and
+/// rows, for terminals that only report the size of the whole text area. As with the
+/// background colour, the attributes request closes the conversation.
+pub fn query_cell_size(
+    io: &mut dyn QueryIo,
+    grid: (u16, u16),
+    timeout: Duration,
+) -> io::Result<CellQuery> {
+    let mut query = CELL_QUERY.to_vec();
+    query.extend_from_slice(DA1_QUERY);
+    io.write_all(&query)?;
+
+    let deadline = Instant::now() + timeout;
+    let mut buf: Vec<u8> = Vec::new();
+    let mut completed = false;
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            break;
+        }
+        match io.read_ready(deadline - now)? {
+            None => break,
+            Some(bytes) => {
+                buf.extend_from_slice(&bytes);
+                if find_da1(&buf).is_some() {
+                    completed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut out = CellQuery {
+        completed,
+        ..CellQuery::default()
+    };
+    let px = |v: u32| u16::try_from(v).ok().filter(|v| *v > 0);
+    // `ESC [ 6 ; height ; width t` is the cell, `ESC [ 4 ; height ; width t` the text area.
+    let mut area = None;
+    while let Some(params) = take_csi(&mut buf, b't') {
+        match numbers(&params).as_slice() {
+            [6, h, w] => out.cell = px(*w).zip(px(*h)),
+            [4, h, w] => area = px(*w).zip(px(*h)),
+            _ => {}
+        }
+    }
+    if out.cell.is_none()
+        && let Some((w, h)) = area
+        && grid.0 > 0
+        && grid.1 > 0
+    {
+        out.cell = px((w / grid.0) as u32).zip(px((h / grid.1) as u32));
+    }
+    if let Some((s, e)) = find_da1(&buf) {
+        out.sixel = numbers(&buf[s + 2..e - 1]).contains(&4);
+        buf.drain(s..e);
+    }
+    out.leftover = buf;
+    Ok(out)
+}
+
 // ------------------------------------------------------------------------------ the layers
 
 /// What the environment and the system can say without asking the terminal.
@@ -432,6 +539,126 @@ impl QueryIo for Tty {
     }
 }
 
+/// The Windows console as a terminal to talk to. While it lives, the console delivers the
+/// terminal's answers as plain characters ("virtual terminal input"); the mode it found is
+/// put back when it is dropped.
+#[cfg(windows)]
+pub struct WinConsole {
+    input: windows_sys::Win32::Foundation::HANDLE,
+    saved: u32,
+}
+
+#[cfg(windows)]
+impl WinConsole {
+    pub fn stdio() -> io::Result<WinConsole> {
+        use windows_sys::Win32::System::Console::{
+            ENABLE_VIRTUAL_TERMINAL_INPUT, GetConsoleMode, GetStdHandle, STD_INPUT_HANDLE,
+            SetConsoleMode,
+        };
+        // SAFETY: plain Win32 calls on the process's own standard input; `saved` lives on
+        // the stack for the duration of the call that fills it.
+        unsafe {
+            let input = GetStdHandle(STD_INPUT_HANDLE);
+            let mut saved = 0u32;
+            if GetConsoleMode(input, &mut saved) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+            if SetConsoleMode(input, saved | ENABLE_VIRTUAL_TERMINAL_INPUT) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(WinConsole { input, saved })
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for WinConsole {
+    fn drop(&mut self) {
+        // SAFETY: the handle is the process's standard input, still open.
+        unsafe {
+            windows_sys::Win32::System::Console::SetConsoleMode(self.input, self.saved);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl QueryIo for WinConsole {
+    fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
+        use std::io::Write;
+        let mut out = io::stdout();
+        out.write_all(bytes)?;
+        out.flush()
+    }
+
+    fn read_ready(&mut self, timeout: Duration) -> io::Result<Option<Vec<u8>>> {
+        use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
+        use windows_sys::Win32::System::Console::{INPUT_RECORD, ReadConsoleInputW};
+        // The record type of a key press or release.
+        const KEY_EVENT: u16 = 1;
+        use windows_sys::Win32::System::Threading::WaitForSingleObject;
+        let ms = u32::try_from(timeout.as_millis()).unwrap_or(u32::MAX - 1);
+        let mut units: Vec<u16> = Vec::new();
+        // SAFETY: plain Win32 calls on the process's standard input. The records are read
+        // into a buffer on the stack whose length is passed along, only the `count` first
+        // ones are looked at, and the union is read as a key event only when the record
+        // says it is one. Reading records (rather than bytes) never blocks once the handle
+        // is signalled, whatever kind of event signalled it.
+        unsafe {
+            if WaitForSingleObject(self.input, ms) != WAIT_OBJECT_0 {
+                return Ok(None);
+            }
+            let mut records: [INPUT_RECORD; 64] = std::mem::zeroed();
+            let mut count = 0u32;
+            if ReadConsoleInputW(
+                self.input,
+                records.as_mut_ptr(),
+                records.len() as u32,
+                &mut count,
+            ) == 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            for record in &records[..count as usize] {
+                if record.EventType != KEY_EVENT {
+                    continue;
+                }
+                let key = record.Event.KeyEvent;
+                let unit = key.uChar.UnicodeChar;
+                if key.bKeyDown != 0 && unit != 0 {
+                    units.push(unit);
+                }
+            }
+        }
+        // Possibly nothing (a resize, a focus change): the caller keeps waiting.
+        Ok(Some(String::from_utf16_lossy(&units).into_bytes()))
+    }
+}
+
+/// Talk to the real terminal, where this system has a way to. Call it with the terminal in
+/// raw mode and before anything reads the keyboard.
+pub fn with_terminal<R>(ask: impl FnOnce(&mut dyn QueryIo) -> R) -> Option<R> {
+    #[cfg(unix)]
+    {
+        let mut tty = Tty::stdio();
+        Some(ask(&mut tty))
+    }
+    #[cfg(windows)]
+    {
+        match WinConsole::stdio() {
+            Ok(mut console) => Some(ask(&mut console)),
+            Err(e) => {
+                tracing::debug!("the console cannot be queried: {e}");
+                None
+            }
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = ask;
+        None
+    }
+}
+
 /// `tmux show-options -gv allow-passthrough`: `on` or `all` lets queries through.
 pub fn tmux_allows_passthrough() -> bool {
     std::process::Command::new("tmux")
@@ -464,23 +691,24 @@ pub fn macos_system_appearance() -> Option<Appearance> {
 /// and before anything reads the keyboard.
 pub fn detect_here(forced: Option<Appearance>) -> Detection {
     use std::io::IsTerminal;
-    let var = |k: &str| std::env::var(k).ok();
+    // The Windows console sets no TERM: it is not a terminal that "does not answer".
+    let var = |k: &str| match std::env::var(k).ok() {
+        None if cfg!(windows) && k == "TERM" => Some("windows-console".to_string()),
+        v => v,
+    };
     let env = Env {
         var: &var,
         system_appearance: &macos_system_appearance,
         is_tty: io::stdin().is_terminal() && io::stdout().is_terminal(),
         tmux_passthrough: &tmux_allows_passthrough,
     };
-    #[cfg(unix)]
-    {
-        let mut tty = Tty::stdio();
-        detect(forced, &env, Some(&mut tty), Duration::from_millis(150))
+    let timeout = Duration::from_millis(150);
+    // Nothing is opened (and no console mode is touched) unless the terminal will be asked.
+    if forced.is_some() || from_environment(&env).is_some() || may_query(&env).is_err() {
+        return detect(forced, &env, None, timeout);
     }
-    #[cfg(not(unix))]
-    {
-        // The Windows console has no select(2); asking it comes with the Windows phase.
-        detect(forced, &env, None, Duration::from_millis(150))
-    }
+    with_terminal(|io| detect(forced, &env, Some(io), timeout))
+        .unwrap_or_else(|| detect(forced, &env, None, timeout))
 }
 
 /// The few keys a user can type in the moment the terminal is being asked, as key events.
@@ -916,5 +1144,49 @@ mod tests {
             d.describe(),
             "light: the terminal's background is rgb(255, 255, 255) (OSC 11)"
         );
+    }
+
+    #[test]
+    fn the_cell_size_comes_from_the_cell_report() {
+        let mut fake = Fake::new(vec![(
+            5,
+            b"\x1b[6;20;9t\x1b[4;600;900t\x1b[?61;4;22c".to_vec(),
+        )]);
+        let r = query_cell_size(&mut fake, (100, 30), Duration::from_millis(100)).unwrap();
+        assert_eq!(r.cell, Some((9, 20)));
+        assert!(r.sixel && r.completed);
+        assert!(r.leftover.is_empty());
+        assert!(
+            fake.written.ends_with(b"\x1b[c"),
+            "the attributes request closes it"
+        );
+    }
+
+    #[test]
+    fn the_cell_size_is_worked_out_from_the_text_area_when_that_is_all_there_is() {
+        let mut fake = Fake::new(vec![(5, b"\x1b[4;600;900tq\x1b[?62c".to_vec())]);
+        let r = query_cell_size(&mut fake, (100, 30), Duration::from_millis(100)).unwrap();
+        assert_eq!(r.cell, Some((9, 20)));
+        assert!(!r.sixel, "no attribute 4, no Sixel");
+        assert_eq!(r.leftover, b"q", "a key typed meanwhile is given back");
+    }
+
+    #[test]
+    fn a_terminal_that_reports_no_size_gives_none() {
+        let mut fake = Fake::new(vec![(5, b"\x1b[?62;4c".to_vec())]);
+        let r = query_cell_size(&mut fake, (100, 30), Duration::from_millis(100)).unwrap();
+        assert_eq!(r.cell, None);
+        assert!(r.sixel && r.completed);
+        // And one that says nothing at all is not waited for beyond the timeout.
+        let mut silent = Fake::new(vec![]);
+        let r = query_cell_size(&mut silent, (100, 30), Duration::from_millis(50)).unwrap();
+        assert_eq!(r, CellQuery::default());
+    }
+
+    #[test]
+    fn a_zero_sized_cell_is_no_cell() {
+        let mut fake = Fake::new(vec![(5, b"\x1b[6;0;0t\x1b[?62c".to_vec())]);
+        let r = query_cell_size(&mut fake, (0, 0), Duration::from_millis(100)).unwrap();
+        assert_eq!(r.cell, None);
     }
 }
