@@ -71,6 +71,17 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
             format!("{} ({} bytes)", fmt::size(e.size), fmt::thousands(e.size)),
         ));
     }
+    if !e.tags.is_empty() {
+        // Drawn with its coloured dots (see `draw_details`); the text is for the width.
+        rows.push((
+            "Tags",
+            e.tags
+                .iter()
+                .map(|t| format!("● {}", t.name))
+                .collect::<Vec<_>>()
+                .join("  "),
+        ));
+    }
     rows.push(("Modified", when(e.mtime)));
     if e.created.is_some() {
         rows.push(("Created", when(e.created)));
@@ -285,14 +296,35 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Properties, at the bottom.
     let props_y = inner.y + inner.height.saturating_sub(props_h);
+    let tags = app.current().map(|e| e.tags.clone()).unwrap_or_default();
     let lines: Vec<Line> = props
         .iter()
         .map(|(k, v)| {
             let room = w.saturating_sub(KEY_W);
-            Line::from(vec![
-                Span::styled(format!("{k:<KEY_W$}"), th.dim()),
-                Span::styled(display::truncate(v, room), th.base()),
-            ])
+            let mut spans = vec![Span::styled(format!("{k:<KEY_W$}"), th.dim())];
+            if *k == "Tags" {
+                // A dot in each tag's colour, then its name; what does not fit is cut.
+                let mut left = room;
+                for (i, t) in tags.iter().enumerate() {
+                    if left < 3 {
+                        break;
+                    }
+                    if i > 0 {
+                        spans.push(Span::raw("  "));
+                        left = left.saturating_sub(2);
+                    }
+                    spans.push(Span::styled(
+                        "●",
+                        Style::default().fg(th.tag_color(t.color)),
+                    ));
+                    let name = display::truncate(&t.name, left.saturating_sub(2));
+                    left = left.saturating_sub(2 + name.width());
+                    spans.push(Span::styled(format!(" {name}"), th.base()));
+                }
+            } else {
+                spans.push(Span::styled(display::truncate(v, room), th.base()));
+            }
+            Line::from(spans)
         })
         .collect();
     f.render_widget(

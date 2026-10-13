@@ -207,7 +207,11 @@ mod tests {
     fn rt(items: &[&str]) {
         let items: Vec<String> = items.iter().map(|s| s.to_string()).collect();
         let bytes = encode_string_array(&items);
-        assert_eq!(decode_string_array(&bytes).as_deref(), Some(&items[..]), "{items:?}");
+        assert_eq!(
+            decode_string_array(&bytes).as_deref(),
+            Some(&items[..]),
+            "{items:?}"
+        );
     }
 
     #[test]
@@ -217,7 +221,11 @@ mod tests {
         rt(&["a", "b", "c"]);
         rt(&["Città", "日本語", "emoji 🌴 ok"]);
         // Lengths of 15 and more need the long form.
-        rt(&["a name of exactly fifteen"[..15].trim_end(), &"x".repeat(15), &"y".repeat(300)]);
+        rt(&[
+            "a name of exactly fifteen"[..15].trim_end(),
+            &"x".repeat(15),
+            &"y".repeat(300),
+        ]);
         rt(&[&"é".repeat(40)]);
         // More than 14 items: the count of the array needs the long form too.
         let many: Vec<String> = (0..40).map(|i| format!("tag {i}")).collect();
@@ -278,7 +286,10 @@ mod tests {
         assert!(decode_string_array(b"bplist00").is_none());
         assert!(decode_string_array(b"bplist00 not really").is_none());
         assert!(decode_string_array(b"hello").is_none());
-        assert!(decode_string_array(b"<plist><dict><key>a</key><string>b</string></dict></plist>").is_none());
+        assert!(
+            decode_string_array(b"<plist><dict><key>a</key><string>b</string></dict></plist>")
+                .is_none()
+        );
         // A truncated real one.
         let good = encode_string_array(&["Red\n6".into(), "Work".into()]);
         for cut in 1..good.len() {

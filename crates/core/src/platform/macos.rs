@@ -158,6 +158,7 @@ impl super::Fidelity for MacFidelity {
         what: super::Preserve,
         _owner: Option<(u32, u32)>,
     ) -> super::AttrOutcome {
+        #[allow(unused_mut)]
         let mut outcome = super::AttrOutcome::default();
         if !what.xattrs {
             return outcome;

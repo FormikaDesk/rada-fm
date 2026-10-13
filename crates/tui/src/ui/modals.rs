@@ -1127,6 +1127,7 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         InputKind::Rename { .. } => ("Rename", "New name"),
         InputKind::NewDir => ("New folder", "Name"),
         InputKind::NewFile => ("New file", "Name (an empty file is created)"),
+        InputKind::NewTag { .. } => ("New tag", "Name of the tag (the selected items get it)"),
         InputKind::OpenWith { .. } => (
             "Open with",
             "Program, with options if you like — for example: code, vlc --fullscreen",

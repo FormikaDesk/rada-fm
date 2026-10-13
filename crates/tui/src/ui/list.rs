@@ -323,9 +323,26 @@ fn row<'a>(
     }
 
     let shown = e.display.clone();
-    let name_txt = display::truncate(&shown, cols.name);
+    // Coloured dots after the name, one for each tag (three at most, then a plus).
+    let dots = super::tagdots::dots(th, &e.tags);
+    let dots_w = if cols.name > 12 {
+        super::tagdots::width(&dots)
+    } else {
+        0
+    };
+    let name_txt = display::truncate(&shown, cols.name.saturating_sub(dots_w));
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
+    if dots_w > 0 {
+        spans.push(Span::styled(" ", with(Style::default())));
+        used += 1 + dots_w - 1;
+        for (text, color) in &dots {
+            spans.push(Span::styled(
+                text.clone(),
+                row_style.patch(Style::default().fg(*color)),
+            ));
+        }
+    }
     if let Some(l) = &e.link {
         let room = cols.name.saturating_sub(used);
         if room > 5 {

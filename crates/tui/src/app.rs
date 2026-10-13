@@ -221,6 +221,10 @@ pub enum InputKind {
     },
     /// The name of a new empty file.
     NewFile,
+    /// The name of a tag to give to the selected items.
+    NewTag {
+        items: Vec<PathBuf>,
+    },
 }
 
 pub struct InputView {
@@ -442,11 +446,23 @@ mod update;
 pub use address::AddressEdit;
 pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
-pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
+pub use input::{FilterState, MenuCmd, MenuItem, MenuView, TagCmd};
 pub use menus::MenuKind;
 pub use props::PropsView;
 pub use tabs::TabState;
 pub use update::{UpdateStatus, UpdateView};
+
+/// Whether an entry carries a tag matching `want` (lower case): a name that contains it, or
+/// the colour of that name. An empty `want` (`tag:` alone) means "any tag".
+fn matches_tag(e: &Entry, want: &str) -> bool {
+    if want.is_empty() {
+        return !e.tags.is_empty();
+    }
+    e.tags.iter().any(|t| {
+        t.name.to_lowercase().contains(want)
+            || t.color.is_some_and(|c| c.name().to_lowercase() == want)
+    })
+}
 
 pub struct App {
     pub th: Theme,
@@ -789,6 +805,11 @@ impl App {
             .as_ref()
             .map(|f| f.text.split_whitespace().map(str::to_lowercase).collect())
             .unwrap_or_default();
+        // `tag:red` keeps what carries a tag with that in its name (or of that colour); every
+        // other word is part of the name.
+        let (tag_terms, name_terms): (Vec<&String>, Vec<&String>) =
+            terms.iter().partition(|t| t.starts_with("tag:"));
+        let tag_terms: Vec<&str> = tag_terms.iter().map(|t| &t["tag:".len()..]).collect();
         self.visible = self
             .listing
             .all()
@@ -796,11 +817,12 @@ impl App {
             .enumerate()
             .filter(|(_, e)| show || !e.hidden)
             .filter(|(_, e)| {
-                terms.is_empty() || {
+                name_terms.is_empty() || {
                     let name = e.display.to_lowercase();
-                    terms.iter().all(|t| name.contains(t))
+                    name_terms.iter().all(|t| name.contains(t.as_str()))
                 }
             })
+            .filter(|(_, e)| tag_terms.iter().all(|want| matches_tag(e, want)))
             .map(|(i, _)| i)
             .collect();
     }
@@ -1165,7 +1187,10 @@ impl App {
                     return;
                 }
                 self.dir_gen += 1;
-                if rescan {
+                // A full read in progress is answered only for the newest request: a patch
+                // would supersede it and leave the folder "loading" for good, so a change
+                // that arrives meanwhile asks for another full read instead.
+                if rescan || matches!(self.load, LoadState::Loading(_)) {
                     self.svc.loader.load(dir, self.dir_gen);
                 } else {
                     self.svc.loader.patch(dir, paths, self.dir_gen);
@@ -1753,6 +1778,23 @@ impl App {
                 let h = self.svc.jobs.plan_mkfile(self.cwd.clone(), iv.text.clone());
                 self.begin_plan("Planning", h);
             }
+            InputKind::NewTag { items } => match rada_core::platform::tags::validate_name(&iv.text)
+            {
+                Ok(name) => {
+                    let h = self.svc.jobs.plan_request(OpRequest::SetTags {
+                        items: items.clone(),
+                        change: rada_core::ops::TagChange::Add {
+                            tag: rada_core::platform::Tag::named(&name),
+                        },
+                    });
+                    self.begin_plan("Planning", h);
+                }
+                Err(e) => {
+                    let mut iv = iv;
+                    iv.error = Some(e);
+                    self.modal = Some(Modal::Input(iv));
+                }
+            },
             InputKind::OpenWith { path } => {
                 let program = iv.text.trim().to_string();
                 if program.is_empty() {

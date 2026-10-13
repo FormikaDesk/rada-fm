@@ -176,11 +176,7 @@ impl Sim<'_> {
                 if !self.exists(path) {
                     return Err(format!("{} is no longer there", display::path(path)));
                 }
-                let now = self
-                    .engine
-                    .platform
-                    .tags()
-                    .and_then(|s| s.read(path).ok());
+                let now = self.engine.platform.tags().and_then(|s| s.read(path).ok());
                 match now {
                     Some(now) if now == *before => Ok(()),
                     Some(_) => Err(format!(

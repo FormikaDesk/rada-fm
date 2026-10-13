@@ -15,7 +15,9 @@ use std::path::Path;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, Result};
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use crate::Error;
+use crate::Result;
 
 /// The Finder's colours, as the menu lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -125,7 +127,9 @@ pub fn validate_name(name: &str) -> std::result::Result<String, String> {
     if n.chars().count() > 100 {
         return Err("a tag name can have at most 100 characters".into());
     }
-    if n.chars().any(|c| c == '\n' || c == '\r' || c == ',' || c == '\0') {
+    if n.chars()
+        .any(|c| c == '\n' || c == '\r' || c == ',' || c == '\0')
+    {
         return Err("a tag name cannot have a comma or a line break".into());
     }
     Ok(n.to_string())
@@ -142,7 +146,10 @@ pub fn with_tag(tags: &[Tag], tag: &Tag) -> Vec<Tag> {
 
 /// `tags` without the one called `name`.
 pub fn without_tag(tags: &[Tag], name: &str) -> Vec<Tag> {
-    tags.iter().filter(|t| !t.is_called(name)).cloned().collect()
+    tags.iter()
+        .filter(|t| !t.is_called(name))
+        .cloned()
+        .collect()
 }
 
 // ----------------------------------------------------------------------------- the formats
@@ -174,7 +181,12 @@ pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
                 let color = index
                     .and_then(TagColor::from_finder_index)
                     // A tag without a colour number but with a colour's name is that colour.
-                    .or_else(|| index.is_none().then(|| TagColor::from_name(&name)).flatten());
+                    .or_else(|| {
+                        index
+                            .is_none()
+                            .then(|| TagColor::from_name(&name))
+                            .flatten()
+                    });
                 Tag { name, color }
             })
             .filter(|t| !t.name.is_empty())
@@ -255,7 +267,8 @@ impl XattrTags {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 impl TagStore for XattrTags {
     fn read(&self, path: &Path) -> Result<Vec<Tag>> {
-        let Some(bytes) = xattr::get(path, self.attribute()).map_err(|e| Error::io("read the tags of", path, e))?
+        let Some(bytes) = xattr::get(path, self.attribute())
+            .map_err(|e| Error::io("read the tags of", path, e))?
         else {
             return Ok(Vec::new());
         };
@@ -319,10 +332,7 @@ pub mod xattr {
 
     /// The system does not keep attributes here (a filesystem without them).
     fn unsupported(e: &io::Error) -> bool {
-        matches!(
-            e.raw_os_error(),
-            Some(libc::ENOTSUP) | Some(libc::ENOSYS)
-        )
+        matches!(e.raw_os_error(), Some(libc::ENOTSUP) | Some(libc::ENOSYS))
     }
 
     /// The attribute's value, `None` when the item has none (or its filesystem cannot).
@@ -392,7 +402,15 @@ pub mod xattr {
     #[cfg(target_os = "linux")]
     unsafe fn raw_set(p: &CString, n: &CString, value: &[u8]) -> isize {
         // SAFETY: the caller passes valid strings; `value` is valid for its length.
-        unsafe { libc::lsetxattr(p.as_ptr(), n.as_ptr(), value.as_ptr().cast(), value.len(), 0) as isize }
+        unsafe {
+            libc::lsetxattr(
+                p.as_ptr(),
+                n.as_ptr(),
+                value.as_ptr().cast(),
+                value.len(),
+                0,
+            ) as isize
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -459,7 +477,10 @@ mod tests {
     fn a_tag_called_after_a_colour_is_drawn_in_it() {
         assert_eq!(Tag::named("red").color, Some(TagColor::Red));
         assert_eq!(Tag::named("Work").color, None);
-        assert_eq!(Tag::standard(TagColor::Blue), t("Blue", Some(TagColor::Blue)));
+        assert_eq!(
+            Tag::standard(TagColor::Blue),
+            t("Blue", Some(TagColor::Blue))
+        );
         assert!(Tag::standard(TagColor::Blue).is_called("blue"));
     }
 
@@ -494,7 +515,10 @@ mod tests {
         let bytes = encode_finder(&tags);
         assert!(bytes.starts_with(b"bplist00"));
         assert_eq!(decode_finder(&bytes).unwrap(), tags);
-        assert_eq!(decode_finder(&encode_finder(&[])).unwrap(), Vec::<Tag>::new());
+        assert_eq!(
+            decode_finder(&encode_finder(&[])).unwrap(),
+            Vec::<Tag>::new()
+        );
     }
 
     #[test]
@@ -566,7 +590,10 @@ mod tests {
             s.write(&f, &tags).unwrap();
             assert_eq!(s.read(&f).unwrap(), tags);
             // The attribute is the freedesktop one other programs read.
-            assert_eq!(xattr::get(&f, "user.xdg.tags").unwrap().unwrap(), b"Red,Work");
+            assert_eq!(
+                xattr::get(&f, "user.xdg.tags").unwrap().unwrap(),
+                b"Red,Work"
+            );
             s.write(&f, &[]).unwrap();
             assert!(s.read(&f).unwrap().is_empty());
             assert!(xattr::get(&f, "user.xdg.tags").unwrap().is_none());
@@ -594,6 +621,62 @@ mod tests {
             let gone = d.path().join("gone.txt");
             let e = s.read(&gone).unwrap_err().to_string();
             assert!(e.contains("gone.txt"), "{e}");
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    mod on_a_mac {
+        use super::*;
+        use crate::platform::Fidelity;
+
+        fn file() -> (tempfile::TempDir, std::path::PathBuf) {
+            let d = tempfile::Builder::new()
+                .prefix("tags-")
+                .tempdir_in(std::env::current_dir().unwrap())
+                .unwrap();
+            let f = d.path().join("a.txt");
+            std::fs::write(&f, "x").unwrap();
+            (d, f)
+        }
+
+        #[test]
+        fn the_finders_tags_are_written_and_read_in_the_attribute_the_finder_uses() {
+            let (_d, f) = file();
+            let s = XattrTags::finder();
+            assert!(s.read(&f).unwrap().is_empty());
+            let tags = vec![Tag::standard(TagColor::Red), t("Work", None)];
+            s.write(&f, &tags).unwrap();
+            assert_eq!(s.read(&f).unwrap(), tags);
+            let raw = xattr::get(&f, "com.apple.metadata:_kMDItemUserTags")
+                .unwrap()
+                .unwrap();
+            assert!(raw.starts_with(b"bplist00"));
+            // The system's own tool reads what rada wrote.
+            let out = std::process::Command::new("xattr")
+                .args(["-px", "com.apple.metadata:_kMDItemUserTags"])
+                .arg(&f)
+                .output()
+                .unwrap();
+            assert!(out.status.success());
+            s.write(&f, &[]).unwrap();
+            assert!(s.read(&f).unwrap().is_empty());
+        }
+
+        #[test]
+        fn a_copy_keeps_the_tags() {
+            let (d, f) = file();
+            let s = XattrTags::finder();
+            s.write(&f, &[Tag::standard(TagColor::Blue)]).unwrap();
+            let copy = d.path().join("b.txt");
+            std::fs::copy(&f, &copy).unwrap();
+            let out = crate::platform::macos::MacFidelity.copy_attributes(
+                &f,
+                &copy,
+                crate::platform::Preserve::default(),
+                None,
+            );
+            assert!(out.not_preserved.is_empty(), "{out:?}");
+            assert_eq!(s.read(&copy).unwrap(), [Tag::standard(TagColor::Blue)]);
         }
     }
 }

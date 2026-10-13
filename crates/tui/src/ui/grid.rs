@@ -171,7 +171,25 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 format!(" {} ", centered(&name, TILE_W - 2)),
                 st.patch(bg),
             ));
-            tile_lines[4].push(Span::raw(" ".repeat(TILE_W)));
+            // The tags, as dots centred under the name.
+            let dots = super::tagdots::dots(&th, &e.tags);
+            let dots_w: usize = dots.iter().map(|(s, _)| s.chars().count()).sum();
+            if dots_w == 0 {
+                tile_lines[4].push(Span::raw(" ".repeat(TILE_W)));
+            } else {
+                let left = TILE_W.saturating_sub(dots_w) / 2;
+                tile_lines[4].push(Span::styled(" ".repeat(left), bg));
+                for (text, color) in &dots {
+                    tile_lines[4].push(Span::styled(
+                        text.clone(),
+                        bg.patch(Style::default().fg(*color)),
+                    ));
+                }
+                tile_lines[4].push(Span::styled(
+                    " ".repeat(TILE_W.saturating_sub(left + dots_w)),
+                    bg,
+                ));
+            }
             app.hits.add(
                 Rect {
                     x: x0 + (c * TILE_W) as u16,

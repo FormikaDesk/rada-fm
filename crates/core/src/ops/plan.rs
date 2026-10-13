@@ -245,7 +245,10 @@ pub fn tag_names(tags: &[crate::platform::Tag]) -> String {
     if tags.is_empty() {
         "none".to_string()
     } else {
-        tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ")
+        tags.iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 }
 
@@ -343,7 +346,11 @@ impl Step {
             Step::RemoveFile { path, .. } => format!("delete {}", display::path(path)),
             Step::RemoveDir { path } => format!("remove folder {}", display::path(path)),
             Step::Restore { item } => format!("restore {}", display::path(&item.original)),
-            Step::SetTags { path, before, after } => format!(
+            Step::SetTags {
+                path,
+                before,
+                after,
+            } => format!(
                 "tags of {}: {} -> {}",
                 display::path(path),
                 tag_names(before),
@@ -462,7 +469,11 @@ impl Step {
                 })
             }
             // Permanent deletion and restore are not reversed here.
-            Step::SetTags { path, before, after } => Some(Step::SetTags {
+            Step::SetTags {
+                path,
+                before,
+                after,
+            } => Some(Step::SetTags {
                 path: path.clone(),
                 before: after.clone(),
                 after: before.clone(),

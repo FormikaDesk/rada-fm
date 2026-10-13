@@ -17,6 +17,7 @@ mod modals;
 mod preview;
 mod sidebar;
 mod tabs;
+mod tagdots;
 mod updates;
 pub mod widgets;
 

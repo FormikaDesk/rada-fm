@@ -626,6 +626,41 @@ impl Theme {
         }
     }
 
+    /// The colour a tag is drawn in: the Finder's seven, in what the terminal can show.
+    pub fn tag_color(&self, color: Option<rada_core::platform::TagColor>) -> Color {
+        use rada_core::platform::TagColor;
+        let Some(c) = color else {
+            return self.text_dim;
+        };
+        match self.depth {
+            ColorDepth::Ansi16 => match c {
+                TagColor::Red => Color::Red,
+                TagColor::Orange => Color::LightRed,
+                TagColor::Yellow => Color::Yellow,
+                TagColor::Green => Color::Green,
+                TagColor::Blue => Color::LightBlue,
+                TagColor::Purple => Color::Magenta,
+                TagColor::Gray => Color::DarkGray,
+            },
+            depth => {
+                let rgb = match c {
+                    TagColor::Red => Color::Rgb(0xff, 0x5f, 0x57),
+                    TagColor::Orange => Color::Rgb(0xff, 0x9f, 0x43),
+                    TagColor::Yellow => Color::Rgb(0xf7, 0xd1, 0x4c),
+                    TagColor::Green => Color::Rgb(0x5f, 0xd0, 0x68),
+                    TagColor::Blue => Color::Rgb(0x4c, 0x9a, 0xff),
+                    TagColor::Purple => Color::Rgb(0xb0, 0x7c, 0xff),
+                    TagColor::Gray => Color::Rgb(0x9a, 0xa0, 0xa6),
+                };
+                if depth == ColorDepth::Ansi256 {
+                    to_256(rgb)
+                } else {
+                    rgb
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ style helpers
 
     pub fn base(&self) -> Style {

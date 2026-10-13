@@ -15,9 +15,9 @@ pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
 pub mod macos;
+pub mod tags;
 pub mod trash;
 pub mod userdirs;
-pub mod tags;
 pub mod volumes;
 pub mod windows;
 
@@ -34,8 +34,8 @@ pub use access::AccessDenied;
 pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use fidelity::{AttrOutcome, DestSupport, Fidelity, NotYet, Preserve, SourceAttrs};
-pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use tags::{Tag, TagColor, TagStore};
+pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use userdirs::{PlaceKind, UserDirs};
 pub use volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
 

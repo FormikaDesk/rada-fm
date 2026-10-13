@@ -61,12 +61,17 @@ fn a_tag_is_planned_added_journaled_and_undone() {
     assert!(p.is_executable(), "{:?}", p.warnings);
     assert_eq!(p.steps.len(), 1);
     assert_eq!(p.items[0].action, ItemAction::Retag);
-    assert!(p.title.contains("tag Red"), "{}", p.title);
+    assert!(p.title.contains("Tag Red"), "{}", p.title);
     // Planning writes nothing.
     assert!(tags_of(&sb, &f).is_empty());
 
     let out = run_journaled(&e, &j, &p);
-    assert_eq!(out.report.status(), RunStatus::Completed, "{:?}", out.report.failed);
+    assert_eq!(
+        out.report.status(),
+        RunStatus::Completed,
+        "{:?}",
+        out.report.failed
+    );
     assert_eq!(tags_of(&sb, &f), ["Red"]);
     assert_eq!(j.entries().unwrap()[0].describe(), "tag change of 1 item");
 
@@ -98,7 +103,11 @@ fn several_items_each_keep_what_they_had() {
     assert_eq!(tags_of(&sb, &c), ["Red"], "a folder too");
     undo(&e, &j, &out.id);
     assert_eq!(tags_of(&sb, &a), ["Work"]);
-    assert_eq!(tags_of(&sb, &b), ["Red", "Work"], "the one that had it is as it was");
+    assert_eq!(
+        tags_of(&sb, &b),
+        ["Red", "Work"],
+        "the one that had it is as it was"
+    );
     assert!(tags_of(&sb, &c).is_empty());
 }
 
@@ -118,7 +127,9 @@ fn clicking_a_colour_toggles_it_for_the_whole_selection() {
     // Only one has it: it is given to both.
     let p = plan(&e, &items, &toggle);
     assert_eq!(p.steps.len(), 1);
-    assert!(matches!(&p.steps[0], Step::SetTags { path, after, .. } if *path == b && after.len() == 1));
+    assert!(
+        matches!(&p.steps[0], Step::SetTags { path, after, .. } if *path == b && after.len() == 1)
+    );
     run(&e, &p);
     assert_eq!(tags_of(&sb, &b), ["Red"]);
     // Both have it now: it is taken off both.
@@ -138,7 +149,16 @@ fn remove_clear_and_set_do_what_they_say() {
     let a = sb.write("a", "1");
     set(&sb, &a, &["Red", "Work", "Blue"]);
     let items = vec![a.clone()];
-    run(&e, &plan(&e, &items, &TagChange::Remove { name: "work".into() }));
+    run(
+        &e,
+        &plan(
+            &e,
+            &items,
+            &TagChange::Remove {
+                name: "work".into(),
+            },
+        ),
+    );
     assert_eq!(tags_of(&sb, &a), ["Red", "Blue"]);
     run(
         &e,
@@ -167,7 +187,13 @@ fn a_change_that_changes_nothing_says_so_and_has_no_steps() {
     let items = vec![a];
     let p = plan(&e, &items, &add(&items, "red"));
     assert!(p.steps.is_empty());
-    assert!(p.warnings.iter().any(|w| w.message.contains("nothing changes")), "{:?}", p.warnings);
+    assert!(
+        p.warnings
+            .iter()
+            .any(|w| w.message.contains("nothing changes")),
+        "{:?}",
+        p.warnings
+    );
 }
 
 #[test]
@@ -183,8 +209,16 @@ fn links_and_vanished_items_are_told_about_and_the_rest_goes_ahead() {
     let items = vec![a.clone(), link, gone];
     let p = plan(&e, &items, &add(&items, "Red"));
     assert_eq!(p.steps.len(), 1);
-    assert!(p.warnings.iter().any(|w| w.kind == WarningKind::CannotTag), "{:?}", p.warnings);
-    assert!(p.warnings.iter().any(|w| w.kind == WarningKind::Missing), "{:?}", p.warnings);
+    assert!(
+        p.warnings.iter().any(|w| w.kind == WarningKind::CannotTag),
+        "{:?}",
+        p.warnings
+    );
+    assert!(
+        p.warnings.iter().any(|w| w.kind == WarningKind::Missing),
+        "{:?}",
+        p.warnings
+    );
     assert!(p.is_executable());
 }
 
@@ -201,7 +235,11 @@ fn undo_leaves_tags_alone_that_were_changed_after_the_operation() {
     // Somebody tags it again in the meantime.
     set(&sb, &a, &["Red", "Later"]);
     let (up, rep) = undo(&e, &j, &out.id);
-    assert_eq!(tags_of(&sb, &a), ["Red", "Later"], "what they did is not overwritten");
+    assert_eq!(
+        tags_of(&sb, &a),
+        ["Red", "Later"],
+        "what they did is not overwritten"
+    );
     assert!(
         !up.blocked.is_empty() || !rep.failed.is_empty(),
         "and the undo says why it did not"
@@ -221,7 +259,11 @@ fn tags_changed_between_the_plan_and_the_run_are_not_overwritten() {
     set(&sb, &a, &["Sneaky"]);
     let rep = run(&e, &p);
     assert_eq!(rep.failed.len(), 1);
-    assert!(rep.failed[0].error.contains("tags changed"), "{:?}", rep.failed);
+    assert!(
+        rep.failed[0].error.contains("tags changed"),
+        "{:?}",
+        rep.failed
+    );
     assert_eq!(tags_of(&sb, &a), ["Sneaky"]);
 }
 
@@ -235,22 +277,26 @@ fn copies_and_moves_keep_the_tags() {
     let a = sb.write("src/a.txt", "hello");
     set(&sb, &a, &["Red", "Work"]);
     let dst = sb.mkdir("dst");
-    let (_, rep) = do_copy(&e, &[a.clone()], &dst, ConflictPolicy::Skip);
+    let (_, rep) = do_copy(&e, std::slice::from_ref(&a), &dst, ConflictPolicy::Skip);
     assert!(rep.failed.is_empty(), "{:?}", rep.failed);
     assert_eq!(tags_of(&sb, &dst.join("a.txt")), ["Red", "Work"]);
-    assert_eq!(tags_of(&sb, &a), ["Red", "Work"], "the original keeps its own");
+    assert_eq!(
+        tags_of(&sb, &a),
+        ["Red", "Work"],
+        "the original keeps its own"
+    );
     // A folder's tags go with it, and so do those of the files inside.
     let d = sb.mkdir("src/folder");
     sb.write("src/folder/in.txt", "x");
     set(&sb, &d, &["Blue"]);
     set(&sb, &d.join("in.txt"), &["Green"]);
     let dst2 = sb.mkdir("dst2");
-    do_copy(&e, &[d.clone()], &dst2, ConflictPolicy::Skip);
+    do_copy(&e, std::slice::from_ref(&d), &dst2, ConflictPolicy::Skip);
     assert_eq!(tags_of(&sb, &dst2.join("folder")), ["Blue"]);
     assert_eq!(tags_of(&sb, &dst2.join("folder/in.txt")), ["Green"]);
     // Moving keeps them too.
     let dst3 = sb.mkdir("dst3");
-    let (_, rep) = do_move(&e, &[a.clone()], &dst3, ConflictPolicy::Skip);
+    let (_, rep) = do_move(&e, std::slice::from_ref(&a), &dst3, ConflictPolicy::Skip);
     assert!(rep.failed.is_empty());
     assert_eq!(tags_of(&sb, &dst3.join("a.txt")), ["Red", "Work"]);
 }
@@ -267,10 +313,21 @@ fn the_request_has_a_json_form_and_is_checked() {
     // Back to JSON and again.
     let again: OpRequest = serde_json::from_str(&serde_json::to_string(&req).unwrap()).unwrap();
     assert_eq!(again, req);
-    let toggle = r#"{"op":"set_tags","items":["/a"],"change":{"how":"toggle","tag":{"name":"Work"}}}"#;
-    assert!(serde_json::from_str::<OpRequest>(toggle).unwrap().validate().is_ok());
+    let toggle =
+        r#"{"op":"set_tags","items":["/a"],"change":{"how":"toggle","tag":{"name":"Work"}}}"#;
+    assert!(
+        serde_json::from_str::<OpRequest>(toggle)
+            .unwrap()
+            .validate()
+            .is_ok()
+    );
     let clear = r#"{"op":"set_tags","items":["/a"],"change":{"how":"clear"}}"#;
-    assert!(serde_json::from_str::<OpRequest>(clear).unwrap().validate().is_ok());
+    assert!(
+        serde_json::from_str::<OpRequest>(clear)
+            .unwrap()
+            .validate()
+            .is_ok()
+    );
 
     // Relative paths, bad names and nothing to tag are refused before anything is read.
     for bad in [
@@ -282,7 +339,12 @@ fn the_request_has_a_json_form_and_is_checked() {
         let r: OpRequest = serde_json::from_str(bad).unwrap();
         assert!(r.validate().is_err(), "{bad}");
     }
-    assert!(serde_json::from_str::<OpRequest>(r#"{"op":"set_tags","items":["/a"],"change":{"how":"explode"}}"#).is_err());
+    assert!(
+        serde_json::from_str::<OpRequest>(
+            r#"{"op":"set_tags","items":["/a"],"change":{"how":"explode"}}"#
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -300,7 +362,14 @@ fn a_request_goes_through_the_engine_like_any_other() {
         },
     };
     let planned = e
-        .plan_request(&req, None, ScanControl { cancel: Cancel::new().flag(), progress: &mut |_| {} })
+        .plan_request(
+            &req,
+            None,
+            ScanControl {
+                cancel: Cancel::new().flag(),
+                progress: &mut |_| {},
+            },
+        )
         .unwrap();
     assert_eq!(planned.plan.kind, OpKind::SetTags);
     assert_eq!(planned.plan.steps.len(), 1);

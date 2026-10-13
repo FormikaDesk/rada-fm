@@ -9,6 +9,7 @@ pub enum MenuKind {
     Sort,
     View,
     More,
+    Tags,
 }
 
 impl App {
@@ -70,6 +71,7 @@ impl App {
                 MenuItem::toggle(ToggleHidden, "Hidden files", self.show_hidden, false),
                 MenuItem::toggle(ToggleSidebar, "Navigation pane", self.side_on, false),
             ],
+            MenuKind::Tags => self.tag_menu_items(),
             MenuKind::More => {
                 let mut v = vec![
                     MenuItem::act(Redo, true, false),
@@ -119,6 +121,14 @@ impl App {
             items.push(MenuItem::act(Rename, !ro, true));
             if !ro {
                 items.push(MenuItem::act(Compress, true, false));
+            }
+            if self.tags_available() {
+                items.push(MenuItem::sub(
+                    MenuKind::Tags,
+                    "Tags",
+                    !ro,
+                    !(on_archive || ro),
+                ));
             }
             if let Some(e) = cur
                 && e.is_navigable_dir()
@@ -178,6 +188,110 @@ impl App {
             }
             MenuCmd::View(mode) => self.set_view(mode),
             MenuCmd::Eject(mount) => self.start_eject(&mount),
+            MenuCmd::Tag(cmd) => self.run_tag_cmd(cmd),
         }
+    }
+}
+
+impl App {
+    /// Whether this system keeps tags, and these items may have them.
+    pub fn tags_available(&self) -> bool {
+        self.svc.platform.tags().is_some() && self.archive.is_none()
+    }
+
+    /// The entries the tag menu is about: the selection, or the item under the cursor.
+    fn tag_targets(&self) -> Vec<&Entry> {
+        if !self.marked.is_empty() {
+            self.listing
+                .all()
+                .iter()
+                .filter(|e| self.marked.contains(&e.name))
+                .collect()
+        } else {
+            self.current().into_iter().collect()
+        }
+    }
+
+    /// The entries of the Tags submenu: the seven colours, the other tags the items carry, a
+    /// new tag, and removing them all. A tag is ticked when every item has it.
+    pub(super) fn tag_menu_items(&self) -> Vec<MenuItem> {
+        use rada_core::platform::{Tag, TagColor};
+        let targets = self.tag_targets();
+        let everyone = |name: &str| {
+            !targets.is_empty()
+                && targets
+                    .iter()
+                    .all(|e| e.tags.iter().any(|t| t.is_called(name)))
+        };
+        let mut items: Vec<MenuItem> = TagColor::ALL
+            .into_iter()
+            .map(|c| {
+                MenuItem::choice(
+                    MenuCmd::Tag(TagCmd::Toggle(Tag::standard(c))),
+                    &format!("● {}", c.name()),
+                    everyone(c.name()),
+                    false,
+                )
+            })
+            .collect();
+        // The tags of their own that the items already carry, so that they can be taken off.
+        let mut others: Vec<Tag> = Vec::new();
+        for e in &targets {
+            for t in &e.tags {
+                if TagColor::from_name(&t.name).is_none()
+                    && !others.iter().any(|o| o.is_called(&t.name))
+                {
+                    others.push(t.clone());
+                }
+            }
+        }
+        for (i, t) in others.into_iter().enumerate() {
+            let on = everyone(&t.name);
+            items.push(MenuItem::choice(
+                MenuCmd::Tag(TagCmd::Toggle(t.clone())),
+                &format!("● {}", t.name),
+                on,
+                i == 0,
+            ));
+        }
+        items.push(MenuItem {
+            cmd: MenuCmd::Tag(TagCmd::New),
+            label: "New tag…".into(),
+            enabled: !targets.is_empty(),
+            gap_before: true,
+            checked: None,
+        });
+        items.push(MenuItem {
+            cmd: MenuCmd::Tag(TagCmd::Clear),
+            label: "Remove all tags".into(),
+            enabled: targets.iter().any(|e| !e.tags.is_empty()),
+            gap_before: false,
+            checked: None,
+        });
+        items
+    }
+
+    pub(super) fn run_tag_cmd(&mut self, cmd: TagCmd) {
+        use rada_core::ops::TagChange;
+        let items = self.targets();
+        if items.is_empty() || self.refuse_in_archive("change tags") || self.refuse_if_busy() {
+            return;
+        }
+        let change = match cmd {
+            TagCmd::Toggle(tag) => TagChange::Toggle { tag },
+            TagCmd::Clear => TagChange::Clear,
+            TagCmd::New => {
+                self.modal = Some(Modal::Input(InputView::new(
+                    InputKind::NewTag { items },
+                    String::new(),
+                )));
+                return;
+            }
+        };
+        let h = self
+            .svc
+            .jobs
+            .plan_request(OpRequest::SetTags { items, change });
+        self.begin_plan("Planning", h);
     }
 }

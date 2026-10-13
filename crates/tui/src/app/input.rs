@@ -26,10 +26,23 @@ pub enum MenuCmd {
     Sub(MenuKind),
     /// Eject the disk mounted here.
     Eject(PathBuf),
+    /// Change the tags of what is selected.
+    Tag(TagCmd),
     SortBy(SortKey),
     /// `true`: descending.
     SortOrder(bool),
     View(ViewMode),
+}
+
+/// What a choice in the Tags menu does.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TagCmd {
+    /// Give the tag to every selected item, or take it off if they all have it.
+    Toggle(rada_core::platform::Tag),
+    /// Ask for the name of a new tag.
+    New,
+    /// Take every tag off.
+    Clear,
 }
 
 pub struct MenuItem {
@@ -930,7 +943,10 @@ impl App {
             OpKind::Undo => "Undone".to_string(),
             OpKind::Extract => format!("Extracted {}", what(true)),
             OpKind::Compress => "Archive created".to_string(),
-            OpKind::SetTags => format!("Tags changed on {}", fmt::count(t.items.max(1), "item", "items")),
+            OpKind::SetTags => format!(
+                "Tags changed on {}",
+                fmt::count(t.items.max(1), "item", "items")
+            ),
         };
         let tail = match r.kind {
             OpKind::Undo => self

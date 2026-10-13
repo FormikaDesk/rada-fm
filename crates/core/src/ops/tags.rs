@@ -77,18 +77,23 @@ impl TagChange {
 impl Engine {
     /// The plan for changing the tags of `items`. Reads the tags, changes nothing.
     pub fn plan_set_tags(&self, items: &[PathBuf], change: &TagChange) -> Plan {
-        let mut plan = Plan::empty(
-            OpKind::SetTags,
-            format!(
-                "{} on {}",
-                change.describe(),
-                if items.len() == 1 {
-                    display::path(&items[0])
-                } else {
-                    format!("{} items", items.len())
-                }
-            ),
-        );
+        let mut plan = Plan::empty(OpKind::SetTags, {
+            let what = if items.len() == 1 {
+                items[0]
+                    .file_name()
+                    .map(display::name)
+                    .unwrap_or_else(|| display::path(&items[0]))
+            } else {
+                format!("{} items", items.len())
+            };
+            let d = change.describe();
+            let mut head = d.chars();
+            let first = head
+                .next()
+                .map(|c| c.to_uppercase().collect::<String>())
+                .unwrap_or_default();
+            format!("{first}{} on {what}", head.as_str())
+        });
         let mut ws = WarningSet::default();
         let Some(store) = self.platform.tags() else {
             ws.add_with(
