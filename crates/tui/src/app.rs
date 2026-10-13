@@ -460,10 +460,19 @@ fn matches_tag(e: &Entry, want: &str) -> bool {
     if want.is_empty() {
         return !e.tags.is_empty();
     }
-    e.tags.iter().any(|t| {
-        t.name.to_lowercase().contains(want)
-            || t.color.is_some_and(|c| c.name().to_lowercase() == want)
-    })
+    // A colour by any of its names ("red", "rosso") is the tags of that colour.
+    let colour = rada_core::platform::TagColor::from_name(want);
+    e.tags
+        .iter()
+        .any(|t| t.name.to_lowercase().contains(want) || (colour.is_some() && t.color == colour))
+}
+
+/// The language of the system's tag names (where there are tags).
+fn svc_tag_language(svc: &Services) -> String {
+    svc.platform
+        .tags()
+        .map(|t| t.language())
+        .unwrap_or_else(|| "en".to_string())
 }
 
 pub struct App {
@@ -534,6 +543,8 @@ pub struct App {
     last_click: Option<(Instant, usize)>,
     /// How soon a second click on the same row makes a double click.
     pub double_click: Duration,
+    /// The language the names of the seven tag colours are written in (the system's).
+    pub tag_lang: String,
     pub help_scroll: usize,
     /// Replaces the system clock when drawing relative dates (tests, screenshots).
     pub clock: Option<std::time::SystemTime>,
@@ -684,6 +695,7 @@ impl App {
             sel_anchor: None,
             last_click: None,
             double_click: Duration::from_millis(400),
+            tag_lang: svc_tag_language(&svc),
             help_scroll: 0,
             clock: None,
             view,

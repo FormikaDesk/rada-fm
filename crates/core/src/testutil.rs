@@ -229,6 +229,8 @@ fn process() -> &'static Process {
             std::env::set_var("XDG_DATA_HOME", &d.data);
             std::env::set_var("XDG_STATE_HOME", &d.state);
             std::env::set_var("XDG_CACHE_HOME", &d.cache);
+            // The tests do not speak the language of whoever runs them.
+            std::env::set_var("RADA_TAG_LANGUAGE", "en");
         }
         Process { guard, scratch }
     })

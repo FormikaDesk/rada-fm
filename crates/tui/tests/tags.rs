@@ -332,3 +332,77 @@ fn a_system_without_tags_has_no_tags_menu() {
     );
     assert!(!h.screen().contains("Tags"));
 }
+
+#[test]
+fn the_colours_are_called_what_the_system_calls_them() {
+    // On an Italian Mac the Finder knows its blue tag as "Blu"; a tag called "Blue" gets no
+    // colour from it, which showed as a grey dot. The menu, the tag written and the dot all
+    // follow the language.
+    let Some((sb, dir)) = scene(&[("a.txt", &["Rosso"])]) else {
+        return;
+    };
+    let mut h = H::new(sb, dir, 140, 36);
+    h.app.tag_lang = "it".into();
+    h.keys("j"); // a.txt
+    // A file tagged "Rosso" is red: the dot is drawn in red, and the menu ticks Rosso.
+    assert_eq!(
+        h.app.current().unwrap().tags[0].color,
+        Some(rada_core::platform::TagColor::Red)
+    );
+    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    h.mouse(
+        crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right),
+        x,
+        y,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    while !menu_selected(&mut h).starts_with("Tags") {
+        h.key(KeyCode::Down);
+    }
+    h.key(KeyCode::Enter);
+    let Some(Modal::Menu(m)) = &h.app.modal else {
+        panic!("{}", h.screen())
+    };
+    let labels: Vec<(String, Option<bool>)> = m
+        .items
+        .iter()
+        .map(|i| (i.label.clone(), i.checked))
+        .collect();
+    let names: Vec<&str> = labels.iter().take(7).map(|l| l.0.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "● Rosso",
+            "● Arancione",
+            "● Giallo",
+            "● Verde",
+            "● Blu",
+            "● Viola",
+            "● Grigio"
+        ]
+    );
+    assert_eq!(labels[0].1, Some(true), "Rosso is ticked: {labels:?}");
+    h.key(KeyCode::Esc);
+    // Choosing Blu puts a tag called Blu, blue, on the file.
+    choose_tag(&mut h, "Blu");
+    plan_modal(&mut h);
+    confirm(&mut h);
+    let blu = h
+        .app
+        .current()
+        .unwrap()
+        .tags
+        .iter()
+        .find(|t| t.name == "Blu")
+        .cloned()
+        .expect("a tag called Blu");
+    assert_eq!(blu.color, Some(rada_core::platform::TagColor::Blue));
+    // The filter finds the colour by either name.
+    for want in ["tag:blu", "tag:blue"] {
+        h.keys("/");
+        h.keys(want);
+        h.press("enter");
+        assert_eq!(h.names(), ["a.txt"], "{want}");
+        h.press("esc");
+    }
+}

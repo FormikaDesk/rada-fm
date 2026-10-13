@@ -2,7 +2,10 @@
 //!
 //! * **macOS**: the Finder's tags, in the extended attribute `com.apple.metadata:_kMDItemUserTags`,
 //!   a binary property list holding strings of the form `Name` or `Name\n<colour number>`. The
-//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange).
+//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The colour is the number;
+//!   the name of a standard colour is written in the language of the system (`Blu\n4` on an
+//!   Italian Mac), because the Finder knows its colour tags by those names and gives a tag of
+//!   another name no colour.
 //! * **Linux**: `user.xdg.tags`, the freedesktop convention that Dolphin and Baloo use: tag
 //!   names in UTF-8, separated by commas. It has no colours; a tag called "Red" is drawn red.
 //! * **Windows**: not supported; the interface offers nothing there.
@@ -74,16 +77,105 @@ impl TagColor {
         TagColor::ALL.into_iter().find(|c| c.finder_index() == i)
     }
 
-    /// A colour from its English name, in any case ("red", "Gray"; "grey" too).
+    /// The name the system of language `lang` (`"it"`, `"fr"`… the first two letters of the
+    /// locale) gives this colour as a tag; English for a language not in the table.
+    pub fn label(self, lang: &str) -> &'static str {
+        let lang = lang.get(..2).unwrap_or(lang).to_ascii_lowercase();
+        let names = LABELS
+            .iter()
+            .find(|(l, _)| *l == lang)
+            .map(|(_, n)| n)
+            .unwrap_or(&LABELS[0].1);
+        let at = TagColor::ALL.iter().position(|c| *c == self).unwrap_or(0);
+        names[at]
+    }
+
+    /// A colour from its name in any language of the table, in any case ("red", "Gray",
+    /// "grey", "Rosso", "Grün").
     pub fn from_name(name: &str) -> Option<TagColor> {
         let n = name.trim().to_lowercase();
         if n == "grey" {
             return Some(TagColor::Gray);
         }
-        TagColor::ALL
-            .into_iter()
-            .find(|c| c.name().to_lowercase() == n)
+        LABELS.iter().find_map(|(_, names)| {
+            names
+                .iter()
+                .position(|l| l.to_lowercase() == n)
+                .map(|i| TagColor::ALL[i])
+        })
     }
+}
+
+/// What the Finder calls its seven colours (in the order of [`TagColor::ALL`]: red, orange,
+/// yellow, green, blue, purple, gray), by language. English first: it is the fallback.
+const LABELS: [(&str, [&str; 7]); 9] = [
+    (
+        "en",
+        ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"],
+    ),
+    (
+        "it",
+        [
+            "Rosso",
+            "Arancione",
+            "Giallo",
+            "Verde",
+            "Blu",
+            "Viola",
+            "Grigio",
+        ],
+    ),
+    (
+        "fr",
+        ["Rouge", "Orange", "Jaune", "Vert", "Bleu", "Violet", "Gris"],
+    ),
+    (
+        "de",
+        ["Rot", "Orange", "Gelb", "Grün", "Blau", "Violett", "Grau"],
+    ),
+    (
+        "es",
+        [
+            "Rojo", "Naranja", "Amarillo", "Verde", "Azul", "Morado", "Gris",
+        ],
+    ),
+    (
+        "pt",
+        [
+            "Vermelho", "Laranja", "Amarelo", "Verde", "Azul", "Roxo", "Cinza",
+        ],
+    ),
+    (
+        "nl",
+        ["Rood", "Oranje", "Geel", "Groen", "Blauw", "Paars", "Grijs"],
+    ),
+    ("sv", ["Röd", "Orange", "Gul", "Grön", "Blå", "Lila", "Grå"]),
+    (
+        "da",
+        ["Rød", "Orange", "Gul", "Grøn", "Blå", "Lilla", "Grå"],
+    ),
+];
+
+/// The language of the system as the first two letters of a locale (`it_IT.UTF-8` is `it`):
+/// from `RADA_TAG_LANGUAGE` (to choose by hand), `LC_ALL`, `LC_MESSAGES`, `LANG`; English
+/// when none says.
+pub fn language_from_env() -> String {
+    ["RADA_TAG_LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
+        .into_iter()
+        .filter_map(|k| std::env::var(k).ok())
+        .find(|v| !v.is_empty() && v != "C" && v != "POSIX")
+        .map(|v| v.chars().take(2).collect::<String>().to_ascii_lowercase())
+        .unwrap_or_else(|| "en".to_string())
+}
+
+/// The first language of `defaults read -g AppleLanguages` (`("it-IT", "en-IT")`): `it`.
+pub fn language_from_apple_languages(output: &str) -> Option<String> {
+    let first = output.split('"').nth(1)?;
+    let lang: String = first
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect();
+    (lang.len() >= 2).then(|| lang.to_ascii_lowercase())
 }
 
 /// One tag: a name, and the colour it is drawn in when it has one.
@@ -99,6 +191,14 @@ impl Tag {
     pub fn standard(color: TagColor) -> Tag {
         Tag {
             name: color.name().to_string(),
+            color: Some(color),
+        }
+    }
+
+    /// One of the seven colours, called what the system of language `lang` calls it.
+    pub fn standard_in(color: TagColor, lang: &str) -> Tag {
+        Tag {
+            name: color.label(lang).to_string(),
             color: Some(color),
         }
     }
@@ -178,15 +278,13 @@ pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
                     Some((n, i)) => (n.to_string(), i.trim().parse::<u8>().ok()),
                     None => (s, None),
                 };
-                let color = index
-                    .and_then(TagColor::from_finder_index)
-                    // A tag without a colour number but with a colour's name is that colour.
-                    .or_else(|| {
-                        index
-                            .is_none()
-                            .then(|| TagColor::from_name(&name))
-                            .flatten()
-                    });
+                // The colour is the number the Finder wrote (0: none), whatever the name says: a
+                // Finder in Italian calls blue "Blu". Only a tag with no number at all is
+                // given the colour of its name, if it has one.
+                let color = match index {
+                    Some(i) => TagColor::from_finder_index(i),
+                    None => TagColor::from_name(&name),
+                };
                 Tag { name, color }
             })
             .filter(|t| !t.name.is_empty())
@@ -225,6 +323,12 @@ pub trait TagStore: Send + Sync {
 
     /// What this system calls them, for messages ("Finder tags").
     fn what(&self) -> &'static str;
+
+    /// The language the names of the seven colours are written in (see
+    /// [`TagColor::label`]). The system's, where the system says.
+    fn language(&self) -> String {
+        language_from_env()
+    }
 }
 
 /// Tags kept in an extended attribute.
@@ -301,6 +405,29 @@ impl TagStore for XattrTags {
             Format::Finder => "Finder tags",
             Format::Freedesktop => "tags",
         }
+    }
+
+    fn language(&self) -> String {
+        #[cfg(target_os = "macos")]
+        if self.format == Format::Finder {
+            // The terminal's LANG says little on a Mac: the system's list of languages does.
+            static LANG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+            return LANG
+                .get_or_init(|| {
+                    std::process::Command::new("defaults")
+                        .args(["read", "-g", "AppleLanguages"])
+                        .stdin(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .output()
+                        .ok()
+                        .and_then(|o| {
+                            language_from_apple_languages(&String::from_utf8_lossy(&o.stdout))
+                        })
+                        .unwrap_or_else(language_from_env)
+                })
+                .clone();
+        }
+        language_from_env()
     }
 }
 
@@ -502,6 +629,123 @@ mod tests {
         assert_eq!(with_tag(&a, &Tag::standard(TagColor::Blue)).len(), 3);
         assert_eq!(without_tag(&a, "RED"), [t("Work", None)]);
         assert_eq!(without_tag(&a, "missing"), a);
+    }
+
+    #[test]
+    fn the_colours_are_called_in_the_language_of_the_system() {
+        let names = |lang: &str| TagColor::ALL.map(|c| c.label(lang));
+        assert_eq!(
+            names("it"),
+            [
+                "Rosso",
+                "Arancione",
+                "Giallo",
+                "Verde",
+                "Blu",
+                "Viola",
+                "Grigio"
+            ]
+        );
+        assert_eq!(
+            names("en"),
+            ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"]
+        );
+        // The first two letters of a locale are the language; an unknown one is English.
+        assert_eq!(TagColor::Blue.label("it_IT.UTF-8"), "Blu");
+        assert_eq!(TagColor::Blue.label("pt-BR"), "Azul");
+        assert_eq!(TagColor::Blue.label("xx"), "Blue");
+        assert_eq!(TagColor::Blue.label(""), "Blue");
+        // Any of the names finds its colour, in any case.
+        for lang in ["en", "it", "fr", "de", "es", "pt", "nl", "sv", "da"] {
+            for c in TagColor::ALL {
+                assert_eq!(TagColor::from_name(c.label(lang)), Some(c), "{lang} {c:?}");
+                assert_eq!(
+                    TagColor::from_name(&c.label(lang).to_uppercase()),
+                    Some(c),
+                    "{lang} {c:?}"
+                );
+            }
+        }
+        assert_eq!(Tag::standard_in(TagColor::Blue, "it").name, "Blu");
+        assert_eq!(Tag::named("Rosso").color, Some(TagColor::Red));
+    }
+
+    #[test]
+    fn the_language_is_read_from_the_locale_and_from_the_macs_list() {
+        assert_eq!(
+            language_from_apple_languages("(\n    \"it-IT\",\n    \"en-IT\"\n)\n").as_deref(),
+            Some("it")
+        );
+        assert_eq!(
+            language_from_apple_languages("(\n    \"zh-Hans-CN\"\n)").as_deref(),
+            Some("zh")
+        );
+        assert_eq!(language_from_apple_languages("garbage"), None);
+        assert_eq!(language_from_apple_languages("()"), None);
+    }
+
+    #[test]
+    fn a_colour_chosen_on_an_italian_mac_is_written_as_the_finder_writes_it() {
+        // "Blu" and the number 4: what the Finder itself stores for the blue tag.
+        let bytes = encode_finder(&[Tag::standard_in(TagColor::Blue, "it")]);
+        assert_eq!(
+            crate::platform::bplist::decode_string_array(&bytes).unwrap(),
+            ["Blu\n4"]
+        );
+        // And back: the colour comes from the number.
+        let back = decode_finder(&bytes).unwrap();
+        assert_eq!(back, [t("Blu", Some(TagColor::Blue))]);
+        // Every standard colour, in every language, goes out and comes back with its number.
+        for lang in ["en", "it", "fr", "de", "es"] {
+            for c in TagColor::ALL {
+                let tag = Tag::standard_in(c, lang);
+                let bytes = encode_finder(std::slice::from_ref(&tag));
+                let items = crate::platform::bplist::decode_string_array(&bytes).unwrap();
+                assert_eq!(items, [format!("{}\n{}", tag.name, c.finder_index())]);
+                assert_eq!(decode_finder(&bytes).unwrap(), [tag]);
+            }
+        }
+    }
+
+    #[test]
+    fn real_finder_values_in_italian_are_read_by_their_numbers() {
+        // What an Italian Finder writes for its seven colours, a tag of the user's own, one
+        // with a colour, one with the number 0, and a tag whose name lies about its number.
+        let bytes = crate::platform::bplist::encode_string_array(&[
+            "Rosso\n6".into(),
+            "Arancione\n7".into(),
+            "Giallo\n5".into(),
+            "Verde\n2".into(),
+            "Blu\n4".into(),
+            "Viola\n3".into(),
+            "Grigio\n1".into(),
+            "Lavoro".into(),
+            "Clienti\n4".into(),
+            "Progetto\n0".into(),
+            "Blue\n0".into(),
+            "Blu\n6".into(),
+        ]);
+        let got = decode_finder(&bytes).unwrap();
+        let colours: Vec<Option<TagColor>> = got.iter().map(|t| t.color).collect();
+        use TagColor::*;
+        assert_eq!(
+            colours,
+            [
+                Some(Red),
+                Some(Orange),
+                Some(Yellow),
+                Some(Green),
+                Some(Blue),
+                Some(Purple),
+                Some(Gray),
+                None,
+                Some(Blue),
+                None,
+                None,
+                Some(Red),
+            ]
+        );
+        assert_eq!(got[4].name, "Blu");
     }
 
     #[test]

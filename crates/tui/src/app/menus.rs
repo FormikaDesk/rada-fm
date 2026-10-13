@@ -223,13 +223,25 @@ impl App {
                     .iter()
                     .all(|e| e.tags.iter().any(|t| t.is_called(name)))
         };
+        // The colours are called what the system calls them (a Mac in Italian says "Blu"): a
+        // tag of another name has no colour for the Finder. A tag with the colour counts
+        // whatever its name.
+        let lang = self.tag_lang.as_str();
+        let has_colour = |c: Hue| {
+            !targets.is_empty()
+                && targets.iter().all(|e| {
+                    e.tags
+                        .iter()
+                        .any(|t| t.color == Some(c) || t.is_called(c.label(lang)))
+                })
+        };
         let mut items: Vec<MenuItem> = Hue::ALL
             .into_iter()
             .map(|c| {
                 MenuItem::choice(
-                    MenuCmd::Tag(TagCmd::Toggle(Tag::standard(c))),
-                    &format!("● {}", c.name()),
-                    everyone(c.name()),
+                    MenuCmd::Tag(TagCmd::Toggle(Tag::standard_in(c, lang))),
+                    &format!("● {}", c.label(lang)),
+                    has_colour(c),
                     false,
                 )
             })
