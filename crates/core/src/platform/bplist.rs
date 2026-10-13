@@ -158,8 +158,10 @@ fn decode_binary(b: &[u8]) -> Option<Vec<String>> {
             0x60 => {
                 let raw = b.get(data..data + len * 2)?;
                 let units: Vec<u16> = raw
-                    .chunks_exact(2)
-                    .map(|c| u16::from_be_bytes([c[0], c[1]]))
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|c| u16::from_be_bytes(*c))
                     .collect();
                 out.push(String::from_utf16(&units).ok()?);
             }

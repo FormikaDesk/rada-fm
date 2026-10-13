@@ -46,7 +46,8 @@ enum Command {
 
 #[derive(Subcommand, Debug)]
 enum SetupWhat {
-    /// Add rada to the application menu (launcher entry and icons), for this user only.
+    /// Add rada to the application menu (Linux), make Rada.app in ~/Applications (macOS) or a
+    /// Start menu shortcut (Windows), for this user only.
     Desktop {
         /// Take away exactly what a previous setup installed.
         #[arg(long)]
@@ -87,7 +88,7 @@ struct Cli {
     #[arg(long)]
     spawn_terminal: bool,
 
-    /// Icons: `auto` (default: Nerd Font if the terminal uses one), `nerd`, `unicode` or `none`.
+    /// Icons: `auto` (default: Nerd Font if the terminal uses one, or is Ghostty), `nerd`, `unicode` or `none`.
     #[arg(long, value_name = "SET")]
     icons: Option<String>,
 
