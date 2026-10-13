@@ -332,12 +332,11 @@ fn the_version_is_in_the_status_bar_and_a_click_asks_for_a_newer_one() {
     // a plain sentence.
     h.app.start_updates(ctx);
     assert_eq!(h.app.version(), "0.6.0");
-    h.app.toast = None;
+    h.app.clear_notices();
     assert!(h.screen().contains("v0.6.0 ⟳"), "{}", h.screen());
     h.click(&Target::CheckUpdates);
     h.wait("the answer", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text == "rada is up to date")
     });
     assert!(h.app.modal.is_none());
@@ -379,8 +378,7 @@ fn a_failed_check_says_so_when_somebody_asked() {
     h.app.start_updates(ctx);
     h.click(&Target::CheckUpdates);
     h.wait("the failure", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text.starts_with("cannot look for updates"))
     });
 }
@@ -425,8 +423,7 @@ fn the_help_button_is_a_menu_with_the_keys_the_check_and_about() {
         .unwrap();
     h.click(&Target::MenuItem(i));
     h.wait("the answer", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text == "rada is up to date")
     });
     // The first entry is still the keys, which F1 and ? open directly.

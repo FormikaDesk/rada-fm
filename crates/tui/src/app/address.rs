@@ -1,5 +1,15 @@
-//! The address bar when it is a text field: typing a path, completing it with the
-//! subfolders of the folder being typed in, and going there.
+//! The bar at the top when it is a text field. One field does three things, told apart by
+//! what is typed:
+//!
+//! - a path (`/etc`, `~/src`, `a/b`): the subfolders of the folder being typed in are offered
+//!   and Enter goes there;
+//! - a word: the files of the folder are filtered as it is typed, and the commands (and the
+//!   places) that match are offered under the field; Enter runs the one picked with the
+//!   arrow keys, or keeps the filter;
+//! - nothing yet: the placeholder, "Search files or type a command…".
+//!
+//! Ctrl+L shows the path all selected, so that typing a word replaces it and typing a path
+//! does too; Ctrl+P and Ctrl+F start from nothing; Esc goes back to the path.
 //!
 //! The subfolders come from a worker (`Services::complete_dirs`): this code never reads the
 //! disk. What it keeps is the last list it was given and filters it as the text changes.
@@ -7,6 +17,62 @@
 use std::path::Component;
 
 use super::*;
+use crate::fuzzy;
+use crate::palette::PaletteKind;
+
+/// Most commands and places offered under the field in the search mode.
+const MAX_COMMANDS: usize = 5;
+const MAX_PLACES: usize = 3;
+
+/// What the text of the bar is for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BarMode {
+    /// Nothing typed.
+    Empty,
+    /// A path to go to.
+    Path,
+    /// Words to filter the files by and to find a command with.
+    Search,
+}
+
+/// What a suggestion of the search mode does.
+#[derive(Clone, Debug)]
+pub enum BarItem {
+    /// Run an action, as its key would.
+    Command(Action),
+    /// Go to a folder.
+    Place(PaletteItem),
+}
+
+#[derive(Clone, Debug)]
+pub struct BarHit {
+    pub item: BarItem,
+    /// Matched characters of the label, to pick out.
+    pub label_pos: Vec<usize>,
+}
+
+/// Whether a text is meant as a path: it starts like one or holds a separator.
+pub fn looks_like_path(text: &str) -> bool {
+    let t = text.trim();
+    t.starts_with('/')
+        || t.starts_with('~')
+        || t == "."
+        || t == ".."
+        || t.contains(is_separator)
+        || (cfg!(windows)
+            && t.chars().nth(1) == Some(':')
+            && t.chars().next().is_some_and(|c| c.is_ascii_alphabetic()))
+}
+
+/// Whether a command is worth offering in the bar: what is done to files, to the view, to
+/// the tabs and to the program; not each step of the cursor.
+fn offered(a: Action) -> bool {
+    use crate::keymap::Group;
+    matches!(
+        a.group(),
+        Group::Files | Group::View | Group::Tabs | Group::Program
+    ) || matches!(a, Action::SelectAll)
+}
 
 /// Most suggestions shown under the field.
 pub const MAX_SUGGESTIONS: usize = 8;
@@ -22,6 +88,16 @@ pub struct AddressEdit {
     asked: Option<PathBuf>,
     /// The suggestion highlighted with the arrow keys.
     pub selected: Option<usize>,
+    /// The whole text is selected: the first thing typed replaces it (Ctrl+L shows the path
+    /// that way), moving the cursor leaves it to be edited.
+    pub fresh: bool,
+    /// The places the search mode may offer, and the matching done over them.
+    palette: Option<Box<PaletteView>>,
+    /// What the search mode offers under the field, and the one picked with the arrows.
+    pub hits: Vec<BarHit>,
+    pub hit_selected: Option<usize>,
+    /// The bar put the filter on the folder (and takes it off when it is left empty).
+    pub filtering: bool,
 }
 
 impl AddressEdit {
@@ -34,7 +110,33 @@ impl AddressEdit {
             listed: None,
             asked: None,
             selected: None,
+            fresh: false,
+            palette: None,
+            hits: Vec::new(),
+            hit_selected: None,
+            filtering: false,
         }
+    }
+
+    pub fn mode(&self) -> BarMode {
+        let t = self.text.trim();
+        if t.is_empty() {
+            BarMode::Empty
+        } else if looks_like_path(t) {
+            BarMode::Path
+        } else {
+            BarMode::Search
+        }
+    }
+
+    /// A typed character: it replaces the text when that was all selected.
+    fn type_char(&mut self, c: char) {
+        if self.fresh {
+            self.text.clear();
+            self.cursor = 0;
+            self.fresh = false;
+        }
+        self.insert(c);
     }
 
     fn byte_at(&self, chars: usize) -> usize {
@@ -53,6 +155,13 @@ impl AddressEdit {
     }
 
     fn backspace(&mut self) {
+        if self.fresh {
+            self.text.clear();
+            self.cursor = 0;
+            self.fresh = false;
+            self.selected = None;
+            return;
+        }
         if self.cursor > 0 {
             let at = self.byte_at(self.cursor - 1);
             self.text.remove(at);
@@ -155,9 +264,34 @@ impl App {
         if !text.ends_with(is_separator) {
             text.push(SEP);
         }
-        self.address = Some(AddressEdit::new(text));
+        let mut edit = AddressEdit::new(text);
+        edit.fresh = true;
+        self.address = Some(edit);
         self.filter_editing_off();
         self.address_changed();
+    }
+
+    /// Ctrl+P and Ctrl+F: the bar from nothing (or from the filter in force), ready for a
+    /// word or a path.
+    pub fn start_bar(&mut self, keep_filter: bool) {
+        let text = if keep_filter {
+            self.filter
+                .as_ref()
+                .map(|f| f.text.clone())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let mut edit = AddressEdit::new(text);
+        edit.palette = Some(Box::new(PaletteView::new(
+            self.palette_items(),
+            self.svc.home.clone(),
+        )));
+        // A filter already on the folder is the bar's to take off.
+        edit.filtering = keep_filter && self.filter.is_some();
+        self.address = Some(edit);
+        self.filter_editing_off();
+        self.bar_changed();
     }
 
     /// The folder shown in the address bar: inside an archive, the archive's own path.
@@ -172,8 +306,133 @@ impl App {
     }
 
     pub fn cancel_address_edit(&mut self) {
-        self.address = None;
+        let filtering = self.address.take().is_some_and(|a| a.filtering);
+        if filtering {
+            self.set_filter(None);
+        }
         self.dirty = true;
+    }
+
+    /// The text changed: in a path, ask for its subfolders; in words, filter the files and
+    /// work out the commands and places to offer.
+    pub(super) fn bar_changed(&mut self) {
+        self.address_changed();
+        let Some(a) = &self.address else { return };
+        match a.mode() {
+            BarMode::Search => {
+                let text = a.text.trim().to_string();
+                self.set_filter(Some(FilterState {
+                    text,
+                    editing: false,
+                }));
+                if let Some(a) = &mut self.address {
+                    a.filtering = true;
+                }
+                self.refresh_bar_hits();
+            }
+            _ => {
+                let was = a.filtering;
+                if let Some(a) = &mut self.address {
+                    a.hits.clear();
+                    a.hit_selected = None;
+                    a.filtering = false;
+                }
+                if was {
+                    self.set_filter(None);
+                }
+            }
+        }
+    }
+
+    /// The commands and the places that match what is typed, best first.
+    fn refresh_bar_hits(&mut self) {
+        let Some(a) = &mut self.address else { return };
+        let q = a.text.trim().to_string();
+        let mut commands: Vec<(i64, BarHit)> = Vec::new();
+        for &action in Action::ALL.iter().filter(|a| offered(**a)) {
+            let label = action.label();
+            let english = action.label_key().in_lang(rada_core::i18n::Lang::En);
+            let best = match (fuzzy::score(&q, label), fuzzy::score(&q, english)) {
+                (Some((a, pos)), Some((b, _))) if a >= b => Some((a, pos)),
+                (_, Some((b, _))) => Some((b, Vec::new())),
+                (Some((a, pos)), None) => Some((a, pos)),
+                (None, None) => None,
+            };
+            if let Some((score, label_pos)) = best {
+                commands.push((
+                    score,
+                    BarHit {
+                        item: BarItem::Command(action),
+                        label_pos,
+                    },
+                ));
+            }
+        }
+        commands.sort_by_key(|c| std::cmp::Reverse(c.0));
+        let mut hits: Vec<BarHit> = commands
+            .into_iter()
+            .take(MAX_COMMANDS)
+            .map(|(_, h)| h)
+            .collect();
+        if let Some(p) = &mut a.palette {
+            p.query = q;
+            p.cursor = p.query.chars().count();
+            p.refilter();
+            let places: Vec<BarHit> = p
+                .hits
+                .iter()
+                .filter(|h| {
+                    !matches!(
+                        p.items[h.item].kind,
+                        PaletteKind::Folder | PaletteKind::Typed | PaletteKind::Parent
+                    )
+                })
+                .take(MAX_PLACES)
+                .map(|h| BarHit {
+                    item: BarItem::Place(p.items[h.item].clone()),
+                    label_pos: h.label_pos.clone(),
+                })
+                .collect();
+            hits.extend(places);
+        }
+        a.hit_selected = a.hit_selected.filter(|i| *i < hits.len());
+        a.hits = hits;
+    }
+
+    /// Run the `i`-th suggestion of the search mode: the bar closes, the filter it made goes.
+    pub(super) fn run_bar_hit(&mut self, i: usize) {
+        let Some(a) = self.address.take() else { return };
+        let Some(hit) = a.hits.get(i).cloned() else {
+            return;
+        };
+        if a.filtering {
+            self.set_filter(None);
+        }
+        match hit.item {
+            BarItem::Command(action) => self.dispatch(action),
+            BarItem::Place(item) => self.open_dir(item.path),
+        }
+    }
+
+    /// Enter in the search mode: run what was picked; else keep the filter if it shows
+    /// something; else run the best suggestion; else leave.
+    fn bar_enter(&mut self) {
+        let Some(a) = &self.address else { return };
+        if let Some(i) = a.hit_selected {
+            return self.run_bar_hit(i);
+        }
+        if a.text.trim().is_empty() {
+            return self.cancel_address_edit();
+        }
+        if !self.visible.is_empty() {
+            // The files that match stay: the bar is done, the filter stays on the folder.
+            self.address = None;
+            return;
+        }
+        if !a.hits.is_empty() {
+            return self.run_bar_hit(0);
+        }
+        self.cancel_address_edit();
     }
 
     /// The text changed: ask for the subfolders of the folder it is in, if not asked yet.
@@ -222,12 +481,20 @@ impl App {
         let Some(a) = &mut self.address else { return };
         match key.code {
             KeyCode::Esc => return self.cancel_address_edit(),
+            KeyCode::Enter if a.mode() != BarMode::Path => return self.bar_enter(),
             KeyCode::Enter => {
                 if let Some(name) = a.selected.and_then(|i| sugg.get(i)) {
                     let text = a.with_name(name);
                     a.text = text;
                 }
                 return self.submit_address();
+            }
+            KeyCode::Tab | KeyCode::BackTab if a.mode() == BarMode::Search => {
+                let n = a.hits.len();
+                if n > 0 {
+                    a.hit_selected = Some(a.hit_selected.map_or(0, |i| (i + 1) % n));
+                }
+                return;
             }
             KeyCode::Tab | KeyCode::BackTab => {
                 let pick = a.selected.and_then(|i| sugg.get(i)).cloned().or_else(|| {
@@ -254,6 +521,21 @@ impl App {
                 }
                 a.selected = None;
             }
+            KeyCode::Down | KeyCode::Up if a.mode() == BarMode::Search => {
+                let down = key.code == KeyCode::Down;
+                let n = a.hits.len();
+                if n == 0 {
+                    // Nothing to pick: the arrows move through the files that match.
+                    return self.dispatch(if down { Action::Down } else { Action::Up });
+                }
+                a.hit_selected = match (a.hit_selected, down) {
+                    (None, true) => Some(0),
+                    (None, false) => Some(n - 1),
+                    (Some(i), true) => Some((i + 1) % n),
+                    (Some(i), false) => Some((i + n - 1) % n),
+                };
+                return;
+            }
             KeyCode::Down => {
                 if !sugg.is_empty() {
                     a.selected = Some(a.selected.map_or(0, |i| (i + 1) % sugg.len()));
@@ -267,21 +549,38 @@ impl App {
                     );
                 }
             }
-            KeyCode::Left => a.cursor = a.cursor.saturating_sub(1),
-            KeyCode::Right => a.cursor = (a.cursor + 1).min(a.text.chars().count()),
-            KeyCode::Home => a.cursor = 0,
-            KeyCode::End => a.cursor = a.text.chars().count(),
+            KeyCode::Left => {
+                a.fresh = false;
+                a.cursor = a.cursor.saturating_sub(1)
+            }
+            KeyCode::Right => {
+                a.fresh = false;
+                a.cursor = (a.cursor + 1).min(a.text.chars().count())
+            }
+            KeyCode::Home => {
+                a.fresh = false;
+                a.cursor = 0
+            }
+            KeyCode::End => {
+                a.fresh = false;
+                a.cursor = a.text.chars().count()
+            }
+            // Backspace with nothing left to delete leaves the bar (as it took the filter off).
+            KeyCode::Backspace if a.text.is_empty() && !a.fresh => {
+                return self.cancel_address_edit();
+            }
             KeyCode::Backspace => a.backspace(),
             KeyCode::Delete => a.delete(),
             KeyCode::Char('u') if ctrl => {
                 a.text.clear();
                 a.cursor = 0;
                 a.selected = None;
+                a.fresh = false;
             }
-            KeyCode::Char(c) if !ctrl && !alt => a.insert(c),
+            KeyCode::Char(c) if !ctrl && !alt => a.type_char(c),
             _ => {}
         }
-        self.address_changed();
+        self.bar_changed();
     }
 
     /// Go where the text says.

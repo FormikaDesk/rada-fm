@@ -72,9 +72,26 @@ impl App {
                     self.view == ViewMode::Icons,
                     false,
                 ),
-                MenuItem::toggle(ToggleDetails, Key::MenuDetailsPane.tr(), self.details_visible(), true),
-                MenuItem::toggle(ToggleHidden, Key::MenuHiddenFiles.tr(), self.show_hidden, false),
+                MenuItem::choice(
+                    MenuCmd::View(ViewMode::Columns),
+                    Key::ViewColumns.tr(),
+                    self.view == ViewMode::Columns,
+                    false,
+                ),
+                MenuItem::toggle(
+                    ToggleDetails,
+                    Key::MenuDetailsPane.tr(),
+                    self.details_visible(),
+                    true,
+                ),
+                MenuItem::toggle(
+                    ToggleHidden,
+                    Key::MenuHiddenFiles.tr(),
+                    self.show_hidden,
+                    false,
+                ),
                 MenuItem::toggle(ToggleSidebar, Key::MenuNavPane.tr(), self.side_on, false),
+                MenuItem::toggle(ToggleTags, Key::MenuTagColumn.tr(), self.show_tags, false),
             ],
             MenuKind::Tags => self.tag_menu_items(),
             MenuKind::Help => vec![
@@ -156,10 +173,25 @@ impl App {
             items.push(MenuItem::act(Trash, !ro, true));
             items.push(MenuItem::act(Properties, true, true));
         } else {
-            items.push(MenuItem::sub(MenuKind::New, Key::MenuNew.tr(), !nowhere, false));
+            items.push(MenuItem::sub(
+                MenuKind::New,
+                Key::MenuNew.tr(),
+                !nowhere,
+                false,
+            ));
             items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
-            items.push(MenuItem::sub(MenuKind::Sort, Key::MenuSortBy.tr(), true, true));
-            items.push(MenuItem::sub(MenuKind::View, Key::MenuView.tr(), true, false));
+            items.push(MenuItem::sub(
+                MenuKind::Sort,
+                Key::MenuSortBy.tr(),
+                true,
+                true,
+            ));
+            items.push(MenuItem::sub(
+                MenuKind::View,
+                Key::MenuView.tr(),
+                true,
+                false,
+            ));
             items.push(MenuItem::act(Refresh, true, true));
             items.push(MenuItem::act(SelectAll, true, false));
             if ro {
@@ -298,7 +330,10 @@ impl App {
     pub(super) fn run_tag_cmd(&mut self, cmd: TagCmd) {
         use rada_core::ops::TagChange;
         let items = self.targets();
-        if items.is_empty() || self.refuse_in_archive(Key::WhatChangeTags.tr()) || self.refuse_if_busy() {
+        if items.is_empty()
+            || self.refuse_in_archive(Key::WhatChangeTags.tr())
+            || self.refuse_if_busy()
+        {
             return;
         }
         let change = match cmd {
@@ -316,6 +351,6 @@ impl App {
             .svc
             .jobs
             .plan_request(OpRequest::SetTags { items, change });
-        self.begin_plan(Key::PlanningTags.tr(), h);
+        self.begin_plan(Key::PlanningGeneric.tr(), h);
     }
 }

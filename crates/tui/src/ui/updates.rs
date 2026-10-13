@@ -78,7 +78,10 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             head.push(Line::from(Span::styled(Key::WhatIsNew.tr(), th.dim())));
             let notes = notice.notes.trim();
             if notes.is_empty() {
-                body.push(Line::from(Span::styled(Key::NoReleaseNotes.tr(), th.faint())));
+                body.push(Line::from(Span::styled(
+                    Key::NoReleaseNotes.tr(),
+                    th.faint(),
+                )));
             }
             for raw in notes.lines() {
                 let raw = raw.trim_end();
@@ -106,7 +109,13 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             let mut spans = Vec::new();
             let mut targets = Vec::new();
             if can {
-                spans.push(button(th, "Enter", Key::BtnUpdateNow.tr(), Some(th.accent), true));
+                spans.push(button(
+                    th,
+                    "Enter",
+                    Key::BtnUpdateNow.tr(),
+                    Some(th.accent),
+                    true,
+                ));
                 spans.push(Span::raw("  "));
                 targets.push((0, Target::Key(KeyCode::Enter)));
                 targets.push((2, Target::Key(KeyCode::Esc)));

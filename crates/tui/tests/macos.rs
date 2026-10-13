@@ -305,7 +305,7 @@ fn an_ordinary_refusal_is_still_just_an_error() {
     h.pump(400);
     assert!(h.app.modal.is_none());
     // An error as before (its wording is the system's own), no window about consent.
-    assert!(h.app.toast.is_some(), "{}", h.screen());
+    assert!(h.app.current_notice().is_some(), "{}", h.screen());
 }
 
 // ---------------------------------------------------------------------------- eject

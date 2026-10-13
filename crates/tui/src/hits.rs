@@ -51,6 +51,8 @@ pub enum Target {
     Address,
     /// A suggestion under the address field.
     Suggest(usize),
+    /// A command or a place offered under the bar while words are typed in it.
+    BarHit(usize),
     /// A dropdown button of the command bar.
     Menu(crate::app::MenuKind),
     /// The Details / Icons buttons of the status bar.
@@ -63,8 +65,25 @@ pub enum Target {
     OpenWithAlways,
     /// The version in the status bar: look for a newer one now.
     CheckUpdates,
+    /// Something on the notification card.
+    Notice(NoticeHit),
     /// Inside a window but on nothing in particular.
     Window,
+}
+
+/// The parts of a notification card that can be clicked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NoticeHit {
+    /// Take back what was done.
+    Undo,
+    /// Do again what was taken back.
+    Redo,
+    /// Go to where the result is.
+    Show,
+    /// Close an error.
+    Close,
+    /// Anywhere else on the card: it goes away.
+    Card,
 }
 
 #[derive(Default, Clone)]

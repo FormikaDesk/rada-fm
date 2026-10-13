@@ -149,8 +149,7 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
         );
         let t = h
             .app
-            .toast
-            .as_ref()
+            .current_notice()
             .map(|t| t.text.clone())
             .unwrap_or_default();
         assert!(t.contains("read-only"), "{k}: {t}");
@@ -164,8 +163,7 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
     h.key(KeyCode::Enter);
     assert!(
         h.app
-            .toast
-            .as_ref()
+            .current_notice()
             .unwrap()
             .text
             .contains("inside an archive")
@@ -306,15 +304,17 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
     let mut h = H::new(sb, dir, 130, 30);
     put_cursor(&mut h, "fake.zip");
     h.key(KeyCode::Enter);
-    h.wait("the message", |a| a.toast.is_some() && !a.is_loading());
-    let t = h.app.toast.as_ref().unwrap().text.clone();
+    h.wait("the message", |a| {
+        a.current_notice().is_some() && !a.is_loading()
+    });
+    let t = h.app.current_notice().unwrap().text.clone();
     assert!(t.contains("not an archive"), "{t}");
     assert!(h.app.archive.is_none());
     // The first message is still up: take it away, so that what comes next is the answer to
     // the extraction and not a left-over. The answer is a one-line message, or, when the
     // sentence is long (it holds the whole path of the file), a window of its own: which of
     // the two depends on where the test runs, so both are read.
-    h.app.toast = None;
+    h.app.clear_notices();
     h.keys("e");
     let said = |a: &rada_tui::app::App| match &a.modal {
         Some(Modal::Result(r)) => Some(
@@ -325,7 +325,7 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
                 .join(" "),
         ),
         Some(_) => None,
-        None => a.toast.as_ref().map(|t| t.text.clone()),
+        None => a.current_notice().map(|t| t.text.clone()),
     };
     h.wait("the answer to the extraction", |a| said(a).is_some());
     let t = said(&h.app).unwrap();

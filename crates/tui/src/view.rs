@@ -9,6 +9,9 @@ pub enum ViewMode {
     Details,
     /// A grid of tiles: a big icon and the name under it.
     Icons,
+    /// Columns as in the Finder: the folder above, the folder here, and what the item under
+    /// the cursor holds (or its preview).
+    Columns,
 }
 
 impl ViewMode {
@@ -16,6 +19,7 @@ impl ViewMode {
         match s.trim().to_ascii_lowercase().as_str() {
             "details" | "detail" | "list" => Some(ViewMode::Details),
             "icons" | "icon" | "grid" => Some(ViewMode::Icons),
+            "columns" | "column" | "miller" => Some(ViewMode::Columns),
             _ => None,
         }
     }
@@ -25,6 +29,7 @@ impl ViewMode {
         match self {
             ViewMode::Details => "details",
             ViewMode::Icons => "icons",
+            ViewMode::Columns => "columns",
         }
     }
 
@@ -32,12 +37,14 @@ impl ViewMode {
         match self {
             ViewMode::Details => "Details",
             ViewMode::Icons => "Icons",
+            ViewMode::Columns => "Columns",
         }
     }
 
+    /// The other of the two views the key that switches between them knows.
     pub fn other(self) -> ViewMode {
         match self {
-            ViewMode::Details => ViewMode::Icons,
+            ViewMode::Details | ViewMode::Columns => ViewMode::Icons,
             ViewMode::Icons => ViewMode::Details,
         }
     }
@@ -69,7 +76,7 @@ mod tests {
 
     #[test]
     fn names_round_trip() {
-        for v in [ViewMode::Details, ViewMode::Icons] {
+        for v in [ViewMode::Details, ViewMode::Icons, ViewMode::Columns] {
             assert_eq!(ViewMode::parse(v.id()), Some(v));
             assert_ne!(v.other(), v);
         }

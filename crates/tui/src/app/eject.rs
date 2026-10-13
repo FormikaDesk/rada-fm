@@ -29,7 +29,7 @@ impl App {
     /// Ask whether to eject the disk at `mount`.
     pub fn start_eject(&mut self, mount: &Path) {
         let Some(volume) = self.ejectable(mount).cloned() else {
-            self.toast(ToastKind::Info, "this one cannot be ejected", 3);
+            self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3);
             return;
         };
         let name = crate::sidebar::device_name(&volume);
@@ -81,11 +81,7 @@ impl App {
                 if waiting {
                     self.modal = None;
                 }
-                self.toast(
-                    ToastKind::Ok,
-                    format!("{name} was ejected: you can unplug it"),
-                    6,
-                );
+                self.toast(ToastKind::Ok, tf(Key::TEjected, &[&name]), 6);
             }
             Err(why) => {
                 if let Some(Modal::Eject(v)) = &mut self.modal

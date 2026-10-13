@@ -1,8 +1,8 @@
 //! The preview pane: no frame, just a title and the content, in the same calm style as
 //! the list. Images are drawn by the terminal graphics protocol; everything else is text.
 
-use rada_core::i18n::Key;
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use rada_core::ops::LinkState;
 use rada_core::preview::Preview;
 use ratatui::Frame;
@@ -115,10 +115,12 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
     // is a few words about an empty or special item.
     if !full {
         let note = match &content {
-            Some(Preview::Empty) => Some("Empty file".to_string()),
-            Some(Preview::Dir(d)) if d.entries.is_empty() => Some("Empty folder".to_string()),
+            Some(Preview::Empty) => Some(Key::PvEmptyFile.tr().to_string()),
+            Some(Preview::Dir(d)) if d.entries.is_empty() => {
+                Some(Key::PvEmptyFolder.tr().to_string())
+            }
             Some(Preview::Special(m)) => Some(m.clone()),
-            Some(Preview::Text(t)) if t.truncated => Some("Beginning of the file only".to_string()),
+            Some(Preview::Text(t)) if t.truncated => Some(Key::PvBeginningOnly.tr().to_string()),
             _ => None,
         };
         if let Some(n) = note {
@@ -150,7 +152,7 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
         Some(Preview::Binary(b)) if app.preview.hex => {
             lines.push(Line::from(vec![
                 Span::styled("H", th.key()),
-                Span::styled("  back to the summary", th.dim()),
+                Span::styled(format!("  {}", Key::PvBackToSummary.tr()), th.dim()),
             ]));
             lines.push(Line::raw(""));
             app.preview.scroll = app.preview.scroll.min(b.hex.len().saturating_sub(1));
@@ -178,32 +180,50 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                 }
                 kv(
                     &mut lines,
-                    "Executable",
+                    Key::PvExecutable.tr(),
                     e.format,
                     th.fg(th.kinds.binary).add_modifier(Modifier::BOLD),
                 );
                 kv(&mut lines, "", &what.join(" · "), th.base());
                 if let Some(i) = &e.interpreter {
-                    kv(&mut lines, "Interpreter", i, th.base());
+                    kv(&mut lines, Key::PvInterpreter.tr(), i, th.base());
                 }
                 lines.push(Line::raw(""));
             }
             if full {
                 kv(
                     &mut lines,
-                    "Size",
-                    &format!("{} · {} bytes", fmt::size(c.size), fmt::thousands(c.size)),
+                    Key::PvSize.tr(),
+                    &tf(
+                        Key::PvSizeBytes,
+                        &[&fmt::size(c.size), &fmt::thousands(c.size)],
+                    ),
                     th.base(),
                 );
-                kv(&mut lines, "Modified", &fmt::date(c.modified), th.base());
+                kv(
+                    &mut lines,
+                    Key::PvModified.tr(),
+                    &fmt::date(c.modified),
+                    th.base(),
+                );
                 if c.created.is_some() {
-                    kv(&mut lines, "Created", &fmt::date(c.created), th.base());
+                    kv(
+                        &mut lines,
+                        Key::PvCreated.tr(),
+                        &fmt::date(c.created),
+                        th.base(),
+                    );
                 }
-                kv(&mut lines, "Accessed", &fmt::date(c.accessed), th.base());
+                kv(
+                    &mut lines,
+                    Key::PvAccessed.tr(),
+                    &fmt::date(c.accessed),
+                    th.base(),
+                );
                 if let Some(m) = c.mode {
                     kv(
                         &mut lines,
-                        "Permissions",
+                        Key::PvPermissions.tr(),
                         &format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
                         th.base(),
                     );
@@ -212,48 +232,53 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
             }
             lines.push(Line::from(vec![
                 Span::styled("H", th.key()),
-                Span::styled("  show the hex dump", th.dim()),
+                Span::styled(format!("  {}", Key::PvShowHex.tr()), th.dim()),
             ]));
         }
         Some(Preview::Archive(a)) => {
             let kv = |lines: &mut Vec<Line>, key: &str, value: &str, st: Style| {
                 kv_lines(lines, &th, key, value, st, w);
             };
-            kv(&mut lines, "Format", &a.format, th.base());
+            kv(&mut lines, Key::PvFormat.tr(), &a.format, th.base());
             if let Some(why) = &a.problem {
                 lines.push(Line::raw(""));
                 for l in fmt::wrap(why, w) {
                     lines.push(Line::from(Span::styled(l, th.fg(th.error))));
                 }
             } else {
-                let lower = if a.complete { "" } else { "at least " };
+                let lower = if a.complete { "" } else { Key::PvAtLeast.tr() };
                 kv(
                     &mut lines,
-                    "Contains",
+                    Key::PvContains.tr(),
                     &format!("{lower}{}", archive_counts(a.files, a.dirs, a.symlinks)),
                     th.base(),
                 );
                 kv(
                     &mut lines,
-                    "Packed",
-                    &format!(
-                        "{} · {} bytes",
-                        fmt::size(a.packed),
-                        fmt::thousands(a.packed)
+                    Key::PvPacked.tr(),
+                    &tf(
+                        Key::PvSizeBytes,
+                        &[&fmt::size(a.packed), &fmt::thousands(a.packed)],
                     ),
                     th.base(),
                 );
                 kv(
                     &mut lines,
-                    "Unpacked",
+                    Key::PvUnpacked.tr(),
                     &format!("{lower}{}", fmt::size(a.bytes)),
                     th.base(),
                 );
                 if a.packed > 0 && a.bytes > a.packed {
                     kv(
                         &mut lines,
-                        "Ratio",
-                        &format!("{:.1} to 1", a.bytes as f64 / a.packed as f64),
+                        Key::PvRatio.tr(),
+                        &tf(
+                            Key::PvRatioValue,
+                            &[&rada_core::i18n::decimal(&format!(
+                                "{:.1}",
+                                a.bytes as f64 / a.packed as f64
+                            ))],
+                        ),
                         th.dim(),
                     );
                 }
@@ -264,10 +289,11 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                 }
                 if a.encrypted > 0 {
                     lines.push(Line::from(Span::styled(
-                        format!(
-                            "{} protected by a password",
-                            fmt::count(a.encrypted, Key::ItemIsOne, Key::ItemsAreMany)
-                        ),
+                        if a.encrypted == 1 {
+                            Key::PvPwOne.tr().to_string()
+                        } else {
+                            tf(Key::PvPwMany, &[&fmt::thousands(a.encrypted)])
+                        },
                         th.fg(th.warn),
                     )));
                 }
@@ -276,10 +302,10 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                     .key_for(crate::keymap::Action::ExtractHere)
                     .unwrap_or_else(|| "e".into());
                 lines.push(Line::from(vec![
-                    Span::styled("Enter", th.key()),
-                    Span::styled("  open like a folder   ", th.dim()),
+                    Span::styled(super::widgets::key_name("Enter"), th.key()),
+                    Span::styled(format!("  {}   ", Key::PvOpenLikeFolder.tr()), th.dim()),
                     Span::styled(extract_key, th.key()),
-                    Span::styled("  extract", th.dim()),
+                    Span::styled(format!("  {}", Key::PvExtract.tr()), th.dim()),
                 ]));
                 lines.push(Line::raw(""));
                 let room = h.saturating_sub(lines.len());
@@ -330,10 +356,10 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                 Span::styled(display::path(target), th.fg(th.kinds.link)),
             ]));
             let (txt, col) = match state {
-                LinkState::ToFile => ("points to a file", th.text_dim),
-                LinkState::ToDir => ("points to a folder", th.text_dim),
-                LinkState::Broken => ("broken link: the target does not exist", th.error),
-                LinkState::Circular => ("circular link", th.error),
+                LinkState::ToFile => (Key::PvPointsToFile.tr(), th.text_dim),
+                LinkState::ToDir => (Key::PvPointsToFolder.tr(), th.text_dim),
+                LinkState::Broken => (Key::PvBrokenLink.tr(), th.error),
+                LinkState::Circular => (Key::PvCircularLink.tr(), th.error),
             };
             lines.push(Line::from(Span::styled(txt, th.fg(col))));
             lines.push(Line::raw(""));
@@ -372,41 +398,43 @@ fn kv_lines(lines: &mut Vec<Line>, th: &Theme, key: &str, value: &str, st: Style
 fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
     match content {
         None | Some(Preview::Image(_)) | Some(Preview::Error(_)) => String::new(),
-        Some(Preview::Empty) => "Empty file".into(),
+        Some(Preview::Empty) => Key::PvEmptyFile.tr().into(),
         Some(Preview::Special(m)) => m.clone(),
         Some(Preview::Text(t)) => {
             let mut s = format!("{} · {} · {}", t.encoding, fmt::size(t.size), ago);
             if t.truncated {
-                s.push_str(" · beginning only");
+                s.push_str(Key::PvBeginningOnlyDot.tr());
             }
             if t.long_lines > 0 {
-                s.push_str(&format!(" · {} long line(s) cut", t.long_lines));
+                s.push_str(&tf(Key::PvLongLinesCut, &[&t.long_lines]));
             }
             s
         }
-        Some(Preview::Binary(b)) if hex => format!("hex dump · first {} bytes", b.hex.len() * 16),
+        Some(Preview::Binary(b)) if hex => tf(Key::PvHexDump, &[&(b.hex.len() * 16)]),
         Some(Preview::Binary(b)) => format!("{} · {}", b.card.kind, fmt::size(b.card.size)),
         Some(Preview::Dir(d)) => {
             if d.entries.is_empty() {
-                "Empty folder".into()
+                Key::PvEmptyFolder.tr().into()
             } else {
-                format!(
-                    "{} shown{}",
-                    fmt::count(d.entries.len() as u64, Key::ItemOne, Key::ItemMany),
-                    if d.truncated {
-                        " · more not listed"
-                    } else {
-                        ""
-                    }
+                tf(
+                    Key::PvShown,
+                    &[
+                        &fmt::count(d.entries.len() as u64, Key::ItemOne, Key::ItemMany),
+                        &if d.truncated {
+                            Key::PvMoreNotListed.tr()
+                        } else {
+                            ""
+                        },
+                    ],
                 )
             }
         }
-        Some(Preview::Symlink { .. }) => "Symbolic link".into(),
+        Some(Preview::Symlink { .. }) => Key::PvSymlink.tr().into(),
         Some(Preview::Archive(a)) if a.problem.is_some() => a.format.clone(),
         Some(Preview::Archive(a)) => format!(
             "{} · {}{} · {}",
             a.format,
-            if a.complete { "" } else { "at least " },
+            if a.complete { "" } else { Key::PvAtLeast.tr() },
             archive_counts(a.files, a.dirs, a.symlinks),
             fmt::size(a.packed)
         ),
@@ -455,31 +483,31 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
     // Under the picture: format, pixels (or pages), weight, date.
     let mut facts = vec![if info.format == "PDF" {
         let pages = match info.doc.as_ref().and_then(|d| d.pages) {
-            Some(1) => "1 page".to_string(),
-            Some(n) => format!("{n} pages"),
-            None => "pages unknown".to_string(),
+            Some(1) => Key::PageOne.tr().to_string(),
+            Some(n) => tf(Key::PageMany, &[&n]),
+            None => Key::PvPagesUnknown.tr().to_string(),
         };
-        format!("PDF · {pages} · {}", fmt::size(info.size))
+        tf(Key::PvPdfPages, &[&pages, &fmt::size(info.size)])
     } else {
         format!(
             "{} · {} · {}",
             info.format,
             match (info.width, info.height) {
                 (Some(a), Some(b)) => format!("{a} × {b} px"),
-                _ => "size unknown".to_string(),
+                _ => Key::PvSizeUnknown.tr().to_string(),
             },
             fmt::size(info.size)
         )
     }];
     if let Some(d) = &info.doc {
         if let Some(t) = &d.title {
-            facts.push(format!("title: {t}"));
+            facts.push(tf(Key::PvTitleLine, &[t]));
         }
         if let Some(a) = &d.author {
-            facts.push(format!("author: {a}"));
+            facts.push(tf(Key::PvAuthorLine, &[a]));
         }
     }
-    facts.push(format!("modified {}", fmt::date(info.modified)));
+    facts.push(tf(Key::PvModifiedLine, &[&fmt::date(info.modified)]));
     // Wrapped, never cut: on a narrow pane "70.7 KB" must not become "70.…".
     // In the details pane the facts are the properties listed below the picture.
     let mut fact_lines: Vec<Line> = if with_facts {
@@ -550,7 +578,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
         Kind::Decoding => {
             let spin = SPIN[app.spinner % SPIN.len()];
             f.render_widget(
-                Paragraph::new(Span::styled(format!("{spin} decoding…"), th.dim())),
+                Paragraph::new(Span::styled(tf(Key::PvDecoding, &[&spin]), th.dim())),
                 Rect {
                     y: pic.y + pic.height / 3,
                     height: 1,
@@ -561,32 +589,32 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
         }
         Kind::Plain => {
             f.render_widget(
-                Paragraph::new(Span::styled("image rendering is off (--images)", th.dim())),
+                Paragraph::new(Span::styled(Key::PvImagesOff.tr(), th.dim())),
                 pic,
             );
             f.render_widget(Paragraph::new(fact_lines), bottom);
         }
         Kind::Warn(m) => {
             let what = if info.format == "PDF" {
-                "PDF too large to preview"
+                Key::PvPdfTooLarge.tr()
             } else {
-                "image too large to preview"
+                Key::PvImageTooLarge.tr()
             };
             message(f, &th, pic, what, &m, th.warn);
             f.render_widget(Paragraph::new(fact_lines), bottom);
         }
         Kind::Err(m) => {
             let what = if info.format == "PDF" {
-                "cannot show this PDF"
+                Key::PvCannotPdf.tr()
             } else {
-                "cannot show this image"
+                Key::PvCannotImage.tr()
             };
             if fallback_text.is_empty() {
                 message(f, &th, pic, what, &m, th.error);
             } else {
                 // The page could not be drawn, but its words can be read.
                 let mut lines = vec![
-                    Line::from(Span::styled(format!("{m} · first page as text"), th.dim())),
+                    Line::from(Span::styled(tf(Key::PvFirstPageText, &[&m]), th.dim())),
                     Line::raw(""),
                 ];
                 let room = pic.height.saturating_sub(2) as usize;

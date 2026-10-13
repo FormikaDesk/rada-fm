@@ -47,16 +47,12 @@ impl App {
             std::thread::spawn(move || {
                 if let Err(e) = platform.opener().open_url(url) {
                     let _ = notes.send(CoreEvent::Note {
-                        text: format!("cannot open the system settings: {e}"),
+                        text: tf(Key::TCannotOpenSettings, &[&e]),
                         error: true,
                     });
                 }
             });
-            self.toast(
-                ToastKind::Info,
-                "System Settings opened — allow it there, then try the folder again",
-                6,
-            );
+            self.toast(ToastKind::Info, Key::TSettingsOpened.tr(), 6);
             return;
         }
         self.modal = Some(Modal::Access(d));
@@ -90,7 +86,7 @@ impl App {
             return Some(d.message());
         }
         Some(match &item.usage {
-            Some(u) => format!("{} · {} free", item.name, fmt::size(u.free)),
+            Some(u) => tf(Key::SideFree, &[&item.name, &fmt::size(u.free)]),
             None => item.name.clone(),
         })
     }
@@ -103,11 +99,7 @@ impl App {
         self.saved_ui.sidebar = Some(self.side_on);
         self.save_ui_state();
         if self.side_on && Mode::for_width(self.term_width, true) == Mode::Hidden {
-            self.toast(
-                ToastKind::Info,
-                "sidebar on — this terminal is too narrow to show it",
-                3,
-            );
+            self.toast(ToastKind::Info, Key::TSidebarOnNarrow.tr(), 3);
         }
     }
 
@@ -121,11 +113,7 @@ impl App {
             self.toggle_sidebar();
         }
         if Mode::for_width(self.term_width, self.side_on) == Mode::Hidden {
-            self.toast(
-                ToastKind::Info,
-                "this terminal is too narrow for the sidebar",
-                3,
-            );
+            self.toast(ToastKind::Info, Key::TSidebarNarrow.tr(), 3);
             return;
         }
         // Make the next frame's mode current before looking at the items.
@@ -171,11 +159,7 @@ impl App {
                     let path = items[self.side_cursor].path.clone();
                     self.set_bookmark(path, false);
                 }
-                _ => self.toast(
-                    ToastKind::Info,
-                    "only bookmarks can be removed from the sidebar (a disk is ejected with this key)",
-                    3,
-                ),
+                _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
             },
             Filter => {
                 // Typing a filter is about the list.
@@ -185,11 +169,7 @@ impl App {
             a if PASS_THROUGH.contains(&a) => return false,
             _ => {
                 let back = self.key_for(SwitchPane).unwrap_or_else(|| "Tab".into());
-                self.toast(
-                    ToastKind::Info,
-                    format!("the sidebar has the focus — {back} goes back to the list"),
-                    3,
-                );
+                self.toast(ToastKind::Info, tf(Key::TSidebarFocus, &[&back]), 3);
             }
         }
         true
@@ -197,7 +177,10 @@ impl App {
 
     /// The menu of a sidebar item: open it, and add or remove it from the bookmarks.
     pub(super) fn side_menu(&self, path: &Path, at: (u16, u16)) -> MenuView {
-        let mut items = vec![MenuItem::go("Open".into(), path.to_path_buf())];
+        let mut items = vec![MenuItem::go(
+            Key::SideMenuOpen.tr().into(),
+            path.to_path_buf(),
+        )];
         if rada_core::tagsearch::view_name(path).is_some() {
             // A tag is not a folder: nothing to pin or eject.
             return MenuView {
@@ -216,7 +199,7 @@ impl App {
         if self.ejectable(path).is_some() {
             items.push(MenuItem {
                 cmd: MenuCmd::Eject(path.to_path_buf()),
-                label: "Eject".into(),
+                label: Key::SideMenuEject.tr().into(),
                 enabled: true,
                 gap_before: true,
                 checked: None,

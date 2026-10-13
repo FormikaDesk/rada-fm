@@ -183,7 +183,10 @@ impl App {
     pub fn folder_summary(&self, e: &Entry) -> Option<String> {
         match self.folder_size_view(e) {
             FolderSizeView::Nothing => None,
-            FolderSizeView::Counting => Some(format!("{} · ···", rada_core::i18n::type_label(&e.type_label))),
+            FolderSizeView::Counting => Some(format!(
+                "{} · ···",
+                rada_core::i18n::type_label(&e.type_label)
+            )),
             FolderSizeView::Counted(c) => {
                 let items = fmt::count(c.items, Key::ItemOne, Key::ItemMany);
                 Some(match c.bytes {

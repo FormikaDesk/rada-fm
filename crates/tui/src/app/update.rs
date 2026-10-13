@@ -70,7 +70,7 @@ impl App {
             UpdateEvent::UpToDate => {
                 if std::mem::take(&mut self.update_asked) {
                     self.update = UpdateStatus::None;
-                    self.toast(ToastKind::Ok, "rada is up to date", 4);
+                    self.toast(ToastKind::Ok, Key::TUpToDate.tr(), 4);
                 }
                 if matches!(self.update, UpdateStatus::Working { .. }) {
                     self.update = UpdateStatus::None;
@@ -78,7 +78,7 @@ impl App {
             }
             UpdateEvent::CheckFailed(e) => {
                 if std::mem::take(&mut self.update_asked) {
-                    self.toast(ToastKind::Warn, format!("cannot look for updates: {e}"), 6);
+                    self.toast(ToastKind::Warn, tf(Key::TCannotLookUpdates, &[&e]), 6);
                 }
             }
             UpdateEvent::Progress(step) => {
@@ -90,10 +90,7 @@ impl App {
             }
             UpdateEvent::Done(applied) => {
                 let text = if applied.restart {
-                    format!(
-                        "rada {} is installed: start rada again to use it",
-                        applied.version
-                    )
+                    tf(Key::UpDoneRestart, &[&applied.version])
                 } else {
                     applied.note.clone()
                 };
@@ -108,7 +105,7 @@ impl App {
                 if self.modal.is_none() {
                     self.modal = Some(Modal::Update(UpdateView::Failed { message, log }));
                 } else {
-                    self.toast(ToastKind::Error, "the update did not work", 6);
+                    self.toast(ToastKind::Error, Key::TUpdateFailed.tr(), 6);
                 }
             }
         }
@@ -125,20 +122,20 @@ impl App {
     pub(super) fn check_updates_now(&mut self) {
         match &self.svc.updater {
             _ if matches!(self.update, UpdateStatus::Working { .. }) => {
-                self.toast(ToastKind::Info, "an update is already running", 3);
+                self.toast(ToastKind::Info, Key::TUpdateRunning.tr(), 3);
             }
             Some(u) => {
                 self.update_asked = true;
                 u.check_now();
-                self.toast(ToastKind::Info, "looking for a newer version…", 3);
+                self.toast(ToastKind::Info, Key::TLookingNewer.tr(), 3);
             }
-            None => self.toast(ToastKind::Info, "updates are not available here", 3),
+            None => self.toast(ToastKind::Info, Key::TUpdatesNA.tr(), 3),
         }
     }
 
     /// "About rada": the version, the channel it follows and how it would be updated.
     pub(super) fn open_about(&mut self) {
-        let mut rows: Vec<(String, String)> = vec![("Version".into(), self.version())];
+        let mut rows: Vec<(String, String)> = vec![(Key::AboutVersion.tr().into(), self.version())];
         match &self.svc.updater {
             Some(u) => {
                 use rada_core::update::Channel;
@@ -146,44 +143,48 @@ impl App {
                 let followed =
                     rada_core::update::resolve_channel(ctx.settings.channel, &ctx.current);
                 let name = match followed {
-                    Channel::Prerelease => "pre-releases",
-                    _ => "stable releases",
+                    Channel::Prerelease => Key::AboutPre.tr(),
+                    _ => Key::AboutStable.tr(),
                 };
                 let why = if ctx.settings.channel == Channel::Auto {
-                    "chosen from the version"
+                    Key::AboutChosenVersion.tr()
                 } else {
-                    "set in the configuration"
+                    Key::AboutSetInConfig.tr()
                 };
-                rows.push(("Channel".into(), format!("{name} ({why})")));
                 rows.push((
-                    "Mode".into(),
+                    Key::AboutChannel.tr().into(),
+                    tf(Key::AboutChannelValue, &[&name, &why]),
+                ));
+                rows.push((
+                    Key::AboutMode.tr().into(),
                     match ctx.mode() {
-                        Ok(Mode::Binary) => {
-                            "a program downloaded from the releases — it replaces itself".into()
-                        }
-                        Ok(Mode::Source { dir }) => format!(
-                            "built from the git checkout in {} — it pulls and builds",
-                            dir.display()
-                        ),
+                        Ok(Mode::Binary) => Key::AboutBinary.tr().into(),
+                        Ok(Mode::Source { dir }) => tf(Key::AboutSourceMode, &[&dir.display()]),
                         Ok(Mode::Package { hint }) => hint,
                         Err(e) => e,
                     },
                 ));
                 rows.push((
-                    "Checks".into(),
+                    Key::AboutChecks.tr().into(),
                     if ctx.settings.check {
-                        "once a day in the background".into()
+                        Key::AboutDaily.tr().into()
                     } else {
-                        "only when asked (check = false)".into()
+                        Key::AboutOnlyAsked.tr().into()
                     },
                 ));
-                rows.push(("Program".into(), rada_core::display::path(&ctx.exe)));
+                rows.push((
+                    Key::AboutProgram.tr().into(),
+                    rada_core::display::path(&ctx.exe),
+                ));
             }
-            None => rows.push(("Updates".into(), "not available here".into())),
+            None => rows.push((Key::AboutUpdates.tr().into(), Key::AboutNA.tr().into())),
         }
-        rows.push(("Source".into(), "github.com/FormikaDesk/rada-fm".into()));
+        rows.push((
+            Key::AboutSource.tr().into(),
+            "github.com/FormikaDesk/rada-fm".into(),
+        ));
         self.modal = Some(Modal::Properties(PropsView {
-            title: "About rada".into(),
+            title: Key::AboutTitle.tr().into(),
             rows,
             scroll: 0,
         }));
@@ -200,14 +201,11 @@ impl App {
                 }));
             }
             UpdateStatus::Working { .. } => {
-                self.toast(ToastKind::Info, "an update is already running", 3);
+                self.toast(ToastKind::Info, Key::TUpdateRunning.tr(), 3);
             }
             UpdateStatus::Done(a) => {
                 let text = if a.restart {
-                    format!(
-                        "rada {} is installed: start rada again to use it",
-                        a.version
-                    )
+                    tf(Key::UpDoneRestart, &[&a.version])
                 } else {
                     a.note.clone()
                 };
@@ -223,9 +221,9 @@ impl App {
                 Some(u) => {
                     self.update_asked = true;
                     u.check_now();
-                    self.toast(ToastKind::Info, "looking for a newer version…", 3);
+                    self.toast(ToastKind::Info, Key::TLookingNewer.tr(), 3);
                 }
-                None => self.toast(ToastKind::Info, "updates are not available here", 3),
+                None => self.toast(ToastKind::Info, Key::TUpdatesNA.tr(), 3),
             },
         }
     }
@@ -243,10 +241,10 @@ impl App {
                         if let Some(u) = &self.svc.updater {
                             u.apply();
                             self.update = UpdateStatus::Working {
-                                step: format!("starting the update to {}", notice.version),
+                                step: tf(Key::UpStarting, &[&notice.version]),
                                 started: Instant::now(),
                             };
-                            self.toast(ToastKind::Info, "updating in the background", 3);
+                            self.toast(ToastKind::Info, Key::TUpdatingBackground.tr(), 3);
                         }
                         return;
                     }
@@ -276,7 +274,7 @@ impl App {
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().open(&path) {
                 let _ = notes.send(CoreEvent::Note {
-                    text: format!("cannot open {}: {e}", path.display()),
+                    text: tf(Key::TCannotOpenPath, &[&path.display(), &e]),
                     error: true,
                 });
             }
@@ -288,7 +286,7 @@ impl App {
     pub fn update_notice(&self) -> Option<(Vec<String>, bool)> {
         let key = self.key_for(Action::Update);
         let press = |what: &str| match &key {
-            Some(k) => format!(" — press {k} to {what}"),
+            Some(k) => tf(Key::UpPress, &[k, &what]),
             None => String::new(),
         };
         let dot = |k: &Option<String>| k.as_ref().map(|k| format!(" · {k}")).unwrap_or_default();
@@ -296,10 +294,9 @@ impl App {
             UpdateStatus::None => None,
             UpdateStatus::Available { notice, .. } => Some((
                 vec![
-                    format!(
-                        "New version {} available{}",
-                        notice.version,
-                        press("update")
+                    tf(
+                        Key::UpNewVersion,
+                        &[&notice.version, &press(Key::UpWordUpdate.tr())],
                     ),
                     format!("{}{}", notice.version, dot(&key)),
                     notice.version.clone(),
@@ -310,24 +307,24 @@ impl App {
                 let t = fmt::duration(started.elapsed());
                 Some((
                     vec![
-                        format!("Updating: {step} ({t})"),
-                        format!("Updating… ({t})"),
+                        tf(Key::UpUpdatingStep, &[&step, &t]),
+                        tf(Key::UpUpdating, &[&t]),
                     ],
                     false,
                 ))
             }
             UpdateStatus::Done(a) if a.restart => Some((
                 vec![
-                    format!("rada {} installed — start rada again to use it", a.version),
-                    "restart rada".into(),
+                    tf(Key::UpInstalledLong, &[&a.version]),
+                    Key::UpRestart.tr().into(),
                 ],
                 false,
             )),
             UpdateStatus::Done(_) => None,
             UpdateStatus::Failed { .. } => Some((
                 vec![
-                    format!("The update did not work{}", press("see why")),
-                    format!("Update failed{}", dot(&key)),
+                    tf(Key::UpFailedLong, &[&press(Key::UpWordSeeWhy.tr())]),
+                    tf(Key::UpFailedShort, &[&dot(&key)]),
                 ],
                 true,
             )),

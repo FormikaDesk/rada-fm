@@ -71,46 +71,53 @@ fn unusable_buttons_are_not_clickable_and_usable_ones_are() {
 }
 
 #[test]
-fn the_search_field_is_labelled_clickable_and_shows_what_is_typed() {
+fn the_one_field_shows_the_path_and_what_to_search_and_shows_what_is_typed() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 140, 30);
     let row = address_row(&mut h);
     assert!(
-        row.contains("Search in proj.v1") && row.contains("Ctrl+F"),
+        row.contains("proj.v1")
+            && row.contains("Search files or type a command")
+            && row.contains("Ctrl+P"),
         "{row}"
     );
     h.click(&Target::Act(Action::Filter));
-    assert!(h.app.filter.as_ref().is_some_and(|f| f.editing));
+    assert!(h.app.address.is_some(), "the field is being typed in");
     h.keys("a");
     let row = address_row(&mut h);
     assert!(
-        row.contains("a▏") && !row.contains("Search in"),
+        row.contains("a▏") && !row.contains("Search files"),
         "the field shows what is being typed: {row}"
     );
     h.key(KeyCode::Esc);
-    assert!(address_row(&mut h).contains("Search in"));
+    assert!(h.app.address.is_none());
+    assert!(address_row(&mut h).contains("Search files"));
 }
 
 #[test]
-fn go_to_is_a_hint_at_the_bottom_and_opens_the_palette() {
+fn commands_is_a_hint_at_the_bottom_and_starts_the_field() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 170, 30);
     let row = hints_row(&mut h);
-    assert!(row.contains("Ctrl+P") && row.contains("go to"), "{row}");
+    assert!(row.contains("Ctrl+P") && row.contains("commands"), "{row}");
     h.click(&Target::Act(Action::Palette));
-    assert!(matches!(h.app.modal, Some(Modal::Palette(_))));
+    assert!(h.app.address.is_some(), "the field takes what is typed");
+    assert!(h.app.modal.is_none(), "it is not a window");
 }
 
 #[test]
-fn when_it_narrows_the_search_shrinks_and_goes_and_the_path_folds_around_the_current_folder() {
+fn when_it_narrows_the_search_goes_and_the_path_folds_around_the_current_folder() {
     let mut h = deep(220);
     let row = address_row(&mut h);
-    assert!(row.contains("Search in") && row.contains("Ctrl+F"), "{row}");
+    assert!(
+        row.contains("Search files") && row.contains("Ctrl+P"),
+        "{row}"
+    );
+    let mut searching = Vec::new();
     for w in (50..=220u16).rev() {
         let mut h = deep(w);
         let row = address_row(&mut h);
-        // The field is there from 70 columns, shorter as the terminal narrows.
-        assert_eq!(row.contains("Search"), w >= 70, "{w}: {row}");
+        searching.push(row.contains("Search"));
         assert!(
             row.contains("eeeeee"),
             "the current folder always shows ({w}): {row}"
@@ -120,6 +127,11 @@ fn when_it_narrows_the_search_shrinks_and_goes_and_the_path_folds_around_the_cur
             "{w}: the row is wider than the screen"
         );
     }
+    // The search part goes as the terminal narrows and does not come back: once it is gone it
+    // stays gone at every narrower width.
+    let first_gone = searching.iter().position(|s| !s).expect("it goes");
+    assert!(first_gone > 0, "there is room for it on a wide terminal");
+    assert!(searching[first_gone..].iter().all(|s| !s), "{searching:?}");
     // The sandbox path is long: it folds, whatever the width.
     let mut h = deep(80);
     let row = address_row(&mut h);
@@ -158,7 +170,7 @@ fn hints_follow_the_situation() {
     let mut h = H::new(sb, dir, 200, 30);
     let row = hints_row(&mut h);
     for k in [
-        "open", "select", "copy", "paste", "trash", "rename", "undo", "new tab", "go to",
+        "open", "select", "copy", "paste", "trash", "rename", "undo", "new tab", "commands",
     ] {
         assert!(row.contains(k), "{k}: {row}");
     }
@@ -177,10 +189,11 @@ fn hints_follow_the_situation() {
 
     h.key(KeyCode::Esc); // clears the selection
     h.press("ctrl+f");
+    h.keys("a");
     let row = hints_row(&mut h);
     assert!(
-        row.contains("keep") && row.contains("clear"),
-        "typing a search: {row}"
+        row.contains("go") && row.contains("cancel"),
+        "typing in the field: {row}"
     );
 }
 
@@ -221,8 +234,9 @@ fn hints_can_be_switched_off_and_the_status_stays() {
 fn a_window_changes_the_hints_to_its_own_keys() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 120, 30);
-    h.press("ctrl+p");
+    h.press("f2");
+    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
     let row = hints_row(&mut h);
-    assert!(row.contains("Esc") && row.contains("close"), "{row}");
+    assert!(row.contains("Esc") && row.contains("cancel"), "{row}");
     assert!(!row.contains("trash"), "{row}");
 }

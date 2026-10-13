@@ -310,7 +310,11 @@ impl Step {
                 remove_source,
                 ..
             } => tf(
-                if *remove_source { StepMoveFile } else { StepCopy },
+                if *remove_source {
+                    StepMoveFile
+                } else {
+                    StepCopy
+                },
                 &[&p(src), &p(dst)],
             ),
             Step::CopySymlink {
@@ -319,7 +323,11 @@ impl Step {
                 remove_source,
                 ..
             } => tf(
-                if *remove_source { StepMoveLink } else { StepCopyLink },
+                if *remove_source {
+                    StepMoveLink
+                } else {
+                    StepCopyLink
+                },
                 &[&p(src), &p(dst)],
             ),
             Step::ExtractFile { src, dst, .. } => tf(StepExtract, &[&p(src), &p(dst)]),
@@ -335,10 +343,7 @@ impl Step {
                 path,
                 before,
                 after,
-            } => tf(
-                StepTags,
-                &[&p(path), &tag_names(before), &tag_names(after)],
-            ),
+            } => tf(StepTags, &[&p(path), &tag_names(before), &tag_names(after)]),
         }
     }
 

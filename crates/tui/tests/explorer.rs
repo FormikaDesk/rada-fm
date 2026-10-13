@@ -204,7 +204,7 @@ fn the_context_menus() {
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
-        y + 23,
+        y + 19, // below the last row of the folder
         KeyModifiers::NONE,
     );
     assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
@@ -434,6 +434,7 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
 
     // Type a path, complete with Tab, go with Enter.
     h.press("alt+d");
+    h.press("end");
     for _ in 0..5 {
         h.press("backspace"); // "~/projects/"
     }
@@ -480,6 +481,7 @@ fn a_click_on_the_path_edits_it_and_a_click_elsewhere_stops() {
     );
     // A suggestion can be clicked.
     h.press("ctrl+l");
+    h.press("end"); // the path is all selected at first: End leaves it to be edited
     for _ in 0..5 {
         h.press("backspace"); // "~/projects/demo" -> keeps "~/projects/"?
     }
@@ -490,9 +492,9 @@ fn a_click_on_the_path_edits_it_and_a_click_elsewhere_stops() {
 fn a_mistyped_address_says_why_and_stays_put() {
     let mut h = scene(140, 30);
     h.press("ctrl+l");
-    h.keys("nowhere");
+    h.keys("~/nowhere"); // what is typed over the selected path; a word alone is a search
     h.press("enter");
-    h.wait("the refusal", |a| a.toast.is_some());
+    h.wait("the refusal", |a| a.current_notice().is_some());
     assert!(h.app.cwd.ends_with("demo"));
 }
 
@@ -626,7 +628,13 @@ fn the_dropdowns_open_menus_that_work() {
 #[test]
 fn clicking_a_column_title_sorts_by_it_and_the_arrow_follows() {
     let mut h = scene(170, 35);
-    let head = |h: &mut H| h.screen().lines().nth(6).unwrap().to_string();
+    let head = |h: &mut H| {
+        h.screen()
+            .lines()
+            .find(|l| l.contains("Name") && l.contains("Size"))
+            .unwrap()
+            .to_string()
+    };
     assert!(head(&mut h).contains("Name ↑"));
     h.click(&Target::SortBy(rada_core::model::SortKey::Type));
     assert_eq!(h.app.sort.key, rada_core::model::SortKey::Type);
@@ -851,8 +859,10 @@ fn pane_rows(h: &mut H) -> Vec<String> {
     h.screen()
         .lines()
         .map(|l| {
+            // Inside the border of the details card.
             l.chars()
-                .skip(132)
+                .skip(133)
+                .take(170 - 133 - 1)
                 .collect::<String>()
                 .trim_end()
                 .to_string()
@@ -919,18 +929,19 @@ fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
 }
 
 #[test]
-fn the_address_and_search_fields_are_rounded_with_nerd_icons_and_rectangles_without() {
+fn the_one_field_and_the_buttons_are_pills_with_nerd_icons_and_rectangles_without() {
     let mut h = scene(170, 35);
     let row = |h: &mut H| h.screen().lines().nth(2).unwrap().to_string();
     let plain = row(&mut h);
     assert!(
-        !plain.contains('\u{e0b6}') && plain.contains("Search in demo"),
+        !plain.contains('\u{e0b6}') && plain.contains("Search files or type a command"),
         "{plain}"
     );
     h.app.icons = rada_tui::IconSet::Nerd;
     let round = row(&mut h);
-    assert_eq!(round.matches('\u{e0b6}').count(), 2, "{round}");
-    assert_eq!(round.matches('\u{e0b4}').count(), 2, "{round}");
+    // The four little buttons, the field, the key in it and the pill of the view: a pill each.
+    assert_eq!(round.matches('\u{e0b6}').count(), 7, "{round}");
+    assert_eq!(round.matches('\u{e0b4}').count(), 7, "{round}");
     assert_eq!(round.width(), 170);
 }
 
@@ -972,7 +983,7 @@ fn the_details_pane_is_hidden_below_140_columns_and_alt_p_shows_it_over_the_list
     // Too narrow for even the overlay.
     let mut h = scene(50, 20);
     h.press("alt+p");
-    assert!(h.app.toast.is_some());
+    assert!(h.app.current_notice().is_some());
 }
 
 #[test]
@@ -1026,7 +1037,7 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
-        y + 23,
+        y + 19, // below the last row of the folder
         KeyModifiers::NONE,
     );
     let s = h.screen();
@@ -1099,7 +1110,7 @@ fn the_hints_can_be_hidden_and_the_dates_made_absolute() {
 
 #[test]
 fn types_and_dates_are_computed_once_per_entry() {
-    let mut h = scene(140, 30);
+    let mut h = scene(140, 36);
     let _ = h.screen();
     // The type of every entry is a word, never computed while drawing: it is in the entry.
     for e in h.app.listing.all() {

@@ -69,7 +69,10 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
     if area.width < TILE_W as u16 || area.height < TILE_H as u16 - 1 {
         // Too small for a single tile: fall back to a plain message.
         f.render_widget(
-            Paragraph::new(Span::styled("too small for icons", th.dim())),
+            Paragraph::new(Span::styled(
+                rada_core::i18n::Key::GridTooSmall.tr(),
+                th.dim(),
+            )),
             area,
         );
         return;
@@ -83,13 +86,16 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
 
     if count == 0 {
         let msg = if app.is_loading() {
-            format!("{} loading…", SPIN[app.spinner % SPIN.len()])
+            rada_core::i18n::tf(
+                rada_core::i18n::Key::ListLoading,
+                &[&SPIN[app.spinner % SPIN.len()]],
+            )
         } else if app.filter.is_some() {
-            "Nothing here matches the search".to_string()
+            rada_core::i18n::Key::ListNoMatch.tr().to_string()
         } else if app.listing.is_empty() {
-            "This folder is empty".to_string()
+            rada_core::i18n::Key::ListEmpty.tr().to_string()
         } else {
-            "Only hidden files here — press . to show them".to_string()
+            rada_core::i18n::Key::ListOnlyHidden.tr().to_string()
         };
         f.render_widget(
             Paragraph::new(Span::styled(msg, th.dim())).alignment(Alignment::Center),

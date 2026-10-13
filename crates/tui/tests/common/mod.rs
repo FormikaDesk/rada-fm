@@ -212,6 +212,8 @@ impl H {
             start_explicit: false,
             dates: rada_tui::fmt::DateStyle::Relative,
             date_format: rada_tui::fmt::DateFormat::DEFAULT,
+            basic: false,
+            tags_column: None,
         };
         if let Some(t) = tweak {
             t(&mut cfg);

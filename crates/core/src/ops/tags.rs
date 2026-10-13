@@ -93,7 +93,10 @@ impl Engine {
                 .next()
                 .map(|c| c.to_uppercase().collect::<String>())
                 .unwrap_or_default();
-            tf(Key::TitleTagsOn, &[&format!("{first}{}", head.as_str()), &what])
+            tf(
+                Key::TitleTagsOn,
+                &[&format!("{first}{}", head.as_str()), &what],
+            )
         });
         let mut ws = WarningSet::default();
         let Some(store) = self.platform.tags() else {

@@ -60,7 +60,10 @@ impl App {
             ),
         ];
         if self.archive.is_some() {
-            rows.push((Key::PropInside.tr().to_string(), Key::PropInArchive.tr().to_string()));
+            rows.push((
+                Key::PropInside.tr().to_string(),
+                Key::PropInArchive.tr().to_string(),
+            ));
         }
         PropsView {
             title: tf(Key::PropsSelected, &[&chosen.len()]),
@@ -79,14 +82,20 @@ impl App {
                     .map(rada_core::display::name)
                     .unwrap_or_else(|| rada_core::display::name(&e.name)),
             ),
-            (Key::PropType.tr().into(), rada_core::i18n::type_label(&e.type_label).into_owned()),
+            (
+                Key::PropType.tr().into(),
+                rada_core::i18n::type_label(&e.type_label).into_owned(),
+            ),
             (
                 Key::PropLocation.tr().into(),
                 fmt::short_path(e.path.parent().unwrap_or(&self.cwd), self.home()),
             ),
         ];
         if let Some(l) = &e.link {
-            rows.push((Key::PropLinkTo.tr().into(), rada_core::display::path(&l.target)));
+            rows.push((
+                Key::PropLinkTo.tr().into(),
+                rada_core::display::path(&l.target),
+            ));
         }
         if !e.is_dir() {
             rows.push((

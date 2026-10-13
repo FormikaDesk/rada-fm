@@ -169,6 +169,46 @@ pub fn bar_spans<'a>(
     vec![Span::styled(f, fill_style), Span::styled(e, track_style)]
 }
 
+/// How many of the ten segments of a disk's bar are filled for `used` (0.0 to 1.0): the
+/// nearest, and at least one for a disk that holds anything.
+pub fn segments_filled(used: f64) -> usize {
+    let used = used.clamp(0.0, 1.0);
+    let n = (used * SEGMENTS as f64).round() as usize;
+    if n == 0 && used > 0.005 { 1 } else { n }
+}
+
+/// Segments in the bar of a disk.
+pub const SEGMENTS: usize = 10;
+
+/// How full a disk is, in ten segments: `■■■■■■□□□□`. The basic profile has no such glyphs
+/// and gets `[######----]`, the brackets keeping the ends apart.
+pub fn segment_bar<'a>(th: &Theme, used: f64, basic: bool, row_bg: Option<Color>) -> Vec<Span<'a>> {
+    let on = segments_filled(used);
+    let mut fill = Style::default().fg(th.disk);
+    let mut rest = Style::default().fg(th.muted);
+    let mut edge = Style::default().fg(th.muted);
+    if let Some(bg) = row_bg {
+        fill = fill.bg(bg);
+        rest = rest.bg(bg);
+        edge = edge.bg(bg);
+    }
+    let mut out = Vec::new();
+    if basic {
+        out.push(Span::styled("[", edge));
+    }
+    out.push(Span::styled("■".repeat(on), fill));
+    out.push(Span::styled("□".repeat(SEGMENTS - on), rest));
+    if basic {
+        out.push(Span::styled("]", edge));
+    }
+    out
+}
+
+/// The cells a disk's bar takes.
+pub fn segment_bar_width(basic: bool) -> usize {
+    SEGMENTS + if basic { 2 } else { 0 }
+}
+
 /// The progress bar: moves in eighths of a cell, so it looks continuous even on a slow copy.
 pub fn progress_spans<'a>(th: &Theme, frac: f64, cells: usize) -> Vec<Span<'a>> {
     let eighths = (frac.clamp(0.0, 1.0) * cells as f64 * 8.0).round() as usize;
@@ -365,5 +405,60 @@ impl<'a> Bar<'a> {
             ratatui::widgets::Paragraph::new(ratatui::text::Line::from(self.spans)),
             area,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text(spans: &[Span]) -> String {
+        spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    fn th() -> Theme {
+        Theme::named("rada", ColorDepth::True).unwrap()
+    }
+
+    #[test]
+    fn a_disk_bar_has_ten_segments() {
+        for used in [0.0, 0.04, 0.3, 0.55, 0.96, 1.0] {
+            let bar = segment_bar(&th(), used, false, None);
+            let t = text(&bar);
+            assert_eq!(t.chars().count(), 10, "{used}: {t}");
+            assert_eq!(
+                unicode_width::UnicodeWidthStr::width(t.as_str()),
+                segment_bar_width(false)
+            );
+        }
+        assert_eq!(text(&segment_bar(&th(), 0.6, false, None)), "■■■■■■□□□□");
+        assert_eq!(text(&segment_bar(&th(), 0.0, false, None)), "□□□□□□□□□□");
+        assert_eq!(text(&segment_bar(&th(), 1.0, false, None)), "■■■■■■■■■■");
+        // A disk with anything on it shows at least a segment.
+        assert_eq!(segments_filled(0.01), 1);
+        assert_eq!(segments_filled(0.0), 0);
+        assert_eq!(segments_filled(0.5), 5);
+    }
+
+    #[test]
+    fn the_basic_profile_draws_brackets_and_plain_characters() {
+        let bar = segment_bar(&th(), 0.5, true, None);
+        let ascii: String = text(&bar)
+            .chars()
+            .map(|c| crate::compat::ascii_for(c).unwrap_or(c))
+            .collect();
+        assert_eq!(ascii, "[#####-----]");
+        assert_eq!(
+            unicode_width::UnicodeWidthStr::width(ascii.as_str()),
+            segment_bar_width(true)
+        );
+    }
+
+    #[test]
+    fn the_filled_segments_are_the_disk_colour_and_the_rest_quiet() {
+        let t = th();
+        let bar = segment_bar(&t, 0.3, false, None);
+        assert_eq!(bar[0].style.fg, Some(t.disk));
+        assert_eq!(bar[1].style.fg, Some(t.muted));
     }
 }

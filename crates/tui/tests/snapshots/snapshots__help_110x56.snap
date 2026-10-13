@@ -2,59 +2,59 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ projects  ✕   +                                                        vim + classic keys   ? Help ▾
+ rada  ▸ projects  ✕   +                                                                              ? Help
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ Search in proj… Ctrl+F
+  ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search files or type a command…        Ctrl+P     ≣ Details
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                                               ⋯
 ▀▀▀▀▀▀▀╭──────────────────────────────────────────────────────────────────────────────────────────────╮▀▀▀▀▀▀▀
-  ⌂ Hom│                                                                                              │  Size
-       │   Keys    ↑↓ scroll · Esc close                                                              │
- TAGS  │                                                                                              │
-  ● Red│                                Vim                           Classic                         │
-  ● Ora│                                                                                              │   1 B
-  ● Yel│  Moving around                                                                               │420 MB
-  ● Gre│  Move up                       k ↑                           ↑                               │  42 B
-  ● Blu│  Move down                     j ↓                           ↓                               │  37 B
-  ● Pur│  Parent folder                 h ← Backspace                 ← Alt+↑                         │.52 KB
-  ● Gra│  Open                          l → Enter                     → Enter                         │  73 B
-       │  First item                    g Home                        Home                            │  13 B
-       │  Last item                     G End                         End                             │  16 B
-       │  Page up                       PgUp                          PgUp                            │   6 B
-       │  Page down                     PgDn                          PgDn                            │
-       │  Half page up                  Ctrl+U                                                        │
-       │  Half page down                Ctrl+D                                                        │
-       │  Go to home                    ~                                                             │
-       │  Back to the previous folder   Ctrl+O                        Alt+← Ctrl+O                    │
-       │  Forward to the next folder    Alt+→ Ctrl+G                  Alt+→ Ctrl+G                    │
-       │                                                                                              │
-       │  Selecting                                                                                   │
-       │  Select / unselect item        Space                         Space Ctrl+Space Ins            │
-       │  Select all                                                  Ctrl+A                          │
-       │  Extend selection up                                         Shift+↑                         │
-       │  Extend selection down                                       Shift+↓                         │
-       │  Extend selection to start                                   Shift+Home Ctrl+Shift+Home      │
-       │  Extend selection to end                                     Shift+End Ctrl+Shift+End        │
-       │  Clear selection / cancel      Esc                           Esc                             │
-       │                                                                                              │
-       │  Working with files                                                                          │
-       │  Copy                          y                             Ctrl+C                          │
-       │  Cut                           x                             Ctrl+X                          │
-       │  Paste                         p                             Ctrl+V                          │
-       │  Move to trash                 d                             Del                             │
-       │  Delete permanently            D                             Shift+Del                       │
-       │  Rename                        r                             F2                              │
-       │  Rename many                   R                                                             │
-       │  New folder                    n                             Ctrl+Shift+N Ctrl+N F7          │
-       │  Extract here                  e                             Ctrl+E                          │
-       │  Extract to a folder…          E                             Alt+e                           │
-       │  Compress…                     z                             Alt+z                           │
-       │  Undo                          u                             Ctrl+Z                          │
-       │  Redo                          Ctrl+R                        Ctrl+Y Ctrl+Shift+Z             │
-       │                                                                                              │
-       ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-                            │
- 12 items                                                                                    v0.6.0 ⟳   ≣  ▦
+╭──────│                                                                                              │──────╮
+│  ⌂ Ho│   Keys    ↑↓ scroll · Esc close                                                              │ Size │
+│      │                                                                                              │      │
+│ TAGS │                                Vim                           Classic                         │      │
+│  ● Re│                                                                                              │      │
+│  ● Or│  Moving around                                                                               │      │
+│  ● Ye│  Move up                       k ↑                           ↑                               │  1 B │
+│  ● Gr│  Move down                     j ↓                           ↓                               │20 MB │
+│  ● Bl│  Parent folder                 h ← Backspace                 ← Alt+↑                         │ 42 B │
+│  ● Pu│  Open                          l → Enter                     → Enter                         │ 37 B │
+│  ● Gr│  First item                    g Home                        Home                            │52 KB │
+│      │  Last item                     G End                         End                             │ 73 B │
+│      │  Page up                       PgUp                          PgUp                            │ 13 B │
+│      │  Page down                     PgDn                          PgDn                            │ 16 B │
+│      │  Half page up                  Ctrl+U                                                        │  6 B │
+│      │  Half page down                Ctrl+D                                                        │      │
+│      │  Go to home                    ~                                                             │      │
+│      │  Back to the previous folder   Ctrl+O                        Alt+← Ctrl+O                    │      │
+│      │  Forward to the next folder    Alt+→ Ctrl+G                  Alt+→ Ctrl+G                    │      │
+│      │                                                                                              │      │
+│      │  Selecting                                                                                   │      │
+│      │  Select / unselect item        Space                         Space Ctrl+Space Ins            │      │
+│      │  Select all                                                  Ctrl+A                          │      │
+│      │  Extend selection up                                         Shift+↑                         │      │
+│      │  Extend selection down                                       Shift+↓                         │      │
+│      │  Extend selection to start                                   Shift+Home Ctrl+Shift+Home      │      │
+│      │  Extend selection to end                                     Shift+End Ctrl+Shift+End        │      │
+│      │  Clear selection / cancel      Esc                           Esc                             │      │
+│      │                                                                                              │      │
+│      │  Working with files                                                                          │      │
+│      │  Copy                          y                             Ctrl+C                          │      │
+│      │  Cut                           x                             Ctrl+X                          │      │
+│      │  Paste                         p                             Ctrl+V                          │      │
+│      │  Move to trash                 d                             Del                             │      │
+│      │  Delete permanently            D                             Shift+Del                       │      │
+│      │  Rename                        r                             F2                              │      │
+│      │  Rename many                   R                                                             │      │
+│      │  New folder                    n                             Ctrl+Shift+N Ctrl+N F7          │      │
+│      │  Extract here                  e                             Ctrl+E                          │      │
+│      │  Extract to a folder…          E                             Alt+e                           │      │
+│      │  Compress…                     z                             Alt+z                           │      │
+│      │  Undo                          u                             Ctrl+Z                          │      │
+│      │  Redo                          Ctrl+R                        Ctrl+Y Ctrl+Shift+Z             │      │
+│      │                                                                                              │      │
+│      ╰──────────────────────────────────────────────────────────────────────────────────────────────╯      │
+╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯
+ 12 items                                                                                 v0.6.0 ⟳   ≣  ▦  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Esc  close
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

@@ -89,34 +89,40 @@ fn confirm(h: &mut H) {
 }
 
 #[test]
-fn a_tagged_file_shows_a_dot_in_its_colour_beside_the_name() {
+fn a_tagged_file_shows_dots_in_its_colours_in_the_tag_column() {
     let Some((sb, dir)) = scene(&[
         ("a.txt", &["Red"]),
         ("b.txt", &["Blue", "Work", "Green", "Gray"]),
     ]) else {
         return;
     };
-    let mut h = H::new(sb, dir, 140, 30);
+    let mut h = H::new(sb, dir, 170, 30);
     let s = h.screen();
+    // The column has its title, and its dots are on the right of the name.
+    assert!(s.contains("Tags"), "the column has a title:\n{s}");
+    let after = |l: &str, what: &str| l[l.find(what).unwrap() + what.len()..].to_string();
     let a_row = s.lines().find(|l| l.contains("a.txt")).unwrap();
-    assert!(a_row.contains("a.txt ●"), "{a_row}");
+    assert_eq!(after(a_row, "a.txt").matches('●').count(), 1, "{a_row}");
     // More than three: three dots and +N.
     let b_row = s.lines().find(|l| l.contains("b.txt")).unwrap();
-    assert!(b_row.contains("b.txt ●●●+1"), "{b_row}");
+    let rest = after(b_row, "b.txt");
+    assert!(rest.contains("● ● ● +1"), "{b_row}");
     // An untagged one has none.
-    let sub_row = s.lines().find(|l| l.contains("sub")).unwrap();
-    assert!(!sub_row.contains('●'), "{sub_row}");
+    let sub_row = s.lines().find(|l| l.contains(" sub")).unwrap();
+    assert!(!after(sub_row, "sub").contains('●'), "{sub_row}");
     // The dot is drawn in the tag's colour.
     let red = h.app.th.tag_color(Some(TagColor::Red));
     let buf = h.term.backend().buffer().clone();
     let mut found = false;
     for y in 0..buf.area.height {
         let line: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect();
-        if line.contains("a.txt ●") {
-            for x in 0..buf.area.width {
+        if let Some(at) = line.find("a.txt") {
+            let from = line[..at].chars().count();
+            for x in from as u16..buf.area.width {
                 if buf[(x, y)].symbol() == "●" {
                     assert_eq!(buf[(x, y)].fg, red);
                     found = true;
+                    break;
                 }
             }
         }
@@ -133,7 +139,10 @@ fn the_details_pane_lists_the_tags() {
     h.keys("j"); // a.txt
     h.wait("details", |a| a.preview.name == "a.txt");
     let s = h.screen();
-    let row = s.lines().find(|l| l.contains("Tags")).expect("a Tags row");
+    let row = s
+        .lines()
+        .find(|l| l.contains("Tags") && l.contains("● Red"))
+        .expect("a Tags row");
     assert!(
         row.contains("● Red") && row.contains("● Project X"),
         "{row}"
@@ -152,7 +161,7 @@ fn the_icons_view_puts_the_dots_under_the_name() {
 #[test]
 fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
     let Some((sb, dir)) = scene(&[]) else { return };
-    let mut h = H::new(sb, dir, 140, 36);
+    let mut h = H::new(sb, dir, 170, 36);
     h.keys("j"); // a.txt
     choose_tag(&mut h, "Red");
     plan_modal(&mut h);
@@ -167,7 +176,13 @@ fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
     h.key(KeyCode::Tab);
     confirm(&mut h);
     assert_eq!(tags_of(&h, "a.txt"), ["Red"]);
-    assert!(h.screen().lines().any(|l| l.contains("a.txt ●")));
+    assert!(
+        h.screen()
+            .lines()
+            .any(|l| l.contains("a.txt")
+                && l.rsplit("a.txt").next().is_some_and(|r| r.contains('●'))),
+        "the dot is in the Tag column"
+    );
 
     // Undo, like any operation.
     h.keys("u");

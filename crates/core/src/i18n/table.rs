@@ -44,6 +44,10 @@ pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::StepWLink,
     Key::StepWHardLink,
     Key::HelpMouse,
+    Key::HOk,
+    Key::HomeLabel,
+    Key::AboutChannelValue,
+    Key::PvPdfPages,
 ];
 
 strings! {
@@ -315,8 +319,6 @@ strings! {
     LShowPackage => "Show package contents", "Mostra il contenuto del pacchetto";
     ResultOne => "result", "risultato";
     ResultMany => "results", "risultati";
-    ItemIsOne => "item is", "elemento è";
-    ItemsAreMany => "items are", "elementi sono";
 
     // ---- the details pane
     PropDimensions => "Dimensions", "Dimensioni";
@@ -571,5 +573,300 @@ strings! {
     MenuNewTag => "New tag…", "Nuovo tag…";
     MenuRemoveAllTags => "Remove all tags", "Togli tutti i tag";
     WhatChangeTags => "change tags", "cambiare i tag";
-    PlanningTags => "Planning", "Preparo il piano";
+
+    // ---- places and sections of the sidebar
+    PlaceTrash => "Trash", "Cestino";
+    SecPinned => "PINNED", "PREFERITI";
+    SecDevices => "DEVICES", "DISPOSITIVI";
+    SecTags => "TAGS", "TAG";
+    DiskSystem => "System", "Sistema";
+
+    // ---- the tab bar
+    UpdateTo => "Update to {0}", "Aggiorna a {0}";
+    HelpMenu => "Help", "Aiuto";
+
+    // ---- the bar at the top
+    BarPlaceholder => "Search files or type a command…", "Cerca file o digita un comando…";
+    BarCommand => "command", "comando";
+    BarGoTo => "go to", "vai a";
+    HomeLabel => "Home", "Home";
+
+    // ---- the command bar
+    BtnCompress => "Compress", "Comprimi";
+    BtnDelete => "Delete", "Elimina";
+    BtnSort => "Sort", "Ordina";
+
+    // ---- the list and the grid
+    ListLoading => "{0} loading…", "{0} caricamento…";
+    ListNoMatch => "Nothing here matches the search", "Nessun elemento corrisponde alla ricerca";
+    ListEmpty => "This folder is empty", "Questa cartella è vuota";
+    ListOnlyHidden => "Only hidden files here — press . to show them", "Qui ci sono solo file nascosti — premi . per mostrarli";
+    GridTooSmall => "too small for icons", "troppo piccolo per le icone";
+
+    // ---- the status bar and the key hints
+    HRun => "run", "esegui";
+    HCancel => "cancel", "annulla";
+    HOk => "ok", "ok";
+    HGo => "go", "vai";
+    HClose => "close", "chiudi";
+    HOpen => "open", "apri";
+    HAlways => "always", "sempre";
+    HQuit => "quit", "esci";
+    HStay => "stay", "resta";
+    HComplete => "complete", "completa";
+    HSuggestions => "suggestions", "suggerimenti";
+    HKeep => "keep", "tieni";
+    HClear => "clear", "cancella";
+    HClearSearch => "clear search", "cancella la ricerca";
+    HList => "list", "elenco";
+    HPin => "pin", "fissa";
+    HUnpin => "unpin", "stacca";
+    HHide => "hide", "nascondi";
+    HCopyOut => "copy out", "copia fuori";
+    HExtractAll => "extract all", "estrai tutto";
+    HSelect => "select", "seleziona";
+    HBack => "back", "indietro";
+    HUndo => "undo", "annulla";
+    HHelp => "help", "aiuto";
+    HExtract => "extract", "estrai";
+    HExtractTo => "extract to…", "estrai in…";
+    HCopy => "copy", "copia";
+    HPaste => "paste", "incolla";
+    HTrash => "trash", "cestino";
+    HRename => "rename", "rinomina";
+    HNewTab => "new tab", "nuova scheda";
+    HCommands => "commands", "comandi";
+    HCut => "cut", "taglia";
+    HNewFolder => "new folder", "nuova cartella";
+    HAddress => "address", "indirizzo";
+    HCompress => "compress", "comprimi";
+    HDelete => "delete", "elimina";
+    HRenameAll => "rename all", "rinomina tutti";
+    HDeselect => "clear", "deseleziona";
+    ItemsOfTotal => "{0} of {1}", "{0} di {1}";
+    SelectedSize => "{0} selected · {1}", "{0} selezionati · {1}";
+    ReadyPaste => "{0} ready to paste", "{0} da incollare";
+    ReadyMove => "{0} ready to move", "{0} da spostare";
+    HiddenShown => "hidden files shown", "file nascosti visibili";
+    FreeSpace => "{0} free", "{0} liberi";
+
+    // ---- the frame
+    TooSmall => "terminal too small", "terminale troppo piccolo";
+    EnlargeNotice => "Enlarge the window for the full layout (now {0}×{1})  Esc: hide", "Ingrandisci la finestra per vedere tutto (ora {0}×{1})  Esc: nascondi";
+    ProgLeft => "{0} left", "ne restano {0}";
+    ProgCancel => "cancel", "annulla";
+
+    // ---- the preview
+    PvEmptyFile => "Empty file", "File vuoto";
+    PvEmptyFolder => "Empty folder", "Cartella vuota";
+    PvBeginningOnly => "Beginning of the file only", "Solo l'inizio del file";
+    PvBackToSummary => "back to the summary", "torna al riepilogo";
+    PvExecutable => "Executable", "Eseguibile";
+    PvInterpreter => "Interpreter", "Interprete";
+    PvSize => "Size", "Dimensione";
+    PvSizeBytes => "{0} · {1} bytes", "{0} · {1} byte";
+    PvModified => "Modified", "Modificato";
+    PvCreated => "Created", "Creato";
+    PvAccessed => "Accessed", "Ultimo accesso";
+    PvPermissions => "Permissions", "Permessi";
+    PvShowHex => "show the hex dump", "mostra il dump esadecimale";
+    PvFormat => "Format", "Formato";
+    PvAtLeast => "at least ", "almeno ";
+    PvContains => "Contains", "Contiene";
+    PvPacked => "Packed", "Compresso";
+    PvUnpacked => "Unpacked", "Decompresso";
+    PvRatio => "Ratio", "Rapporto";
+    PvRatioValue => "{0} to 1", "{0} a 1";
+    PvOpenLikeFolder => "open like a folder", "apri come una cartella";
+    PvExtract => "extract", "estrai";
+    PvPointsToFile => "points to a file", "punta a un file";
+    PvPointsToFolder => "points to a folder", "punta a una cartella";
+    PvBrokenLink => "broken link: the target does not exist", "collegamento interrotto: la destinazione non esiste";
+    PvCircularLink => "circular link", "collegamento circolare";
+    PvBeginningOnlyDot => " · beginning only", " · solo l'inizio";
+    PvLongLinesCut => " · {0} long line(s) cut", " · {0} riga/righe lunghe tagliate";
+    PvHexDump => "hex dump · first {0} bytes", "dump esadecimale · primi {0} byte";
+    PvMoreNotListed => " · more not listed", " · altri non elencati";
+    PvShown => "{0} shown{1}", "{0} mostrati{1}";
+    PvSymlink => "Symbolic link", "Collegamento simbolico";
+    PvPdfPages => "PDF · {0} · {1}", "PDF · {0} · {1}";
+    PvPagesUnknown => "pages unknown", "pagine sconosciute";
+    PvSizeUnknown => "size unknown", "dimensione sconosciuta";
+    PvTitleLine => "title: {0}", "titolo: {0}";
+    PvAuthorLine => "author: {0}", "autore: {0}";
+    PvModifiedLine => "modified {0}", "modificato {0}";
+    PvDecoding => "{0} decoding…", "{0} decodifica…";
+    PvImagesOff => "image rendering is off (--images)", "le immagini sono disattivate (--images)";
+    PvPdfTooLarge => "PDF too large to preview", "PDF troppo grande per l'anteprima";
+    PvImageTooLarge => "image too large to preview", "immagine troppo grande per l'anteprima";
+    PvCannotPdf => "cannot show this PDF", "impossibile mostrare questo PDF";
+    PvCannotImage => "cannot show this image", "impossibile mostrare questa immagine";
+    PvFirstPageText => "{0} · first page as text", "{0} · prima pagina come testo";
+
+    // ---- the preview (passwords)
+    PvPwOne => "1 item is protected by a password", "1 elemento è protetto da una password";
+    PvPwMany => "{0} items are protected by a password", "{0} elementi sono protetti da una password";
+
+    // ---- notifications
+    NCopyOne => "1 item copied to {0}", "1 elemento copiato in {0}";
+    NCopyMany => "{0} items copied to {1}", "{0} elementi copiati in {1}";
+    NMoveOne => "1 item moved to {0}", "1 elemento spostato in {0}";
+    NMoveMany => "{0} items moved to {1}", "{0} elementi spostati in {1}";
+    NTrashOne => "1 item moved to the trash", "1 elemento spostato nel cestino";
+    NTrashMany => "{0} items moved to the trash", "{0} elementi spostati nel cestino";
+    NRenameOne => "Renamed to {0}", "Rinominato in {0}";
+    NRenameMany => "{0} items renamed", "{0} elementi rinominati";
+    NCompressOne => "1 item compressed into {0}", "1 elemento compresso in {0}";
+    NCompressMany => "{0} items compressed into {1}", "{0} elementi compressi in {1}";
+    NExtractOne => "1 item extracted to {0}", "1 elemento estratto in {0}";
+    NExtractMany => "{0} items extracted to {1}", "{0} elementi estratti in {1}";
+    NTagsOne => "Tags changed on 1 item", "Tag modificati su 1 elemento";
+    NTagsMany => "Tags changed on {0} items", "Tag modificati su {0} elementi";
+    NFolderCreated => "Folder created: {0}", "Cartella creata: {0}";
+    NFileCreated => "File created: {0}", "File creato: {0}";
+    NDeleteOne => "1 item deleted permanently", "1 elemento eliminato definitivamente";
+    NDeleteMany => "{0} items deleted permanently", "{0} elementi eliminati definitivamente";
+    NUndone => "Undone", "Annullato";
+    NDoneDefault => "{0}: done", "{0}: fatto";
+    NDoneKept => "{0}: done, some items were kept", "{0}: fatto, alcuni elementi sono rimasti";
+    NDoneNotKept => "{0}: done, but some attributes could not be kept", "{0}: fatto, ma alcuni attributi non si sono potuti conservare";
+    NProblems => "{0}: finished with {1} problem(s)", "{0}: concluso con {1} problema/i";
+    NStopped => "{0}: stopped; press u to undo what was done", "{0}: fermato; premi u per annullare ciò che è stato fatto";
+    NCancelled => "{0}: cancelled; press u to undo what was done", "{0}: annullato; premi u per annullare ciò che è stato fatto";
+    NInterrupted => "{0}: interrupted; press u to undo what was done", "{0}: interrotto; premi u per annullare ciò che è stato fatto";
+    NSkippedFolder => "{0} more skipped because their folder failed", "{0} saltati in più perché la loro cartella ha dato errore";
+    NNotPreserved => "not preserved: {0} — {1}, for example {2}", "non conservati: {0} — {1}, per esempio {2}";
+    NJournalErrors => "{0} steps could not be written to the journal and may not be undoable", "{0} passaggi non si sono potuti scrivere nel registro e potrebbero non essere annullabili";
+    NoticeShow => "Show", "Mostra";
+    NoticeClose => "Close", "Chiudi";
+
+    // ---- notices
+    TJournalDown => "journal unavailable: operations cannot be undone this session", "registro non disponibile: in questa sessione le operazioni non si possono annullare";
+    TTagViewRefuse => "this list is the items tagged \"{0}\", not a folder — cannot {1} here", "questo elenco contiene gli elementi con il tag \"{0}\", non è una cartella — qui non si può {1}";
+    TAtTop => "already at the top", "sei già in cima";
+    TInArchive => "inside an archive: copy ({0}) it to a folder, or extract with {1}", "dentro un archivio: copialo ({0}) in una cartella, oppure estrai con {1}";
+    TOpening => "opening {0}", "apro {0}";
+    TNotPackage => "this is not a package", "questo non è un pacchetto";
+    TQuickLookMac => "Quick Look is a macOS feature", "Anteprima rapida è una funzione di macOS";
+    TLiveOff => "live updates off: {0}", "aggiornamenti in tempo reale disattivati: {0}";
+    TNothingUndo => "nothing to undo", "niente da annullare";
+    TNothingRedo => "nothing to redo (redo only follows an undo, until another operation)", "niente da ripetere (si può ripetere solo dopo un annullamento, finché non c'è un'altra operazione)";
+    TBusy => "an operation is running; wait or press Esc to cancel it", "un'operazione è in corso: aspetta o premi Esc per annullarla";
+    TArchiveReadOnly => "an archive is read-only — cannot {0}; copy ({1}) items out to a folder instead", "un archivio è in sola lettura — non si può {0}; copia ({1}) gli elementi in una cartella";
+    TNothingCopied => "nothing copied yet (y = copy, x = cut)", "non hai ancora copiato nulla (y = copia, x = taglia)";
+    TYankCopied => "{0} copied — go to the destination and press {1}", "{0} copiati — vai alla destinazione e premi {1}";
+    TYankCut => "{0} cut — go to the destination and press {1}", "{0} tagliati — vai alla destinazione e premi {1}";
+    TSortedBy => "sorted by {0} {1}", "ordinati per {0} {1}";
+    TBookmarked => "folder bookmarked — it is in the sidebar and in Ctrl+P", "cartella tra i preferiti — è nella barra laterale e in Ctrl+P";
+    TBookmarkRemoved => "bookmark removed", "preferito rimosso";
+    TCannotUndoThis => "this operation cannot be undone (permanent, already undone, or nothing to undo)", "questa operazione non si può annullare (definitiva, già annullata, o niente da annullare)";
+    WhatCreateFolder => "create a folder", "creare una cartella";
+    WhatCreateFile => "create a file", "creare un file";
+    WhatOpenWithProgram => "open with a program", "aprire con un programma";
+    WhatPasteHere => "paste here", "incollare qui";
+    WhatPaste => "paste", "incollare";
+    WhatCut => "cut", "tagliare";
+    WhatDelete => "delete", "eliminare";
+    WhatRename => "rename", "rinominare";
+    WhatBookmark => "bookmark it", "aggiungerla ai preferiti";
+    WhatCompressHere => "compress from here", "comprimere da qui";
+    WhatQuickLook => "preview with Quick Look", "vedere l'anteprima rapida";
+    SortKeyName => "name", "nome";
+    SortKeySize => "size", "dimensione";
+    SortKeyDate => "date", "data";
+    SortKeyType => "type", "tipo";
+    KeyCopyWord => "copy", "copia";
+    KeyExtractWord => "extract", "estrai";
+    KeyPasteWord => "paste", "incolla";
+    TCancelling => "cancelling…", "annullamento in corso…";
+    THexOnlyBinary => "the hex dump is available for binary files", "il dump esadecimale è disponibile per i file binari";
+    TDetailsOnNarrow => "details pane on — this terminal is too narrow to show it", "pannello dei dettagli attivo — questo terminale è troppo stretto per mostrarlo";
+    TOpenWithFiles => "Open with… is for files", "Apri con… vale per i file";
+    TPathCopied => "path copied", "percorso copiato";
+    TPathsCopied => "paths copied", "percorsi copiati";
+    TOpeningWith => "opening {0} with {1}{2}", "apro {0} con {1}{2}";
+    TSettingsOpened => "System Settings opened — allow it there, then try the folder again", "Impostazioni di Sistema aperte — consenti lì l'accesso, poi riprova con la cartella";
+    TSidebarOnNarrow => "sidebar on — this terminal is too narrow to show it", "barra laterale attiva — questo terminale è troppo stretto per mostrarla";
+    TSidebarNarrow => "this terminal is too narrow for the sidebar", "questo terminale è troppo stretto per la barra laterale";
+    TOnlyBookmarksRemovable => "only bookmarks can be removed from the sidebar (a disk is ejected with this key)", "dalla barra laterale si possono togliere solo i preferiti (un disco si espelle con questo tasto)";
+    TSidebarFocus => "the sidebar has the focus — {0} goes back to the list", "il focus è sulla barra laterale — {0} torna all'elenco";
+    TTabLimit => "{0} tabs is the limit", "{0} schede è il limite";
+    TCannotOpenSettings => "cannot open the system settings: {0}", "impossibile aprire le impostazioni di sistema: {0}";
+    TCannotEject => "this one cannot be ejected", "questo non si può espellere";
+    TEjected => "{0} was ejected: you can unplug it", "{0} è stato espulso: puoi scollegarlo";
+    TExtractPartHint => "to extract part of an archive somewhere else: copy it ({0}), go there and paste ({1})", "per estrarre una parte di un archivio altrove: copiala ({0}), vai lì e incolla ({1})";
+    TSelectArchive => "select an archive to extract (zip, tar, 7z, rar, .gz, .xz, .zst…)", "seleziona un archivio da estrarre (zip, tar, 7z, rar, .gz, .xz, .zst…)";
+    TOneArchive => "extract one archive at a time", "estrai un archivio alla volta";
+    TUpToDate => "rada is up to date", "rada è aggiornato";
+    TCannotLookUpdates => "cannot look for updates: {0}", "impossibile cercare aggiornamenti: {0}";
+    TUpdateFailed => "the update did not work", "l'aggiornamento non è riuscito";
+    TUpdateRunning => "an update is already running", "un aggiornamento è già in corso";
+    TLookingNewer => "looking for a newer version…", "cerco una versione più recente…";
+    TUpdatesNA => "updates are not available here", "qui gli aggiornamenti non sono disponibili";
+    TUpdatingBackground => "updating in the background", "aggiornamento in corso in background";
+
+    // ---- messages of the app
+    PlanningGeneric => "Planning", "Preparo il piano";
+    PlanningRedo => "Planning redo", "Preparo il piano per ripetere";
+    PlanningUndo => "Planning undo", "Preparo il piano per annullare";
+    PlanningRename => "Planning rename", "Preparo il piano per rinominare";
+    PlanningCompress => "Planning compression", "Preparo il piano per comprimere";
+    PlanningCopy => "Planning copy", "Preparo il piano per copiare";
+    ReadingArchive => "Reading the archive", "Leggo l'archivio";
+    TFontNotInstalled => "the font was not installed: {0}", "il font non è stato installato: {0}";
+    TOpeningWithNote1 => " — rada will use it for this kind of file", " — rada lo userà per questo tipo di file";
+    TOpeningWithNote2 => " — rada goes back to the system's choice for this kind of file", " — rada torna alla scelta del sistema per questo tipo di file";
+    SideFree => "{0} · {1} free", "{0} · {1} liberi";
+    SideMenuOpen => "Open", "Apri";
+    SideMenuEject => "Eject", "Espelli";
+    SideMenuPin => "Pin to navigation", "Fissa nella barra laterale";
+    SideMenuUnpin => "Unpin from navigation", "Stacca dalla barra laterale";
+    AboutTitle => "About rada", "Informazioni su rada";
+    AboutVersion => "Version", "Versione";
+    AboutChannel => "Channel", "Canale";
+    AboutMode => "Mode", "Modo";
+    AboutChecks => "Checks", "Controlli";
+    AboutProgram => "Program", "Programma";
+    AboutUpdates => "Updates", "Aggiornamenti";
+    AboutSource => "Source", "Sorgente";
+    AboutPre => "pre-releases", "versioni di prova";
+    AboutStable => "stable releases", "versioni stabili";
+    AboutChosenVersion => "chosen from the version", "scelto in base alla versione";
+    AboutSetInConfig => "set in the configuration", "impostato nella configurazione";
+    AboutChannelValue => "{0} ({1})", "{0} ({1})";
+    AboutBinary => "a program downloaded from the releases — it replaces itself", "un programma scaricato dalle versioni — si sostituisce da solo";
+    AboutSourceMode => "built from the git checkout in {0} — it pulls and builds", "compilato dalla copia git in {0} — si aggiorna e si ricompila";
+    AboutDaily => "once a day in the background", "una volta al giorno in background";
+    AboutOnlyAsked => "only when asked (check = false)", "solo su richiesta (check = false)";
+    AboutNA => "not available here", "non disponibili qui";
+    UpDoneRestart => "rada {0} is installed: start rada again to use it", "rada {0} è installato: riavvia rada per usarlo";
+    UpStarting => "starting the update to {0}", "avvio l'aggiornamento a {0}";
+    UpPress => " — press {0} to {1}", " — premi {0} per {1}";
+    UpWordUpdate => "update", "aggiornare";
+    UpWordSeeWhy => "see why", "vedere perché";
+    UpNewVersion => "New version {0} available{1}", "Nuova versione {0} disponibile{1}";
+    UpUpdatingStep => "Updating: {0} ({1})", "Aggiornamento: {0} ({1})";
+    UpUpdating => "Updating… ({0})", "Aggiornamento… ({0})";
+    UpInstalledLong => "rada {0} installed — start rada again to use it", "rada {0} installato — riavvia rada per usarlo";
+    UpRestart => "restart rada", "riavvia rada";
+    UpFailedLong => "The update did not work{0}", "L'aggiornamento non è riuscito{0}";
+    UpFailedShort => "Update failed{0}", "Aggiornamento fallito{0}";
+    TCannotOpenPath => "cannot open {0}: {1}", "impossibile aprire {0}: {1}";
+
+    // ---- planning
+    PlanningMove => "Planning move", "Preparo il piano per spostare";
+
+    // ---- more of the app
+    TCannotOpen => "cannot open {0}: {1}", "impossibile aprire {0}: {1}";
+    TQuickLookErr => "Quick Look: {0}", "Anteprima rapida: {0}";
+    ResultCouldNot => "Could not go on", "Non si è potuto continuare";
+    ResultRecovered => "\"{0}\" was interrupted last time: {1} leftover temporary file(s) removed, {2} finished step(s) added to the history", "\"{0}\" era stata interrotta l'ultima volta: {1} file temporanei rimasti eliminati, {2} passaggi conclusi aggiunti alla cronologia";
+    ResultOpenHistory => "Open the history to undo what was done before the interruption.", "Apri la cronologia per annullare ciò che era stato fatto prima dell'interruzione.";
+    ResultInterruptedTitle => "An earlier operation was interrupted", "Un'operazione precedente è stata interrotta";
+    PalNotResponding => " · not responding", " · non risponde";
+    PalFreeDetail => " · {0} free", " · {0} liberi";
+
+    // ---- new actions
+    LViewColumns => "View as columns", "Vista a colonne";
+    LToggleTags => "Show / hide the Tag column", "Mostra / nascondi la colonna dei tag";
 }

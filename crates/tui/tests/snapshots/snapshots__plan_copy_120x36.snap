@@ -2,39 +2,39 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ backup  ✕   +                                                                    vim + classic keys   ? Help ▾
+ rada  ▸ backup  ✕   +                                                                                          ? Help
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ←   →   ↑   ⟳   ⌂ Home › demo › backup                                                      ⌕ Search in back… Ctrl+F
+  ←   →   ↑   ⟳     ⌂ Home › demo › backup │ ⌕ Search files or type a command…                    Ctrl+P     ≣ Details
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
+  + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
-                            │▌☐ · README.md                            10/10/2026      Markdown                     3 B
- TAGS ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-  ● Re│                                                                                                          │
-  ● Or│   Copy                                                                                                   │
-  ● Ye│  Copy 2 items                                                                                            │
-  ● Gr│  From  ~/demo/projects                                                                                   │
-  ● Bl│  To    ~/demo/backup                                                                                     │
-  ● Pu│                                                                                                          │
-  ● Gr│  2             79 B                                                                                      │
-      │  files         in total                                                                                  │
-      │                                                                                                          │
-      │  If a name already exists    skip  keep both  overwrite    c to change                                   │
-      │                                                                                                          │
-      │  What will happen                                                                                        │
-      │  · Cargo.toml                                  copy                                              42 B    │
-      │  · main.rs                                     copy                                              37 B    │
-      │                                                                                                          │
-      │   Enter  Run    Esc  Cancel       ↑↓ scroll                                                              │
-      │                                                                                                          │
-      ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                            │
-                            │
-                            │
-                            │
-                            │
- 1 item  │  ⎘ 2 items ready to paste                            ●  2 items copied — go to the destination and press p
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│     ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮     │
+│ TAGS│                                                                                                          │     │
+│  ● R│   Copy                                                                                                   │     │
+│  ● O│  Copy 2 items                                                                                            │     │
+│  ● Y│  From  ~/demo/projects                                                                                   │     │
+│  ● G│  To    ~/demo/backup                                                                                     │     │
+│  ● B│                                                                                                          │     │
+│  ● P│  2             79 B                                                                                      │     │
+│  ● G│  files         in total                                                                                  │     │
+│     │                                                                                                          │     │
+│     │  If a name already exists    skip  keep both  overwrite    c to change                                   │     │
+│     │                                                                                                          │     │
+│     │  What will happen                                                                                        │     │
+│     │  · Cargo.toml                                  copy                                              42 B    │     │
+│     │  · main.rs                                     copy                                              37 B    │     │
+│     │                                                                                                          │     │
+│     │   Enter  Run    Esc  Cancel       ↑↓ scroll                                                              │     │
+│     │                                                                                                          │     │
+│     ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯     │
+│                          │ │                                                                                         │
+│                          │ │                                                                                         │
+│                          │ │                                ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ │
+│                          │ │                                  ● 2 items copied — go to the destination and press p   │
+╰──────────────────────────╯ ╰────────────────────────────────▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀─╯
+ 1 item  │  ⎘ 2 items ready to paste                                                                v0.6.0 ⟳   ≣  ▦  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Enter  run     Esc  cancel
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

@@ -2,33 +2,33 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ projects  ✕   +                                                        vim + classic keys   ? Help ▾
-  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ Search in proj… Ctrl+F
+ rada  ▸ projects  ✕   +                                                                              ? Help
+  ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search files or type a command…        Ctrl+P     ≣ Details
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                                               ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
-                            │ ☐ ▸ data                       6 days ago      Folder
- TAGS                       │ ☐ ▸ src                        6 days ago      Folder
-  ● Red                     │ ☐ ▸ 目录                       6 days ago      Folder
-  ● Orange                  │ ☐ · a-very-long-file-name-th…  12 days ago     Archive (tar.gz)             1 B
-  ● Yellow                  │ ☐ · backup.img                 9 days ago      Disk image                420 MB
-  ● Green                   │ ☐ · Cargo.toml                 2 days a╭──────────────────────────────╮    42 B
-  ● Blue                    │▌☐ · main.rs                    Yesterda│ Open                    Enter│    37 B
-  ● Purple                  │ ☐ · notes.txt                  5 weeks │ Open with…              Alt+o│ 3.52 KB
-  ● Gray                    │ ☐ · README.md                  Today 09│──────────────────────────────│    73 B
-                            │ ☐ · тест-файл.md               Today 10│ Cut                    Ctrl+X│    13 B
-                            │ ☐ · 日本語のファイル名.txt     5 days a│ Copy                   Ctrl+C│    16 B
-                            │ ☐ · 📷 holiday photos 🌴.txt   27/11/20│ Paste                  Ctrl+V│     6 B
-                            │                                        │──────────────────────────────│
-                            │                                        │ Rename                     F2│
-                            │                                        │ Compress…               Alt+z│
-                            │                                        │──────────────────────────────│
-                            │                                        │ Tags                        ▸│
-                            │                                        │──────────────────────────────│
-                            │                                        │ Copy the path    Ctrl+Shift+C│
-                            │                                        │──────────────────────────────│
- 12 items                                                            │ Move to trash             Del│   ≣  ▦
+╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
+│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size │
+│                          │ │                                                                               │
+│ TAGS                     │ │ ☐ ▸ data                    6 days ago       Folder                           │
+│  ● Red                   │ │ ☐ ▸ src                     6 days ago       Folder                           │
+│  ● Orange                │ │ ☐ ▸ 目录                    6 days ago       Folder                           │
+│  ● Yellow                │ │ ☐ · a-very-long-file-name…  12 days ag╭──────────────────────────────╮    1 B │
+│  ● Green                 │ │ ☐ · backup.img              9 days ago│ Open                    Enter│ 420 MB │
+│  ● Blue                  │ │ ☐ · Cargo.toml              2 days ago│ Open with…              Alt+o│   42 B │
+│  ● Purple                │ │▌☐ · main.rs                 Yesterday │──────────────────────────────│   37 B │
+│  ● Gray                  │ │ ☐ · notes.txt               5 weeks ag│ Cut                    Ctrl+X│3.52 KB │
+│                          │ │ ☐ · README.md               Today 09:0│ Copy                   Ctrl+C│   73 B │
+│                          │ │ ☐ · тест-файл.md            Today 10:3│ Paste                  Ctrl+V│   13 B │
+│                          │ │ ☐ · 日本語のファイル名.txt  5 days ago│──────────────────────────────│   16 B │
+│                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028│ Rename                     F2│    6 B │
+│                          │ │                                       │ Compress…               Alt+z│        │
+│                          │ │                                       │──────────────────────────────│        │
+│                          │ │                                       │ Tags                        ▸│        │
+│                          │ │                                       │──────────────────────────────│        │
+│                          │ │                                       │ Copy the path    Ctrl+Shift+C│        │
+╰──────────────────────────╯ ╰───────────────────────────────────────│──────────────────────────────│────────╯
+ 12 items                                                            │ Move to trash             Del│≣  ▦  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄
    Esc  close                                                        │ Properties          Alt+Enter│
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╰──────────────────────────────╯▀▀▀▀▀▀▀▀▀

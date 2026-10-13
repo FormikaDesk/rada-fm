@@ -20,6 +20,9 @@ use rada_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
 pub struct Services {
     pub jobs: Jobs,
     pub loader: DirLoader,
+    /// Reads the folder above the one shown, for the first of the Columns view's columns. Its
+    /// own worker: the answers to the loader above must not be mistaken for these.
+    pub parent_loader: DirLoader,
     pub previewer: PreviewWorker,
     /// Counts the size of the folders on screen.
     pub sizes: SizeWorker,
@@ -73,6 +76,7 @@ impl Services {
         Services {
             jobs,
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
+            parent_loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn_with(fs.clone(), Some(platform.clone()), tx.clone()),
             sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
             size_settings: SizeSettings {

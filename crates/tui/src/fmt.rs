@@ -198,10 +198,7 @@ pub fn explorer_date_in(
     let days = (zn.date() - z.date()).get_days();
     match days {
         d if d < 0 => full,
-        0 => tf(
-            Key::Today,
-            &[&format!("{:02}:{:02}", z.hour(), z.minute())],
-        ),
+        0 => tf(Key::Today, &[&format!("{:02}:{:02}", z.hour(), z.minute())]),
         1 => Key::Yesterday.tr().into(),
         2..=13 => tf(Key::DaysAgo, &[&days]),
         14..=55 => tf(Key::WeeksAgo, &[&(days / 7)]),

@@ -2,38 +2,38 @@
 source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
- rada  ▸ demo  ✕   +                                                                                          vim + classic keys   ? Help ▾
+ rada  ▸ demo  ✕   +                                                                                                                ? Help
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                                  ⌕ Search in demo        Ctrl+F
+  ←   →   ↑   ⟳     ⌂ Home › projects › demo │ ⌕ Search files or type a command…                                      Ctrl+P     ≣ Details
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-  +  New ▾   │  ✂  Cut     ⧉  Copy     ⎘  Paste     ✎  Rename     ▣  Compress     ✗  Delete  │  ⇅  Sort ▾     ≣  View ▾  │  ↶  Undo        ⋯
+  + New ▾   │   ✂ Cut    ⧉ Copy    ⎘ Paste    ✎ Rename    ▣ Compress    ✗ Delete   │   ⇅ Sort ▾    ◆ Tags ▾   │   ↶ Undo                   ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ⌂ Home                    │ ☐   Name ↑                Date modified   Type                        Size │ 3 items selected
-                            │ ☐ ▸ assets                3 days ago      Folder                           │ 56.6 MB in files
- PINNED                     │ ☐ ▸ docs                  Yesterday       Folder                           │
-  ▭ Desktop               ⚲ │ ☐ ▸ scripts               9 days ago      Folder                           │
-  ▤ Documents             ⚲ │ ☐ ▸ src                   Today 09:30     Folder                           │
-  ↓ Downloads             ⚲ │ ☐ ▸ tests                 2 days ago      Folder                           │
-  ▣ Pictures              ⚲ │ ☑ · archive.tar.gz        8 days ago      Archive (tar.gz)         17.6 MB │
-  ♪ Music                 ⚲ │ ☑ · backup.zip            05/07/2026      Archive (ZIP)            39.0 MB │
-  ▶ Videos                ⚲ │ ☑ · Cargo.toml            3 days ago      Settings file               82 B │
-                            │ ☐ · data.json             6 days ago      JSON data                   49 B │
- DEVICES                    │ ☐ · demo.mp4              2 weeks ago     MP4 video                91.0 MB │
-  ▥ System                  │ ☐ · logo.svg              5 days ago      SVG image                  197 B │
-    ━━━━━━━━━──────  183 GB │ ☐ · main.rs               Today 14:10     Rust source                 80 B │
-  ▥ Data                    │ ☐ · notes.txt             Yesterday       Text document               28 B │
-    ━━━━━━─────────  555 GB │▌☐ · photo.jpg             Today 13:30     JPEG image               70.7 KB │
-  ⏏ USB drive               │ ☐ · README.md             Today 13:28     Markdown                   145 B │
-    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf            4 days ago      PDF document             2.29 MB │
-                            │ ☐ · screenshot.png        Yesterday       PNG image                5.34 KB │
- TAGS                       │ ☐ · setup.sh              12 days ago     Shell script                21 B │
-  ● Red                     │ ☐ · song.mp3              30/07/2026      MP3 audio                7.44 MB │
-  ● Orange                  │                                                                            │
-  ● Yellow                  │                                                                            │
-  ● Green                   │                                                                            │
-  ● Blue                    │                                                                            │
-  ● Purple                  │                                                                            │
- 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste                                   v0.6.0 ⟳  183 GB free ━━━━━━────  ≣  ▦
+╭──────────────────────────╮ ╭──────────────────────────────────────────────────────────────────────────╮ ╭────────────────────────────────╮
+│  ⌂ Home                  │ │ ☐   Name ↑             Date modified    Type                        Size │ │ 3 items selected               │
+│                          │ │                                                                          │ │ 56.6 MB in files               │
+│ PINNED                   │ │ ☐ ▸ assets             3 days ago       Folder                           │ │                                │
+│  ▭ Desktop             ⚲ │ │ ☐ ▸ docs               Yesterday        Folder                           │ │                                │
+│  ▤ Documents           ⚲ │ │ ☐ ▸ scripts            9 days ago       Folder                           │ │                                │
+│  ↓ Downloads           ⚲ │ │ ☐ ▸ src                Today 09:30      Folder                           │ │                                │
+│  ▣ Pictures            ⚲ │ │ ☐ ▸ tests              2 days ago       Folder                           │ │                                │
+│  ♪ Music               ⚲ │ │ ☑ · archive.tar.gz     8 days ago       Archive (tar.gz)         17.6 MB │ │                                │
+│  ▶ Videos              ⚲ │ │ ☑ · backup.zip         05/07/2026       Archive (ZIP)            39.0 MB │ │                                │
+│                          │ │ ☑ · Cargo.toml         3 days ago       Settings file               82 B │ │                                │
+│ DEVICES                  │ │ ☐ · data.json          6 days ago       JSON data                   49 B │ │                                │
+│  ▥ System                │ │ ☐ · demo.mp4           2 weeks ago      MP4 video                91.0 MB │ │                                │
+│    ■■■■■■□□□□     183 GB │ │ ☐ · logo.svg           5 days ago       SVG image                  197 B │ │                                │
+│  ▥ Data                  │ │ ☐ · main.rs            Today 14:10      Rust source                 80 B │ │                                │
+│    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt          Yesterday        Text document               28 B │ │                                │
+│  ⏏ USB drive             │ │▌☐ · photo.jpg          Today 13:30      JPEG image               70.7 KB │ │                                │
+│    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md          Today 13:28      Markdown                   145 B │ │                                │
+│                          │ │ ☐ · report.pdf         4 days ago       PDF document             2.29 MB │ │                                │
+│ TAGS                     │ │ ☐ · screenshot.png     Yesterday        PNG image                5.34 KB │ │                                │
+│  ● Red                   │ │ ☐ · setup.sh           12 days ago      Shell script                21 B │ │                                │
+│  ● Orange                │ │ ☐ · song.mp3           30/07/2026       MP3 audio                7.44 MB │ │                                │
+│  ● Yellow                │ │                                                                          │ │                                │
+│  ● Green                 │ │                                                                          │ │                                │
+╰──────────────────────────╯ ╰──────────────────────────────────────────────────────────────────────────╯ ╰────────────────────────────────╯
+ 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste                                v0.6.0 ⟳  183 GB free ■■■■■■□□□□  ≣  ▦  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress     Ctrl+V  paste     Esc  clear
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

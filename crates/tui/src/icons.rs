@@ -328,10 +328,13 @@ pub enum Glyph {
     Unchecked,
     TabFolder,
     Filter,
+    Tag,
+    Columns,
+    Done,
 }
 
 impl Glyph {
-    pub const ALL: [Glyph; 29] = [
+    pub const ALL: [Glyph; 32] = [
         Glyph::Back,
         Glyph::Forward,
         Glyph::Up,
@@ -361,6 +364,9 @@ impl Glyph {
         Glyph::Unchecked,
         Glyph::TabFolder,
         Glyph::Filter,
+        Glyph::Tag,
+        Glyph::Columns,
+        Glyph::Done,
     ];
 }
 
@@ -398,6 +404,9 @@ pub fn ui(set: IconSet, g: Glyph) -> &'static str {
         Glyph::Unchecked => ("\u{f096}", "☐", "."),
         Glyph::TabFolder => ("\u{f07b}", "▸", ""),
         Glyph::Filter => ("\u{f0b0}", "▽", ""),
+        Glyph::Tag => ("\u{f02b}", "◆", ""),
+        Glyph::Columns => ("\u{f0db}", "▥", ""),
+        Glyph::Done => ("\u{f00c}", "✓", "+"),
     };
     match set {
         IconSet::Nerd => nerd,

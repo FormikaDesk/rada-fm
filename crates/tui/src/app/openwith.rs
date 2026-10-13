@@ -279,13 +279,13 @@ impl App {
             }
         });
         let note = match (always, was_always) {
-            (true, false) => " — rada will use it for this kind of file",
-            (false, true) => " — rada goes back to the system's choice for this kind of file",
+            (true, false) => Key::TOpeningWithNote1.tr(),
+            (false, true) => Key::TOpeningWithNote2.tr(),
             _ => "",
         };
         self.toast(
             ToastKind::Info,
-            format!("opening {} with {name}{note}", v.file),
+            tf(Key::TOpeningWith, &[&v.file, &name, &note]),
             3,
         );
     }

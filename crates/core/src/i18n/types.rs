@@ -150,8 +150,20 @@ mod tests {
     #[test]
     fn every_label_of_the_core_has_an_italian_form() {
         let english_words = [
-            "source", "image", "document", "data", "component", "package", "spreadsheet",
-            "presentation", "drawing", "module", "library", "archive", "settings", "list",
+            "source",
+            "image",
+            "document",
+            "data",
+            "component",
+            "package",
+            "spreadsheet",
+            "presentation",
+            "drawing",
+            "module",
+            "library",
+            "archive",
+            "settings",
+            "list",
             "installer",
         ];
         let mut labels = crate::filetype::all_labels();

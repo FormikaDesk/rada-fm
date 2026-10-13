@@ -147,7 +147,10 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
                 fmt::selected_items(app.marked.len() as u64),
                 th.base().add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled(tf(Key::InFiles, &[&fmt::size(size)]), th.dim())),
+            Line::from(Span::styled(
+                tf(Key::InFiles, &[&fmt::size(size)]),
+                th.dim(),
+            )),
         ];
         f.render_widget(Paragraph::new(lines), Rect { height: 2, ..inner });
         return;
@@ -180,7 +183,11 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         app.folder_summary(&e)
             .unwrap_or_else(|| rada_core::i18n::type_label(&e.type_label).into_owned())
     } else {
-        format!("{} · {}", rada_core::i18n::type_label(&e.type_label), fmt::size(e.size))
+        format!(
+            "{} · {}",
+            rada_core::i18n::type_label(&e.type_label),
+            fmt::size(e.size)
+        )
     };
     f.render_widget(
         Paragraph::new(Span::styled(display::truncate(&sub, w), th.dim())),
@@ -262,7 +269,10 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             let preview_label = preview_label.trim().to_string();
             // What takes the second place: Preview, or Quick Look when it has no row of its own.
             let (second, second_target) = if quick_look && !quick_look_below {
-                (Key::BtnQuickLook.tr().to_string(), Target::Act(Action::QuickLook))
+                (
+                    Key::BtnQuickLook.tr().to_string(),
+                    Target::Act(Action::QuickLook),
+                )
             } else {
                 (preview_label, Target::FullPreview)
             };

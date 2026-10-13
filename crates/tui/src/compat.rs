@@ -151,6 +151,7 @@ pub fn ascii_for(ch: char) -> Option<char> {
         '◀' | '◂' | '◁' | '◃' => '<',
         // squares
         '■' | '▣' | '▤' | '▥' | '▦' => '#',
+        '□' => '-',
         '▭' => '=',
         // box drawing: lines stay lines, every corner and joint is a plus
         '─' | '━' | '╌' | '╍' | '┄' | '┅' | '┈' | '┉' | '═' | '╴' | '╶' | '╸' | '╺' | '╼' | '╾' => {
@@ -209,6 +210,7 @@ pub fn std_for(ch: char) -> Option<char> {
         '⧉' => '+',
         '☑' | '⎘' => '■',
         '▣' => '◘',
+        '□' => '░',
         '▥' => '◙',
         '▦' => '▒',
         '▭' => '▬',
@@ -221,6 +223,7 @@ pub fn std_for(ch: char) -> Option<char> {
         '▋' => '▌',
         '▍' | '▎' | '▏' => '│',
         '▖' => '▄',
+        '▔' => '▀',
         // the spinner's ten braille frames turn as the classic four
         '⠋' | '⠼' | '⠇' => '|',
         '⠙' | '⠴' | '⠏' => '/',

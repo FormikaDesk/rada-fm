@@ -88,6 +88,9 @@ pub enum Action {
     // Quick Look and packages (macOS; the keys exist everywhere)
     QuickLook,
     ShowPackage,
+    // rc.5
+    ViewColumns,
+    ToggleTags,
 }
 
 /// Where an action appears in the help, in this order.
@@ -124,7 +127,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 66] = [
+    pub const ALL: [Action; 68] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -191,6 +194,8 @@ impl Action {
         Action::Update,
         Action::QuickLook,
         Action::ShowPackage,
+        Action::ViewColumns,
+        Action::ToggleTags,
     ];
 
     /// The name used in the configuration file.
@@ -262,6 +267,8 @@ impl Action {
             Action::Update => "update",
             Action::QuickLook => "quick_look",
             Action::ShowPackage => "show_package",
+            Action::ViewColumns => "view_columns",
+            Action::ToggleTags => "toggle_tags",
         }
     }
 
@@ -270,75 +277,82 @@ impl Action {
     }
 
     /// Short human description (help, context menu, palette).
-    pub fn label(self) -> &'static str {
+    pub fn label_key(self) -> Key {
         match self {
-            Action::Up => Key::LUp.tr(),
-            Action::Down => Key::LDown.tr(),
-            Action::Parent => Key::LParent.tr(),
-            Action::Open => Key::LOpen.tr(),
-            Action::First => Key::LFirst.tr(),
-            Action::Last => Key::LLast.tr(),
-            Action::PageUp => Key::LPageUp.tr(),
-            Action::PageDown => Key::LPageDown.tr(),
-            Action::HalfPageUp => Key::LHalfPageUp.tr(),
-            Action::HalfPageDown => Key::LHalfPageDown.tr(),
-            Action::ToggleMark => Key::LToggleMark.tr(),
-            Action::SelectAll => Key::LSelectAll.tr(),
-            Action::SelectUp => Key::LSelectUp.tr(),
-            Action::SelectDown => Key::LSelectDown.tr(),
-            Action::SelectToFirst => Key::LSelectToFirst.tr(),
-            Action::SelectToLast => Key::LSelectToLast.tr(),
-            Action::ClearSelection => Key::LClearSelection.tr(),
-            Action::Copy => Key::LCopy.tr(),
-            Action::Cut => Key::LCut.tr(),
-            Action::Paste => Key::LPaste.tr(),
-            Action::Trash => Key::LTrash.tr(),
-            Action::DeletePermanently => Key::LDeletePermanently.tr(),
-            Action::Rename => Key::LRename.tr(),
-            Action::BulkRename => Key::LBulkRename.tr(),
-            Action::NewFolder => Key::LNewFolder.tr(),
-            Action::ExtractHere => Key::LExtractHere.tr(),
-            Action::ExtractToFolder => Key::LExtractToFolder.tr(),
-            Action::Compress => Key::LCompress.tr(),
-            Action::Undo => Key::LUndo.tr(),
-            Action::Redo => Key::LRedo.tr(),
-            Action::History => Key::LHistory.tr(),
-            Action::Filter => Key::LFilter.tr(),
-            Action::Palette => Key::LPalette.tr(),
-            Action::Sort => Key::LSort.tr(),
-            Action::SortReverse => Key::LSortReverse.tr(),
-            Action::ToggleHidden => Key::LToggleHidden.tr(),
-            Action::ToggleHex => Key::LToggleHex.tr(),
-            Action::PreviewDown => Key::LPreviewDown.tr(),
-            Action::PreviewUp => Key::LPreviewUp.tr(),
-            Action::Bookmark => Key::LBookmark.tr(),
-            Action::GoHome => Key::LGoHome.tr(),
-            Action::Back => Key::LBack.tr(),
-            Action::Forward => Key::LForward.tr(),
-            Action::SwitchPane => Key::LSwitchPane.tr(),
-            Action::ToggleSidebar => Key::LToggleSidebar.tr(),
-            Action::Help => Key::LHelp.tr(),
-            Action::Quit => Key::LQuit.tr(),
-            Action::NewFile => Key::LNewFile.tr(),
-            Action::Refresh => Key::LRefresh.tr(),
-            Action::FocusAddress => Key::LFocusAddress.tr(),
-            Action::ToggleDetails => Key::LToggleDetails.tr(),
-            Action::ViewDetails => Key::LViewDetails.tr(),
-            Action::ViewIcons => Key::LViewIcons.tr(),
-            Action::ToggleView => Key::LToggleView.tr(),
-            Action::Properties => Key::LProperties.tr(),
-            Action::OpenWith => Key::LOpenWith.tr(),
-            Action::CopyPath => Key::LCopyPath.tr(),
-            Action::OpenTerminal => Key::LOpenTerminal.tr(),
-            Action::ContextMenu => Key::LContextMenu.tr(),
-            Action::NewTab => Key::LNewTab.tr(),
-            Action::CloseTab => Key::LCloseTab.tr(),
-            Action::NextTab => Key::LNextTab.tr(),
-            Action::PrevTab => Key::LPrevTab.tr(),
-            Action::Update => Key::LUpdate.tr(),
-            Action::QuickLook => Key::LQuickLook.tr(),
-            Action::ShowPackage => Key::LShowPackage.tr(),
+            Action::Up => Key::LUp,
+            Action::Down => Key::LDown,
+            Action::Parent => Key::LParent,
+            Action::Open => Key::LOpen,
+            Action::First => Key::LFirst,
+            Action::Last => Key::LLast,
+            Action::PageUp => Key::LPageUp,
+            Action::PageDown => Key::LPageDown,
+            Action::HalfPageUp => Key::LHalfPageUp,
+            Action::HalfPageDown => Key::LHalfPageDown,
+            Action::ToggleMark => Key::LToggleMark,
+            Action::SelectAll => Key::LSelectAll,
+            Action::SelectUp => Key::LSelectUp,
+            Action::SelectDown => Key::LSelectDown,
+            Action::SelectToFirst => Key::LSelectToFirst,
+            Action::SelectToLast => Key::LSelectToLast,
+            Action::ClearSelection => Key::LClearSelection,
+            Action::Copy => Key::LCopy,
+            Action::Cut => Key::LCut,
+            Action::Paste => Key::LPaste,
+            Action::Trash => Key::LTrash,
+            Action::DeletePermanently => Key::LDeletePermanently,
+            Action::Rename => Key::LRename,
+            Action::BulkRename => Key::LBulkRename,
+            Action::NewFolder => Key::LNewFolder,
+            Action::ExtractHere => Key::LExtractHere,
+            Action::ExtractToFolder => Key::LExtractToFolder,
+            Action::Compress => Key::LCompress,
+            Action::Undo => Key::LUndo,
+            Action::Redo => Key::LRedo,
+            Action::History => Key::LHistory,
+            Action::Filter => Key::LFilter,
+            Action::Palette => Key::LPalette,
+            Action::Sort => Key::LSort,
+            Action::SortReverse => Key::LSortReverse,
+            Action::ToggleHidden => Key::LToggleHidden,
+            Action::ToggleHex => Key::LToggleHex,
+            Action::PreviewDown => Key::LPreviewDown,
+            Action::PreviewUp => Key::LPreviewUp,
+            Action::Bookmark => Key::LBookmark,
+            Action::GoHome => Key::LGoHome,
+            Action::Back => Key::LBack,
+            Action::Forward => Key::LForward,
+            Action::SwitchPane => Key::LSwitchPane,
+            Action::ToggleSidebar => Key::LToggleSidebar,
+            Action::Help => Key::LHelp,
+            Action::Quit => Key::LQuit,
+            Action::NewFile => Key::LNewFile,
+            Action::Refresh => Key::LRefresh,
+            Action::FocusAddress => Key::LFocusAddress,
+            Action::ToggleDetails => Key::LToggleDetails,
+            Action::ViewDetails => Key::LViewDetails,
+            Action::ViewIcons => Key::LViewIcons,
+            Action::ToggleView => Key::LToggleView,
+            Action::Properties => Key::LProperties,
+            Action::OpenWith => Key::LOpenWith,
+            Action::CopyPath => Key::LCopyPath,
+            Action::OpenTerminal => Key::LOpenTerminal,
+            Action::ContextMenu => Key::LContextMenu,
+            Action::NewTab => Key::LNewTab,
+            Action::CloseTab => Key::LCloseTab,
+            Action::NextTab => Key::LNextTab,
+            Action::PrevTab => Key::LPrevTab,
+            Action::Update => Key::LUpdate,
+            Action::QuickLook => Key::LQuickLook,
+            Action::ShowPackage => Key::LShowPackage,
+            Action::ViewColumns => Key::LViewColumns,
+            Action::ToggleTags => Key::LToggleTags,
         }
+    }
+
+    /// Short human description (help, context menu, palette) in the language in use.
+    pub fn label(self) -> &'static str {
+        self.label_key().tr()
     }
 
     pub fn group(self) -> Group {
@@ -353,9 +367,8 @@ impl Action {
             | Properties | OpenWith | CopyPath | QuickLook | ShowPackage => Group::Files,
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
             | PreviewUp | Bookmark | SwitchPane | ToggleSidebar | Refresh | FocusAddress
-            | ToggleDetails | ViewDetails | ViewIcons | ToggleView | OpenTerminal | ContextMenu => {
-                Group::View
-            }
+            | ToggleDetails | ViewDetails | ViewIcons | ViewColumns | ToggleTags | ToggleView
+            | OpenTerminal | ContextMenu => Group::View,
             NewTab | CloseTab | NextTab | PrevTab => Group::Tabs,
             Help | Quit | Update => Group::Program,
         }
@@ -689,6 +702,8 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::ToggleDetails, &["alt+p", "f6"]),
     (Action::ViewDetails, &["ctrl+1", "ctrl+shift+1"]),
     (Action::ViewIcons, &["ctrl+2", "ctrl+shift+2"]),
+    (Action::ViewColumns, &["ctrl+3", "ctrl+shift+3"]),
+    (Action::ToggleTags, &["f8"]),
     (Action::ContextMenu, &["shift+f10", "menu"]),
     (Action::NewTab, &["ctrl+t"]),
     (Action::CloseTab, &["ctrl+w"]),
@@ -1330,7 +1345,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 66);
+        assert_eq!(Action::ALL.len(), 68);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

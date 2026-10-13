@@ -194,7 +194,12 @@ impl ImageUi {
         }
     }
 
-    pub fn show(&mut self, img: DynamicImage) {
+    /// Hand a decoded picture over for drawing. With `bg`, the colour of what lies behind it,
+    /// its four corners are rounded first (see [`round_corners`]).
+    pub fn show(&mut self, mut img: DynamicImage, bg: Option<[u8; 3]>) {
+        if let Some(bg) = bg {
+            round_corners(&mut img, bg);
+        }
         let p = self.picker.new_resize_protocol(img);
         self.proto.replace_protocol(p);
     }
@@ -210,5 +215,134 @@ impl ImageUi {
             }
             Err(e) => tracing::warn!("image encoding failed: {e}"),
         }
+    }
+}
+
+/// The radius of the rounded corners, as a share of the shorter side of the picture: the
+/// same look at any size (and at any scale it is drawn at later).
+const CORNER_SHARE: f32 = 0.06;
+
+/// Round the four corners of a picture, in place: the pixels outside a quarter circle in each
+/// corner are given the colour of the background `bg`, blended along the edge so that it
+/// stays smooth when the picture is scaled down. This is done on the pixels, before they are
+/// sent to the terminal, so that every graphics protocol (and the half blocks) shows it.
+pub fn round_corners(img: &mut DynamicImage, bg: [u8; 3]) {
+    let (w, h) = (img.width(), img.height());
+    let radius = ((w.min(h) as f32 * CORNER_SHARE).round() as u32).max(3);
+    if w < radius * 2 + 2 || h < radius * 2 + 2 {
+        return;
+    }
+    // Only the corners are touched; a picture that is not 8-bit RGB(A) is converted first.
+    if !matches!(
+        img,
+        DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_)
+    ) {
+        *img = DynamicImage::ImageRgba8(img.to_rgba8());
+    }
+    let r = radius as f32;
+    // How much of the pixel at (dx, dy) from the corner square's inner corner is inside the
+    // quarter circle: 1.0 inside, 0.0 outside, in between along the edge.
+    let coverage = |dx: u32, dy: u32| -> f32 {
+        let (px, py) = (r - dx as f32 - 0.5, r - dy as f32 - 0.5);
+        (r - (px * px + py * py).sqrt() + 0.5).clamp(0.0, 1.0)
+    };
+    let blend = |c: u8, b: u8, cov: f32| (c as f32 * cov + b as f32 * (1.0 - cov)).round() as u8;
+    for dy in 0..radius {
+        for dx in 0..radius {
+            let cov = coverage(dx, dy);
+            if cov >= 1.0 {
+                continue;
+            }
+            for (x, y) in [
+                (dx, dy),
+                (w - 1 - dx, dy),
+                (dx, h - 1 - dy),
+                (w - 1 - dx, h - 1 - dy),
+            ] {
+                match img {
+                    DynamicImage::ImageRgb8(p) => {
+                        let px = p.get_pixel_mut(x, y);
+                        for i in 0..3 {
+                            px[i] = blend(px[i], bg[i], cov);
+                        }
+                    }
+                    DynamicImage::ImageRgba8(p) => {
+                        let px = p.get_pixel_mut(x, y);
+                        for i in 0..3 {
+                            px[i] = blend(px[i], bg[i], cov);
+                        }
+                        // The corner is no longer see-through: it is the background.
+                        px[3] = blend(px[3], 255, cov);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgb, RgbImage, Rgba, RgbaImage};
+
+    const BG: [u8; 3] = [26, 27, 38];
+
+    #[test]
+    fn the_corners_of_a_picture_take_the_background_and_the_middle_is_untouched() {
+        let mut img =
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 80, Rgb::from([200u8, 100, 50])));
+        round_corners(&mut img, BG);
+        let p = img.to_rgb8();
+        for (x, y) in [(0, 0), (99, 0), (0, 79), (99, 79)] {
+            assert_eq!(p.get_pixel(x, y).0, BG, "corner {x},{y}");
+        }
+        assert_eq!(p.get_pixel(50, 40).0, [200, 100, 50]);
+        // Along the edges, away from the corners, nothing changes.
+        assert_eq!(p.get_pixel(50, 0).0, [200, 100, 50]);
+        assert_eq!(p.get_pixel(0, 40).0, [200, 100, 50]);
+    }
+
+    #[test]
+    fn the_edge_of_the_curve_is_blended_not_cut() {
+        let mut img =
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(200, 200, Rgb::from([255u8, 255, 255])));
+        round_corners(&mut img, [0, 0, 0]);
+        let p = img.to_rgb8();
+        let radius = (200.0 * CORNER_SHARE).round() as u32;
+        // Somewhere along the diagonal of the corner there is a pixel that is neither.
+        let mixed = (0..radius).any(|i| {
+            let v = p.get_pixel(i, i)[0];
+            v > 0 && v < 255
+        });
+        assert!(mixed, "the curve has an anti-aliased edge");
+        // A pixel well inside the quarter circle is the picture's own.
+        assert_eq!(p.get_pixel(radius, radius).0, [255, 255, 255]);
+    }
+
+    #[test]
+    fn a_picture_with_transparency_becomes_opaque_in_its_corners() {
+        let mut img =
+            DynamicImage::ImageRgba8(RgbaImage::from_pixel(60, 60, Rgba([10, 20, 30, 0])));
+        round_corners(&mut img, BG);
+        let p = img.to_rgba8();
+        assert_eq!(p.get_pixel(0, 0).0, [BG[0], BG[1], BG[2], 255]);
+        assert_eq!(p.get_pixel(30, 30).0, [10, 20, 30, 0]);
+    }
+
+    #[test]
+    fn other_pixel_formats_are_converted_and_tiny_pictures_left_alone() {
+        let mut grey =
+            DynamicImage::ImageLuma8(image::GrayImage::from_pixel(80, 80, image::Luma([128])));
+        round_corners(&mut grey, BG);
+        assert!(matches!(grey, DynamicImage::ImageRgba8(_)));
+        assert_eq!(grey.to_rgb8().get_pixel(0, 0).0, BG);
+        let mut tiny = DynamicImage::ImageRgb8(RgbImage::from_pixel(6, 6, Rgb::from([9u8, 9, 9])));
+        round_corners(&mut tiny, BG);
+        assert_eq!(
+            tiny.to_rgb8().get_pixel(0, 0).0,
+            [9, 9, 9],
+            "too small to round"
+        );
     }
 }

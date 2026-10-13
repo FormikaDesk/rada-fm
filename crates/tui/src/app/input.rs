@@ -1,6 +1,5 @@
 //! Keyboard and mouse: from key chords and clicks to [`Action`]s, and what each action does.
 
-use rada_core::i18n::Key;
 use crossterm::event::{KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 
 use super::*;
@@ -96,9 +95,9 @@ impl MenuItem {
         MenuItem {
             cmd: MenuCmd::Bookmark { path, add },
             label: if add {
-                "Pin to navigation".into()
+                Key::SideMenuPin.tr().into()
             } else {
-                "Unpin from navigation".into()
+                Key::SideMenuUnpin.tr().into()
             },
             enabled: true,
             gap_before,
@@ -157,6 +156,17 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return;
         }
+        // The card at the bottom right goes at the first key (the key still does its job); an
+        // error stays until Esc, which it takes when nothing else is open.
+        let now = self.notice_now();
+        if self.modal.is_none()
+            && self.address.is_none()
+            && key.code == KeyCode::Esc
+            && self.notices.dismiss_error(now)
+        {
+            return;
+        }
+        self.notices.on_key(now);
         if self.modal.is_some() {
             self.on_modal_key(key);
             return;
@@ -175,6 +185,18 @@ impl App {
             && let KeyCode::Char(c @ '1'..='9') = key.code
         {
             self.go_tab(c as usize - '0' as usize);
+            return;
+        }
+        // In the Columns view Right goes into the folder under the cursor and does nothing on a
+        // file; Left (the parent action) already goes to the folder above.
+        if self.view == ViewMode::Columns
+            && !self.side_focus
+            && key.modifiers.is_empty()
+            && matches!(key.code, KeyCode::Right | KeyCode::Char('l'))
+            && self.keymap.action_for(&key) == Some(Action::Open)
+        {
+            self.columns_right();
+            self.dirty = true;
             return;
         }
         if let Some(action) = self.keymap.action_for(&key) {
@@ -260,7 +282,7 @@ impl App {
             ClearSelection => {
                 if let Some(r) = &self.running {
                     r.handle.cancel.cancel();
-                    self.toast(ToastKind::Info, "cancelling…", 3);
+                    self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
                 } else if !self.marked.is_empty() {
                     self.clear_marks();
                 } else if self.filter.is_some() {
@@ -280,8 +302,8 @@ impl App {
             Rename => self.start_rename(),
             BulkRename => self.start_bulk_rename(),
             NewFolder => {
-                if !self.refuse_in_archive("create a folder")
-                    && !self.refuse_in_tag_view("create a folder")
+                if !self.refuse_in_archive(Key::WhatCreateFolder.tr())
+                    && !self.refuse_in_tag_view(Key::WhatCreateFolder.tr())
                 {
                     self.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewDir,
@@ -303,14 +325,8 @@ impl App {
                 self.svc.jobs.load_history();
             }
 
-            Filter => {
-                let text = self.filter.take().map(|f| f.text).unwrap_or_default();
-                self.filter = Some(FilterState {
-                    text,
-                    editing: true,
-                });
-            }
-            Palette => self.open_palette(),
+            Filter => self.start_bar(true),
+            Palette => self.start_bar(false),
             Sort => self.set_sort(SortSpec {
                 key: self.sort.key.next(),
                 ..self.sort
@@ -333,11 +349,7 @@ impl App {
                     self.preview.hex = !self.preview.hex;
                     self.preview.scroll = 0;
                 } else {
-                    self.toast(
-                        ToastKind::Info,
-                        "the hex dump is available for binary files",
-                        2,
-                    );
+                    self.toast(ToastKind::Info, Key::THexOnlyBinary.tr(), 2);
                 }
             }
             PreviewDown => self.preview.scroll = self.preview.scroll.saturating_add(5),
@@ -348,8 +360,8 @@ impl App {
 
             NewFile => {
                 if !self.refuse_if_busy()
-                    && !self.refuse_in_archive("create a file")
-                    && !self.refuse_in_tag_view("create a file")
+                    && !self.refuse_in_archive(Key::WhatCreateFile.tr())
+                    && !self.refuse_in_tag_view(Key::WhatCreateFile.tr())
                 {
                     self.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewFile,
@@ -362,6 +374,8 @@ impl App {
             ToggleDetails => self.toggle_details(),
             ViewDetails => self.set_view(ViewMode::Details),
             ViewIcons => self.set_view(ViewMode::Icons),
+            ViewColumns => self.set_view(ViewMode::Columns),
+            ToggleTags => self.toggle_tags_column(),
             ToggleView => self.set_view(self.view.other()),
             Properties => self.open_properties(),
             OpenWith => self.start_open_with(),
@@ -404,6 +418,14 @@ impl App {
         self.dirty = true;
     }
 
+    /// Show or hide the Tag column of the list, and remember it.
+    pub fn toggle_tags_column(&mut self) {
+        self.show_tags = !self.show_tags;
+        self.saved_ui.tags_column = Some(self.show_tags);
+        self.save_ui_state();
+        self.dirty = true;
+    }
+
     /// Whether the last frame showed the details pane.
     pub fn details_visible(&self) -> bool {
         self.details_shown != crate::ui::DetailsMode::Hidden
@@ -415,11 +437,7 @@ impl App {
         self.saved_ui.details = Some(want);
         self.save_ui_state();
         if want && self.term_width < 60 {
-            self.toast(
-                ToastKind::Info,
-                "details pane on — this terminal is too narrow to show it",
-                3,
-            );
+            self.toast(ToastKind::Info, Key::TDetailsOnNarrow.tr(), 3);
         }
     }
 
@@ -437,10 +455,10 @@ impl App {
             return;
         };
         if is_dir {
-            self.toast(ToastKind::Info, "Open with… is for files", 3);
+            self.toast(ToastKind::Info, Key::TOpenWithFiles.tr(), 3);
             return;
         }
-        if self.refuse_in_archive("open with a program") {
+        if self.refuse_in_archive(Key::WhatOpenWithProgram.tr()) {
             return;
         }
         self.open_with_window(path);
@@ -461,9 +479,9 @@ impl App {
         self.toast(
             ToastKind::Ok,
             if paths.len() == 1 {
-                "path copied"
+                Key::TPathCopied.tr()
             } else {
-                "paths copied"
+                Key::TPathsCopied.tr()
             },
             2,
         );
@@ -525,7 +543,7 @@ impl App {
             return;
         }
         let h = self.svc.jobs.plan_redo();
-        self.begin_plan("Planning redo", h);
+        self.begin_plan(Key::PlanningRedo.tr(), h);
     }
 
     // ------------------------------------------------------------------ filter
@@ -732,10 +750,14 @@ impl App {
         if self.modal.is_some() {
             return self.click_in_modal(target);
         }
+        if let Some(Target::Notice(hit)) = target {
+            return self.click_notice(hit);
+        }
         // A click anywhere but on the address field or its suggestions ends the editing.
         if self.address.is_some() {
             match &target {
                 Some(Target::Suggest(i)) => return self.pick_suggestion(*i),
+                Some(Target::BarHit(i)) => return self.run_bar_hit(*i),
                 Some(Target::Address) => return,
                 _ => self.cancel_address_edit(),
             }
@@ -957,51 +979,6 @@ impl App {
     }
 
     // ------------------------------------------------------------------ messages
-
-    /// "Copied 342 files — press u to undo"
-    pub(super) fn done_message(&self, r: &Running) -> String {
-        let t = &r.totals;
-        let what = |files_first: bool| {
-            if files_first && t.files > 0 {
-                fmt::count(t.files, Key::FileOne, Key::FileMany)
-            } else if files_first && t.dirs > 0 {
-                fmt::count(t.dirs, Key::FolderOne, Key::FolderMany)
-            } else {
-                fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany)
-            }
-        };
-        let base = match r.kind {
-            OpKind::Copy => format!("Copied {}", what(true)),
-            OpKind::Move => format!("Moved {}", what(true)),
-            OpKind::Rename | OpKind::BulkRename => {
-                format!("Renamed {}", fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany))
-            }
-            OpKind::MakeDir => "Folder created".to_string(),
-            OpKind::MakeFile => "File created".to_string(),
-            OpKind::Trash => format!("Moved {} to the trash", what(false)),
-            OpKind::Delete => format!("Deleted {} permanently", what(false)),
-            OpKind::Undo => "Undone".to_string(),
-            OpKind::Extract => format!("Extracted {}", what(true)),
-            OpKind::Compress => "Archive created".to_string(),
-            OpKind::SetTags => format!(
-                "Tags changed on {}",
-                fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany)
-            ),
-        };
-        let tail = match r.kind {
-            OpKind::Undo => self
-                .key_for(Action::Redo)
-                .map(|k| format!("press {k} to redo")),
-            _ if r.reversible => self
-                .key_for(Action::Undo)
-                .map(|k| format!("press {k} to undo")),
-            _ => None,
-        };
-        match tail {
-            Some(t) => format!("{base} — {t}"),
-            None => base,
-        }
-    }
 
     /// The shortest key for an action, for messages: vim's single letter when the vim
     /// keys are on, else the classic shortcut.

@@ -8,28 +8,31 @@
 
 mod address;
 mod bottom;
+mod columns;
 mod commands;
 mod details;
 mod dialogs;
 mod grid;
 mod list;
 mod modals;
+mod notice;
 mod preview;
 mod sidebar;
+pub mod soft;
 mod tabs;
 mod tagdots;
 mod updates;
 pub mod widgets;
 
-use rada_core::i18n::Key;
 use std::path::Path;
 
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
+use ratatui::widgets::{Block, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::*;
@@ -124,7 +127,7 @@ pub fn hints_height(wanted: bool, height: u16) -> u16 {
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
     if area.width < 24 || area.height < 8 {
-        f.render_widget(Paragraph::new("terminal too small"), area);
+        f.render_widget(Paragraph::new(Key::TooSmall.tr()), area);
         return;
     }
     let th = app.th.clone();
@@ -141,7 +144,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let explorer = app.layout == LayoutKind::Explorer;
     let tabs_h = 1;
     let gap_h = top_gap_height(explorer, area.height);
-    let address_h = u16::from(explorer);
+    let look = soft::Look::of(app);
+    // The thin line under the bar of the path takes a row of its own where it can be drawn.
+    let address_h = if explorer {
+        1 + u16::from(look.caps && area.height >= 26)
+    } else {
+        0
+    };
     let commands_h = commands_height(explorer, area.height);
     let hints_h = hints_height(explorer && app.show_hints, area.height);
     let progress_h = if app.running.is_some() { 4 } else { 0 };
@@ -188,13 +197,15 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         commands::draw_commands(f, app, commands_row);
     }
 
-    // Body: the navigation pane, the folder, and the details pane when there is room.
+    // Body: the navigation pane, the folder, and the details pane when there is room; in the
+    // explorer layout each is a card with rounded corners, a column of air between them.
     app.side_mode = Mode::for_width(area.width, app.side_on);
     if app.side_mode == Mode::Hidden {
         app.side_focus = false;
     }
     let dmode = details_mode(area.width, app.details, app.layout);
     app.details_shown = dmode;
+    let carded = explorer && body.height >= 3;
     let mut rest = body;
     if app.side_mode != Mode::Hidden {
         let width = if app.side_mode == Mode::Full {
@@ -209,11 +220,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         ])
         .areas(rest);
         let mode = app.side_mode;
-        sidebar::draw_sidebar(f, app, side_area, mode);
-        let rule: Vec<Line> = (0..divider.height)
-            .map(|_| Line::from(Span::styled("│", th.faint())))
-            .collect();
-        f.render_widget(Paragraph::new(rule), divider);
+        if carded {
+            let inner = soft::card(f, side_area, &th, app.side_focus);
+            sidebar::draw_sidebar(f, app, inner, mode);
+        } else {
+            sidebar::draw_sidebar(f, app, side_area, mode);
+            let rule: Vec<Line> = (0..divider.height)
+                .map(|_| Line::from(Span::styled("│", th.faint())))
+                .collect();
+            f.render_widget(Paragraph::new(rule), divider);
+        }
         rest = others;
     }
     let main = if dmode == DetailsMode::Column {
@@ -224,21 +240,38 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             Constraint::Length(pw),
         ])
         .areas(rest);
-        let rule: Vec<Line> = (0..divider.height)
-            .map(|_| Line::from(Span::styled("│", th.faint())))
-            .collect();
-        f.render_widget(Paragraph::new(rule), divider);
-        details::draw_details(f, app, right);
+        if carded {
+            let inner = soft::card(f, right, &th, false);
+            details::draw_details(f, app, inner);
+        } else {
+            let rule: Vec<Line> = (0..divider.height)
+                .map(|_| Line::from(Span::styled("│", th.faint())))
+                .collect();
+            f.render_widget(Paragraph::new(rule), divider);
+            details::draw_details(f, app, right);
+        }
         left
     } else {
         rest
     };
+    // The folder's own card.
+    let main_outer = main;
+    let main = if carded {
+        soft::card(f, main, &th, !app.side_focus)
+    } else {
+        main
+    };
+    let _ = main_outer;
     match app.view {
+        ViewMode::Columns => columns::draw_columns(f, app, main),
         ViewMode::Details => list::draw_list(
             f,
             app,
             main,
-            list::ListOpts::for_terminal(area.width as usize),
+            list::ListOpts::for_terminal(
+                area.width as usize,
+                app.show_tags && app.tags_supported(),
+            ),
         ),
         ViewMode::Icons => grid::draw_grid(f, app, main),
     }
@@ -246,10 +279,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         details::draw_overlay(f, app, main);
     }
     if notice {
-        let text = format!(
-            " Enlarge the window for the full layout (now {}×{})  Esc: hide",
-            area.width, area.height
-        );
+        let text = format!(" {}", tf(Key::EnlargeNotice, &[&area.width, &area.height]));
         f.render_widget(
             Paragraph::new(Span::styled(
                 display::truncate(&text, area.width as usize),
@@ -265,8 +295,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if hints_h > 0 {
         bottom::draw_hints(f, app, hints_row);
     }
-    let toast_anchor = if hints_h > 0 { hints_row } else { status };
-    draw_toast(f, app, area, toast_anchor);
+    // Notifications sit at the bottom right of the body.
+    notice::draw_notice(f, app, body);
     if app.address.is_some() && address_h > 0 {
         address::draw_suggestions(f, app, address_row, area);
     }
@@ -279,79 +309,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         }
         modals::draw_modal(f, app, area);
     }
-}
-
-/// A notification: a small pill that comes and goes by itself. Long messages (an error
-/// with a full path) are wrapped in a box, never truncated.
-fn draw_toast(f: &mut Frame, app: &App, area: Rect, footer: Rect) {
-    let Some(t) = &app.toast else { return };
-    let th = &app.th;
-    let color = match t.kind {
-        ToastKind::Info => th.accent,
-        ToastKind::Ok => th.success,
-        ToastKind::Warn => th.warn,
-        ToastKind::Error => th.error,
-    };
-    let glyph = match t.kind {
-        ToastKind::Info => "●",
-        ToastKind::Ok => "✔",
-        ToastKind::Warn => "▲",
-        ToastKind::Error => "✖",
-    };
-    let one_line = t.text.replace('\n', " ");
-    let max_line = (area.width as usize).saturating_sub(10);
-    if footer.y == 0 {
-        return;
-    }
-    if one_line.width() + 6 <= max_line.min(90) {
-        let text = format!(" {glyph}  {one_line} ");
-        let w = text.width() as u16;
-        let r = Rect {
-            x: area.x + area.width.saturating_sub(w + 2),
-            y: footer.y - 1,
-            width: w,
-            height: 1,
-        };
-        f.render_widget(Clear, r);
-        f.render_widget(
-            Paragraph::new(Span::styled(
-                text,
-                Style::default()
-                    .fg(color)
-                    .bg(th.tint(color))
-                    .add_modifier(Modifier::BOLD),
-            )),
-            r,
-        );
-        return;
-    }
-    let inner_w = max_line.clamp(10, 96);
-    let mut lines = fmt::wrap(&t.text, inner_w);
-    lines.truncate(6);
-    let h = lines.len() as u16 + 2;
-    if footer.y < h {
-        return;
-    }
-    let widest = lines.iter().map(|l| l.width()).max().unwrap_or(10) as u16 + 6;
-    let r = Rect {
-        x: area.x + area.width.saturating_sub(widest + 2),
-        y: footer.y - h,
-        width: widest,
-        height: h,
-    };
-    f.render_widget(Clear, r);
-    let blk = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(th.fg(color))
-        .padding(ratatui::widgets::Padding::horizontal(1));
-    let inner = blk.inner(r);
-    f.render_widget(blk, r);
-    let text: Vec<Line> = lines
-        .into_iter()
-        .map(|l| Line::from(Span::styled(l, th.fg(color))))
-        .collect();
-    f.render_widget(Paragraph::new(text), inner);
 }
 
 // ----------------------------------------------------------------------------- progress
@@ -379,7 +336,10 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
             right.push_str(&format!("  ·  {}", fmt::rate(r.rate())));
         }
         if let Some(eta) = r.eta() {
-            right.push_str(&format!("  ·  {} left", fmt::duration(eta)));
+            right.push_str(&format!(
+                "  ·  {}",
+                tf(Key::ProgLeft, &[&fmt::duration(eta)])
+            ));
         }
     } else {
         right.push_str(&format!(
@@ -388,7 +348,7 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
             fmt::count(p.steps_total, Key::StepOne, Key::StepMany)
         ));
     }
-    let head_right = format!("{pct:>3}%   {right}   Esc cancel");
+    let head_right = format!("{pct:>3}%   {right}   Esc {}", Key::ProgCancel.tr());
     // The title names a folder with its full path; show it the way the rest of the
     // interface does.
     let full_title = r.title.replace(&display::path(app.home()), "~");
@@ -407,7 +367,7 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(format!("   {right}   "), th.dim()),
         Span::styled("Esc", th.key()),
-        Span::styled(" cancel", th.dim()),
+        Span::styled(format!(" {}", Key::ProgCancel.tr()), th.dim()),
     ]);
     let y = area.y + 1;
     f.render_widget(

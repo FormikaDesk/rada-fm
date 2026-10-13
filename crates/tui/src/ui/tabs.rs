@@ -1,9 +1,11 @@
 //! The top row: the name of the program, one tab for each open folder with its close mark,
-//! the new-tab button, and on the right the key scheme in use and the help button.
+//! the new-tab button, and on the right the notice of a newer version and the help button.
 //!
-//! On a narrow terminal the tabs fold into `‹ 2/3 ›` and the name of the one in front.
+//! The tab in front is a pill; the others are plain text. On a narrow terminal the tabs fold
+//! into `‹ 2/3 ›` and the name of the one in front.
 
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
@@ -11,13 +13,14 @@ use ratatui::text::Span;
 use ratatui::widgets::Block;
 use unicode_width::UnicodeWidthStr;
 
+use super::soft::{self, Look};
 use super::widgets::Bar;
 use crate::app::{App, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::{Action, Preset};
 
-/// The key scheme as the right of the row says it.
+/// The key scheme as the right of the row says it (only on a very wide terminal).
 pub fn scheme_label(preset: Preset) -> &'static str {
     match preset {
         Preset::VimClassic => "vim + classic keys",
@@ -28,6 +31,7 @@ pub fn scheme_label(preset: Preset) -> &'static str {
 
 pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
+    let look = Look::of(app);
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
@@ -39,13 +43,15 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     if w >= 60
         && let crate::app::UpdateStatus::Available { notice, .. } = &app.update
     {
-        right.push_hit(
-            Span::styled(format!(" ↑ Update to {} ", notice.version), th.pill()),
+        let up = icons::ui(set, Glyph::Up);
+        let text = format!("{up} {}", tf(Key::UpdateTo, &[&notice.version]));
+        right.push_hits(
+            soft::pill(&th, look, text.trim(), th.accent, th.pill(), band),
             Target::Act(Action::Update),
         );
-        right.push(Span::styled("  ", band));
+        right.push(Span::styled(" ", band));
     }
-    if w >= 100 {
+    if w >= 200 {
         right.push(Span::styled(
             format!("{}  ", scheme_label(app.keymap.preset)),
             th.dim().patch(band),
@@ -54,17 +60,22 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     if w >= 40 {
         let mark = icons::ui(set, Glyph::Help);
         let label = if mark.is_empty() {
-            " Help ▾ ".to_string()
+            Key::HelpMenu.tr().to_string()
         } else {
-            format!(" {mark} Help ▾ ")
+            format!("{mark} {}", Key::HelpMenu.tr())
         };
-        right.push_hit(
-            Span::styled(
-                label,
-                th.accent_style().add_modifier(Modifier::BOLD).patch(band),
+        right.push_hits(
+            soft::pill(
+                &th,
+                look,
+                &label,
+                th.button,
+                th.accent_style().add_modifier(Modifier::BOLD),
+                band,
             ),
             Target::Menu(MenuKind::Help),
         );
+        right.push(Span::styled(" ", band));
     }
 
     let mut left = Bar::default();
@@ -82,9 +93,9 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let title_of = |app: &App, i: usize| -> String {
         let t = display::truncate(&app.tab_title(i), max_title);
         if folder.is_empty() {
-            format!(" {t} ")
+            t
         } else {
-            format!(" {folder} {t} ")
+            format!("{folder} {t}")
         }
     };
 
@@ -92,33 +103,54 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let mut tabs = Bar::default();
     for i in 0..n {
         let active = i == app.active_tab;
-        let style = if active {
-            th.base().add_modifier(Modifier::BOLD).patch(th.chip_row())
+        let title = title_of(app, i);
+        if active {
+            // A pill: the half circle, the name, the close mark, the half circle.
+            let style = th.base().add_modifier(Modifier::BOLD);
+            let fill = th.selection;
+            let ends = look.caps;
+            let edge = band.fg(fill);
+            if ends {
+                tabs.push_hit(Span::styled(soft::CAP_LEFT, edge), Target::Tab(i));
+            }
+            tabs.push_hit(
+                Span::styled(
+                    format!("{}{title} ", if ends { "" } else { " " }),
+                    style.bg(fill),
+                ),
+                Target::Tab(i),
+            );
+            let mark = if close.is_empty() { " " } else { close };
+            tabs.push_hit(
+                Span::styled(
+                    format!(" {mark}{}", if ends { "" } else { " " }),
+                    th.dim().bg(fill),
+                ),
+                Target::TabClose(i),
+            );
+            if ends {
+                tabs.push_hit(Span::styled(soft::CAP_RIGHT, edge), Target::TabClose(i));
+            }
         } else {
-            th.dim().patch(band)
-        };
-        tabs.push_hit(Span::styled(title_of(app, i), style), Target::Tab(i));
-        let close_label = if close.is_empty() {
-            " ".to_string()
-        } else {
-            format!(" {close} ")
-        };
-        tabs.push_hit(
-            Span::styled(
-                close_label,
-                if active {
-                    th.dim().patch(th.chip_row())
-                } else {
-                    th.faint().patch(band)
-                },
-            ),
-            Target::TabClose(i),
-        );
+            tabs.push_hit(
+                Span::styled(format!(" {title} "), th.dim().patch(band)),
+                Target::Tab(i),
+            );
+            let close_label = if close.is_empty() {
+                " ".to_string()
+            } else {
+                format!(" {close} ")
+            };
+            tabs.push_hit(
+                Span::styled(close_label, th.faint().patch(band)),
+                Target::TabClose(i),
+            );
+        }
         tabs.push(Span::styled(" ", band));
     }
     let plus = icons::ui(set, Glyph::New);
-    tabs.push_hit(
-        Span::styled(format!(" {plus} "), th.dim().patch(band)),
+    tabs.push_hits(
+        soft::pill(&th, look, plus, th.button, th.dim(), band),
         Target::TabNew,
     );
 
@@ -135,17 +167,21 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
         let room = budget.saturating_sub(arrows + 5);
         if room >= 6 {
             let t = display::truncate(&app.tab_title(app.active_tab), room.min(max_title));
-            bar.push_hit(
-                Span::styled(
-                    format!(" {t} "),
-                    th.base().add_modifier(Modifier::BOLD).patch(th.chip_row()),
+            bar.push_hits(
+                soft::pill(
+                    &th,
+                    look,
+                    &t,
+                    th.selection,
+                    th.base().add_modifier(Modifier::BOLD),
+                    band,
                 ),
                 Target::Tab(app.active_tab),
             );
         }
         if budget > arrows + 4 {
-            bar.push_hit(
-                Span::styled(format!(" {plus} "), th.dim().patch(band)),
+            bar.push_hits(
+                soft::pill(&th, look, plus, th.button, th.dim(), band),
                 Target::TabNew,
             );
         }

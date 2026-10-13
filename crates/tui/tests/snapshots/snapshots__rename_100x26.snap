@@ -2,29 +2,29 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ projects  ✕   +                                              vim + classic keys   ? Help ▾
-  ←   →   ↑   ⟳   ⌂ Home › demo › projects                                ⌕ Search in proj… Ctrl+F
-  + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo  ⋯
-  ⌂ Home                    │ ☐   Name ↑           Date modified   Type                        Size
-                            │ ☐ ▸ data             6 days ago      Folder
- TAGS                       │ ☐ ▸ src              6 days ago      Folder
-  ● Red                     │ ☐ ▸ 目录             6 days ago      Folder
-  ● Orange                  │ ☐ · a-very-long-fi…  12 days ago     Archive (tar.gz)             1 B
-  ● Ye╭──────────────────────────────────────────────────────────────────────────────────────╮20 MB
-  ● Gr│                                                                                      │ 42 B
-  ● Bl│   Rename                                                                             │ 37 B
-  ● Pu│                                                                                      │52 KB
-  ● Gr│  New name                                                                            │ 73 B
-      │  › main.rs                                                                           │ 13 B
-      │                                                                                      │ 16 B
-      │                                                                                      │  6 B
-      │                                                                                      │
-      ╰──────────────────────────────────────────────────────────────────────────────────────╯
-                            │
-                            │
-                            │
-                            │
-                            │
-                            │
- 12 items                                                                          v0.6.0 ⟳   ≣  ▦
+ rada  ▸ projects  ✕   +                                                                    ? Help
+  ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search file…                 Ctrl+P     ≣ Details
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                                     ⋯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│  ⌂ Home                  │ │ ☐   Name ↑        Date modified    Type                        Size │
+│                          │ │                                                                     │
+│ TAGS                     │ │ ☐ ▸ data          6 days ago       Folder                           │
+│  ● Red                   │ │ ☐ ▸ src           6 days ago       Folder                           │
+│  ● O╭──────────────────────────────────────────────────────────────────────────────────────╮     │
+│  ● Y│                                                                                      │ 1 B │
+│  ● G│   Rename                                                                             │0 MB │
+│  ● B│                                                                                      │42 B │
+│  ● P│  New name                                                                            │37 B │
+│  ● G│  › main.rs                                                                           │2 KB │
+│     │                                                                                      │73 B │
+│     │                                                                                      │13 B │
+│     │                                                                                      │16 B │
+│     ╰──────────────────────────────────────────────────────────────────────────────────────╯ 6 B │
+│                          │ │                                                                     │
+│                          │ │                                                                     │
+│                          │ │                                                                     │
+│                          │ │                                                                     │
+│                          │ │                                                                     │
+╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯
+ 12 items                                                                       v0.6.0 ⟳   ≣  ▦  ▥
    Enter  ok     Esc  cancel

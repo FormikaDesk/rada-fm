@@ -77,7 +77,7 @@ fn a_folder_that_vanished_is_reported_and_the_history_stays_as_it_was() {
     at(&mut h, &start);
     std::fs::remove_dir_all(dir.join("sub")).unwrap();
     h.press("alt+right");
-    h.wait("the error", |a| a.toast.is_some());
+    h.wait("the error", |a| a.current_notice().is_some());
     assert!(h.app.cwd.ends_with(&start), "still where we were");
     assert!(h.app.nav.can_forward(), "the entry is still there");
 }

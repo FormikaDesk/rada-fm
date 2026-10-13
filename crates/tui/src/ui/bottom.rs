@@ -1,11 +1,11 @@
 //! The bottom of the screen: a status bar (how many items, what is selected, what waits on
-//! the clipboard, the free space of the disk and the Details / Icons switch) and below it a
-//! row of key hints drawn as little keys.
+//! the clipboard, the free space of the disk and the Details / Icons / Columns switch) and
+//! below it a row of key hints drawn as little keys.
 //!
 //! The hints come from the real keymap, so they follow the scheme in use and whatever the
 //! user rebound, and each one can be clicked.
 
-use rada_core::i18n::Key;
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -13,23 +13,24 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use super::widgets::{Bar, bar_spans};
-use crate::app::{App, Modal};
+use super::soft::{self, Look};
+use super::widgets::{Bar, key_name, segment_bar};
+use crate::app::{App, BarMode, Modal};
 use crate::fmt;
 use crate::hits::Target;
-use crate::icons::{self, Glyph, IconSet};
+use crate::icons::{self, Glyph};
 use crate::keymap::Action;
 use crate::view::{LayoutKind, ViewMode};
 
 /// One key hint: the key as written on the cap, what it does, and what a click does.
 struct Hint {
     key: String,
-    what: &'static str,
+    what: Key,
     click: Option<Target>,
 }
 
 impl Hint {
-    fn act(app: &App, action: Action, what: &'static str) -> Option<Hint> {
+    fn act(app: &App, action: Action, what: Key) -> Option<Hint> {
         app.keymap.hint(action).map(|key| Hint {
             key,
             what,
@@ -37,9 +38,9 @@ impl Hint {
         })
     }
 
-    fn fixed(key: &str, what: &'static str) -> Hint {
+    fn fixed(key: &str, what: Key) -> Hint {
         Hint {
-            key: key.to_string(),
+            key: key_name(key).to_string(),
             what,
             click: None,
         }
@@ -49,98 +50,124 @@ impl Hint {
 /// The hints that fit the situation, most useful first; the row shows as many as fit.
 fn hints(app: &App) -> Vec<Hint> {
     use Action::*;
-    let acts = |list: &[(Action, &'static str)]| -> Vec<Hint> {
+    let acts = |list: &[(Action, Key)]| -> Vec<Hint> {
         list.iter()
-            .filter_map(|(a, w)| Hint::act(app, *a, w))
+            .filter_map(|(a, w)| Hint::act(app, *a, *w))
             .collect()
     };
     if let Some(modal) = &app.modal {
         return match modal {
-            Modal::Plan(_) => vec![Hint::fixed("Enter", "run"), Hint::fixed("Esc", "cancel")],
-            Modal::Input(_) => vec![Hint::fixed("Enter", "ok"), Hint::fixed("Esc", "cancel")],
-            Modal::Palette(_) => vec![Hint::fixed("Enter", "go"), Hint::fixed("Esc", "close")],
-            Modal::OpenWith(_) => vec![
-                Hint::fixed("Enter", "open"),
-                Hint::fixed("Tab", "always"),
-                Hint::fixed("Esc", "close"),
+            Modal::Plan(_) => vec![
+                Hint::fixed("Enter", Key::HRun),
+                Hint::fixed("Esc", Key::HCancel),
             ],
-            Modal::ConfirmQuit => vec![Hint::fixed("Enter", "quit"), Hint::fixed("Esc", "stay")],
-            Modal::Scanning { .. } => vec![Hint::fixed("Esc", "cancel")],
-            _ => vec![Hint::fixed("Esc", "close")],
+            Modal::Input(_) => vec![
+                Hint::fixed("Enter", Key::HOk),
+                Hint::fixed("Esc", Key::HCancel),
+            ],
+            Modal::Palette(_) => vec![
+                Hint::fixed("Enter", Key::HGo),
+                Hint::fixed("Esc", Key::HClose),
+            ],
+            Modal::OpenWith(_) => vec![
+                Hint::fixed("Enter", Key::HOpen),
+                Hint::fixed("Tab", Key::HAlways),
+                Hint::fixed("Esc", Key::HClose),
+            ],
+            Modal::ConfirmQuit => vec![
+                Hint::fixed("Enter", Key::HQuit),
+                Hint::fixed("Esc", Key::HStay),
+            ],
+            Modal::Scanning { .. } => vec![Hint::fixed("Esc", Key::HCancel)],
+            _ => vec![Hint::fixed("Esc", Key::HClose)],
         };
     }
-    if app.address.is_some() {
-        return vec![
-            Hint::fixed("Enter", "go"),
-            Hint::fixed("Tab", "complete"),
-            Hint::fixed("↑↓", "suggestions"),
-            Hint::fixed("Esc", "cancel"),
-        ];
+    if let Some(a) = &app.address {
+        return if a.mode() == BarMode::Search {
+            vec![
+                Hint::fixed("Enter", Key::HGo),
+                Hint::fixed("↑↓", Key::HSuggestions),
+                Hint::fixed("Esc", Key::HCancel),
+            ]
+        } else {
+            vec![
+                Hint::fixed("Enter", Key::HGo),
+                Hint::fixed("Tab", Key::HComplete),
+                Hint::fixed("↑↓", Key::HSuggestions),
+                Hint::fixed("Esc", Key::HCancel),
+            ]
+        };
     }
     if let Some(f) = &app.filter
         && f.editing
     {
-        return vec![Hint::fixed("Enter", "keep"), Hint::fixed("Esc", "clear")];
+        return vec![
+            Hint::fixed("Enter", Key::HKeep),
+            Hint::fixed("Esc", Key::HClear),
+        ];
     }
     if app.side_focus {
-        let mut v = vec![Hint::fixed("Enter", "open")];
-        v.extend(Hint::act(app, SwitchPane, "list"));
-        v.extend(Hint::act(app, Bookmark, "pin"));
-        v.push(Hint::fixed("Del", "unpin"));
-        v.extend(Hint::act(app, ToggleSidebar, "hide"));
+        let mut v = vec![Hint::fixed("Enter", Key::HOpen)];
+        v.extend(Hint::act(app, SwitchPane, Key::HList));
+        v.extend(Hint::act(app, Bookmark, Key::HPin));
+        v.push(Hint::fixed("Del", Key::HUnpin));
+        v.extend(Hint::act(app, ToggleSidebar, Key::HHide));
         return v;
     }
     let mut v = if app.marked.is_empty() && app.in_archive() {
         acts(&[
-            (Open, "open"),
-            (Copy, "copy out"),
-            (ExtractHere, "extract all"),
-            (ToggleMark, "select"),
-            (Parent, "back"),
-            (Undo, "undo"),
-            (Help, "help"),
+            (Open, Key::HOpen),
+            (Copy, Key::HCopyOut),
+            (ExtractHere, Key::HExtractAll),
+            (ToggleMark, Key::HSelect),
+            (Parent, Key::HBack),
+            (Undo, Key::HUndo),
+            (Help, Key::HHelp),
         ])
     } else if app.marked.is_empty() {
         let mut first = if app.on_archive_item() {
-            acts(&[(ExtractHere, "extract"), (ExtractToFolder, "extract to…")])
+            acts(&[
+                (ExtractHere, Key::HExtract),
+                (ExtractToFolder, Key::HExtractTo),
+            ])
         } else {
             Vec::new()
         };
         first.extend(acts(&[
-            (Open, "open"),
-            (ToggleMark, "select"),
-            (Copy, "copy"),
-            (Paste, "paste"),
-            (Trash, "trash"),
-            (Rename, "rename"),
-            (Undo, "undo"),
-            (NewTab, "new tab"),
-            (Palette, "go to"),
+            (Open, Key::HOpen),
+            (ToggleMark, Key::HSelect),
+            (Copy, Key::HCopy),
+            (Paste, Key::HPaste),
+            (Trash, Key::HTrash),
+            (Rename, Key::HRename),
+            (Undo, Key::HUndo),
+            (NewTab, Key::HNewTab),
+            (Palette, Key::HCommands),
             // Extras, shown when there is room.
-            (Cut, "cut"),
-            (NewFolder, "new folder"),
-            (FocusAddress, "address"),
-            (Compress, "compress"),
-            (Help, "help"),
+            (Cut, Key::HCut),
+            (NewFolder, Key::HNewFolder),
+            (FocusAddress, Key::HAddress),
+            (Compress, Key::HCompress),
+            (Help, Key::HHelp),
         ]));
         first
     } else {
         let mut v = acts(&[
-            (Copy, "copy"),
-            (Cut, "cut"),
-            (Trash, "trash"),
-            (DeletePermanently, "delete"),
-            (BulkRename, "rename all"),
-            (Compress, "compress"),
+            (Copy, Key::HCopy),
+            (Cut, Key::HCut),
+            (Trash, Key::HTrash),
+            (DeletePermanently, Key::HDelete),
+            (BulkRename, Key::HRenameAll),
+            (Compress, Key::HCompress),
         ]);
         if app.clipboard.is_some() {
-            v.extend(acts(&[(Paste, "paste")]));
+            v.extend(acts(&[(Paste, Key::HPaste)]));
         }
-        v.extend(acts(&[(ClearSelection, "clear")]));
+        v.extend(acts(&[(ClearSelection, Key::HDeselect)]));
         v
     };
     if app.filter.is_some() && app.marked.is_empty() {
-        v.insert(0, Hint::fixed("Esc", "clear search"));
+        v.insert(0, Hint::fixed("Esc", Key::HClearSearch));
     }
     v
 }
@@ -149,10 +176,12 @@ fn hints(app: &App) -> Vec<Hint> {
 fn count_text(app: &App) -> String {
     let total = app.listing.all().len();
     if app.filter.is_some() {
-        format!(
-            "{} of {}",
-            app.visible.len(),
-            fmt::count(total as u64, Key::ItemOne, Key::ItemMany)
+        tf(
+            Key::ItemsOfTotal,
+            &[
+                &app.visible.len(),
+                &fmt::count(total as u64, Key::ItemOne, Key::ItemMany),
+            ],
         )
     } else {
         fmt::count(app.visible.len() as u64, Key::ItemOne, Key::ItemMany)
@@ -174,7 +203,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     if app.layout == LayoutKind::Compact {
         b.push(Span::styled(
             match app.tag_view() {
-                Some(tag) => format!("Tag: {tag}"),
+                Some(tag) => tf(Key::TagViewTitle, &[&tag]),
                 None => fmt::short_path(&app.cwd, app.home()),
             },
             th.accent_style().add_modifier(Modifier::BOLD).patch(band),
@@ -193,22 +222,32 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         let tick = icons::ui(app.icons, Glyph::Checked);
         b.push(Span::styled("  │  ", th.faint().patch(band)));
         b.push(Span::styled(
-            format!("{tick} {} selected · {}", app.marked.len(), fmt::size(size)),
+            format!(
+                "{tick} {}",
+                tf(Key::SelectedSize, &[&app.marked.len(), &fmt::size(size)])
+            ),
             th.fg(th.check).add_modifier(Modifier::BOLD).patch(band),
         ));
     }
     if let Some(c) = &app.clipboard {
         let icon = icons::ui(app.icons, Glyph::Clipboard);
         let verb = if c.mode == rada_core::ops::TransferMode::Copy {
-            "ready to paste"
+            Key::ReadyPaste
         } else {
-            "ready to move"
+            Key::ReadyMove
         };
         b.push(Span::styled("  │  ", th.faint().patch(band)));
         b.push(Span::styled(
             format!(
-                "{icon} {} {verb}",
-                fmt::count(c.paths.len() as u64, Key::ItemOne, Key::ItemMany)
+                "{icon} {}",
+                tf(
+                    verb,
+                    &[&fmt::count(
+                        c.paths.len() as u64,
+                        Key::ItemOne,
+                        Key::ItemMany
+                    )]
+                )
             ),
             th.fg(th.kinds.vector).patch(band),
         ));
@@ -216,7 +255,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     if app.show_hidden {
         b.push(Span::styled("  │  ", th.faint().patch(band)));
         b.push(Span::styled(
-            "hidden files shown",
+            Key::HiddenShown.tr(),
             th.fg(th.warn).patch(band),
         ));
     }
@@ -253,7 +292,8 @@ fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Ba
     Some(b)
 }
 
-/// The free space of the disk the current folder is on, with a bar of how full it is.
+/// The free space of the disk the current folder is on, with a bar of ten segments for how
+/// full it is.
 fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     let th = &app.th;
     let band = th.band();
@@ -268,37 +308,40 @@ fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     };
     let Some(avail) = v.available else { return b };
     b.push(Span::styled(
-        format!("{} free ", fmt::size(avail)),
+        format!("{} ", tf(Key::FreeSpace, &[&fmt::size(avail)])),
         th.dim().patch(band),
     ));
     if with_bar && let Some(total) = v.total.filter(|t| *t > 0) {
         let used = 1.0 - avail as f64 / total as f64;
-        b.spans.extend(bar_spans(th, used, 10, th.disk, band.bg));
+        b.spans.extend(segment_bar(th, used, app.basic, band.bg));
         b.push(Span::styled(" ", band));
     }
     b
 }
 
-/// The two buttons that switch between Details and Icons.
+/// The buttons that switch between Details, Icons and Columns: the one in use is a pill.
 fn view_buttons<'a>(app: &App) -> Bar<'a> {
     let th = &app.th;
     let band = th.band();
+    let look = Look::of(app);
     let mut b = Bar::default();
     for (mode, glyph) in [
         (ViewMode::Details, Glyph::Details),
         (ViewMode::Icons, Glyph::Icons),
+        (ViewMode::Columns, Glyph::Columns),
     ] {
-        let style = if app.view == mode {
-            th.accent_style()
-                .add_modifier(Modifier::BOLD)
-                .patch(th.chip_row())
+        let g = icons::ui(app.icons, glyph);
+        if app.view == mode {
+            b.push_hits(
+                soft::pill(th, look, g, th.accent, th.pill(), band),
+                Target::ViewMode(mode),
+            );
         } else {
-            th.dim().patch(band)
-        };
-        b.push_hit(
-            Span::styled(format!(" {} ", icons::ui(app.icons, glyph)), style),
-            Target::ViewMode(mode),
-        );
+            b.push_hit(
+                Span::styled(format!(" {g} "), th.dim().patch(band)),
+                Target::ViewMode(mode),
+            );
+        }
     }
     b.push(Span::styled(" ", band));
     b
@@ -384,13 +427,13 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
         area
     };
     f.render_widget(Block::default().style(strip), inner);
-    let rounded = app.icons == IconSet::Nerd;
+    let look = Look::of(app);
     let all = hints(app);
 
     // As many as fit, two spaces from the left edge and four between groups.
     // A rounded pill has a glyph on each side, a plain one a space: two cells either way.
     let pill_w = |h: &Hint| h.key.width() + 2;
-    let chunk = |h: &Hint| pill_w(h) + 1 + h.what.width();
+    let chunk = |h: &Hint| pill_w(h) + 1 + h.what.tr().width();
     let mut shown: Vec<&Hint> = Vec::new();
     let mut used = 2;
     for h in &all {
@@ -408,36 +451,26 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
         if i > 0 {
             bar.push(Span::styled("    ", strip));
         }
-        let key_style = Style::default()
-            .fg(th.key_text)
-            .bg(th.key_bg)
-            .add_modifier(Modifier::BOLD);
-        let edge_style = Style::default().fg(th.key_bg).bg(th.panel);
-        let (left, text, right) = if rounded {
-            (
-                Span::styled("\u{e0b6}", edge_style),
-                Span::styled(h.key.clone(), key_style),
-                Span::styled("\u{e0b4}", edge_style),
-            )
-        } else {
-            (
-                Span::styled(" ", key_style),
-                Span::styled(h.key.clone(), key_style),
-                Span::styled(" ", key_style),
-            )
-        };
-        let what = Span::styled(format!(" {}", h.what), th.dim().patch(strip));
+        let pill = soft::pill(
+            &th,
+            look,
+            &h.key,
+            th.key_bg,
+            Style::default()
+                .fg(th.key_text)
+                .add_modifier(Modifier::BOLD),
+            strip,
+        );
+        let what = Span::styled(format!(" {}", h.what.tr()), th.dim().patch(strip));
         match &h.click {
             Some(t) => {
-                bar.push_hit(left, t.clone());
-                bar.push_hit(text, t.clone());
-                bar.push_hit(right, t.clone());
+                bar.push_hits(pill, t.clone());
                 bar.push_hit(what, t.clone());
             }
             None => {
-                bar.push(left);
-                bar.push(text);
-                bar.push(right);
+                for sp in pill {
+                    bar.push(sp);
+                }
                 bar.push(what);
             }
         }

@@ -85,8 +85,17 @@ fn yes_installs_in_the_background_and_says_what_to_do_next() {
     assert!(h.screen().contains("Downloading and installing"));
     h.wait("installed", |a| a.modal.is_none());
     assert_eq!(installs.load(Ordering::SeqCst), 1);
-    let s = h.screen();
-    assert!(s.contains("choose it as the font of your terminal"), "{s}");
+    // The card wraps what it says: read it as running text.
+    let raw = h.screen();
+    let s = raw
+        .replace(['│', '▄', '▀'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        s.contains("choose it as the font of your terminal"),
+        "{raw}"
+    );
 }
 
 #[test]

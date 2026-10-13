@@ -74,11 +74,11 @@ fn open_tag(h: &mut H, name: &str) {
     });
 }
 
-/// The row of the list for the item called `what` (the one with its tag dot).
+/// The row of the list for the item called `what`.
 fn row_with<'a>(screen: &'a str, what: &str) -> &'a str {
     screen
         .lines()
-        .find(|l| l.contains(&format!("{what} ●")))
+        .find(|l| l.contains(what) && l.contains("~/"))
         .unwrap_or_else(|| panic!("no row with {what:?}:\n{screen}"))
 }
 
@@ -162,11 +162,10 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     assert!(h.app.modal.is_none(), "{}", h.screen());
     assert!(
         h.app
-            .toast
-            .as_ref()
+            .current_notice()
             .is_some_and(|t| t.text.contains("not a folder")),
         "{:?}",
-        h.app.toast.as_ref().map(|t| &t.text)
+        h.app.current_notice().map(|t| &t.text)
     );
     h.keys("y"); // copy the first
     h.keys("p");

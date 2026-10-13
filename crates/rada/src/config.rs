@@ -7,6 +7,9 @@
 //! icons = "auto"      # auto | nerd | unicode-icons | unicode-std | none. `auto` takes the
 //!                     # first the font can draw: Nerd Font symbols, Unicode symbols (needs a
 //!                     # symbol font on the system), or only what every monospace font has
+//! language = "auto"   # auto (the language of the system: LANG, LC_ALL and LC_MESSAGES on Linux,
+//!                     # the language preferences on macOS, the interface language on Windows)
+//!                     # | it | en
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
@@ -29,7 +32,8 @@
 //! sidebar = true             # the navigation pane; shown by default; Ctrl+B toggles and remembers
 //! layout = "explorer"        # explorer | compact (no address bar, command bar or hints)
 //! show_details_pane = true   # false: never show the details pane on its own (Alt+P still does)
-//! view = "details"           # details | icons: how a new tab shows a folder
+//! view = "details"           # details | icons | columns: how a new tab shows a folder
+//! tags_column = true         # the Tag column of the list (View ▾ switches it too)
 //! remember_tabs = true       # reopen the tabs of the last session
 //! dates = "relative"         # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm)
 //! folder_sizes = "auto"      # auto (count the folders on screen in the background) | items
@@ -73,6 +77,10 @@ use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct FileConfig {
+    /// `auto`, `it` or `en`.
+    pub language: Option<String>,
+    /// The Tag column of the list; `None` leaves it to the remembered choice, then to on.
+    pub tags_column: Option<bool>,
     pub profile: Option<String>,
     pub icons: Option<String>,
     pub show_hidden: bool,
@@ -114,6 +122,16 @@ struct UpdateFile {
 }
 
 impl FileConfig {
+    /// Make the language the process speaks: a chosen one also decides the names that live on
+    /// the disk (the tags), the system's leaves them to the system.
+    pub fn apply_language(&self) {
+        use rada_core::i18n::{Lang, set_chosen_lang, set_lang};
+        match self.language.as_deref().and_then(Lang::parse) {
+            Some(l) => set_chosen_lang(l),
+            None => set_lang(Lang::system()),
+        }
+    }
+
     /// `folder_sizes` and its limits, with the choice checked.
     pub fn folder_size_settings(&self) -> anyhow::Result<SizeSettings> {
         use anyhow::Context;
@@ -197,6 +215,8 @@ struct DevicesRaw {
 
 #[derive(Deserialize, Default)]
 struct Raw {
+    language: Option<String>,
+    tags_column: Option<bool>,
     profile: Option<String>,
     icons: Option<String>,
     show_hidden: Option<bool>,
@@ -266,6 +286,8 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         },
         archive_preview_entries: archives.preview_entries.unwrap_or(200).clamp(10, 5000),
         archive_preview_seconds: archives.preview_seconds.unwrap_or(1.5).clamp(0.0, 30.0),
+        language: raw.language,
+        tags_column: raw.tags_column,
         profile: raw.profile,
         icons: raw.icons,
         show_hidden: raw.show_hidden.unwrap_or(false),
@@ -351,6 +373,16 @@ mod tests {
         let d = with_config("sidebar = true\n");
         assert_eq!(d.archive_limits, ArchiveLimits::default());
         assert_eq!(d.archive_preview_entries, 200);
+    }
+
+    #[test]
+    fn the_language_and_the_tag_column_are_read() {
+        let c = with_config("language = \"it\"\ntags_column = false\n");
+        assert_eq!(c.language.as_deref(), Some("it"));
+        assert_eq!(c.tags_column, Some(false));
+        let d = with_config("sidebar = true\n");
+        assert_eq!(d.language, None);
+        assert_eq!(d.tags_column, None);
     }
 
     #[test]

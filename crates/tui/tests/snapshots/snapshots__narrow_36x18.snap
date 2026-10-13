@@ -3,20 +3,20 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
  rada  ‹ 1/1 ›  projects  +
-  ↑   ⟳   ⌂ Home › demo › projects
-  +▾  │ ⧉   ⎘   ✗ │ ↶              ⋯
- ☐   Name ↑                    Size
- ☐ ▸ data
- ☐ ▸ src
- ☐ ▸ 目录
- ☐ · a-very-long-file-…         1 B
- ☐ · backup.img              420 MB
-▌☐ · Cargo.toml                42 B
- ☐ · main.rs                   37 B
- ☐ · notes.txt              3.52 KB
- ☐ · README.md                 73 B
- ☐ · тест-файл.md              13 B
- ☐ · 日本語のファイル…         16 B
- ☐ · 📷 holiday photos…         6 B
+  ↑   ⟳     … › projects  Ctrl+P
+  +▾  │  ⧉   ⎘   ✗  │  ↶           ⋯
+╭──────────────────────────────────╮
+│ ☐   Name ↑                  Size │
+│                                  │
+│ ☐ ▸ data                         │
+│ ☐ ▸ src                          │
+│ ☐ ▸ 目录                         │
+│ ☐ · a-very-long-fil…         1 B │
+│ ☐ · backup.img            420 MB │
+│▌☐ · Cargo.toml              42 B │
+│ ☐ · main.rs                 37 B │
+│ ☐ · notes.txt            3.52 KB │
+│ ☐ · README.md               73 B │
+╰──────────────────────────────────╯
  Enlarge the window for the full la…
- 12 items                     ≣  ▦
+ 12 items                  ≣  ▦  ▥

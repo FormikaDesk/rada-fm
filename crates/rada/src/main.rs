@@ -181,6 +181,7 @@ fn main() -> Result<()> {
     {
         let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
         let cfg_file = config::load(&dirs);
+        cfg_file.apply_language();
         let settings = cfg_file.update_settings(&dirs.home)?;
         let ctx = update_context(&dirs, settings)?;
         return update_cmd::run(ctx, *check, *rollback, *yes);
@@ -222,6 +223,7 @@ fn main() -> Result<()> {
     let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
+    cfg_file.apply_language();
 
     // What the terminal can do comes first: the icons, the colours and the pictures follow.
     let profile_name = cli
@@ -463,6 +465,8 @@ fn main() -> Result<()> {
         layout,
         view,
         dates,
+        basic,
+        tags_column: cfg_file.tags_column,
         date_format: rada_tui::fmt::DateFormat::from_env(),
         remember_tabs: cfg_file.remember_tabs,
         // What the user chose with Alt+P wins over the file's setting.

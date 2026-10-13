@@ -65,10 +65,16 @@ impl App {
             if !only.is_empty() && !here {
                 self.toast(
                     ToastKind::Info,
-                    format!(
-                        "to extract part of an archive somewhere else: copy it ({}), go there and paste ({})",
-                        self.key_for(Action::Copy).unwrap_or_else(|| "copy".into()),
-                        self.key_for(Action::Paste).unwrap_or_else(|| "paste".into()),
+                    tf(
+                        Key::TExtractPartHint,
+                        &[
+                            &self
+                                .key_for(Action::Copy)
+                                .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
+                            &self
+                                .key_for(Action::Paste)
+                                .unwrap_or_else(|| Key::KeyPasteWord.tr().into()),
+                        ],
                     ),
                     5,
                 );
@@ -86,11 +92,7 @@ impl App {
             .map(|e| e.path.clone())
             .collect();
         match archives.len() {
-            0 => self.toast(
-                ToastKind::Info,
-                "select an archive to extract (zip, tar, 7z, rar, .gz, .xz, .zst…)",
-                3,
-            ),
+            0 => self.toast(ToastKind::Info, Key::TSelectArchive.tr(), 3),
             1 => {
                 let archive = archives[0].clone();
                 let dest = self.folder_for_new(std::slice::from_ref(&archive));
@@ -100,7 +102,7 @@ impl App {
                     self.ask_extract_folder(archive, dest);
                 }
             }
-            _ => self.toast(ToastKind::Info, "extract one archive at a time", 3),
+            _ => self.toast(ToastKind::Info, Key::TOneArchive.tr(), 3),
         }
     }
 
@@ -118,7 +120,7 @@ impl App {
             only,
             conflict: ConflictPolicy::Skip,
         });
-        self.begin_plan("Reading the archive", h);
+        self.begin_plan(Key::ReadingArchive.tr(), h);
     }
 
     fn ask_extract_folder(&mut self, archive: PathBuf, dest: PathBuf) {
@@ -138,7 +140,7 @@ impl App {
 
     /// Ask for a name and a format, then plan the new archive.
     pub(super) fn start_compress(&mut self) {
-        if self.refuse_if_busy() || self.refuse_in_archive("compress from here") {
+        if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatCompressHere.tr()) {
             return;
         }
         let sources = self.targets();

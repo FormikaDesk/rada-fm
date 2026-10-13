@@ -1,13 +1,15 @@
-//! The command bar: New, Cut, Copy, Paste, Rename, Compress, Delete, then Sort and View,
-//! and Undo with a few words about what it would undo.
+//! The command bar: New, Cut, Copy, Paste, Rename, Compress, Delete, then Sort and Tag, and
+//! Undo with a few words about what it would undo.
 //!
 //! The bar has a background of its own and, when there is height to spare, a row of ▄ above
-//! and ▀ below in the bar's colour: a vertical padding made of half blocks.
+//! and ▀ below in the bar's colour: a vertical padding made of half blocks. Every button is
+//! a pill; New, the one that makes something, is filled with the accent colour.
 //!
 //! Every button runs the action the keyboard runs. One that cannot be used right now is
 //! drawn faint and is not clickable. When the terminal narrows the bar gives up room in
 //! steps: first the description after Undo, then the generous spacing, then the words.
 
+use rada_core::i18n::Key;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -15,6 +17,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
+use super::soft::{self, Look};
 use super::widgets::Bar;
 use crate::app::{App, MenuKind};
 use crate::hits::Target;
@@ -24,27 +27,19 @@ use crate::keymap::Action;
 /// How much of each button is drawn.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Level {
-    /// Two spaces between icon and label, five between buttons.
+    /// Icon and word, a space of air inside each pill and between pills.
     Roomy,
-    /// One space between icon and label, two between buttons.
+    /// The same, tighter.
     Words,
     /// Icons only.
     Icons,
 }
 
 impl Level {
-    fn inner(self) -> &'static str {
-        match self {
-            Level::Roomy => "  ",
-            _ => " ",
-        }
-    }
-
     fn between(self) -> &'static str {
         match self {
-            Level::Roomy => "     ",
-            Level::Words => "  ",
-            Level::Icons => "   ",
+            Level::Roomy => "  ",
+            Level::Words | Level::Icons => " ",
         }
     }
 
@@ -59,6 +54,7 @@ impl Level {
 
 fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a> {
     let th = &app.th;
+    let look = Look::of(app);
     let bar = Style::default().bg(th.cmdbar);
     let set = app.icons;
     let ro = app.archive.is_some();
@@ -70,14 +66,17 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     // New ▾: the one filled button, its text in the colour made for the accent.
     let new_icon = icons::ui(set, Glyph::New);
     let new_text = match level {
-        Level::Icons => format!(" {new_icon}▾ "),
-        _ => format!(" {new_icon}{}New ▾ ", level.inner()),
+        Level::Icons => format!("{new_icon}▾"),
+        _ => format!("{new_icon} {} ▾", Key::MenuNew.tr()),
     };
     if nowhere {
-        b.push(Span::styled(new_text, th.faint().patch(bar)));
+        b.push_hits(
+            soft::pill(th, look, &new_text, th.button, th.faint(), bar),
+            Target::Window,
+        );
     } else {
-        b.push_hit(
-            Span::styled(new_text, th.pill()),
+        b.push_hits(
+            soft::pill(th, look, &new_text, th.accent, th.pill(), bar),
             Target::Menu(MenuKind::New),
         );
     }
@@ -103,12 +102,18 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         let text = match (level, icon.is_empty()) {
             (Level::Icons, false) => icon.to_string(),
             (_, true) => word.to_string(),
-            _ => format!("{icon}{}{word}", level.inner()),
+            _ => format!("{icon} {word}"),
         };
         if enabled {
-            b.push_hit(Span::styled(text, th.base().patch(bar)), target);
+            b.push_hits(
+                soft::pill(th, look, &text, th.button, th.base(), bar),
+                target,
+            );
         } else {
-            b.push(Span::styled(text, th.faint().patch(bar)));
+            b.push_hits(
+                soft::pill(th, look, &text, th.button, th.faint(), bar),
+                Target::Window,
+            );
         }
     };
 
@@ -117,7 +122,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut b,
             &mut first,
             Glyph::Cut,
-            "Cut",
+            Key::LCut.tr(),
             has_target && !ro,
             Target::Act(Action::Cut),
         );
@@ -126,7 +131,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut b,
         &mut first,
         Glyph::Copy,
-        "Copy",
+        Key::LCopy.tr(),
         has_target,
         Target::Act(Action::Copy),
     );
@@ -134,7 +139,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut b,
         &mut first,
         Glyph::Paste,
-        "Paste",
+        Key::LPaste.tr(),
         app.clipboard.is_some() && !nowhere,
         Target::Act(Action::Paste),
     );
@@ -143,7 +148,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut b,
             &mut first,
             Glyph::Rename,
-            "Rename",
+            Key::LRename.tr(),
             app.current().is_some() && !ro,
             Target::Act(Action::Rename),
         );
@@ -151,7 +156,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut b,
             &mut first,
             Glyph::Compress,
-            "Compress",
+            Key::BtnCompress.tr(),
             has_target && !ro,
             Target::Act(Action::Compress),
         );
@@ -160,7 +165,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut b,
         &mut first,
         Glyph::Delete,
-        "Delete",
+        Key::BtnDelete.tr(),
         has_target && !ro,
         Target::Act(Action::Trash),
     );
@@ -171,18 +176,20 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut b,
             &mut first,
             Glyph::Sort,
-            "Sort ▾",
+            &format!("{} ▾", Key::BtnSort.tr()),
             true,
             Target::Menu(MenuKind::Sort),
         );
-        button(
-            &mut b,
-            &mut first,
-            Glyph::View,
-            "View ▾",
-            true,
-            Target::Menu(MenuKind::View),
-        );
+        if app.tags_available() {
+            button(
+                &mut b,
+                &mut first,
+                Glyph::Tag,
+                &format!("{} ▾", Key::MenuTags.tr()),
+                has_target,
+                Target::Menu(MenuKind::Tags),
+            );
+        }
     }
     sep(&mut b);
     first = true;
@@ -190,7 +197,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut b,
         &mut first,
         Glyph::Undo,
-        "Undo",
+        Key::LUndo.tr(),
         app.undo_label.is_some(),
         Target::Act(Action::Undo),
     );

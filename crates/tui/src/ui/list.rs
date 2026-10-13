@@ -1,12 +1,17 @@
 //! The folder as a table (the Details view): a checkbox, the icon and name, the date, the
-//! type in words and the size. The column titles are buttons that sort; the sorted one
-//! carries an arrow.
+//! type in words, the size and the tags as coloured dots. The column titles, a pill, are
+//! buttons that sort; the sorted one carries an arrow.
 //!
 //! What the terminal's width allows decides the columns: below 100 columns the type goes,
-//! below 60 the date goes too and only name and size remain.
+//! below 60 the date goes too and only name and size remain. The Tag column gives way first,
+//! whenever the name would be left too little room.
+//!
+//! The row under the cursor is shaded from one end to the other, the selected ones are
+//! tinted, both with rounded ends (see `soft`).
 
 use rada_core::display;
 use rada_core::fs::FileKind;
+use rada_core::i18n::{Key, tf};
 use rada_core::model::{Entry, SortKey};
 use rada_core::ops::LinkState;
 use ratatui::Frame;
@@ -16,6 +21,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
+use super::soft::{self, Look, RowTone};
 use super::widgets::{SPIN, hit_spans, pad, pad_left};
 use crate::app::App;
 use crate::fmt::{self, DateStyle};
@@ -26,12 +32,19 @@ use crate::keymap::Action;
 /// Cells of the checkbox column: a space, the box, a space.
 const CHECK: usize = 3;
 
+/// The cells of the Tag column: three dots with a space between, and a "+N".
+const TAG_W: usize = 8;
+/// The name keeps at least this much room before the Tag column is let in.
+const NAME_MIN_WITH_TAGS: usize = 18;
+
 /// Which columns fit, and how wide each is.
 pub struct Columns {
     pub icon: usize,
     pub date: usize,
     pub kind: usize,
     pub size: usize,
+    /// 0 when the column is not shown.
+    pub tags: usize,
     pub gap: usize,
     pub name: usize,
 }
@@ -43,14 +56,18 @@ pub struct Columns {
 pub struct ListOpts {
     pub show_type: bool,
     pub show_date: bool,
+    /// The Tag column is wanted (it still needs the room).
+    pub show_tags: bool,
 }
 
 impl ListOpts {
-    /// Below 100 columns the type goes, below 60 the date goes too.
-    pub fn for_terminal(term_width: usize) -> ListOpts {
+    /// Below 100 columns the type goes, below 60 the date goes too. `tags` is whether the
+    /// person wants the Tag column (and the system has tags).
+    pub fn for_terminal(term_width: usize, tags: bool) -> ListOpts {
         ListOpts {
             show_type: term_width >= 100,
             show_date: term_width >= 60,
+            show_tags: tags,
         }
     }
 }
@@ -61,7 +78,13 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
         DateStyle::Relative => 14,
         DateStyle::Absolute => 16,
     };
-    let (mut date, mut kind, mut size) = (date_w, 20, 10);
+    // A title with the arrow of the sort must fit its column ("Dimensione ↑").
+    let fit = |base: usize, label: Key| base.max(label.tr().width() + 2);
+    let (mut date, mut kind, mut size) = (
+        fit(date_w, Key::ColModified),
+        fit(20, Key::ColType),
+        fit(10, Key::ColSize),
+    );
     if !opts.show_type {
         kind = 0;
     }
@@ -73,12 +96,19 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
     }
     let cols = [date, kind, size].iter().filter(|c| **c > 0).count();
     let fixed = CHECK + icon_w + date + kind + size + 1;
-    let name = area_width.saturating_sub(fixed + gap * cols);
+    let mut name = area_width.saturating_sub(fixed + gap * cols);
+    // The tags come last and go first: only while the name keeps its room.
+    let mut tags = 0;
+    if opts.show_tags && name >= NAME_MIN_WITH_TAGS + TAG_W + gap {
+        tags = TAG_W;
+        name -= TAG_W + gap;
+    }
     Columns {
         icon: icon_w,
         date,
         kind,
         size,
+        tags,
         gap,
         name,
     }
@@ -87,10 +117,11 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
 /// Draw the table of the front tab in `area` (any area: nothing here knows where it is).
 pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let th = app.th.clone();
+    let look = Look::of(app);
     let count = app.visible.len();
     let cols = columns(area.width as usize, opts, app.icons.width(), app.dates);
 
-    // Column titles, on a band of their own; the sorted one carries an arrow.
+    // Column titles, in a pill of their own; the sorted one carries an arrow.
     let head_bg = Style::default().bg(th.field);
     let arrow = if app.sort.reverse { "↓" } else { "↑" };
     let label = |text: &str, k: SortKey| {
@@ -131,26 +162,33 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         },
     ));
     head.push(Span::styled(" ".repeat(cols.icon), head_bg));
-    let (t, st) = label("Name", SortKey::Name);
+    let (t, st) = label(Key::ColName.tr(), SortKey::Name);
     head_hits.push((head.len(), Target::SortBy(SortKey::Name)));
     head.push(Span::styled(pad(&t, cols.name), st));
     if cols.date > 0 {
         head.push(gap());
-        let (t, st) = label("Date modified", SortKey::Modified);
+        let (t, st) = label(Key::ColModified.tr(), SortKey::Modified);
         head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
         head.push(Span::styled(pad(&t, cols.date), st));
     }
     if cols.kind > 0 {
         head.push(gap());
-        let (t, st) = label("Type", SortKey::Type);
+        let (t, st) = label(Key::ColType.tr(), SortKey::Type);
         head_hits.push((head.len(), Target::SortBy(SortKey::Type)));
         head.push(Span::styled(pad(&t, cols.kind), st));
     }
     if cols.size > 0 {
         head.push(gap());
-        let (t, st) = label("Size", SortKey::Size);
+        let (t, st) = label(Key::ColSize.tr(), SortKey::Size);
         head_hits.push((head.len(), Target::SortBy(SortKey::Size)));
         head.push(Span::styled(pad_left(&t, cols.size), st));
+    }
+    if cols.tags > 0 {
+        head.push(gap());
+        head.push(Span::styled(
+            pad(Key::ColTags.tr(), cols.tags),
+            th.dim().patch(head_bg),
+        ));
     }
     head.push(Span::styled(" ", head_bg));
     let drawn: usize = head.iter().map(|s| s.content.width()).sum();
@@ -164,11 +202,15 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         return;
     }
     hit_spans(&mut app.hits, area.x, area.y, &head, &head_hits);
-    f.render_widget(Paragraph::new(Line::from(head)), Rect { height: 1, ..area });
+    let head_row = Rect { height: 1, ..area };
+    f.render_widget(Paragraph::new(Line::from(head)), head_row);
+    soft::round_ends(f.buffer_mut(), head_row, &th, look, th.field);
 
+    // A row of air under the titles, where there is room for it.
+    let air = u16::from(area.height >= 6);
     let body = Rect {
-        y: area.y + 1,
-        height: area.height - 1,
+        y: area.y + 1 + air,
+        height: area.height - 1 - air,
         ..area
     };
     app.viewport.rows = body.height as usize;
@@ -179,13 +221,13 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
 
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
-            format!("{} loading…", SPIN[app.spinner % SPIN.len()])
+            tf(Key::ListLoading, &[&SPIN[app.spinner % SPIN.len()]])
         } else if app.filter.is_some() {
-            "Nothing here matches the search".to_string()
+            Key::ListNoMatch.tr().to_string()
         } else if app.listing.is_empty() {
-            "This folder is empty".to_string()
+            Key::ListEmpty.tr().to_string()
         } else {
-            "Only hidden files here — press . to show them".to_string()
+            Key::ListOnlyHidden.tr().to_string()
         };
         f.render_widget(
             Paragraph::new(Span::styled(msg, th.dim())).alignment(Alignment::Center),
@@ -214,6 +256,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
             vis == app.cursor,
             &cols,
             area.width as usize,
+            look,
         ));
     }
     f.render_widget(Paragraph::new(lines), body);
@@ -223,6 +266,16 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
             height: 1,
             ..body
         };
+        // The row under the cursor shades from one end to the other, the selected ones are
+        // tinted; both have round ends where the font allows.
+        let marked = app
+            .entry_at(vis)
+            .is_some_and(|e| app.marked.contains(&e.name));
+        if vis == app.cursor {
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
+        } else if marked {
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);
+        }
         app.hits.add(r, Target::Row(vis));
         app.hits.add(
             Rect {
@@ -241,6 +294,7 @@ fn row<'a>(
     is_cursor: bool,
     cols: &Columns,
     width: usize,
+    look: Look,
 ) -> Line<'a> {
     let th = &app.th;
     let marked = app.marked.contains(&e.name);
@@ -290,8 +344,7 @@ fn row<'a>(
             Glyph::Unchecked
         },
     );
-    // The leftmost cell carries a bar in the accent colour on the cursor row; the tick keeps
-    // its accent on a selected row and stays visible under the cursor.
+    // The tick keeps its accent on a selected row and stays visible under the cursor.
     let tick_style = if is_cursor && marked {
         Style::default()
             .fg(th.cursor_text)
@@ -301,11 +354,11 @@ fn row<'a>(
     } else {
         th.faint()
     };
+    // The leftmost cell carries a bar in the accent colour on the cursor row; with round
+    // ends it is the left end itself, drawn after the row (see `soft::tint_row`).
+    let mark = if is_cursor && !look.caps { "▌" } else { " " };
     let mut spans: Vec<Span> = vec![
-        Span::styled(
-            if is_cursor { "▌" } else { " " },
-            row_style.patch(Style::default().fg(th.accent)),
-        ),
+        Span::styled(mark, row_style.patch(Style::default().fg(th.accent))),
         Span::styled(check.to_string(), with(tick_style)),
         Span::styled(" ", with(Style::default())),
     ];
@@ -324,26 +377,9 @@ fn row<'a>(
     }
 
     let shown = e.display.clone();
-    // Coloured dots after the name, one for each tag (three at most, then a plus).
-    let dots = super::tagdots::dots(th, &e.tags);
-    let dots_w = if cols.name > 12 {
-        super::tagdots::width(&dots)
-    } else {
-        0
-    };
-    let name_txt = display::truncate(&shown, cols.name.saturating_sub(dots_w));
+    let name_txt = display::truncate(&shown, cols.name);
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
-    if dots_w > 0 {
-        spans.push(Span::styled(" ", with(Style::default())));
-        used += 1 + dots_w - 1;
-        for (text, color) in &dots {
-            spans.push(Span::styled(
-                text.clone(),
-                row_style.patch(Style::default().fg(*color)),
-            ));
-        }
-    }
     // In the list of a tag's items, the folder each one is in, dim after the name.
     if app.tag_view().is_some() {
         let room = cols.name.saturating_sub(used);
@@ -395,6 +431,27 @@ fn row<'a>(
             }),
         ));
     }
+    if cols.tags > 0 {
+        spans.push(gap());
+        // A dot in each tag's colour, three at most, then "+N": the colour says it all.
+        let dots = super::tagdots::dots(th, &e.tags);
+        let mut text_w = 0;
+        for (i, (text, color)) in dots.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::styled(" ", with(Style::default())));
+                text_w += 1;
+            }
+            text_w += text.width();
+            spans.push(Span::styled(
+                text.clone(),
+                row_style.patch(Style::default().fg(*color)),
+            ));
+        }
+        spans.push(Span::styled(
+            " ".repeat(cols.tags.saturating_sub(text_w)),
+            with(Style::default()),
+        ));
+    }
     // Make the highlight reach the right edge.
     let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
     if drawn < width {
@@ -413,23 +470,37 @@ mod tests {
     #[test]
     fn narrow_terminals_lose_the_least_important_columns_first() {
         let rel = DateStyle::Relative;
-        let wide = columns(120, ListOpts::for_terminal(170), 2, rel);
+        let wide = columns(120, ListOpts::for_terminal(170, false), 2, rel);
         assert!(wide.kind > 0 && wide.date > 0 && wide.size > 0);
-        let mid = columns(90, ListOpts::for_terminal(99), 2, rel);
+        let mid = columns(90, ListOpts::for_terminal(99, false), 2, rel);
         assert_eq!(mid.kind, 0, "the type goes below 100 columns");
         assert!(mid.date > 0);
-        let narrow = columns(50, ListOpts::for_terminal(59), 2, rel);
+        let narrow = columns(50, ListOpts::for_terminal(59, false), 2, rel);
         assert_eq!((narrow.date, narrow.kind), (0, 0));
         assert!(narrow.size > 0, "name and size are what stays");
         // Absolute dates need more room than relative ones.
-        assert!(columns(120, ListOpts::for_terminal(170), 2, DateStyle::Absolute).date > wide.date);
+        assert!(
+            columns(
+                120,
+                ListOpts::for_terminal(170, false),
+                2,
+                DateStyle::Absolute
+            )
+            .date
+                > wide.date
+        );
     }
 
     #[test]
     fn the_columns_always_add_up_to_the_width() {
         for term in [170usize, 120, 99, 80, 59, 40] {
             let area = term.saturating_sub(30).max(24);
-            let c = columns(area, ListOpts::for_terminal(term), 2, DateStyle::Relative);
+            let c = columns(
+                area,
+                ListOpts::for_terminal(term, false),
+                2,
+                DateStyle::Relative,
+            );
             let n = [c.date, c.kind, c.size].iter().filter(|x| **x > 0).count();
             assert_eq!(
                 CHECK + c.icon + c.name + c.date + c.kind + c.size + c.gap * n + 1,

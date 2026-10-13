@@ -49,11 +49,7 @@ impl App {
         }
         match result {
             Ok(text) => self.toast(ToastKind::Ok, text, 15),
-            Err(e) => self.toast(
-                ToastKind::Error,
-                format!("the font was not installed: {e}"),
-                10,
-            ),
+            Err(e) => self.toast(ToastKind::Error, tf(Key::TFontNotInstalled, &[&e]), 10),
         }
     }
 }

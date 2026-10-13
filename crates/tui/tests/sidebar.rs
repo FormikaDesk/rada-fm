@@ -182,7 +182,7 @@ fn file_operations_are_not_done_behind_the_sidebars_back() {
     h.key(KeyCode::Tab);
     h.press("ctrl+c");
     assert!(h.app.clipboard.is_none(), "nothing was copied");
-    assert!(h.app.toast.is_some(), "and it was said why");
+    assert!(h.app.current_notice().is_some(), "and it was said why");
     assert!(h.app.side_focus);
 }
 
@@ -258,7 +258,7 @@ fn below_sixty_columns_the_navigation_pane_is_gone() {
     );
     h.key(KeyCode::Tab);
     assert!(!h.app.side_focus, "no focus on what is not there");
-    assert!(h.app.toast.is_some(), "and it says why");
+    assert!(h.app.current_notice().is_some(), "and it says why");
 }
 
 fn ui_state_file(h: &H) -> PathBuf {

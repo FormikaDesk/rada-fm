@@ -2,7 +2,7 @@
 //! touches the disk is a request to a worker; everything the workers say arrives as an
 //! event and changes state here.
 
-use rada_core::i18n::Key;
+use rada_core::i18n::{Key, tf};
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -43,12 +43,6 @@ pub enum ToastKind {
     Ok,
     Warn,
     Error,
-}
-
-pub struct Toast {
-    pub text: String,
-    pub kind: ToastKind,
-    until: Instant,
 }
 
 #[derive(Default)]
@@ -130,6 +124,8 @@ pub struct Running {
     pub kind: OpKind,
     pub totals: Totals,
     pub reversible: bool,
+    /// Where the result will be, for the card that says it is done.
+    pub outcome: notice::Outcome,
 }
 
 impl Running {
@@ -182,7 +178,7 @@ pub struct PlanView {
 pub fn is_confirmation(typed: &str) -> bool {
     matches!(
         typed.trim().to_lowercase().as_str(),
-        "yes" | "si" | "sì"
+        "yes" | "si" | "s\u{ec}"
     )
 }
 
@@ -400,6 +396,10 @@ pub struct Config {
     pub start_explicit: bool,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// The basic profile (ASCII, 16 colours): no rounded ends, no shades, a plain look.
+    pub basic: bool,
+    /// The Tag column of the list: `None` follows the remembered choice, then shows it.
+    pub tags_column: Option<bool>,
 }
 
 /// A theme that follows the terminal's background: which one, and how to show it. Resolved
@@ -446,10 +446,12 @@ pub struct Demo {
 
 mod address;
 mod archives;
+mod columns;
 mod eject;
 mod font;
 mod input;
 mod menus;
+mod notice;
 mod openwith;
 mod props;
 mod side;
@@ -458,11 +460,12 @@ pub use sizes::FolderSizeView;
 mod tabs;
 mod update;
 
-pub use address::AddressEdit;
+pub use address::{AddressEdit, BarHit, BarItem, BarMode};
 pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView, TagCmd};
 pub use menus::MenuKind;
+pub use notice::{Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
 pub use props::PropsView;
 pub use tabs::TabState;
@@ -529,7 +532,14 @@ pub struct App {
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
     pub running: Option<Running>,
-    pub toast: Option<Toast>,
+    /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
+    pub notices: NoticeQueue,
+    /// The folder above the one shown, for the Columns view (see `columns.rs`).
+    pub columns_parent: Option<columns::ParentColumn>,
+    parent_gen: u64,
+    parent_asked: Option<PathBuf>,
+    /// Added to the clock the notifications read: tests and screenshots move time on with it.
+    notice_skew: Duration,
     pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
@@ -551,6 +561,9 @@ pub struct App {
     /// The sidebar item under the mouse.
     pub hover: Option<PathBuf>,
     pub term_width: u16,
+    /// Where the field of the bar at the top was drawn (what is offered under it lines up
+    /// with it).
+    pub bar_field: ratatui::layout::Rect,
     /// Screen rectangles of everything clickable, rebuilt every frame.
     pub hits: Hits,
     pub filter: Option<FilterState>,
@@ -575,6 +588,10 @@ pub struct App {
     pub details: Option<bool>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// The basic profile: the soft shapes (rounded ends, shades) give way to plain ones.
+    pub basic: bool,
+    /// The Tag column of the list is shown.
+    pub show_tags: bool,
     /// What is known of the size of folders (see `sizes.rs`).
     pub(crate) folder_sizes: sizes::Sizes,
     /// The time zone dates are shown in (the system's; tests pin it).
@@ -695,7 +712,11 @@ impl App {
             clipboard: None,
             modal: None,
             running: None,
-            toast: None,
+            notices: NoticeQueue::default(),
+            columns_parent: None,
+            parent_gen: 0,
+            parent_asked: None,
+            notice_skew: Duration::ZERO,
             watch_note: None,
             viewport: Viewport::default(),
             should_quit: false,
@@ -711,6 +732,7 @@ impl App {
             side_cursor: 0,
             hover: None,
             term_width: 0,
+            bar_field: ratatui::layout::Rect::default(),
             hits: Hits::default(),
             filter: None,
             sel_anchor: None,
@@ -725,6 +747,8 @@ impl App {
             details: cfg.details_pane,
             dates: cfg.dates,
             date_format: cfg.date_format,
+            basic: cfg.basic,
+            show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
             folder_sizes: Default::default(),
             tz: jiff::tz::TimeZone::system(),
             remember_tabs: cfg.remember_tabs,
@@ -753,11 +777,7 @@ impl App {
             tracing::warn!("keymap: {w}");
         }
         if !app.svc.journal_ok {
-            app.toast(
-                ToastKind::Warn,
-                "journal unavailable: operations cannot be undone this session",
-                8,
-            );
+            app.toast(ToastKind::Warn, Key::TJournalDown.tr(), 8);
         }
         if let Some(name) = cfg.select {
             app.remembered.insert(start_dir.clone(), name);
@@ -773,7 +793,7 @@ impl App {
         }
         if let Some(req) = cfg.request {
             let h = app.svc.jobs.plan_request(req);
-            app.begin_plan("Planning", h);
+            app.begin_plan(Key::PlanningGeneric.tr(), h);
         }
         app.maybe_offer_font(cfg.font_offer);
         app
@@ -808,23 +828,58 @@ impl App {
 
     // ------------------------------------------------------------------ small helpers
 
+    /// The time notifications go by: the clock, and what tests have moved it on.
+    pub fn notice_now(&self) -> Instant {
+        Instant::now() + self.notice_skew
+    }
+
+    /// Move the notifications' clock on (tests and screenshots: nobody waits six seconds).
+    pub fn advance_notices(&mut self, by: Duration) {
+        self.notice_skew += by;
+        self.tick_notices();
+    }
+
+    fn tick_notices(&mut self) {
+        let now = self.notice_now();
+        if self.notices.tick(now) {
+            self.dirty = true;
+        }
+    }
+
+    /// A word about what happened, as a card. `secs` is how long a long message needs; a
+    /// short one goes after about six seconds, an error stays until it is closed.
     pub fn toast(&mut self, kind: ToastKind, text: impl Into<String>, secs: u64) {
-        self.toast = Some(Toast {
-            text: text.into(),
-            kind,
-            until: Instant::now() + Duration::from_secs(secs),
-        });
+        let kind = match kind {
+            ToastKind::Info => NoticeKind::Info,
+            ToastKind::Ok => NoticeKind::Ok,
+            ToastKind::Warn => NoticeKind::Warn,
+            ToastKind::Error => NoticeKind::Error,
+        };
+        let ttl = Notice::TTL.max(Duration::from_secs(secs));
+        self.notify(Notice::new(kind, text).lasting(ttl));
+    }
+
+    /// Queue a notification.
+    pub fn notify(&mut self, notice: Notice) {
+        let now = self.notice_now();
+        self.notices.push(notice, now);
         self.dirty = true;
+    }
+
+    /// Take every notification away (tests: so that what comes next is not a left-over).
+    pub fn clear_notices(&mut self) {
+        self.notices = NoticeQueue::default();
+        self.dirty = true;
+    }
+
+    /// The notification on screen.
+    pub fn current_notice(&self) -> Option<&Notice> {
+        self.notices.front()
     }
 
     pub fn tick(&mut self) {
         self.spinner = self.spinner.wrapping_add(1);
-        if let Some(t) = &self.toast
-            && Instant::now() >= t.until
-        {
-            self.toast = None;
-            self.dirty = true;
-        }
+        self.tick_notices();
         if self.running.is_some()
             || matches!(self.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
@@ -1020,11 +1075,7 @@ impl App {
         let Some(tag) = self.tag_view() else {
             return false;
         };
-        self.toast(
-            ToastKind::Warn,
-            format!("this list is the items tagged \"{tag}\", not a folder — cannot {what} here"),
-            5,
-        );
+        self.toast(ToastKind::Warn, tf(Key::TTagViewRefuse, &[&tag, &what]), 5);
         true
     }
 
@@ -1069,7 +1120,7 @@ impl App {
             return;
         }
         let Some(parent) = self.cwd.parent().map(|p| p.to_path_buf()) else {
-            self.toast(ToastKind::Info, "already at the top", 2);
+            self.toast(ToastKind::Info, Key::TAtTop.tr(), 2);
             return;
         };
         if let Some(name) = self.cwd.file_name() {
@@ -1086,11 +1137,16 @@ impl App {
         } else if self.archive.is_some() {
             self.toast(
                 ToastKind::Info,
-                format!(
-                    "inside an archive: copy ({}) it to a folder, or extract with {}",
-                    self.key_for(Action::Copy).unwrap_or_else(|| "copy".into()),
-                    self.key_for(Action::ExtractHere)
-                        .unwrap_or_else(|| "extract".into()),
+                tf(
+                    Key::TInArchive,
+                    &[
+                        &self
+                            .key_for(Action::Copy)
+                            .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
+                        &self
+                            .key_for(Action::ExtractHere)
+                            .unwrap_or_else(|| Key::KeyExtractWord.tr().into()),
+                    ],
                 ),
                 4,
             );
@@ -1112,18 +1168,19 @@ impl App {
                 if let Err(err) = platform.opener().open(&path) {
                     tracing::warn!("open {}: {err}", path.display());
                     let _ = notes.send(CoreEvent::Note {
-                        text: format!("cannot open {}: {err}", path.display()),
+                        text: tf(Key::TCannotOpen, &[&path.display(), &err]),
                         error: true,
                     });
                 }
             });
             self.toast(
                 ToastKind::Info,
-                format!(
-                    "opening {}",
-                    self.current()
+                tf(
+                    Key::TOpening,
+                    &[&self
+                        .current()
                         .map(|e| e.display.clone())
-                        .unwrap_or_default()
+                        .unwrap_or_default()],
                 ),
                 2,
             );
@@ -1142,7 +1199,7 @@ impl App {
                 let path = e.path.clone();
                 self.open_dir(path);
             }
-            _ => self.toast(ToastKind::Info, "this is not a package", 2),
+            _ => self.toast(ToastKind::Info, Key::TNotPackage.tr(), 2),
         }
     }
 
@@ -1152,10 +1209,10 @@ impl App {
             return;
         };
         if !self.svc.platform.opener().can_quick_look() {
-            self.toast(ToastKind::Info, "Quick Look is a macOS feature", 3);
+            self.toast(ToastKind::Info, Key::TQuickLookMac.tr(), 3);
             return;
         }
-        if self.refuse_in_archive("preview with Quick Look") {
+        if self.refuse_in_archive(Key::WhatQuickLook.tr()) {
             return;
         }
         let platform = self.svc.platform.clone();
@@ -1163,7 +1220,7 @@ impl App {
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().quick_look(&path) {
                 let _ = notes.send(CoreEvent::Note {
-                    text: format!("Quick Look: {e}"),
+                    text: tf(Key::TQuickLookErr, &[&e]),
                     error: true,
                 });
             }
@@ -1226,6 +1283,9 @@ impl App {
                 archive,
                 denied,
             } => {
+                if generation & columns::PARENT_GEN != 0 {
+                    return self.on_parent_loaded(generation, path, result);
+                }
                 if generation != self.dir_gen {
                     return; // an answer to a request that has been superseded
                 }
@@ -1337,7 +1397,7 @@ impl App {
             WatchEvent::Degraded(msg) => self.watch_note = Some(msg),
             WatchEvent::Failed(msg) => {
                 self.watch_note = Some(msg.clone());
-                self.toast(ToastKind::Warn, format!("live updates off: {msg}"), 6);
+                self.toast(ToastKind::Warn, tf(Key::TLiveOff, &[&msg]), 6);
             }
         }
     }
@@ -1370,7 +1430,14 @@ impl App {
                             // The event owns the only reference: no pixel copy.
                             let img = std::sync::Arc::try_unwrap(px)
                                 .unwrap_or_else(|shared| (*shared).clone());
-                            ui.show(img);
+                            // Rounded corners, blended into the colour behind the picture
+                            // (the theme's own background, or its canvas).
+                            let bg = if self.basic {
+                                None
+                            } else {
+                                crate::theme::rgb_of(self.th.bg.unwrap_or(self.th.canvas))
+                            };
+                            ui.show(img, bg);
                             ImageStatus::Shown
                         }
                         None => ImageStatus::NoGraphics,
@@ -1451,7 +1518,7 @@ impl App {
                     // A sentence that does not fit a one-line message is read in a window.
                     if message.chars().count() > 70 {
                         self.modal = Some(Modal::Result(ResultView {
-                            title: "Could not go on".to_string(),
+                            title: Key::ResultCouldNot.tr().to_string(),
                             lines: vec![(ToastKind::Error, message)],
                             scroll: 0,
                         }));
@@ -1465,18 +1532,14 @@ impl App {
                 if self.plan_job == Some(job) {
                     self.modal = None;
                     self.plan_job = None;
-                    self.toast(ToastKind::Info, "nothing to undo", 3);
+                    self.toast(ToastKind::Info, Key::TNothingUndo.tr(), 3);
                 }
             }
             JobEvent::NothingToRedo { job } => {
                 if self.plan_job == Some(job) {
                     self.modal = None;
                     self.plan_job = None;
-                    self.toast(
-                        ToastKind::Info,
-                        "nothing to redo (redo only follows an undo, until another operation)",
-                        4,
-                    );
+                    self.toast(ToastKind::Info, Key::TNothingRedo.tr(), 4);
                 }
             }
             JobEvent::Progress { job, progress } => {
@@ -1516,23 +1579,18 @@ impl App {
                 for r in &items {
                     lines.push((
                         ToastKind::Warn,
-                        format!(
-                            "\"{}\" was interrupted last time: {} leftover temporary file(s) removed, {} finished step(s) added to the history",
-                            r.title,
-                            r.removed_temps.len(),
-                            r.adopted.len()
+                        tf(
+                            Key::ResultRecovered,
+                            &[&r.title, &r.removed_temps.len(), &r.adopted.len()],
                         ),
                     ));
                     for n in &r.notes {
                         lines.push((ToastKind::Warn, n.clone()));
                     }
                 }
-                lines.push((
-                    ToastKind::Info,
-                    "Open the history to undo what was done before the interruption.".to_string(),
-                ));
+                lines.push((ToastKind::Info, Key::ResultOpenHistory.tr().to_string()));
                 self.modal = Some(Modal::Result(ResultView {
-                    title: "An earlier operation was interrupted".to_string(),
+                    title: Key::ResultInterruptedTitle.tr().to_string(),
                     lines,
                     scroll: 0,
                 }));
@@ -1562,10 +1620,7 @@ impl App {
         if report.skipped_dependent > 0 {
             lines.push((
                 ToastKind::Warn,
-                format!(
-                    "{} more skipped because their folder failed",
-                    report.skipped_dependent
-                ),
+                tf(Key::NSkippedFolder, &[&report.skipped_dependent]),
             ));
         }
         for (_, note) in &report.kept {
@@ -1580,50 +1635,49 @@ impl App {
         for (what, paths) in lost {
             lines.push((
                 ToastKind::Warn,
-                format!(
-                    "not preserved: {what} — {}, for example {}",
-                    fmt::count(paths.len() as u64, Key::ItemOne, Key::ItemMany),
-                    fmt::short_path(paths[0], self.home())
+                tf(
+                    Key::NNotPreserved,
+                    &[
+                        &what,
+                        &fmt::count(paths.len() as u64, Key::ItemOne, Key::ItemMany),
+                        &fmt::short_path(paths[0], self.home()),
+                    ],
                 ),
             ));
         }
         if journal_errors > 0 {
-            lines.push((ToastKind::Warn, format!("{journal_errors} steps could not be written to the journal and may not be undoable")));
+            lines.push((ToastKind::Warn, tf(Key::NJournalErrors, &[&journal_errors])));
         }
         let (kind, headline) = match report.status() {
-            Completed if report.kept.is_empty() && report.not_preserved.is_empty() => (
-                ToastKind::Ok,
-                done.as_ref()
-                    .map(|r| self.done_message(r))
-                    .unwrap_or_else(|| format!("{title}: done")),
-            ),
-            Completed if report.not_preserved.is_empty() => (
-                ToastKind::Warn,
-                format!("{title}: done, some items were kept"),
-            ),
-            Completed => (
-                ToastKind::Warn,
-                format!("{title}: done, but some attributes could not be kept"),
-            ),
+            Completed if report.kept.is_empty() && report.not_preserved.is_empty() => {
+                // The clean ending: a card with what was done, the way back and the way to see it.
+                if lines.is_empty() {
+                    let notice = match done.as_ref() {
+                        Some(r) => self.done_notice(r),
+                        None => Notice::new(NoticeKind::Ok, tf(Key::NDoneDefault, &[&title])),
+                    };
+                    self.notify(notice);
+                    return;
+                }
+                (ToastKind::Ok, tf(Key::NDoneDefault, &[&title]))
+            }
+            Completed if report.not_preserved.is_empty() => {
+                (ToastKind::Warn, tf(Key::NDoneKept, &[&title]))
+            }
+            Completed => (ToastKind::Warn, tf(Key::NDoneNotKept, &[&title])),
             CompletedWithProblems => (
                 ToastKind::Warn,
-                format!(
-                    "{title}: finished with {} problem(s)",
-                    report.failed.len() + report.skipped_dependent as usize
+                tf(
+                    Key::NProblems,
+                    &[
+                        &title,
+                        &(report.failed.len() + report.skipped_dependent as usize),
+                    ],
                 ),
             ),
-            Aborted => (
-                ToastKind::Warn,
-                format!("{title}: stopped; press u to undo what was done"),
-            ),
-            Cancelled => (
-                ToastKind::Warn,
-                format!("{title}: cancelled; press u to undo what was done"),
-            ),
-            Interrupted => (
-                ToastKind::Warn,
-                format!("{title}: interrupted; press u to undo what was done"),
-            ),
+            Aborted => (ToastKind::Warn, tf(Key::NStopped, &[&title])),
+            Cancelled => (ToastKind::Warn, tf(Key::NCancelled, &[&title])),
+            Interrupted => (ToastKind::Warn, tf(Key::NInterrupted, &[&title])),
         };
         if lines.is_empty() {
             self.toast(kind, headline, 4);
@@ -1714,11 +1768,7 @@ impl App {
 
     fn refuse_if_busy(&mut self) -> bool {
         if self.is_busy() {
-            self.toast(
-                ToastKind::Warn,
-                "an operation is running; wait or press Esc to cancel it",
-                3,
-            );
+            self.toast(ToastKind::Warn, Key::TBusy.tr(), 3);
             true
         } else {
             false
@@ -1732,9 +1782,14 @@ impl App {
         }
         self.toast(
             ToastKind::Warn,
-            format!(
-                "an archive is read-only — cannot {what}; copy ({}) items out to a folder instead",
-                self.key_for(Action::Copy).unwrap_or_else(|| "copy".into())
+            tf(
+                Key::TArchiveReadOnly,
+                &[
+                    &what,
+                    &self
+                        .key_for(Action::Copy)
+                        .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
+                ],
             ),
             5,
         );
@@ -1743,13 +1798,13 @@ impl App {
 
     fn start_paste(&mut self) {
         if self.refuse_if_busy()
-            || self.refuse_in_archive("paste here")
-            || self.refuse_in_tag_view("paste")
+            || self.refuse_in_archive(Key::WhatPasteHere.tr())
+            || self.refuse_in_tag_view(Key::WhatPaste.tr())
         {
             return;
         }
         let Some(clip) = self.clipboard.clone() else {
-            self.toast(ToastKind::Info, "nothing copied yet (y = copy, x = cut)", 3);
+            self.toast(ToastKind::Info, Key::TNothingCopied.tr(), 3);
             return;
         };
         let opts = TransferOptions {
@@ -1763,16 +1818,16 @@ impl App {
             .plan_transfer(clip.paths, self.cwd.clone(), opts);
         self.begin_plan(
             if clip.mode == TransferMode::Copy {
-                "Planning copy"
+                Key::PlanningCopy.tr()
             } else {
-                "Planning move"
+                Key::PlanningMove.tr()
             },
             h,
         );
     }
 
     fn start_trash(&mut self, permanent: bool) {
-        if self.refuse_if_busy() || self.refuse_in_archive("delete") {
+        if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatDelete.tr()) {
             return;
         }
         let t = self.targets();
@@ -1784,7 +1839,7 @@ impl App {
         } else {
             self.svc.jobs.plan_trash(t)
         };
-        self.begin_plan("Planning", h);
+        self.begin_plan(Key::PlanningGeneric.tr(), h);
     }
 
     fn start_undo(&mut self, id: Option<String>) {
@@ -1792,7 +1847,7 @@ impl App {
             return;
         }
         let h = self.svc.jobs.plan_undo(id);
-        self.begin_plan("Planning undo", h);
+        self.begin_plan(Key::PlanningUndo.tr(), h);
     }
 
     /// Ask for the same transfer again with another way of settling name clashes.
@@ -1834,6 +1889,7 @@ impl App {
         let title = pv.plan.title.clone();
         let total = pv.plan.total_bytes();
         let (kind, totals, reversible) = (pv.plan.kind, pv.plan.totals, pv.plan.reversible);
+        let outcome = self.outcome_of(&pv.plan);
         let handle = match pv.undo {
             Some(up) => self.svc.jobs.execute_undo(*up),
             None => self.svc.jobs.execute(pv.plan),
@@ -1851,6 +1907,7 @@ impl App {
             kind,
             totals,
             reversible,
+            outcome,
         });
         self.clear_marks();
     }
@@ -1862,11 +1919,11 @@ impl App {
                     .svc
                     .jobs
                     .plan_rename(from.clone(), iv.text.trim_end_matches('\n').to_string());
-                self.begin_plan("Planning rename", h);
+                self.begin_plan(Key::PlanningRename.tr(), h);
             }
             InputKind::NewDir => {
                 let h = self.svc.jobs.plan_mkdir(self.cwd.clone(), iv.text.clone());
-                self.begin_plan("Planning", h);
+                self.begin_plan(Key::PlanningGeneric.tr(), h);
             }
             InputKind::ExtractTo {
                 archive,
@@ -1886,7 +1943,7 @@ impl App {
                     only: Vec::new(),
                     conflict: ConflictPolicy::Skip,
                 });
-                self.begin_plan("Reading the archive", h);
+                self.begin_plan(Key::ReadingArchive.tr(), h);
             }
             InputKind::Compress {
                 sources,
@@ -1913,11 +1970,11 @@ impl App {
                     format: kind,
                     conflict: ConflictPolicy::Skip,
                 });
-                self.begin_plan("Planning compression", h);
+                self.begin_plan(Key::PlanningCompress.tr(), h);
             }
             InputKind::NewFile => {
                 let h = self.svc.jobs.plan_mkfile(self.cwd.clone(), iv.text.clone());
-                self.begin_plan("Planning", h);
+                self.begin_plan(Key::PlanningGeneric.tr(), h);
             }
             InputKind::NewTag { items } => match rada_core::platform::tags::validate_name(&iv.text)
             {
@@ -1928,7 +1985,7 @@ impl App {
                             tag: rada_core::platform::Tag::named(&name),
                         },
                     });
-                    self.begin_plan("Planning", h);
+                    self.begin_plan(Key::PlanningGeneric.tr(), h);
                 }
                 Err(e) => {
                     let mut iv = iv;
@@ -1962,7 +2019,7 @@ impl App {
                         .svc
                         .jobs
                         .plan_bulk_rename(items.clone(), iv.text.clone());
-                    self.begin_plan("Planning rename", h);
+                    self.begin_plan(Key::PlanningRename.tr(), h);
                 }
                 Err(e) => {
                     let mut iv = iv;
@@ -2012,7 +2069,7 @@ impl App {
     }
 
     fn yank(&mut self, mode: TransferMode) {
-        if mode == TransferMode::Move && self.refuse_in_archive("cut") {
+        if mode == TransferMode::Move && self.refuse_in_archive(Key::WhatCut.tr()) {
             return;
         }
         let paths = self.targets();
@@ -2023,17 +2080,20 @@ impl App {
         self.clipboard = Some(Clip { mode, paths });
         self.clear_marks();
         let verb = if mode == TransferMode::Copy {
-            "copied"
+            Key::TYankCopied
         } else {
-            "cut"
+            Key::TYankCut
         };
         self.toast(
             ToastKind::Info,
-            format!(
-                "{} {verb} — go to the destination and press {}",
-                fmt::count(n as u64, Key::ItemOne, Key::ItemMany),
-                self.key_for(Action::Paste)
-                    .unwrap_or_else(|| "paste".into()),
+            tf(
+                verb,
+                &[
+                    &fmt::count(n as u64, Key::ItemOne, Key::ItemMany),
+                    &self
+                        .key_for(Action::Paste)
+                        .unwrap_or_else(|| Key::KeyPasteWord.tr().into()),
+                ],
             ),
             3,
         );
@@ -2048,13 +2108,25 @@ impl App {
         let arrow = if spec.reverse { "↓" } else { "↑" };
         self.toast(
             ToastKind::Info,
-            format!("sorted by {} {arrow}", spec.key.label()),
+            tf(
+                Key::TSortedBy,
+                &[
+                    &match spec.key {
+                        SortKey::Name => Key::SortKeyName,
+                        SortKey::Size => Key::SortKeySize,
+                        SortKey::Modified => Key::SortKeyDate,
+                        SortKey::Type => Key::SortKeyType,
+                    }
+                    .tr(),
+                    &arrow,
+                ],
+            ),
             2,
         );
     }
 
     fn start_rename(&mut self) {
-        if self.refuse_if_busy() || self.refuse_in_archive("rename") {
+        if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatRename.tr()) {
             return;
         }
         if let Some(e) = self.current() {
@@ -2074,7 +2146,7 @@ impl App {
     }
 
     fn start_bulk_rename(&mut self) {
-        if self.refuse_if_busy() || self.refuse_in_archive("rename") {
+        if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatRename.tr()) {
             return;
         }
         let items = self.targets();
@@ -2108,7 +2180,7 @@ impl App {
             }
             let label = label.unwrap_or_else(|| {
                 if path == home {
-                    "Home".to_string()
+                    Key::HomeLabel.tr().to_string()
                 } else {
                     path.file_name()
                         .map(rada_core::display::name)
@@ -2142,25 +2214,25 @@ impl App {
             &mut items,
             Path::new(std::path::MAIN_SEPARATOR_STR),
             PaletteKind::Place,
-            Some("System".into()),
+            Some(Key::DiskSystem.tr().into()),
             Some(std::path::MAIN_SEPARATOR_STR.into()),
         );
         for v in &self.volumes {
             let label = v.label.clone().unwrap_or_else(|| {
                 if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
-                    "System".to_string()
+                    Key::DiskSystem.tr().to_string()
                 } else {
                     rada_core::display::path(&v.mount_point)
                 }
             });
             let free = v
                 .available
-                .map(|a| format!(" · {} free", fmt::size(a)))
+                .map(|a| tf(Key::PalFreeDetail, &[&fmt::size(a)]))
                 .unwrap_or_else(|| {
                     if v.responsive {
                         String::new()
                     } else {
-                        " · not responding".into()
+                        Key::PalNotResponding.tr().into()
                     }
                 });
             let detail = format!("{}{free}", rada_core::display::path(&v.mount_point));
@@ -2242,7 +2314,7 @@ impl App {
                 self.demo_auto_run = scene == "progress";
                 let opts = TransferOptions::copy(ConflictPolicy::Skip);
                 let h = self.svc.jobs.plan_transfer(paths, dest, opts);
-                self.begin_plan("Planning copy", h);
+                self.begin_plan(Key::PlanningCopy.tr(), h);
             }
             "history" => {
                 self.modal = Some(Modal::History(HistoryView {
@@ -2280,7 +2352,7 @@ impl App {
     }
 
     fn toggle_bookmark(&mut self) {
-        if self.refuse_in_tag_view("bookmark it") {
+        if self.refuse_in_tag_view(Key::WhatBookmark.tr()) {
             return;
         }
         let cwd = self.cwd.clone();
@@ -2298,9 +2370,9 @@ impl App {
         self.toast(
             ToastKind::Ok,
             if add {
-                "folder bookmarked — it is in the sidebar and in Ctrl+P"
+                Key::TBookmarked.tr()
             } else {
-                "bookmark removed"
+                Key::TBookmarkRemoved.tr()
             },
             3,
         );
@@ -2466,7 +2538,7 @@ impl App {
                         if e.is_undoable() || e.can_retry_undo() {
                             self.start_undo(Some(e.id));
                         } else {
-                            self.toast(ToastKind::Info, "this operation cannot be undone (permanent, already undone, or nothing to undo)", 4);
+                            self.toast(ToastKind::Info, Key::TCannotUndoThis.tr(), 4);
                             self.modal = Some(Modal::History(h));
                         }
                     }

@@ -34,6 +34,9 @@ pub struct UiState {
     /// The details pane (`Alt+P`); `None` until toggled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<bool>,
+    /// The Tag column of the list (View ▾); `None` until toggled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags_column: Option<bool>,
     /// The tabs that were open when rada last ended, and which one was in front.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tabs: Vec<SavedTab>,

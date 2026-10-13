@@ -2,7 +2,6 @@
 
 use rada_core::platform::Tag;
 use ratatui::style::Color;
-use unicode_width::UnicodeWidthStr;
 
 use crate::theme::Theme;
 
@@ -18,13 +17,4 @@ pub fn dots(th: &Theme, tags: &[Tag]) -> Vec<(String, Color)> {
         out.push((format!("+{}", tags.len() - 3), th.text_dim));
     }
     out
-}
-
-/// The cells the dots take, with the space before them.
-pub fn width(dots: &[(String, Color)]) -> usize {
-    if dots.is_empty() {
-        0
-    } else {
-        1 + dots.iter().map(|(s, _)| s.width()).sum::<usize>()
-    }
 }

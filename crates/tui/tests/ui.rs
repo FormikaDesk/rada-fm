@@ -83,7 +83,7 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
     let mut h = H::new(sb, dir.clone(), 120, 30);
     assert_eq!(h.names()[0], "locked");
     h.key(KeyCode::Enter);
-    h.wait("an error toast", |a| a.toast.is_some());
+    h.wait("an error toast", |a| a.current_notice().is_some());
     chmod(&dir.join("locked"), 0o755);
     let s = h.screen();
     // The message is wrapped in a box, so look for its pieces rather than one line.
@@ -134,13 +134,14 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     assert!(s.contains("Copy 1 item"), "{s}");
     // The totals stack a number over its label.
     let lines: Vec<&str> = s.lines().collect();
-    // The text inside the window: after its left border, whatever the pane behind it holds.
-    let inside = |l: &str| l.split('│').nth(1).unwrap_or("").trim_start().to_string();
+    // The label sits under its number, inside the window (the panes behind it have borders
+    // of their own).
     let i = lines
         .iter()
-        .position(|l| inside(l).starts_with("file "))
+        .position(|l| l.contains("  file ") && l.contains("in total"))
         .unwrap_or_else(|| panic!("no 'file' label: {s}"));
-    assert!(inside(lines[i - 1]).starts_with('1'), "{s}");
+    let at = lines[i].find("file").unwrap();
+    assert!(lines[i - 1][at..].starts_with('1'), "{s}");
     assert!(s.contains("What will happen"), "{s}");
     assert!(
         !dest.join("a.txt").exists(),
@@ -149,8 +150,8 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
 
     run_plan_and_wait(&mut h);
     assert_eq!(std::fs::read_to_string(dest.join("a.txt")).unwrap(), "ay");
-    h.wait("toast", |a| a.toast.is_some());
-    let toast = h.app.toast.as_ref().unwrap().text.clone();
+    h.wait("toast", |a| a.current_notice().is_some());
+    let toast = h.app.current_notice().unwrap().text.clone();
     assert_eq!(toast, "Copied 1 file — press u to undo");
     assert!(h.screen().contains("Copied 1 file"));
 
@@ -163,8 +164,7 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
 
     h.keys("u");
     h.wait("nothing to undo", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text.contains("nothing to undo"))
     });
 }
@@ -205,8 +205,7 @@ fn permanent_delete_needs_the_word_yes() {
     assert!(!dir.join("a.txt").exists());
     h.keys("u");
     h.wait("nothing to undo", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text.contains("nothing to undo"))
     });
 }

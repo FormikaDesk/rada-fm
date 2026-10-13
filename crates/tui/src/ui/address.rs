@@ -1,13 +1,16 @@
-//! The address row: back, forward, up and refresh buttons; the path as clickable segments
-//! (or, after Ctrl+L, as a text field with suggestions); and on the right the search field
-//! that filters the folder.
+//! The bar at the top: the buttons back, forward, up and refresh as little round pills; in
+//! the middle one field, a pill holding the path as clickable crumbs, "Search files or type a
+//! command…" and the key that starts it (Ctrl+P); on the right the pill of the view in use.
+//! A thin shaded line runs under the field.
 //!
-//! When the terminal narrows the search field shrinks and goes, then the middle of the path
-//! folds into a clickable "…".
+//! The field is also where typing happens: a path is completed, words filter the files and
+//! offer commands (see `app/address.rs`). When the terminal narrows the search part shrinks
+//! and goes, then the middle of the path folds into a clickable "…".
 
 use std::path::PathBuf;
 
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -15,8 +18,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use super::widgets::{Bar, SPIN, field_ends, pad};
-use crate::app::App;
+use super::soft::{self, Look, RowTone};
+use super::widgets::{Bar, SPIN, pad};
+use crate::app::{App, BarItem, BarMode, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::Action;
@@ -27,9 +31,9 @@ const SEP: &str = " › ";
 fn home_label(app: &App) -> String {
     let mark = icons::ui(app.icons, Glyph::Home);
     if mark.is_empty() {
-        "Home".to_string()
+        Key::HomeLabel.tr().to_string()
     } else {
-        format!("{mark} Home")
+        format!("{mark} {}", Key::HomeLabel.tr())
     }
 }
 
@@ -38,7 +42,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
     // A tag's items are not on a path: one segment, which is the list itself.
     if let Some(tag) = app.tag_view() {
-        return vec![(format!("Tag: {tag}"), app.cwd.clone())];
+        return vec![(tf(Key::TagViewTitle, &[&tag]), app.cwd.clone())];
     }
     let home = app.home();
     let (first, rest) = match app.cwd.strip_prefix(home) {
@@ -151,105 +155,222 @@ fn crumbs(app: &App, budget: usize, field: Style) -> Vec<(Span<'static>, Option<
     out
 }
 
-/// Width of the search field for a terminal of `w` columns.
-fn search_width(w: usize, active: bool) -> usize {
-    let natural = if w >= 140 {
-        32
-    } else if w >= 100 {
-        26
-    } else if w >= 70 {
-        18
-    } else {
-        0
-    };
-    if active { natural.max(14) } else { natural }
+/// The view in use, as the pill on the right of the bar says it.
+fn view_label(app: &App) -> (Glyph, &'static str) {
+    use crate::view::ViewMode;
+    match app.view {
+        ViewMode::Details => (Glyph::Details, Key::ViewDetails.tr()),
+        ViewMode::Icons => (Glyph::Icons, Key::ViewIcons.tr()),
+        ViewMode::Columns => (Glyph::Columns, Key::ViewColumns.tr()),
+    }
 }
 
-/// The search field: an icon, "Search in demo" and the key, or what is being typed.
-fn search_field(app: &App, width: usize) -> Bar<'static> {
+/// The path part of the field in its idle state: the crumbs after a leading space, within
+/// `budget` cells.
+fn idle_crumbs(app: &App, budget: usize, field: Style, bar: &mut Bar<'static>) {
+    bar.push(Span::styled(" ", field));
+    // A folder being read shows a spinner after the path.
+    let spin = if app.is_loading() { 2 } else { 0 };
+    for (span, target) in crumbs(app, budget.saturating_sub(1 + spin), field) {
+        match target {
+            Some(t) => bar.push_hit(span, t),
+            None => bar.push(span),
+        }
+    }
+    if spin > 0 {
+        bar.push(Span::styled(
+            format!(" {}", SPIN[app.spinner % SPIN.len()]),
+            app.th.fg(app.th.warn).patch(field),
+        ));
+    }
+}
+
+/// The key that starts the bar, as a little pill inside the field (the field's colour around).
+fn key_chip(
+    app: &App,
+    look: Look,
+    key: &str,
+    field: Style,
+    target: Option<Target>,
+) -> Vec<Span<'static>> {
     let th = &app.th;
+    let _ = target;
+    soft::pill(
+        th,
+        look,
+        key,
+        th.key_bg,
+        Style::default()
+            .fg(th.key_text)
+            .add_modifier(Modifier::BOLD),
+        field,
+    )
+}
+
+/// The field: a pill of exactly `width` cells.
+fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
+    let th = &app.th;
+    let band = th.band();
     let field = Style::default().bg(th.field);
-    let mut b = Bar::default();
-    if width < 8 {
-        return b;
+    let mut out = Bar::default();
+    if width < 6 {
+        return out;
     }
-    // Rounded ends take a cell each; without the Nerd glyphs the field is a plain rectangle.
-    let ends = field_ends(th, app.icons);
-    let width = width - if ends.is_some() { 2 } else { 0 };
-    if let Some((left, _)) = &ends {
-        b.push_hit(left.clone(), Target::Act(Action::Filter));
-    }
-    let icon = icons::ui(app.icons, Glyph::Search);
-    let lead = if icon.is_empty() {
-        " ".to_string()
-    } else {
-        format!(" {icon} ")
-    };
-    let (text, style) = if let Some(f) = &app.filter {
+    // The ends: half circles in the field's colour on the strip, or a space of the field.
+    let (left_end, right_end) = if look.caps {
+        let edge = band.fg(th.field);
         (
-            format!("{}{}", f.text, if f.editing { "▏" } else { "" }),
-            th.base().add_modifier(Modifier::BOLD),
+            Span::styled(soft::CAP_LEFT, edge),
+            Span::styled(soft::CAP_RIGHT, edge),
         )
     } else {
-        let name = if app.cwd == app.home() {
-            "Home".to_string()
-        } else if let Some(tag) = app.tag_view() {
-            format!("Tag: {tag}")
-        } else {
-            app.cwd
-                .file_name()
-                .map(display::name)
-                .unwrap_or_else(|| display::path(&app.cwd))
-        };
-        (format!("Search in {name}"), th.dim())
+        (Span::styled(" ", field), Span::styled(" ", field))
     };
-    let key = if app.filter.is_none() {
-        app.keymap.hint(Action::Filter).unwrap_or_default()
-    } else {
+    let inner = width - 2;
+    let icon = icons::ui(app.icons, Glyph::Search);
+    let lead = if icon.is_empty() {
         String::new()
-    };
-    let key_w = if key.is_empty() { 0 } else { key.width() + 1 };
-    let room = width.saturating_sub(lead.width() + key_w + 1);
-    // What is typed shows its end; the placeholder shows its beginning.
-    let shown = if app.filter.is_some() {
-        super::widgets::tail(&text, room)
     } else {
-        display::truncate(&text, room)
+        format!("{icon} ")
     };
-    let gap = width.saturating_sub(lead.width() + shown.width() + key_w);
-    b.push_hit(
-        Span::styled(lead, th.dim().patch(field)),
-        Target::Act(Action::Filter),
-    );
-    b.push_hit(
-        Span::styled(shown, style.patch(field)),
-        Target::Act(Action::Filter),
-    );
-    b.push_hit(
-        Span::styled(" ".repeat(gap), field),
-        Target::Act(Action::Filter),
-    );
-    if key_w > 0 {
-        b.push_hit(
-            Span::styled(format!("{key} "), th.faint().patch(field)),
-            Target::Act(Action::Filter),
-        );
+    let mut body = Bar::default();
+
+    if let Some(a) = &app.address {
+        // Typing: an icon, the text with its cursor, and the way out.
+        let esc = key_chip(app, look, "Esc", field, None);
+        let esc_w: usize = esc.iter().map(|s| s.content.width()).sum();
+        body.push(Span::styled(format!(" {lead}"), th.dim().patch(field)));
+        let room = inner.saturating_sub(1 + lead.width() + esc_w + 2).max(2);
+        let before: String = a.text.chars().take(a.cursor).collect();
+        let after_c: String = a.text.chars().skip(a.cursor).collect();
+        if a.fresh {
+            // Everything selected: the first key typed replaces it.
+            let shown = display::truncate(&a.text, room.saturating_sub(1));
+            body.push(Span::styled(
+                shown,
+                th.base().patch(Style::default().bg(th.selection)),
+            ));
+            body.push(Span::styled(
+                "▏",
+                th.accent_style().add_modifier(Modifier::BOLD).patch(field),
+            ));
+        } else if a.text.is_empty() {
+            body.push(Span::styled(
+                "▏",
+                th.accent_style().add_modifier(Modifier::BOLD).patch(field),
+            ));
+            body.push(Span::styled(
+                display::truncate(Key::BarPlaceholder.tr(), room.saturating_sub(1)),
+                th.faint().patch(field),
+            ));
+        } else {
+            // Keep the cursor in view: cut the front when the text is longer than the field.
+            let mut head = before.clone();
+            while head.width() + 1 > room && !head.is_empty() {
+                head.remove(0);
+            }
+            let tail_room = room.saturating_sub(head.width() + 1);
+            body.push(Span::styled(head, th.base().patch(field)));
+            body.push(Span::styled(
+                "▏",
+                th.accent_style().add_modifier(Modifier::BOLD).patch(field),
+            ));
+            body.push(Span::styled(
+                display::truncate(&after_c, tail_room.max(1)),
+                th.base().patch(field),
+            ));
+        }
+        let used = body.width();
+        body.push(Span::styled(
+            " ".repeat(inner.saturating_sub(used + esc_w + 1)),
+            field,
+        ));
+        body.push_hits(esc, Target::Address);
+        body.push(Span::styled(" ", field));
+    } else {
+        // Idle: the crumbs, a thin rule, what to search for, and Ctrl+P.
+        let key = app.keymap.hint(Action::Palette).unwrap_or_default();
+        let chip = if key.is_empty() {
+            Vec::new()
+        } else {
+            key_chip(app, look, &key, field, None)
+        };
+        let chip_w: usize = chip.iter().map(|s| s.content.width()).sum();
+        let chip_room = if chip_w > 0 { chip_w + 1 } else { 0 };
+        let natural = natural_width(&segments(app)) + 1;
+        // The words of the search are worth keeping whole before the path is: the path folds
+        // its middle into a "…" first, down to its beginning and its last folder.
+        let whole = lead.width() + Key::BarPlaceholder.tr().width();
+        let sep_w = 3;
+        let avail = inner.saturating_sub(chip_room);
+        let (crumb_w, search_w) = if avail >= natural + sep_w + whole {
+            (natural, avail - natural - sep_w)
+        } else if avail >= 34 + sep_w + whole {
+            (avail - sep_w - whole, whole)
+        } else if avail >= 30 + sep_w + 14 {
+            // Narrower still: the words are cut short.
+            (avail - sep_w - 14, 14)
+        } else {
+            (avail, 0)
+        };
+        idle_crumbs(app, crumb_w, field, &mut body);
+        if search_w > 0 {
+            body.push(Span::styled(" │ ", th.faint().patch(field)));
+            let (text, style) = match &app.filter {
+                Some(f) => (
+                    format!("{}{}", icons::ui(app.icons, Glyph::Filter), f.text),
+                    th.base().add_modifier(Modifier::BOLD),
+                ),
+                None => (format!("{lead}{}", Key::BarPlaceholder.tr()), th.dim()),
+            };
+            let target = Target::Act(Action::Filter);
+            let used = body.width();
+            let shown = display::truncate(&text, search_w);
+            let pad_to = crumb_w.max(used.saturating_sub(sep_w)) + sep_w + search_w;
+            body.push_hit(
+                Span::styled(shown.clone(), style.patch(field)),
+                target.clone(),
+            );
+            let drawn = body.width();
+            if drawn < pad_to {
+                body.push_hit(Span::styled(" ".repeat(pad_to - drawn), field), target);
+            }
+        }
+        let used = body.width();
+        body.push(Span::styled(
+            " ".repeat(inner.saturating_sub(used + chip_room)),
+            field,
+        ));
+        if chip_w > 0 {
+            body.push_hits(chip, Target::Act(Action::Palette));
+            body.push(Span::styled(" ", field));
+        }
     }
-    if let Some((_, right)) = ends {
-        b.push_hit(right, Target::Act(Action::Filter));
+    // Pad or cut to the inner width exactly.
+    let w = body.width();
+    if w > inner {
+        body.clip(inner);
+    } else if w < inner {
+        body.push(Span::styled(" ".repeat(inner - w), field));
     }
-    b
+    out.push(left_end);
+    out.append(body);
+    out.push(right_end);
+    out
 }
 
 pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
+    let look = Look::of(app);
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
     let set = app.icons;
-    let field = Style::default().bg(th.field);
 
-    // Buttons: back, forward, up, refresh. Unusable ones are not clickable.
+    // The line under the field is the second row of the area, when there is one.
+    let row = Rect { height: 1, ..area };
+
+    // Buttons: back, forward, up, refresh, as little pills. Unusable ones are not clickable.
     let mut left = Bar::default();
     left.push(Span::styled(" ", band));
     let buttons = [
@@ -263,123 +384,110 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
         if narrow && matches!(glyph, Glyph::Back | Glyph::Forward) {
             continue;
         }
-        let text = format!(" {} ", icons::ui(set, glyph));
+        let g = icons::ui(set, glyph);
         if enabled {
-            left.push_hit(
-                Span::styled(text, th.base().patch(Style::default().bg(th.button))),
+            left.push_hits(
+                soft::pill(&th, look, g, th.button, th.base(), band),
                 Target::Act(action),
             );
         } else {
-            left.push(Span::styled(text, th.faint().patch(band)));
+            left.push_hits(
+                soft::pill(&th, look, g, th.button, th.faint(), band),
+                Target::Window,
+            );
         }
         left.push(Span::styled(" ", band));
     }
+    left.push(Span::styled(" ", band));
 
-    let search_w = search_width(w, app.filter.is_some());
-    let search = search_field(app, search_w);
-    let after = if search_w > 0 { 2 } else { 1 };
-    let field_w = w.saturating_sub(left.width() + search.width() + after);
-    if field_w < 6 {
-        left.render(f, &mut app.hits, area);
+    // On the right, the view in use (it opens the menu of views); not on a narrow terminal.
+    let mut right = Bar::default();
+    if w >= 100 {
+        let (glyph, name) = view_label(app);
+        let g = icons::ui(set, glyph);
+        let label = if g.is_empty() {
+            name.to_string()
+        } else {
+            format!("{g} {name}")
+        };
+        right.push(Span::styled(" ", band));
+        right.push_hits(
+            soft::pill(&th, look, &label, th.button, th.base(), band),
+            Target::Menu(MenuKind::View),
+        );
+        right.push(Span::styled(" ", band));
+    } else {
+        right.push(Span::styled(" ", band));
+    }
+
+    let field_w = w.saturating_sub(left.width() + right.width());
+    if field_w < 8 {
+        left.render(f, &mut app.hits, row);
         return;
     }
     let field_x = area.x + left.width() as u16;
-
-    // The path field: rounded ends take a cell each (see `field_ends`); `field_w` is all of it.
-    let ends = field_ends(&th, set);
-    let field_w = field_w - if ends.is_some() { 2 } else { 0 };
-    let mut path_bar = Bar::default();
-    if let Some((left, _)) = &ends {
-        path_bar.push(left.clone());
-    }
+    let field = field_bar(app, look, field_w);
     let field_rect = Rect {
         x: field_x,
         y: area.y,
-        width: (field_w + if ends.is_some() { 2 } else { 0 }) as u16,
+        width: field_w as u16,
         height: 1,
     };
-    if let Some(a) = &app.address {
-        // A text field: what is typed, with the cursor.
-        let before: String = a.text.chars().take(a.cursor).collect();
-        let after_c: String = a.text.chars().skip(a.cursor).collect();
-        let room = field_w.saturating_sub(2);
-        // Keep the cursor in view: cut the front when the text is longer than the field.
-        let mut head = before.clone();
-        while head.width() + 1 > room && !head.is_empty() {
-            head.remove(0);
-        }
-        let tail_room = room.saturating_sub(head.width() + 1);
-        let tail = display::truncate(&after_c, tail_room.max(1));
-        path_bar.push(Span::styled(" ", field));
-        path_bar.push(Span::styled(head, th.base().patch(field)));
-        path_bar.push(Span::styled(
-            "▏",
-            th.accent_style().add_modifier(Modifier::BOLD).patch(field),
-        ));
-        path_bar.push(Span::styled(tail, th.base().patch(field)));
-    } else {
-        path_bar.push(Span::styled(" ", field));
-        let loading = app.is_loading();
-        let spin_w = if loading { 2 } else { 0 };
-        for (span, target) in crumbs(app, field_w.saturating_sub(2 + spin_w), field) {
-            match target {
-                Some(t) => path_bar.push_hit(span, t),
-                None => path_bar.push(span),
-            }
-        }
-        if loading {
-            path_bar.push(Span::styled(
-                format!(" {}", SPIN[app.spinner % SPIN.len()]),
-                th.fg(th.warn).patch(field),
-            ));
-        }
-    }
-    let used = path_bar.width();
-    let used = used - if ends.is_some() { 1 } else { 0 };
-    path_bar.push(Span::styled(
-        " ".repeat(field_w.saturating_sub(used)),
-        field,
-    ));
-    if let Some((_, right)) = ends {
-        path_bar.push(right);
-    }
-    // A click anywhere in the field that is not a segment edits the address.
+    app.bar_field = field_rect;
+    // A click anywhere in the field that is not a segment starts the typing.
     if app.address.is_none() {
         app.hits.add(field_rect, Target::Address);
     }
-
     let mut bar = left;
-    bar.append(path_bar);
-    bar.push(Span::styled(" ", band));
-    if search_w > 0 {
-        bar.append(search);
-        bar.push(Span::styled(" ", band));
-    }
+    bar.append(field);
+    bar.append(right);
     let total = bar.width();
     if total < w {
         bar.push(Span::styled(" ".repeat(w - total), band));
     }
-    bar.render(f, &mut app.hits, area);
+    bar.render(f, &mut app.hits, row);
+
+    // The thin line under the field.
+    if area.height >= 2 {
+        let line = Rect {
+            x: field_x,
+            y: area.y + 1,
+            width: field_w as u16,
+            height: 1,
+        };
+        soft::gradient_line(f.buffer_mut(), line, &th, look);
+    }
 }
 
-/// The suggestions of the address field, drawn over what is below it.
+/// What is offered under the field: the subfolders of a path being typed, or the commands and
+/// places that match the words typed.
 pub fn draw_suggestions(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
+    match app.address.as_ref().map(|a| a.mode()) {
+        Some(BarMode::Search) => draw_bar_hits(f, app, row, screen),
+        _ => draw_paths(f, app, row, screen),
+    }
+}
+
+fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     let names = app.address_suggestions();
-    if names.is_empty() || row.y + 1 >= screen.height {
+    if names.is_empty() || row.y + row.height >= screen.height {
         return;
     }
     let th = app.th.clone();
     let widest = names.iter().map(|n| n.width()).max().unwrap_or(8);
     let w = (widest + 4).clamp(24, 60).min(screen.width as usize) as u16;
-    // Under the field: after the buttons, which are four cells each.
-    let x = (row.x + 12).min(screen.width.saturating_sub(w));
+    // Under the field: after the buttons.
+    let x = (app.bar_field.x + 2).min(screen.width.saturating_sub(w));
     let selected = app.address.as_ref().and_then(|a| a.selected);
     let area = Rect {
         x,
-        y: row.y + 1,
+        y: row.y + row.height,
         width: w,
-        height: (names.len() as u16).min(screen.height - row.y - 1),
+        height: (names.len() as u16).min(screen.height.saturating_sub(row.y + row.height)),
     };
+    if area.height == 0 {
+        return;
+    }
     f.render_widget(Clear, area);
     let lines: Vec<Line> = names
         .iter()
@@ -413,6 +521,108 @@ pub fn draw_suggestions(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     }
 }
 
+fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
+    let th = app.th.clone();
+    let look = Look::of(app);
+    let Some(a) = &app.address else { return };
+    if a.hits.is_empty() || row.y + row.height >= screen.height {
+        return;
+    }
+    let rows: Vec<(String, String, String, Vec<usize>)> = a
+        .hits
+        .iter()
+        .map(|h| match &h.item {
+            BarItem::Command(action) => (
+                action.label().to_string(),
+                app.keymap.hint(*action).unwrap_or_default(),
+                Key::BarCommand.tr().to_string(),
+                h.label_pos.clone(),
+            ),
+            BarItem::Place(item) => (
+                item.label.clone(),
+                item.detail.clone(),
+                Key::BarGoTo.tr().to_string(),
+                h.label_pos.clone(),
+            ),
+        })
+        .collect();
+    let selected = a.hit_selected;
+    let label_w = rows
+        .iter()
+        .map(|r| r.0.width())
+        .max()
+        .unwrap_or(10)
+        .clamp(14, 30);
+    let detail_w = rows
+        .iter()
+        .map(|r| r.1.width())
+        .max()
+        .unwrap_or(0)
+        .clamp(0, 32);
+    let tag_w = 9usize;
+    let w = (label_w + detail_w + tag_w + 10).min(screen.width as usize - 2) as u16;
+    let x = (app.bar_field.x + 2).min(screen.width.saturating_sub(w));
+    let height = (rows.len() as u16).min(screen.height.saturating_sub(row.y + row.height));
+    let area = Rect {
+        x,
+        y: row.y + row.height,
+        width: w,
+        height,
+    };
+    f.render_widget(Clear, area);
+    let iw = area.width as usize;
+    let mut lines: Vec<Line> = Vec::new();
+    for (i, (label, detail, tag, pos)) in rows.iter().enumerate().take(height as usize) {
+        let sel = selected == Some(i);
+        let row_style = Style::default().bg(th.field);
+        let mut spans = vec![Span::styled(" ", row_style)];
+        let mut used = 1;
+        let shown = display::truncate(label, label_w);
+        for (ci, c) in shown.chars().enumerate() {
+            let hl = pos.contains(&ci);
+            let st = if hl {
+                th.accent_style().add_modifier(Modifier::BOLD)
+            } else {
+                th.base()
+            };
+            let st = if sel {
+                st.add_modifier(Modifier::BOLD)
+            } else {
+                st
+            };
+            spans.push(Span::styled(c.to_string(), st.patch(row_style)));
+            used += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+        }
+        let gap = (1 + label_w + 2).saturating_sub(used);
+        spans.push(Span::styled(" ".repeat(gap), row_style));
+        let detail = display::truncate(detail, detail_w);
+        spans.push(Span::styled(
+            pad(&detail, detail_w + 2),
+            th.dim().patch(row_style),
+        ));
+        let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
+        let tail = iw.saturating_sub(drawn + tag.width() + 2);
+        spans.push(Span::styled(" ".repeat(tail), row_style));
+        spans.push(Span::styled(
+            format!("{tag}  "),
+            th.faint().patch(row_style),
+        ));
+        lines.push(Line::from(spans));
+    }
+    f.render_widget(Paragraph::new(lines), area);
+    for (i, _) in rows.iter().enumerate().take(height as usize) {
+        let r = Rect {
+            y: area.y + i as u16,
+            height: 1,
+            ..area
+        };
+        if selected == Some(i) {
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
+        }
+        app.hits.add(r, Target::BarHit(i));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,14 +635,5 @@ mod tests {
             ("bc".to_string(), PathBuf::from("/h/a/bc")),
         ];
         assert_eq!(natural_width(&segs), 1 + 1 + 2 + 2 * SEP.width());
-    }
-
-    #[test]
-    fn the_search_field_shrinks_with_the_terminal() {
-        assert!(search_width(170, false) > search_width(120, false));
-        assert!(search_width(120, false) > search_width(80, false));
-        assert_eq!(search_width(60, false), 0);
-        // While it is in use it keeps enough room to type.
-        assert!(search_width(60, true) >= 14);
     }
 }

@@ -152,9 +152,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("new folder", "ctrl+n", |h| {
             matches!(h.app.modal, Some(Modal::Input(_)))
         }),
-        ("palette", "m", |h| {
-            matches!(h.app.modal, Some(Modal::Palette(_)))
-        }),
+        ("commands", "m", |h| h.app.address.is_some()),
         ("address", "ctrl+l", |h| h.app.address.is_some()),
         ("address", "alt+d", |h| h.app.address.is_some()),
         ("new folder", "ctrl+shift+n", |h| {
@@ -170,11 +168,9 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("new tab", "ctrl+t", |h| h.app.tab_count() == 2),
         ("details", "alt+p", |h| h.app.details == Some(false)),
         ("view", "v", |h| h.app.view == rada_tui::ViewMode::Icons),
-        ("palette", "ctrl+p", |h| {
-            matches!(h.app.modal, Some(Modal::Palette(_)))
-        }),
-        ("filter", "/", |h| h.app.filter.is_some()),
-        ("filter", "ctrl+f", |h| h.app.filter.is_some()),
+        ("commands", "ctrl+p", |h| h.app.address.is_some()),
+        ("search", "/", |h| h.app.address.is_some()),
+        ("search", "ctrl+f", |h| h.app.address.is_some()),
         ("help", "?", |h| matches!(h.app.modal, Some(Modal::Help))),
         ("help", "F1", |h| matches!(h.app.modal, Some(Modal::Help))),
         ("history", "U", |h| {
@@ -207,10 +203,10 @@ fn scanning(h: &H) -> bool {
 }
 fn undoing(h: &H) -> bool {
     // "nothing to undo" is a plan job too: either a scanning window or the toast.
-    scanning(h) || h.app.toast.is_some()
+    scanning(h) || h.app.current_notice().is_some()
 }
 fn redoing(h: &H) -> bool {
-    scanning(h) || h.app.toast.is_some()
+    scanning(h) || h.app.current_notice().is_some()
 }
 
 #[test]
@@ -316,14 +312,28 @@ fn redo_replans_the_undone_operation_and_asks_for_confirmation_again() {
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     assert!(dest.join("a.txt").exists());
+    assert_eq!(
+        h.app.current_notice().unwrap().text,
+        "1 item copied to dest",
+        "the copy says what it did"
+    );
+    // Seven seconds pass (the clock of the cards is moved on, nobody waits for it).
+    h.app.advance_notices(std::time::Duration::from_secs(7));
+    assert!(
+        h.app.current_notice().is_none(),
+        "the card has gone by itself"
+    );
 
     h.press("ctrl+z");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     assert!(!dest.join("a.txt").exists());
+    let said = h.app.current_notice().unwrap().clone();
+    assert_eq!(said.text, "Undone");
     assert_eq!(
-        h.app.toast.as_ref().unwrap().text,
-        "Undone — press Ctrl+R to redo"
+        said.action,
+        rada_tui::app::NoticeAction::Redo,
+        "after an undo the card offers to redo"
     );
 
     h.press("ctrl+y");
@@ -334,8 +344,7 @@ fn redo_replans_the_undone_operation_and_asks_for_confirmation_again() {
     // Nothing left to redo.
     h.press("ctrl+y");
     h.wait("toast", |a| {
-        a.toast
-            .as_ref()
+        a.current_notice()
             .is_some_and(|t| t.text.contains("nothing to redo"))
     });
 }
@@ -347,8 +356,9 @@ fn done_messages_say_what_happened_and_how_to_undo() {
     h.keys("jjd");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
-    let t = h.app.toast.as_ref().unwrap().text.clone();
-    assert_eq!(t, "Moved 1 item to the trash — press u to undo");
+    let n = h.app.current_notice().unwrap().clone();
+    assert_eq!(n.text, "1 item moved to the trash");
+    assert_eq!(n.action, rada_tui::app::NoticeAction::Undo);
 }
 
 // ---------------------------------------------------------------------------------- mouse
@@ -442,13 +452,9 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     h.wait("parent", |a| a.cwd.ends_with("dir") && !a.is_loading());
     // The top bar's "Go to" button and the bottom bar's hints run their action.
     h.click(&Target::Act(Action::Palette));
-    assert!(
-        matches!(h.app.modal, Some(Modal::Palette(_))),
-        "{}",
-        h.screen()
-    );
+    assert!(h.app.address.is_some(), "{}", h.screen());
     h.key(crossterm::event::KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.address.is_none());
     h.click(&Target::Act(Action::Rename));
     assert!(
         matches!(h.app.modal, Some(Modal::Input(_))),
@@ -576,27 +582,46 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
 }
 
 #[test]
-fn palette_rows_are_clickable() {
+fn the_commands_offered_under_the_field_are_clickable() {
     let (sb, dir) = files();
     let mut h = H::new(sb, dir, 120, 30);
     h.press("ctrl+p");
+    h.keys("renam");
+    let s = h.screen();
+    assert!(s.contains("Rename") && s.contains("command"), "{s}");
+    // The best match comes first: a click on it runs it, as its key would.
+    h.click(&Target::BarHit(0));
+    assert!(
+        matches!(h.app.modal, Some(Modal::Input(_))),
+        "{}",
+        h.screen()
+    );
+    assert!(h.app.address.is_none(), "the field closed");
+    assert!(h.app.filter.is_none(), "and took its filter off");
+}
+
+#[test]
+fn places_are_offered_too_and_a_click_goes_there() {
+    let (sb, dir) = files();
+    let target = sb.path("w/dir");
+    let mut h = H::new(sb, dir, 120, 30);
+    h.app.paths.bookmarks.push(target.clone());
+    h.press("ctrl+p");
     h.keys("dir");
     let s = h.screen();
-    assert!(s.contains("dir"), "{s}");
-    // Which result comes first is the fuzzy search's business and depends on the letters of
-    // the folder the test runs in (any path with a d, an i and an r after it matches "dir"):
-    // the row of the folder `dir` is looked for, not assumed.
-    let row = match &h.app.modal {
-        Some(Modal::Palette(p)) => p
-            .hits
-            .iter()
-            .position(|hit| p.items[hit.item].path.ends_with("dir"))
-            .expect("the folder dir is among the results"),
-        _ => panic!("{s}"),
-    };
-    h.click(&Target::PaletteRow(row));
-    h.wait("moved", |a| a.cwd.ends_with("dir") && !a.is_loading());
-    assert!(h.app.modal.is_none());
+    assert!(s.contains("go to"), "{s}");
+    let row = h
+        .app
+        .address
+        .as_ref()
+        .unwrap()
+        .hits
+        .iter()
+        .position(|hit| matches!(&hit.item, rada_tui::app::BarItem::Place(p) if p.path == target))
+        .expect("the bookmark is among the suggestions");
+    h.click(&Target::BarHit(row));
+    h.wait("moved", |a| a.cwd == target && !a.is_loading());
+    assert!(h.app.address.is_none());
 }
 
 #[test]
@@ -755,8 +780,8 @@ fn a_bad_request_is_reported_and_the_browser_still_works() {
             sources: vec!["relative/path".into()],
         },
     );
-    h.wait("an error", |a| a.toast.is_some());
-    assert!(h.app.toast.as_ref().unwrap().text.contains("absolute"));
+    h.wait("an error", |a| a.current_notice().is_some());
+    assert!(h.app.current_notice().unwrap().text.contains("absolute"));
     assert!(h.app.modal.is_none());
     h.keys("j");
     assert_eq!(h.cursor_name(), "a.txt");

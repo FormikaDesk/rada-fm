@@ -64,11 +64,12 @@ pub enum Section {
 impl Section {
     /// The heading over the section, if it has one.
     pub fn title(self) -> Option<&'static str> {
+        use rada_core::i18n::Key;
         match self {
             Section::Home | Section::Trash => None,
-            Section::Pinned => Some("PINNED"),
-            Section::Devices => Some("DEVICES"),
-            Section::Tags => Some("TAGS"),
+            Section::Pinned => Some(Key::SecPinned.tr()),
+            Section::Devices => Some(Key::SecDevices.tr()),
+            Section::Tags => Some(Key::SecTags.tr()),
         }
     }
 }
@@ -272,7 +273,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
 pub fn device_name(v: &rada_core::platform::Volume) -> String {
     v.label.clone().unwrap_or_else(|| {
         if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
-            "System".to_string()
+            rada_core::i18n::Key::DiskSystem.tr().to_string()
         } else {
             base_name(&v.mount_point)
         }

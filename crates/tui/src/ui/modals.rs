@@ -2,8 +2,8 @@
 //! One window at a time, centred, with everything behind it dimmed.
 
 use rada_core::display;
-use rada_core::i18n::{Key, tf};
 use rada_core::fs::FileKind;
+use rada_core::i18n::{Key, tf};
 use rada_core::journal::{EntryStatus, UndoState};
 use rada_core::ops::{ConflictPolicy, ItemAction, OpKind, RunStatus, Severity, Step};
 use ratatui::Frame;
@@ -122,7 +122,13 @@ fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &
     ];
     out.extend(lines.into_iter().skip(scroll).take(rows));
     out.push(Line::raw(""));
-    out.push(Line::from(vec![button(th, "Esc", Key::BtnClose.tr(), None, true)]));
+    out.push(Line::from(vec![button(
+        th,
+        "Esc",
+        Key::BtnClose.tr(),
+        None,
+        true,
+    )]));
     f.render_widget(Paragraph::new(out), inner);
     hits.add(
         Rect {
@@ -235,10 +241,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 ],
             );
             lines.push(Line::from(btns));
-            lines.push(Line::from(Span::styled(
-                Key::AbortKeeps.tr(),
-                th.faint(),
-            )));
+            lines.push(Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint())));
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::Input(iv) => draw_input(f, &th, iv, area),
@@ -460,21 +463,33 @@ fn draw_plan(
             if t.files > 0 {
                 stats.push((
                     fmt::thousands(t.files),
-                    if t.files == 1 { Key::FileOne.tr() } else { Key::FileMany.tr() },
+                    if t.files == 1 {
+                        Key::FileOne.tr()
+                    } else {
+                        Key::FileMany.tr()
+                    },
                     false,
                 ));
             }
             if t.dirs > 0 {
                 stats.push((
                     fmt::thousands(t.dirs),
-                    if t.dirs == 1 { Key::FolderOne.tr() } else { Key::FolderMany.tr() },
+                    if t.dirs == 1 {
+                        Key::FolderOne.tr()
+                    } else {
+                        Key::FolderMany.tr()
+                    },
                     false,
                 ));
             }
             if t.symlinks > 0 {
                 stats.push((
                     fmt::thousands(t.symlinks),
-                    if t.symlinks == 1 { Key::LinkOne.tr() } else { Key::LinkMany.tr() },
+                    if t.symlinks == 1 {
+                        Key::LinkOne.tr()
+                    } else {
+                        Key::LinkMany.tr()
+                    },
                     false,
                 ));
             }
@@ -545,7 +560,10 @@ fn draw_plan(
     // How name clashes are settled: a segmented control.
     if !matches!(pv.replan, Replan::None) {
         seg_line = Some(body.len());
-        let mut seg: Vec<Span> = vec![Span::styled(format!("{}   ", Key::PolicyAsk.tr()), th.dim())];
+        let mut seg: Vec<Span> = vec![Span::styled(
+            format!("{}   ", Key::PolicyAsk.tr()),
+            th.dim(),
+        )];
         for p in [
             ConflictPolicy::Skip,
             ConflictPolicy::KeepBoth,
@@ -569,7 +587,10 @@ fn draw_plan(
                 seg.push(Span::styled(format!(" {label} "), th.dim()));
             }
         }
-        seg.push(Span::styled(format!("   {}", Key::PolicyChange.tr()), th.faint()));
+        seg.push(Span::styled(
+            format!("   {}", Key::PolicyChange.tr()),
+            th.faint(),
+        ));
         seg_spans = seg.clone();
         body.push(Line::from(seg));
         if plan.policy == ConflictPolicy::Overwrite {
@@ -692,7 +713,10 @@ fn draw_plan(
         let n = plan.steps.len() as u64;
         body.push(Line::from(vec![
             Span::styled(
-                tf(Key::PlanWhatN, &[&fmt::count(n, Key::StepOne, Key::StepMany)]),
+                tf(
+                    Key::PlanWhatN,
+                    &[&fmt::count(n, Key::StepOne, Key::StepMany)],
+                ),
                 th.dim().add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -747,7 +771,10 @@ fn draw_plan(
     let mut buttons: Vec<Span> = Vec::new();
     let mut button_hits: Vec<(usize, Target)> = Vec::new();
     if pv.replanning.is_some() {
-        buttons.push(Span::styled(format!("{}   ", Key::Replanning.tr()), th.fg(th.warn)));
+        buttons.push(Span::styled(
+            format!("{}   ", Key::Replanning.tr()),
+            th.fg(th.warn),
+        ));
     }
     if blocked {
         buttons.push(Span::styled(
@@ -764,7 +791,10 @@ fn draw_plan(
     button_hits.push((buttons.len(), Target::Key(KeyCode::Esc)));
     buttons.push(button(th, "Esc", Key::BtnCancel.tr(), None, true));
     if !typed {
-        buttons.push(Span::styled(format!("      {}", Key::ArrowsScroll.tr()), th.faint()));
+        buttons.push(Span::styled(
+            format!("      {}", Key::ArrowsScroll.tr()),
+            th.faint(),
+        ));
     }
     foot.push(Line::raw(""));
     foot.push(Line::from(buttons.clone()));
@@ -1041,10 +1071,7 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
             " ",
             Style::default().add_modifier(Modifier::REVERSED),
         ));
-        input.push(Span::styled(
-            Key::PaletteHint.tr(),
-            th.faint(),
-        ));
+        input.push(Span::styled(Key::PaletteHint.tr(), th.faint()));
     } else {
         input.push(Span::styled(before, th.base()));
         input.push(Span::styled(
@@ -1075,10 +1102,7 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
     let start = p.selected.saturating_sub(visible.saturating_sub(1));
     let mut lines: Vec<Line> = Vec::new();
     if p.hits.is_empty() {
-        lines.push(Line::from(Span::styled(
-            Key::PaletteNone.tr(),
-            th.dim(),
-        )));
+        lines.push(Line::from(Span::styled(Key::PaletteNone.tr(), th.dim())));
     }
     for (i, hit) in p.hits.iter().enumerate().skip(start).take(visible) {
         let it = &p.items[hit.item];
@@ -1351,10 +1375,7 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
         hits.add(box_area, Target::OpenWithAlways);
     }
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            Key::OnlyInRada.tr(),
-            th.faint(),
-        ))),
+        Paragraph::new(Line::from(Span::styled(Key::OnlyInRada.tr(), th.faint()))),
         Rect {
             y: foot_y + 1,
             height: 1,
@@ -1390,7 +1411,12 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         InputKind::ExtractTo { .. } => (Key::VExtract.tr(), Key::InExtractHint.tr().into()),
         InputKind::Compress { format, .. } => {
             use rada_core::archive::ArchiveKind::*;
-            let all = [(Zip, "zip"), (TarGz, "tar.gz"), (TarZst, "tar.zst"), (TarXz, "tar.xz")];
+            let all = [
+                (Zip, "zip"),
+                (TarGz, "tar.gz"),
+                (TarZst, "tar.zst"),
+                (TarXz, "tar.xz"),
+            ];
             let formats = all
                 .iter()
                 .map(|(k, name)| {
@@ -1523,9 +1549,7 @@ fn draw_history(
         };
         let (tag, tag_color) = match (&e.undo_state, e.reversible) {
             (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
-            (UndoState::Partial { remaining }, _) => {
-                (tf(Key::HistPartly, &[remaining]), th.muted)
-            }
+            (UndoState::Partial { remaining }, _) => (tf(Key::HistPartly, &[remaining]), th.muted),
             (_, false) => (Key::HistPermanent.tr().to_string(), th.error),
             _ if e.undo_steps == 0 => (Key::HistNothing.tr().to_string(), th.muted),
             _ => (Key::HistCanUndo.tr().to_string(), th.accent),
@@ -1562,7 +1586,13 @@ fn draw_history(
         lines.push(Line::raw(""));
     }
     let btns = vec![
-        button(th, "Enter", Key::BtnUndoSelected.tr(), Some(th.accent), true),
+        button(
+            th,
+            "Enter",
+            Key::BtnUndoSelected.tr(),
+            Some(th.accent),
+            true,
+        ),
         Span::raw("  "),
         button(th, "Esc", Key::BtnClose.tr(), None, true),
     ];
@@ -1615,7 +1645,10 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
             pad("Vim", vim_w),
             th.accent_style().add_modifier(Modifier::BOLD),
         ),
-        Span::styled(Key::HelpClassic.tr(), th.accent_style().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            Key::HelpClassic.tr(),
+            th.accent_style().add_modifier(Modifier::BOLD),
+        ),
     ]));
     for g in Group::ALL {
         lines.push(Line::raw(""));

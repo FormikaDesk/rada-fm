@@ -200,11 +200,24 @@ fn rename_prompt() {
     windows,
     ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
 )]
-fn palette_modal() {
+fn the_commands_offered_under_the_field() {
     let mut h = scene(110, 30);
     h.press("ctrl+p");
-    h.keys("projec");
-    insta::assert_snapshot!("palette_110x30", shot(&mut h));
+    h.keys("compr");
+    insta::assert_snapshot!("bar_commands_110x30", shot(&mut h));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
+fn the_folders_offered_under_the_field_while_a_path_is_typed() {
+    let mut h = scene(110, 30);
+    h.press("ctrl+l");
+    h.keys("~/de");
+    h.wait("the subfolders", |a| !a.address_suggestions().is_empty());
+    insta::assert_snapshot!("bar_path_110x30", shot(&mut h));
 }
 
 #[test]
@@ -274,11 +287,12 @@ fn rows_stay_aligned_with_cjk_emoji_and_very_long_names() {
         let rows: Vec<&&str> = body.iter().filter(|l| !l.trim().is_empty()).collect();
         assert!(rows.len() >= 8, "{w}: {s}");
         // Whatever the names contain (wide glyphs, emoji, very long text), the columns
-        // line up: with the navigation pane the divider sits in one column on every row.
+        // line up: with the navigation pane its right border sits in one column on every row.
         if w >= 60 {
             let cols: Vec<usize> = body
                 .iter()
-                .map(|l| l.split('│').next().unwrap().width())
+                .filter(|l| l.starts_with('│'))
+                .map(|l| l.split('│').nth(1).unwrap().width())
                 .collect();
             assert!(
                 cols.iter().all(|c| *c == cols[0]),

@@ -29,7 +29,7 @@ impl Place {
     pub fn name(&self) -> String {
         match self.kind {
             PlaceKind::Home => "Home".into(),
-            PlaceKind::Trash => "Trash".into(),
+            PlaceKind::Trash => crate::i18n::Key::PlaceTrash.tr().into(),
             PlaceKind::ICloud => "iCloud Drive".into(),
             _ => self
                 .path

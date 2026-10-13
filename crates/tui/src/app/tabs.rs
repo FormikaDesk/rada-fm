@@ -148,10 +148,10 @@ impl App {
     pub fn tab_title(&self, i: usize) -> String {
         let p = self.tab_cwd(i);
         if p == self.home() {
-            return "Home".to_string();
+            return Key::HomeLabel.tr().to_string();
         }
         if let Some(tag) = rada_core::tagsearch::view_name(p) {
-            return format!("Tag: {tag}");
+            return tf(Key::TagViewTitle, &[&tag]);
         }
         p.file_name()
             .map(rada_core::display::name)
@@ -188,7 +188,7 @@ impl App {
     /// A new tab, to the right of the front one, in the folder the front one is in.
     pub fn new_tab(&mut self) {
         if self.tabs.len() >= MAX_TABS {
-            self.toast(ToastKind::Warn, format!("{MAX_TABS} tabs is the limit"), 3);
+            self.toast(ToastKind::Warn, tf(Key::TTabLimit, &[&MAX_TABS]), 3);
             return;
         }
         if let Some(name) = self.cursor_name() {

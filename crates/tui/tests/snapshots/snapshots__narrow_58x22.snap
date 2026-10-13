@@ -2,25 +2,25 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ‹ 1/1 ›  projects  +                      ? Help ▾
-  ←   →   ↑   ⟳   ⌂ Home › demo › projects
-  +▾  │ ✂   ⧉   ⎘   ✎   ▣   ✗ │ ⇅   ≣ │ ↶                ⋯
- ☐   Name ↑                                          Size
- ☐ ▸ data
- ☐ ▸ src
- ☐ ▸ 目录
- ☐ · a-very-long-file-name-that-keeps-going-…         1 B
- ☐ · backup.img                                    420 MB
-▌☐ · Cargo.toml                                      42 B
- ☐ · main.rs                                         37 B
- ☐ · notes.txt                                    3.52 KB
- ☐ · README.md                                       73 B
- ☐ · тест-файл.md                                    13 B
- ☐ · 日本語のファイル名.txt                          16 B
- ☐ · 📷 holiday photos 🌴.txt                         6 B
-
-
-
-
+ rada  ‹ 1/1 ›  projects  +                       ? Help
+  ←   →   ↑   ⟳     ⌂ Home › demo › projects    Ctrl+P
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶           ⋯
+╭────────────────────────────────────────────────────────╮
+│ ☐   Name ↑                              Size  Tags     │
+│                                                        │
+│ ☐ ▸ data                                               │
+│ ☐ ▸ src                                                │
+│ ☐ ▸ 目录                                               │
+│ ☐ · a-very-long-file-name-that-…         1 B           │
+│ ☐ · backup.img                        420 MB           │
+│▌☐ · Cargo.toml                          42 B           │
+│ ☐ · main.rs                             37 B           │
+│ ☐ · notes.txt                        3.52 KB           │
+│ ☐ · README.md                           73 B           │
+│ ☐ · тест-файл.md                        13 B           │
+│ ☐ · 日本語のファイル名.txt              16 B           │
+│ ☐ · 📷 holiday photos 🌴.txt             6 B           │
+│                                                        │
+╰────────────────────────────────────────────────────────╯
  Enlarge the window for the full layout (now 58×22)  Esc:…
- 12 items                                           ≣  ▦
+ 12 items                                        ≣  ▦  ▥

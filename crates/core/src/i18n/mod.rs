@@ -81,7 +81,11 @@ impl Lang {
     /// From the primary language of a Windows language identifier (`LANGID`): `0x10` is
     /// Italian.
     pub fn from_langid(id: u16) -> Lang {
-        if id & 0x3ff == 0x10 { Lang::It } else { Lang::En }
+        if id & 0x3ff == 0x10 {
+            Lang::It
+        } else {
+            Lang::En
+        }
     }
 
     /// The language of the system: `LANG`, `LC_ALL` and `LC_MESSAGES` on Linux, the language

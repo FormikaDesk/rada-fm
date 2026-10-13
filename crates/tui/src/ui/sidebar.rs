@@ -1,9 +1,9 @@
 //! The navigation pane: Home, the pinned folders (with a pin), the disks (a name, a bar of
-//! how full each is and what is free) and the trash. Narrow, it is a column of icons.
+//! ten segments for how full each is and what is free), the tags and the trash, which sits at
+//! the bottom. Narrow, it is a column of icons.
 //!
-//! The place you are in is marked with a bar and a tone, the item the keyboard is on is
-//! highlighted more strongly (so focus is visible), and the one under the mouse gets a light
-//! highlight.
+//! The place you are in is a rounded pill, the item the keyboard is on is highlighted more
+//! strongly (so focus is visible), and the one under the mouse gets a light highlight.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -12,7 +12,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
-use super::widgets::{bar_spans, pad, pad_left};
+use super::soft::{self, Look, RowTone};
+use super::widgets::{pad, pad_left, segment_bar, segment_bar_width};
 use crate::app::App;
 use crate::fmt;
 use crate::hits::Target;
@@ -51,6 +52,7 @@ fn layout(items: &[Item], rail: bool) -> Vec<Row> {
 
 pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
     let th = app.th.clone();
+    let look = Look::of(app);
     let items = app.side_items();
     if items.is_empty() || area.height == 0 {
         return;
@@ -60,7 +62,19 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
     let focused = app
         .side_focus
         .then_some(app.side_cursor.min(items.len() - 1));
-    let rows = layout(&items, rail);
+    let mut rows = layout(&items, rail);
+    // The trash sits at the bottom of the pane when there is room to spare above it.
+    let height = area.height as usize;
+    let mut trash_row: Option<Row> = None;
+    if rows.len() < height
+        && let Some(Row::Item(i)) = rows.last()
+        && items[*i].section == Section::Trash
+    {
+        trash_row = rows.pop();
+        if matches!(rows.last(), Some(Row::Gap)) {
+            rows.pop();
+        }
+    }
 
     // Keep the focused (or current) item on screen when the list is longer than the pane.
     let anchor = focused.or(current).unwrap_or(0);
@@ -68,14 +82,23 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
         .iter()
         .rposition(|r| matches!(r, Row::Item(i) | Row::Usage(i) if *i == anchor))
         .unwrap_or(0);
-    let height = area.height as usize;
     let skip = (anchor_row + 1).saturating_sub(height);
 
     let w = area.width as usize;
     let pin = icons::ui(app.icons, Glyph::Pin);
-    for (screen_y, row) in rows.iter().skip(skip).take(height).enumerate() {
+    let mut placed: Vec<(u16, &Row)> = rows
+        .iter()
+        .skip(skip)
+        .take(height)
+        .enumerate()
+        .map(|(y, r)| (y as u16, r))
+        .collect();
+    if let Some(t) = &trash_row {
+        placed.push((area.height - 1, t));
+    }
+    for (screen_y, row) in placed {
         let r = Rect {
-            y: area.y + screen_y as u16,
+            y: area.y + screen_y,
             height: 1,
             ..area
         };
@@ -106,7 +129,11 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 } else {
                     Style::default()
                 };
-                let edge = if is_focus || is_current { "▎" } else { " " };
+                let edge = if (is_focus || is_current) && !look.caps {
+                    "▎"
+                } else {
+                    " "
+                };
                 let marked = is_focus || is_current;
                 let mut spans = vec![Span::styled(edge, th.accent_style().patch(row_style))];
                 if let Row::Usage(_) = row {
@@ -117,20 +144,28 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         .map(|u| fmt::size(u.free))
                         .unwrap_or_default();
                     let free_w = free.width().max(7);
-                    let bar_w = w.saturating_sub(4 + free_w + 2).max(3);
+                    let bar_w = segment_bar_width(app.basic);
                     spans.push(Span::styled("   ", row_style));
                     if let Some(u) = &item.usage {
-                        spans.extend(bar_spans(&th, u.used, bar_w, th.disk, row_style.bg));
+                        spans.extend(segment_bar(&th, u.used, app.basic, row_style.bg));
                     }
+                    let used: usize = spans.iter().map(|s| s.content.width()).sum();
+                    // What is free is pushed to the right edge, with a column of air before the
+                    // border, when the bar leaves room.
+                    let room = w.saturating_sub(used + 2);
+                    let free_shown = pad_left(&free, room.max(free_w));
+                    let _ = bar_w;
                     spans.push(Span::styled(" ", row_style));
-                    spans.push(Span::styled(
-                        pad_left(&free, free_w),
-                        th.dim().patch(row_style),
-                    ));
+                    spans.push(Span::styled(free_shown, th.dim().patch(row_style)));
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), row_style));
                     app.hits.add(r, Target::Place(item.path.clone()));
                     f.render_widget(Paragraph::new(Line::from(spans)), r);
+                    if is_focus {
+                        soft::tint_row(f.buffer_mut(), r, &th, Look::FLAT, RowTone::Focus);
+                    } else if is_current {
+                        soft::tint_row(f.buffer_mut(), r, &th, Look::FLAT, RowTone::Place);
+                    }
                     continue;
                 }
                 let icon_color = match item.origin {
@@ -201,6 +236,13 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 }
                 app.hits.add(r, Target::Place(item.path.clone()));
                 f.render_widget(Paragraph::new(Line::from(spans)), r);
+                // The place you are in is a rounded pill; the item the keyboard is on is
+                // stronger.
+                if is_focus {
+                    soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
+                } else if is_current {
+                    soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Place);
+                }
             }
         }
     }
