@@ -92,6 +92,12 @@ pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
         && height >= 12
 }
 
+/// Rows between the tabs and the address: half a row of space, made of a ▀ in the colour of
+/// the tabs. It is the first thing a short terminal gives up.
+pub fn top_gap_height(explorer: bool, height: u16) -> u16 {
+    u16::from(explorer && height >= 31)
+}
+
 /// Rows of the command bar on a terminal `height` rows tall: three (the bar and a half-block
 /// padding above and below) while there is room, then one, then none. The padding of the
 /// hints goes before the padding of the command bar, the hints before the command bar.
@@ -133,6 +139,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // command bar next; the compact layout has neither, nor the address bar.
     let explorer = app.layout == LayoutKind::Explorer;
     let tabs_h = 1;
+    let gap_h = top_gap_height(explorer, area.height);
     let address_h = u16::from(explorer);
     let commands_h = commands_height(explorer, area.height);
     let hints_h = hints_height(explorer && app.show_hints, area.height);
@@ -141,6 +148,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.size_notice_visible = notice;
     let [
         tabs_row,
+        gap_row,
         address_row,
         commands_row,
         body,
@@ -150,6 +158,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         hints_row,
     ] = Layout::vertical([
         Constraint::Length(tabs_h),
+        Constraint::Length(gap_h),
         Constraint::Length(address_h),
         Constraint::Length(commands_h),
         Constraint::Min(3),
@@ -161,6 +170,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     .areas(area);
 
     tabs::draw_tabs(f, app, tabs_row);
+    if let (true, Some(band)) = (gap_h > 0, th.band().bg) {
+        // The tabs' colour on the upper half, the window's below: half a row of air.
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                "▀".repeat(area.width as usize),
+                Style::default().fg(band),
+            )),
+            gap_row,
+        );
+    }
     if address_h > 0 {
         address::draw_address(f, app, address_row);
     }
@@ -452,6 +471,16 @@ mod tests {
         }
         assert_eq!(commands_height(false, 40), 0);
         assert_eq!(hints_height(false, 40), 0);
+    }
+
+    #[test]
+    fn the_space_under_the_tabs_is_the_first_thing_a_short_terminal_gives_up() {
+        assert_eq!(top_gap_height(true, 37), 1);
+        assert_eq!(top_gap_height(true, 31), 1);
+        assert_eq!(top_gap_height(true, 30), 0);
+        // While it goes, the bars below still have all their padding.
+        assert_eq!((commands_height(true, 30), hints_height(true, 30)), (3, 3));
+        assert_eq!(top_gap_height(false, 40), 0, "the compact layout has none");
     }
 
     #[test]

@@ -3,6 +3,7 @@ source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
  rada  ▸ demo  ✕   +                                                                        vim + classic keys   ? Help
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                    ⌕ Search in demo  Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
@@ -17,17 +18,16 @@ expression: shot(&mut h)
   ♪ Music                 ⚲ │ ☐ · backup.zip                           05/07/2026      Archive (ZIP)            39.0 MB
   ▶ Videos                ⚲ │ ☐ · Cargo.toml                           3 days ago      Settings file               82 B
                             │ ☐ · data.json                            6 days ago      JSON data                   49 B
- DEVICES                    │ ☐ · demo.mp4                             2 weeks ago     MP4 video                91.0 MB
-  ▥ System                  │ ☐ · logo.svg                             5 d╭──────────────────────────────╮        197 B
-    ━━━━━━━━━──────  183 GB │ ☐ · main.rs                              Tod│ Open                    Enter│         80 B
-  ▥ Data                    │ ☐ · notes.txt                            Yes│ Open with…              Alt+o│         28 B
-    ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Tod│──────────────────────────────│      70.7 KB
-  ⏏ USB drive               │ ☐ · README.md                            Tod│ Cut                    Ctrl+X│        145 B
-    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│ Copy                   Ctrl+C│      2.29 MB
-                            │ ☐ · screenshot.png                       Yes│ Paste                  Ctrl+V│      5.34 KB
-                            │ ☐ · setup.sh                             12 │──────────────────────────────│         21 B
-                            │ ☐ · song.mp3                             30/│ Rename                     F2│      7.44 MB
-                            │                                             │ Compress…               Alt+z│
+ DEVICES                    │ ☐ · demo.mp4                             2 w╭──────────────────────────────╮      91.0 MB
+  ▥ System                  │ ☐ · logo.svg                             5 d│ Open                    Enter│        197 B
+    ━━━━━━━━━──────  183 GB │ ☐ · main.rs                              Tod│ Open with…              Alt+o│         80 B
+  ▥ Data                    │ ☐ · notes.txt                            Yes│──────────────────────────────│         28 B
+    ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Tod│ Cut                    Ctrl+X│      70.7 KB
+  ⏏ USB drive               │ ☐ · README.md                            Tod│ Copy                   Ctrl+C│        145 B
+    ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│ Paste                  Ctrl+V│      2.29 MB
+                            │ ☐ · screenshot.png                       Yes│──────────────────────────────│      5.34 KB
+                            │ ☐ · setup.sh                             12 │ Rename                     F2│         21 B
+                            │ ☐ · song.mp3                             30/│ Compress…               Alt+z│      7.44 MB
                             │                                             │──────────────────────────────│
                             │                                             │ Tags                        ▸│
                             │                                             │──────────────────────────────│

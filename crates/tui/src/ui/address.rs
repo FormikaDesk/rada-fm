@@ -15,7 +15,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use super::widgets::{Bar, SPIN, pad};
+use super::widgets::{Bar, SPIN, field_ends, pad};
 use crate::app::App;
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
@@ -169,6 +169,12 @@ fn search_field(app: &App, width: usize) -> Bar<'static> {
     if width < 8 {
         return b;
     }
+    // Rounded ends take a cell each; without the Nerd glyphs the field is a plain rectangle.
+    let ends = field_ends(th, app.icons);
+    let width = width - if ends.is_some() { 2 } else { 0 };
+    if let Some((left, _)) = &ends {
+        b.push_hit(left.clone(), Target::Act(Action::Filter));
+    }
     let icon = icons::ui(app.icons, Glyph::Search);
     let lead = if icon.is_empty() {
         " ".to_string()
@@ -223,6 +229,9 @@ fn search_field(app: &App, width: usize) -> Bar<'static> {
             Target::Act(Action::Filter),
         );
     }
+    if let Some((_, right)) = ends {
+        b.push_hit(right, Target::Act(Action::Filter));
+    }
     b
 }
 
@@ -270,12 +279,17 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
     }
     let field_x = area.x + left.width() as u16;
 
-    // The path field.
+    // The path field: rounded ends take a cell each (see `field_ends`); `field_w` is all of it.
+    let ends = field_ends(&th, set);
+    let field_w = field_w - if ends.is_some() { 2 } else { 0 };
     let mut path_bar = Bar::default();
+    if let Some((left, _)) = &ends {
+        path_bar.push(left.clone());
+    }
     let field_rect = Rect {
         x: field_x,
         y: area.y,
-        width: field_w as u16,
+        width: (field_w + if ends.is_some() { 2 } else { 0 }) as u16,
         height: 1,
     };
     if let Some(a) = &app.address {
@@ -315,10 +329,14 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
     let used = path_bar.width();
+    let used = used - if ends.is_some() { 1 } else { 0 };
     path_bar.push(Span::styled(
         " ".repeat(field_w.saturating_sub(used)),
         field,
     ));
+    if let Some((_, right)) = ends {
+        path_bar.push(right);
+    }
     // A click anywhere in the field that is not a segment edits the address.
     if app.address.is_none() {
         app.hits.add(field_rect, Target::Address);

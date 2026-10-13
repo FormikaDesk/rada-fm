@@ -3,6 +3,7 @@ source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
  rada  ▸ demo  ✕   +                                                                                            vim + classic keys   ? Help
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                                  ⌕ Search in demo        Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   +  New ▾   │  ✂  Cut     ⧉  Copy     ⎘  Paste     ✎  Rename     ▣  Compress     ✗  Delete  │  ⇅  Sort ▾     ≣  View ▾  │  ↶  Undo        ⋯
@@ -27,7 +28,6 @@ expression: shot(&mut h)
                             │ ☐ · screenshot.png        Yesterday       PNG image                5.34 KB │
                             │ ☐ · setup.sh              12 days ago     Shell script                21 B │
                             │ ☐ · song.mp3              30/07/2026      MP3 audio                7.44 MB │
-                            │                                                                            │
                             │                                                                            │
                             │                                                                            │
                             │                                                                            │

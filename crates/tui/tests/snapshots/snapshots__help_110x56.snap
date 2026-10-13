@@ -3,24 +3,24 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
  rada  ▸ projects  ✕   +                                                          vim + classic keys   ? Help
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ←   →   ↑   ⟳   ⌂ Home › demo › projects                                          ⌕ Search in proj… Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo            ⋯
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-  ⌂ Hom╭──────────────────────────────────────────────────────────────────────────────────────────────╮  Size
-       │                                                                                              │
+▀▀▀▀▀▀▀╭──────────────────────────────────────────────────────────────────────────────────────────────╮▀▀▀▀▀▀▀
+  ⌂ Hom│                                                                                              │  Size
        │   Keys    ↑↓ scroll · Esc close                                                              │
        │                                                                                              │
-       │                                Vim                           Classic                         │   1 B
-       │                                                                                              │420 MB
-       │  Moving around                                                                               │  42 B
-       │  Move up                       k ↑                           ↑                               │  37 B
-       │  Move down                     j ↓                           ↓                               │.52 KB
-       │  Parent folder                 h ← Backspace                 ← Alt+↑                         │  73 B
-       │  Open                          l → Enter                     → Enter                         │  13 B
-       │  First item                    g Home                        Home                            │  16 B
-       │  Last item                     G End                         End                             │   6 B
-       │  Page up                       PgUp                          PgUp                            │
+       │                                Vim                           Classic                         │
+       │                                                                                              │   1 B
+       │  Moving around                                                                               │420 MB
+       │  Move up                       k ↑                           ↑                               │  42 B
+       │  Move down                     j ↓                           ↓                               │  37 B
+       │  Parent folder                 h ← Backspace                 ← Alt+↑                         │.52 KB
+       │  Open                          l → Enter                     → Enter                         │  73 B
+       │  First item                    g Home                        Home                            │  13 B
+       │  Last item                     G End                         End                             │  16 B
+       │  Page up                       PgUp                          PgUp                            │   6 B
        │  Page down                     PgDn                          PgDn                            │
        │  Half page up                  Ctrl+U                                                        │
        │  Half page down                Ctrl+D                                                        │

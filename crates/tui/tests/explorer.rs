@@ -195,7 +195,7 @@ fn the_context_menus() {
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
-        y + 24,
+        y + 23,
         KeyModifiers::NONE,
     );
     assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
@@ -490,7 +490,7 @@ fn in_command_bar(h: &H, action: Action) -> bool {
     h.app
         .hits
         .all()
-        .any(|(r, t)| *t == Target::Act(action) && r.y == 3)
+        .any(|(r, t)| *t == Target::Act(action) && r.y == 4)
 }
 
 #[test]
@@ -539,14 +539,14 @@ fn undo_says_what_it_would_undo_and_runs_after_a_plan() {
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     h.wait("the label", |a| a.undo_label.is_some());
-    let row = h.screen().lines().nth(3).unwrap().to_string();
+    let row = h.screen().lines().nth(4).unwrap().to_string();
     assert!(row.contains("Undo") && row.contains("new folder"), "{row}");
     assert!(h.app.hits.find(&Target::Act(Action::Undo)).is_some());
     h.click(&Target::Act(Action::Undo));
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     h.wait("nothing left to undo", |a| a.undo_label.is_none());
-    let row = h.screen().lines().nth(3).unwrap().to_string();
+    let row = h.screen().lines().nth(4).unwrap().to_string();
     assert!(!row.contains("new folder"), "{row}");
 }
 
@@ -613,7 +613,7 @@ fn the_dropdowns_open_menus_that_work() {
 #[test]
 fn clicking_a_column_title_sorts_by_it_and_the_arrow_follows() {
     let mut h = scene(170, 35);
-    let head = |h: &mut H| h.screen().lines().nth(5).unwrap().to_string();
+    let head = |h: &mut H| h.screen().lines().nth(6).unwrap().to_string();
     assert!(head(&mut h).contains("Name ↑"));
     h.click(&Target::SortBy(rada_core::model::SortKey::Type));
     assert_eq!(h.app.sort.key, rada_core::model::SortKey::Type);
@@ -836,6 +836,112 @@ fn the_details_pane_shows_the_item_its_properties_and_buttons() {
     assert!(h.screen().contains("Location"));
 }
 
+/// The cells of the details pane (the pane, right of the divider of a 170-wide screen), row by row.
+fn pane_rows(h: &mut H) -> Vec<String> {
+    h.screen()
+        .lines()
+        .map(|l| {
+            l.chars()
+                .skip(132)
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        })
+        .collect()
+}
+
+#[test]
+fn the_buttons_have_blank_rows_between_them_and_the_properties_a_blank_row_before_the_status() {
+    let mut h = scene(170, 35);
+    h.app.marked.clear();
+    let rows = pane_rows(&mut h);
+    let open = rows
+        .iter()
+        .position(|l| l.trim() == "▸ Open" || l.trim() == "Open")
+        .unwrap_or_else(|| panic!("{rows:#?}"));
+    assert!(
+        rows[open + 1].is_empty(),
+        "a blank row under Open: {rows:#?}"
+    );
+    let second = &rows[open + 2];
+    assert!(
+        second.contains("Open with…") && second.contains("Preview"),
+        "side by side: {second}"
+    );
+    assert!(rows[open + 3].is_empty(), "{rows:#?}");
+    // The last property, then a blank row, then the status bar (its row has the free space).
+    let status = h
+        .screen()
+        .lines()
+        .position(|l| l.contains("GB free"))
+        .unwrap();
+    let last = rows
+        .iter()
+        .rposition(|l| l.contains("Permissions"))
+        .unwrap();
+    assert!(status >= last + 2, "last property {last}, status {status}");
+}
+
+#[test]
+fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
+    let mut h = scene(170, 35);
+    h.app.marked.clear();
+    h.app.icons = rada_tui::IconSet::Nerd;
+    let rows = pane_rows(&mut h);
+    let with_caps = |needle: &str| {
+        rows.iter()
+            .find(|l| l.contains(needle))
+            .unwrap_or_else(|| panic!("{needle}: {rows:#?}"))
+            .matches('\u{e0b6}') // the left end of each pill
+            .count()
+    };
+    assert_eq!(with_caps("Open"), 1, "one pill, the whole width");
+    assert_eq!(
+        with_caps("Preview"),
+        2,
+        "Open with… and Preview, a pill each"
+    );
+}
+
+#[test]
+fn the_address_and_search_fields_are_rounded_with_nerd_icons_and_rectangles_without() {
+    let mut h = scene(170, 35);
+    let row = |h: &mut H| h.screen().lines().nth(2).unwrap().to_string();
+    let plain = row(&mut h);
+    assert!(
+        !plain.contains('\u{e0b6}') && plain.contains("Search in demo"),
+        "{plain}"
+    );
+    h.app.icons = rada_tui::IconSet::Nerd;
+    let round = row(&mut h);
+    assert_eq!(round.matches('\u{e0b6}').count(), 2, "{round}");
+    assert_eq!(round.matches('\u{e0b4}').count(), 2, "{round}");
+    assert_eq!(round.width(), 170);
+}
+
+#[test]
+fn half_a_row_of_space_separates_the_tabs_from_the_address_and_goes_first_on_a_short_terminal() {
+    let mut h = scene(170, 35);
+    let s = h.screen();
+    let gap = s.lines().nth(1).unwrap();
+    assert!(
+        gap.chars().all(|c| c == '▀') && gap.chars().count() == 170,
+        "{gap}"
+    );
+    assert!(
+        s.lines().nth(2).unwrap().contains('⌂'),
+        "the address follows"
+    );
+    // A little shorter and it is gone, with the bars below still padded.
+    let mut h = scene(120, 30);
+    let s = h.screen();
+    assert!(s.lines().nth(1).unwrap().contains('⌂'), "{s}");
+    assert!(
+        s.lines().nth(2).unwrap().starts_with('▄'),
+        "the command bar's padding stays"
+    );
+}
+
 #[test]
 fn the_details_pane_is_hidden_below_140_columns_and_alt_p_shows_it_over_the_list() {
     let mut h = scene(120, 30);
@@ -905,7 +1011,7 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
-        y + 24,
+        y + 23,
         KeyModifiers::NONE,
     );
     let s = h.screen();

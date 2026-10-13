@@ -11,6 +11,22 @@ use crate::theme::{BadgeStyle, BarStyle, ColorDepth, Theme};
 
 pub const SPIN: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+/// The two ends of a text field, rounded with Nerd Font glyphs: the field's colour on the
+/// bar's. Without those glyphs there are none, and the field is a plain rectangle.
+pub fn field_ends(
+    th: &Theme,
+    set: crate::icons::IconSet,
+) -> Option<(Span<'static>, Span<'static>)> {
+    if set != crate::icons::IconSet::Nerd {
+        return None;
+    }
+    let edge = Style::default().fg(th.field).patch(th.band());
+    Some((
+        Span::styled("\u{e0b6}", edge),
+        Span::styled("\u{e0b4}", edge),
+    ))
+}
+
 pub fn pad(s: &str, width: usize) -> String {
     let w = s.width();
     if w >= width {

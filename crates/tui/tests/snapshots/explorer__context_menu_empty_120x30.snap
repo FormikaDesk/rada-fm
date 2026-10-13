@@ -3,6 +3,7 @@ source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
  rada  ▸ demo  ✕   +                                                                        vim + classic keys   ? Help
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                    ⌕ Search in demo  Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
@@ -24,10 +25,9 @@ expression: shot(&mut h)
     ━━━━━━─────────  555 GB │▌☐ · photo.jpg                            Today 13:30     JPEG image               70.7 KB
   ⏏ USB drive               │ ☐ · README.md                            Today 13:28     Markdown                   145 B
     ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 days ago      PDF document             2.29 MB
-                            │ ☐ · screenshot.png                       Yesterday       PNG image                5.34 KB
-                            │ ☐ · setup.sh                             12 ╭───────────────────────────────────╮    21 B
-                            │ ☐ · song.mp3                             30/│ New                              ▸│ 7.44 MB
-                            │                                             │ Paste                       Ctrl+V│
+                            │ ☐ · screenshot.png                       Yes╭───────────────────────────────────╮ 5.34 KB
+                            │ ☐ · setup.sh                             12 │ New                              ▸│    21 B
+                            │ ☐ · song.mp3                             30/│ Paste                       Ctrl+V│ 7.44 MB
                             │                                             │───────────────────────────────────│
                             │                                             │ Sort by                          ▸│
                             │                                             │ View                             ▸│
