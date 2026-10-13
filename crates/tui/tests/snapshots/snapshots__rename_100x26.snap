@@ -7,14 +7,14 @@ expression: shot(&mut h)
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo  ⋯
   ⌂ Home                    │ ☐   Name ↑           Date modified   Type                        Size
                             │ ☐ ▸ data             6 days ago      Folder
-                            │ ☐ ▸ src              6 days ago      Folder
-                            │ ☐ ▸ 目录             6 days ago      Folder
-                            │ ☐ · a-very-long-fi…  12 days ago     Archive (tar.gz)             1 B
-      ╭──────────────────────────────────────────────────────────────────────────────────────╮20 MB
-      │                                                                                      │ 42 B
-      │   Rename                                                                             │ 37 B
-      │                                                                                      │52 KB
-      │  New name                                                                            │ 73 B
+ TAGS                       │ ☐ ▸ src              6 days ago      Folder
+  ● Red                     │ ☐ ▸ 目录             6 days ago      Folder
+  ● Orange                  │ ☐ · a-very-long-fi…  12 days ago     Archive (tar.gz)             1 B
+  ● Ye╭──────────────────────────────────────────────────────────────────────────────────────╮20 MB
+  ● Gr│                                                                                      │ 42 B
+  ● Bl│   Rename                                                                             │ 37 B
+  ● Pu│                                                                                      │52 KB
+  ● Gr│  New name                                                                            │ 73 B
       │  › main.rs                                                                           │ 13 B
       │                                                                                      │ 16 B
       │                                                                                      │  6 B

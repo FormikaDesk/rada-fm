@@ -10,14 +10,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀╭──────────────────────────────────────────────────────────────────────────────────────────────╮▀▀▀▀▀▀▀
   ⌂ Hom│                                                                                              │  Size
        │   Keys    ↑↓ scroll · Esc close                                                              │
-       │                                                                                              │
-       │                                Vim                           Classic                         │
-       │                                                                                              │   1 B
-       │  Moving around                                                                               │420 MB
-       │  Move up                       k ↑                           ↑                               │  42 B
-       │  Move down                     j ↓                           ↓                               │  37 B
-       │  Parent folder                 h ← Backspace                 ← Alt+↑                         │.52 KB
-       │  Open                          l → Enter                     → Enter                         │  73 B
+ TAGS  │                                                                                              │
+  ● Red│                                Vim                           Classic                         │
+  ● Ora│                                                                                              │   1 B
+  ● Yel│  Moving around                                                                               │420 MB
+  ● Gre│  Move up                       k ↑                           ↑                               │  42 B
+  ● Blu│  Move down                     j ↓                           ↓                               │  37 B
+  ● Pur│  Parent folder                 h ← Backspace                 ← Alt+↑                         │.52 KB
+  ● Gra│  Open                          l → Enter                     → Enter                         │  73 B
        │  First item                    g Home                        Home                            │  13 B
        │  Last item                     G End                         End                             │  16 B
        │  Page up                       PgUp                          PgUp                            │   6 B

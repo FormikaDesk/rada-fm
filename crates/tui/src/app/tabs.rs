@@ -117,7 +117,7 @@ impl App {
         self.dir_gen += 1;
         self.load = LoadState::Loading(cwd.clone());
         self.svc.loader.load(cwd.clone(), self.dir_gen);
-        if self.archive.is_none() {
+        if self.archive.is_none() && self.tag_view().is_none() {
             self.svc.watcher.watch(cwd);
         }
         self.previewed = None;
@@ -149,6 +149,9 @@ impl App {
         let p = self.tab_cwd(i);
         if p == self.home() {
             return "Home".to_string();
+        }
+        if let Some(tag) = rada_core::tagsearch::view_name(p) {
+            return format!("Tag: {tag}");
         }
         p.file_name()
             .map(rada_core::display::name)
@@ -264,6 +267,8 @@ impl App {
                         .parent()
                         .map(Path::to_path_buf)
                         .unwrap_or_else(|| cwd.clone()),
+                    // A list of tagged items is not a place to come back to.
+                    None if rada_core::tagsearch::view_name(cwd).is_some() => self.svc.home.clone(),
                     None => cwd.clone(),
                 };
                 SavedTab {

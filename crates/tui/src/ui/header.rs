@@ -40,6 +40,10 @@ fn home_mark(icons: IconSet) -> &'static str {
 /// (or the root of the disk for a path outside it).
 fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
+    // A tag's items are not on a path: one segment, which is the list itself.
+    if let Some(tag) = app.tag_view() {
+        return vec![(format!("Tag: {tag}"), app.cwd.clone())];
+    }
     let home = app.home();
     let (first, rest) = match app.cwd.strip_prefix(home) {
         Ok(rest) => ((home_mark(app.icons).to_string(), home.to_path_buf()), rest),

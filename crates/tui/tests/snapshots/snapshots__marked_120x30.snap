@@ -9,14 +9,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
                             │ ☐ ▸ data                                 6 days ago      Folder
-                            │ ☐ ▸ src                                  6 days ago      Folder
-                            │ ☐ ▸ 目录                                 6 days ago      Folder
-                            │ ☐ · a-very-long-file-name-that-keeps-g…  12 days ago     Archive (tar.gz)             1 B
-                            │ ☐ · backup.img                           9 days ago      Disk image                420 MB
-                            │ ☑ · Cargo.toml                           2 days ago      Settings file               42 B
-                            │ ☑ · main.rs                              Yesterday       Rust source                 37 B
-                            │▌☐ · notes.txt                            5 weeks ago     Text document            3.52 KB
-                            │ ☐ · README.md                            Today 09:00     Markdown                    73 B
+ TAGS                       │ ☐ ▸ src                                  6 days ago      Folder
+  ● Red                     │ ☐ ▸ 目录                                 6 days ago      Folder
+  ● Orange                  │ ☐ · a-very-long-file-name-that-keeps-g…  12 days ago     Archive (tar.gz)             1 B
+  ● Yellow                  │ ☐ · backup.img                           9 days ago      Disk image                420 MB
+  ● Green                   │ ☑ · Cargo.toml                           2 days ago      Settings file               42 B
+  ● Blue                    │ ☑ · main.rs                              Yesterday       Rust source                 37 B
+  ● Purple                  │▌☐ · notes.txt                            5 weeks ago     Text document            3.52 KB
+  ● Gray                    │ ☐ · README.md                            Today 09:00     Markdown                    73 B
                             │ ☐ · тест-файл.md                         Today 10:30     Markdown                    13 B
                             │ ☐ · 日本語のファイル名.txt               5 days ago      Text document               16 B
                             │ ☐ · 📷 holiday photos 🌴.txt             27/11/2028      Text document                6 B

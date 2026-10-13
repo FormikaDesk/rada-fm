@@ -100,9 +100,9 @@ fn a_tagged_file_shows_a_dot_in_its_colour_beside_the_name() {
     let s = h.screen();
     let a_row = s.lines().find(|l| l.contains("a.txt")).unwrap();
     assert!(a_row.contains("a.txt ●"), "{a_row}");
-    // More than three: three dots and a plus.
+    // More than three: three dots and +N.
     let b_row = s.lines().find(|l| l.contains("b.txt")).unwrap();
-    assert!(b_row.contains("b.txt ●●●+"), "{b_row}");
+    assert!(b_row.contains("b.txt ●●●+1"), "{b_row}");
     // An untagged one has none.
     let sub_row = s.lines().find(|l| l.contains("sub")).unwrap();
     assert!(!sub_row.contains('●'), "{sub_row}");

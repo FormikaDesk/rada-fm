@@ -9,14 +9,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
                             │ ☐ ▸ data                       6 days ago      Folder
-                            │ ☐ ▸ src                        6 days ago      Folder
-                            │ ☐ ▸ 目录                       6 days ago      Folder
-                            │ ☐ · a-very-long-file-name-th…  12 days ago     Archive (tar.gz)             1 B
-                            │ ☐ · backup.img                 9 days ago      Disk image                420 MB
-                            │ ☐ · Cargo.toml                 2 days a╭──────────────────────────────╮    42 B
-                            │▌☐ · main.rs                    Yesterda│ Open                    Enter│    37 B
-                            │ ☐ · notes.txt                  5 weeks │ Open with…              Alt+o│ 3.52 KB
-                            │ ☐ · README.md                  Today 09│──────────────────────────────│    73 B
+ TAGS                       │ ☐ ▸ src                        6 days ago      Folder
+  ● Red                     │ ☐ ▸ 目录                       6 days ago      Folder
+  ● Orange                  │ ☐ · a-very-long-file-name-th…  12 days ago     Archive (tar.gz)             1 B
+  ● Yellow                  │ ☐ · backup.img                 9 days ago      Disk image                420 MB
+  ● Green                   │ ☐ · Cargo.toml                 2 days a╭──────────────────────────────╮    42 B
+  ● Blue                    │▌☐ · main.rs                    Yesterda│ Open                    Enter│    37 B
+  ● Purple                  │ ☐ · notes.txt                  5 weeks │ Open with…              Alt+o│ 3.52 KB
+  ● Gray                    │ ☐ · README.md                  Today 09│──────────────────────────────│    73 B
                             │ ☐ · тест-файл.md               Today 10│ Cut                    Ctrl+X│    13 B
                             │ ☐ · 日本語のファイル名.txt     5 days a│ Copy                   Ctrl+C│    16 B
                             │ ☐ · 📷 holiday photos 🌴.txt   27/11/20│ Paste                  Ctrl+V│     6 B

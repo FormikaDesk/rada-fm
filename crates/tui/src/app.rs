@@ -546,6 +546,9 @@ pub struct App {
     pub double_click: Duration,
     /// The language the names of the seven tag colours are written in (the system's).
     pub tag_lang: String,
+    /// Tags of the user's own seen on the items of the folders shown so far (the sidebar's TAGS
+    /// section lists them after the seven colours), by name.
+    pub known_tags: Vec<rada_core::platform::Tag>,
     pub help_scroll: usize,
     /// Replaces the system clock when drawing relative dates (tests, screenshots).
     pub clock: Option<std::time::SystemTime>,
@@ -697,6 +700,7 @@ impl App {
             last_click: None,
             double_click: Duration::from_millis(400),
             tag_lang: svc_tag_language(&svc),
+            known_tags: Vec::new(),
             help_scroll: 0,
             clock: None,
             view,
@@ -963,6 +967,58 @@ impl App {
         self.request_dir(path);
     }
 
+    /// The tag whose items the list shows, when it is not a folder but the view of a tag.
+    pub fn tag_view(&self) -> Option<String> {
+        rada_core::tagsearch::view_name(&self.cwd)
+    }
+
+    /// This system keeps tags (everywhere but Windows).
+    pub fn tags_supported(&self) -> bool {
+        self.svc.platform.tags().is_some()
+    }
+
+    /// Remember the tags of the user's own that these items carry, for the sidebar.
+    fn note_tags<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
+        use rada_core::platform::TagColor as Hue;
+        let before = self.known_tags.len();
+        for t in entries.into_iter().flat_map(|e| e.tags.iter()) {
+            if Hue::from_name(&t.name).is_none()
+                && !self.known_tags.iter().any(|k| k.is_called(&t.name))
+                && self.known_tags.len() < 60
+            {
+                self.known_tags.push(t.clone());
+            }
+        }
+        if self.known_tags.len() != before {
+            self.known_tags.sort_by_key(|t| t.name.to_lowercase());
+        }
+    }
+
+    /// Say why nothing can be made here when the list is a tag's items, not a folder.
+    pub(super) fn refuse_in_tag_view(&mut self, what: &str) -> bool {
+        let Some(tag) = self.tag_view() else {
+            return false;
+        };
+        self.toast(
+            ToastKind::Warn,
+            format!("this list is the items tagged \"{tag}\", not a folder — cannot {what} here"),
+            5,
+        );
+        true
+    }
+
+    /// The folder to use for something made next to the items: the one the first of them is
+    /// in when the list is a tag's items, the folder shown otherwise.
+    pub(super) fn folder_for_new(&self, items: &[PathBuf]) -> PathBuf {
+        if self.tag_view().is_some() {
+            if let Some(dir) = items.first().and_then(|p| p.parent()) {
+                return dir.to_path_buf();
+            }
+            return self.svc.home.clone();
+        }
+        self.cwd.clone()
+    }
+
     /// Back to the previous folder of the history (or forward to the next one).
     fn go_history(&mut self, back: bool) {
         let target = if back {
@@ -982,6 +1038,15 @@ impl App {
     }
 
     fn go_parent(&mut self) {
+        // A tag's items have no parent: leave the way one came.
+        if self.tag_view().is_some() {
+            if self.nav.back_target().is_some() {
+                self.go_history(true);
+            } else {
+                self.request_dir(self.svc.home.clone());
+            }
+            return;
+        }
         let Some(parent) = self.cwd.parent().map(|p| p.to_path_buf()) else {
             self.toast(ToastKind::Info, "already at the top", 2);
             return;
@@ -1136,6 +1201,7 @@ impl App {
                         // It opened: whatever the system was holding back for this place, it
                         // is not any more.
                         self.denied.retain(|d| !path.starts_with(&d.folder));
+                        self.note_tags(&entries);
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
                             // Before the first listing there is no cursor yet: use the
@@ -1146,7 +1212,8 @@ impl App {
                             self.remembered.get(&path).cloned()
                         };
                         self.listing = DirListing::new(path.clone(), entries, self.sort);
-                        let virtual_dir = archive.is_some();
+                        let virtual_dir =
+                            archive.is_some() || rada_core::tagsearch::view_name(&path).is_some();
                         self.archive = archive;
                         if !same_dir {
                             match self.nav_move.take() {
@@ -1194,6 +1261,10 @@ impl App {
                     return;
                 }
                 let keep = self.cursor_name();
+                self.note_tags(updates.iter().filter_map(|u| match u {
+                    rada_core::model::EntryUpdate::Upsert(e) => Some(e),
+                    _ => None,
+                }));
                 self.listing.apply(updates);
                 self.sync_folder_sizes();
                 let existing: BTreeSet<OsString> =
@@ -1638,7 +1709,10 @@ impl App {
     }
 
     fn start_paste(&mut self) {
-        if self.refuse_if_busy() || self.refuse_in_archive("paste here") {
+        if self.refuse_if_busy()
+            || self.refuse_in_archive("paste here")
+            || self.refuse_in_tag_view("paste")
+        {
             return;
         }
         let Some(clip) = self.clipboard.clone() else {
@@ -1951,7 +2025,13 @@ impl App {
             return;
         }
         if let Some(e) = self.current() {
-            let text = e.name.to_string_lossy().into_owned();
+            // The name on the disk (in a list of tagged items `name` is the whole path).
+            let text = e
+                .path
+                .file_name()
+                .unwrap_or(&e.name)
+                .to_string_lossy()
+                .into_owned();
             let from = e.path.clone();
             self.modal = Some(Modal::Input(InputView::new(
                 InputKind::Rename { from },
@@ -2059,8 +2139,10 @@ impl App {
                 Some(detail),
             );
         }
-        for anc in cwd.ancestors().skip(1).take(4) {
-            add(&mut items, anc, PaletteKind::Parent, None, None);
+        if self.tag_view().is_none() {
+            for anc in cwd.ancestors().skip(1).take(4) {
+                add(&mut items, anc, PaletteKind::Parent, None, None);
+            }
         }
         let dirs: Vec<PathBuf> = self
             .listing
@@ -2165,6 +2247,9 @@ impl App {
     }
 
     fn toggle_bookmark(&mut self) {
+        if self.refuse_in_tag_view("bookmark it") {
+            return;
+        }
         let cwd = self.cwd.clone();
         let add = !self.paths.bookmarks.contains(&cwd);
         self.set_bookmark(cwd, add);

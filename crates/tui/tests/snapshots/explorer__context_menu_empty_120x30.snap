@@ -26,13 +26,13 @@ expression: shot(&mut h)
   ⏏ USB drive               │ ☐ · README.md                            Today 13:28     Markdown                   145 B
     ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 days ago      PDF document             2.29 MB
                             │ ☐ · screenshot.png                       Yes╭───────────────────────────────────╮ 5.34 KB
-                            │ ☐ · setup.sh                             12 │ New                              ▸│    21 B
-                            │ ☐ · song.mp3                             30/│ Paste                       Ctrl+V│ 7.44 MB
-                            │                                             │───────────────────────────────────│
-                            │                                             │ Sort by                          ▸│
-                            │                                             │ View                             ▸│
-                            │                                             │───────────────────────────────────│
-                            │                                             │ Refresh the folder              F5│
+ TAGS                       │ ☐ · setup.sh                             12 │ New                              ▸│    21 B
+  ● Red                     │ ☐ · song.mp3                             30/│ Paste                       Ctrl+V│ 7.44 MB
+  ● Orange                  │                                             │───────────────────────────────────│
+  ● Yellow                  │                                             │ Sort by                          ▸│
+  ● Green                   │                                             │ View                             ▸│
+  ● Blue                    │                                             │───────────────────────────────────│
+  ● Purple                  │                                             │ Refresh the folder              F5│
  19 items                                                                 │ Select all                  Ctrl+A│─  ≣  ▦
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│───────────────────────────────────│▄▄▄▄▄▄▄▄▄
    Esc  close                                                             │ Open a terminal here    Ctrl+Alt+T│

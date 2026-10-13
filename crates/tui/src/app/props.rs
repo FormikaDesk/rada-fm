@@ -50,7 +50,10 @@ impl App {
             ),
             (
                 "Location".to_string(),
-                fmt::short_path(&self.cwd, self.home()),
+                match self.tag_view() {
+                    Some(tag) => format!("Tag: {tag}"),
+                    None => fmt::short_path(&self.cwd, self.home()),
+                },
             ),
         ];
         if self.archive.is_some() {
@@ -66,7 +69,13 @@ impl App {
     fn item_properties(&self, e: &Entry) -> PropsView {
         let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &self.tz);
         let mut rows: Vec<(String, String)> = vec![
-            ("Name".into(), rada_core::display::name(&e.name)),
+            (
+                "Name".into(),
+                e.path
+                    .file_name()
+                    .map(rada_core::display::name)
+                    .unwrap_or_else(|| rada_core::display::name(&e.name)),
+            ),
             ("Type".into(), e.type_label.to_string()),
             (
                 "Location".into(),

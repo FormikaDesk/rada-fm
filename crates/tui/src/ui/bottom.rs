@@ -167,7 +167,10 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     }
     if app.layout == LayoutKind::Compact {
         b.push(Span::styled(
-            fmt::short_path(&app.cwd, app.home()),
+            match app.tag_view() {
+                Some(tag) => format!("Tag: {tag}"),
+                None => fmt::short_path(&app.cwd, app.home()),
+            },
             th.accent_style().add_modifier(Modifier::BOLD).patch(band),
         ));
         b.push(Span::styled("  │  ", th.faint().patch(band)));

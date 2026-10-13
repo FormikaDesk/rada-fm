@@ -36,6 +36,10 @@ fn home_label(app: &App) -> String {
 /// The path as segments, each with the folder it stands for.
 fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
+    // A tag's items are not on a path: one segment, which is the list itself.
+    if let Some(tag) = app.tag_view() {
+        return vec![(format!("Tag: {tag}"), app.cwd.clone())];
+    }
     let home = app.home();
     let (first, rest) = match app.cwd.strip_prefix(home) {
         Ok(rest) => ((home_label(app), home.to_path_buf()), rest),
@@ -189,6 +193,8 @@ fn search_field(app: &App, width: usize) -> Bar<'static> {
     } else {
         let name = if app.cwd == app.home() {
             "Home".to_string()
+        } else if let Some(tag) = app.tag_view() {
+            format!("Tag: {tag}")
         } else {
             app.cwd
                 .file_name()

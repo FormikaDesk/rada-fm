@@ -139,11 +139,22 @@ const OPENERS: &[&str] = &[
     "start",
 ];
 
+/// The system's search tools. A test never asks the real index of whoever runs it: each name
+/// is a script that finds nothing (the search falls back to walking the sandbox).
+#[cfg(unix)]
+const SEARCHERS: &[&str] = &["mdfind", "baloosearch", "baloosearch6"];
+
 /// Write the stand-ins into `bin`: scripts that add a line to `log` and fail.
 #[cfg(unix)]
 fn write_opener_traps(bin: &Path, log: &Path) {
     use std::os::unix::fs::PermissionsExt;
     let _ = std::fs::create_dir_all(bin);
+    for name in SEARCHERS {
+        let exe = bin.join(name);
+        if std::fs::write(&exe, "#!/bin/sh\nexit 1\n").is_ok() {
+            let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
+        }
+    }
     for name in OPENERS {
         let script = format!(
             "#!/bin/sh\necho \"{name} $*\" >> '{}'\nexit 1\n",

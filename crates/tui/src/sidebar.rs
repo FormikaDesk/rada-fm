@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rada_core::platform::{PlaceKind, VolumeKind};
+use rada_core::platform::{PlaceKind, TagColor as Hue, VolumeKind};
 
 use crate::app::App;
 use crate::icons::IconSet;
@@ -55,6 +55,8 @@ pub enum Section {
     /// The user's standard folders and the folders pinned by hand.
     Pinned,
     Devices,
+    /// The seven colours and the user's own tags: each opens the list of what carries it.
+    Tags,
     /// The trash, alone at the bottom.
     Trash,
 }
@@ -66,6 +68,7 @@ impl Section {
             Section::Home | Section::Trash => None,
             Section::Pinned => Some("PINNED"),
             Section::Devices => Some("DEVICES"),
+            Section::Tags => Some("TAGS"),
         }
     }
 }
@@ -79,6 +82,8 @@ pub enum Origin {
         removable: bool,
     },
     Device(VolumeKind),
+    /// A tag, in its colour if it has one.
+    Tag(Option<Hue>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -116,6 +121,8 @@ impl Item {
             Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
             Origin::Device(_) => ("\u{f0a0}", "▥"),
+            // A dot in the tag's colour, in every set: it is the colour that says what it is.
+            Origin::Tag(_) => ("●", "●"),
         };
         match set {
             IconSet::Nerd => nerd,
@@ -238,6 +245,24 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             path: v.mount_point.clone(),
             usage,
         });
+    }
+    if app.tags_supported() {
+        // The seven colours always, in the Finder's order and called what the system calls
+        // them; then the user's own tags seen in the folders opened so far.
+        let tag = |name: String, color: Option<Hue>| Item {
+            section: Section::Tags,
+            origin: Origin::Tag(color),
+            path: rada_core::tagsearch::view_path(&name),
+            name,
+            usage: None,
+            locked: false,
+        };
+        for c in Hue::ALL {
+            out.push(tag(c.label(&app.tag_lang).to_string(), Some(c)));
+        }
+        for t in &app.known_tags {
+            out.push(tag(t.name.clone(), t.color));
+        }
     }
     trash(&mut out);
     out

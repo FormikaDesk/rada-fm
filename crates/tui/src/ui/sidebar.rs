@@ -133,7 +133,12 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     f.render_widget(Paragraph::new(Line::from(spans)), r);
                     continue;
                 }
-                let icon_color = if marked { th.accent } else { th.text_dim };
+                let icon_color = match item.origin {
+                    // A tag's dot keeps its colour (a tag with none is a dim dot).
+                    Origin::Tag(color) => th.tag_color(color),
+                    _ if marked => th.accent,
+                    _ => th.text_dim,
+                };
                 let glyph = item.glyph(app.icons);
                 let mark = if glyph.is_empty() && rail {
                     item.initial()

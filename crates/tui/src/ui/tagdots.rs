@@ -6,8 +6,8 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::theme::Theme;
 
-/// The dots for `tags`: `●` in each tag's colour, three at most, then a `+` when there are
-/// more. Empty when there are no tags. A tag with no colour is a dim dot.
+/// The dots for `tags`: `●` in each tag's colour, three at most, then `+N` for the N more.
+/// Empty when there are no tags. A tag with no colour is a dim dot.
 pub fn dots(th: &Theme, tags: &[Tag]) -> Vec<(String, Color)> {
     let mut out: Vec<(String, Color)> = tags
         .iter()
@@ -15,7 +15,7 @@ pub fn dots(th: &Theme, tags: &[Tag]) -> Vec<(String, Color)> {
         .map(|t| ("●".to_string(), th.tag_color(t.color)))
         .collect();
     if tags.len() > 3 {
-        out.push(("+".to_string(), th.text_dim));
+        out.push((format!("+{}", tags.len() - 3), th.text_dim));
     }
     out
 }

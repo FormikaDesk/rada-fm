@@ -374,3 +374,214 @@ fn a_request_goes_through_the_engine_like_any_other() {
     assert_eq!(planned.plan.kind, OpKind::SetTags);
     assert_eq!(planned.plan.steps.len(), 1);
 }
+
+// ------------------------------------------------------------------------- the view of a tag
+
+mod view {
+    use super::*;
+    use rada_core::fs::LocalFs;
+    use rada_core::platform::tags::XattrTags;
+    use rada_core::tagsearch::{self, TagQuery};
+
+    fn home_file(sb: &Sandbox, rel: &str) -> PathBuf {
+        let p = sb.dirs.home.join(rel);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(&p, "x").unwrap();
+        p
+    }
+
+    fn tag_all(sb: &Sandbox, p: &Path, tags: Vec<Tag>) {
+        sb.platform().tags().unwrap().write(p, &tags).unwrap();
+    }
+
+    fn listed(sb: &Sandbox, name: &str) -> Vec<PathBuf> {
+        let mut v = tagsearch::find(sb.platform().as_ref(), &TagQuery::new(name), &|| false)
+            .expect("a search");
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn items_are_found_by_walking_the_home_folder_when_there_is_no_index() {
+        let sb = Sandbox::new();
+        if !supported(&sb) {
+            return;
+        }
+        let blue_a = home_file(&sb, "Documents/a.txt");
+        let blue_b = home_file(&sb, "Projects/deep/er/b.txt");
+        let red = home_file(&sb, "red.txt");
+        let hidden = home_file(&sb, ".cache/x/c.txt");
+        let plain = home_file(&sb, "plain.txt");
+        let _ = plain;
+        // Blue in two languages, and a tag of the user's own that is blue.
+        tag_all(&sb, &blue_a, vec![Tag::standard_in(TagColor::Blue, "it")]);
+        tag_all(&sb, &blue_b, vec![Tag::standard(TagColor::Blue)]);
+        tag_all(&sb, &red, vec![Tag::standard(TagColor::Red)]);
+        tag_all(&sb, &hidden, vec![Tag::standard(TagColor::Blue)]);
+        let clients = home_file(&sb, "clients.txt");
+        tag_all(
+            &sb,
+            &clients,
+            vec![Tag {
+                name: "Clients".into(),
+                color: Some(TagColor::Blue),
+            }],
+        );
+
+        let mut want = vec![blue_a.clone(), blue_b.clone()];
+        want.sort();
+        assert_eq!(listed(&sb, "Blu"), want, "the colour, whatever its name");
+        assert_eq!(listed(&sb, "blue"), want);
+        assert_eq!(listed(&sb, "Clients"), [clients]);
+        assert_eq!(listed(&sb, "Rosso"), [red]);
+        assert!(listed(&sb, "Nothing").is_empty());
+    }
+
+    #[test]
+    fn the_entries_of_the_view_are_told_apart_by_their_full_path() {
+        let sb = Sandbox::new();
+        if !supported(&sb) {
+            return;
+        }
+        let a = home_file(&sb, "one/same.txt");
+        let b = home_file(&sb, "two/same.txt");
+        for p in [&a, &b] {
+            tag_all(&sb, p, vec![Tag::named("Work")]);
+        }
+        let entries = tagsearch::entries(
+            &LocalFs,
+            sb.platform().as_ref(),
+            &TagQuery::new("work"),
+            &|| false,
+        )
+        .unwrap();
+        assert_eq!(entries.len(), 2);
+        let mut names: Vec<_> = entries.iter().map(|e| e.name.clone()).collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), 2, "two files called same.txt are two rows");
+        for e in &entries {
+            assert_eq!(e.display, "same.txt");
+            assert_eq!(e.name, e.path.as_os_str());
+            assert_eq!(e.tags[0].name, "Work");
+        }
+    }
+
+    /// A stand-in for `baloosearch`: prints what it is told to, after a line that is not a path.
+    fn fake_tool(dir: &Path, name: &str, body: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        let exe = dir.join(name);
+        std::fs::write(&exe, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[test]
+    fn the_index_is_asked_first_and_what_it_says_is_checked_against_the_tags() {
+        let sb = Sandbox::new();
+        if !supported(&sb) {
+            return;
+        }
+        let tagged = home_file(&sb, "tagged.txt");
+        let stale = home_file(&sb, "stale.txt"); // the index still lists it; the tag is gone
+        let elsewhere = home_file(&sb, "far/away/elsewhere.txt"); // the index does not know it
+        tag_all(&sb, &tagged, vec![Tag::named("Work")]);
+        tag_all(&sb, &elsewhere, vec![Tag::named("Work")]);
+        let bin = sb.root.join("tools");
+        std::fs::create_dir_all(&bin).unwrap();
+        let log = sb.root.join("tool.log");
+        fake_tool(
+            &bin,
+            "baloosearch6",
+            &format!(
+                "echo \"$*\" >> '{}'\necho '{}'\necho '{}'\necho 'Elapsed: 4 msec'",
+                log.display(),
+                tagged.display(),
+                stale.display()
+            ),
+        );
+        let store = XattrTags::freedesktop().with_tool_dir(bin.clone());
+        use rada_core::platform::TagStore;
+        let found = store
+            .find(&TagQuery::new("Work"), &sb.dirs.home, &|| false)
+            .unwrap();
+        // The index had something to say, so the disk was not walked.
+        assert_eq!(found, std::slice::from_ref(&tagged));
+        let asked = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(asked.trim(), "tag:\"Work\"");
+
+        // An index that finds nothing, or fails, sends the search to the disk.
+        fake_tool(&bin, "baloosearch6", "exit 0");
+        let mut found = store
+            .find(&TagQuery::new("Work"), &sb.dirs.home, &|| false)
+            .unwrap();
+        found.sort();
+        let mut want = vec![tagged.clone(), elsewhere.clone()];
+        want.sort();
+        assert_eq!(found, want);
+        fake_tool(&bin, "baloosearch6", "exit 3");
+        let mut found = store
+            .find(&TagQuery::new("Work"), &sb.dirs.home, &|| false)
+            .unwrap();
+        found.sort();
+        assert_eq!(found, want);
+        // No tool at all: the same.
+        let empty = sb.root.join("no-tools");
+        std::fs::create_dir_all(&empty).unwrap();
+        let store = XattrTags::freedesktop().with_tool_dir(empty);
+        let mut found = store
+            .find(&TagQuery::new("Work"), &sb.dirs.home, &|| false)
+            .unwrap();
+        found.sort();
+        assert_eq!(found, want);
+    }
+
+    #[test]
+    fn a_search_that_is_given_up_returns_what_it_has() {
+        let sb = Sandbox::new();
+        if !supported(&sb) {
+            return;
+        }
+        for i in 0..900 {
+            let f = home_file(&sb, &format!("many/{i}.txt"));
+            tag_all(&sb, &f, vec![Tag::named("Work")]);
+        }
+        let q = TagQuery::new("Work");
+        let all = tagsearch::find(sb.platform().as_ref(), &q, &|| false).unwrap();
+        assert_eq!(all.len(), 900);
+        let cancelled = tagsearch::find(sb.platform().as_ref(), &q, &|| true).unwrap();
+        assert!(cancelled.len() < 900, "stopped early: {}", cancelled.len());
+    }
+
+    #[test]
+    fn spotlight_is_asked_for_the_tag_by_the_name_the_finder_stores() {
+        use rada_core::platform::TagStore;
+        let sb = Sandbox::new();
+        if !supported(&sb) {
+            return;
+        }
+        let f = home_file(&sb, "doc.txt");
+        let bin = sb.root.join("tools");
+        std::fs::create_dir_all(&bin).unwrap();
+        let log = sb.root.join("mdfind.log");
+        fake_tool(
+            &bin,
+            "mdfind",
+            &format!("echo \"$*\" >> '{}'\necho '{}'", log.display(), f.display()),
+        );
+        let store = XattrTags::finder().with_tool_dir(bin);
+        // (This system cannot keep the Finder's attribute, so what the stand-in lists fails
+        // the check and the search ends on the disk with nothing: only the question is tested.)
+        let found = store
+            .find(&TagQuery::new("Blu"), &sb.dirs.home, &|| false)
+            .unwrap();
+        assert!(found.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap().trim(),
+            "kMDItemUserTags == 'Blu'c"
+        );
+        // A quote in the name cannot end the query early.
+        let _ = store.find(&TagQuery::new("it's"), &sb.dirs.home, &|| false);
+        let asked = std::fs::read_to_string(&log).unwrap();
+        assert!(asked.contains(r"kMDItemUserTags == 'it\'s'c"), "{asked}");
+    }
+}

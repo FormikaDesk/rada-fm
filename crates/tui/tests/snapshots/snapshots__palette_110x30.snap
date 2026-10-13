@@ -9,14 +9,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
                             │▌☐ ▸ data                       6 days ago      Folder
-                ╭────────────────────────────────────────────────────────────────────────────╮
-                │                                                                            │
-                │  ⌕  projec                                                                 │            1 B
-                │  ────────────────────────────────────────────────────────────────────────  │         420 MB
-                │  ▎ ▸ data                      ~/demo/projects/data                folder  │           42 B
-                │    ▸ src                       ~/demo/projects/src                 folder  │           37 B
-                │                                                                            │        3.52 KB
-                │  ↑↓ move   Enter go   Esc close   3 results                                │           73 B
+ TAGS           ╭────────────────────────────────────────────────────────────────────────────╮
+  ● Red         │                                                                            │
+  ● Orange      │  ⌕  projec                                                                 │            1 B
+  ● Yellow      │  ────────────────────────────────────────────────────────────────────────  │         420 MB
+  ● Green       │  ▎ ▸ data                      ~/demo/projects/data                folder  │           42 B
+  ● Blue        │    ▸ src                       ~/demo/projects/src                 folder  │           37 B
+  ● Purple      │                                                                            │        3.52 KB
+  ● Gray        │  ↑↓ move   Enter go   Esc close   3 results                                │           73 B
                 │                                                                            │           13 B
                 ╰────────────────────────────────────────────────────────────────────────────╯           16 B
                             │ ☐ · 📷 holiday photos 🌴.txt   27/11/2028      Text document                6 B

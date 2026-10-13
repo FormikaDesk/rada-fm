@@ -9,14 +9,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ⌂ Home                    │ ☐   Name ↑                     Date modified   Type                        Size
    ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-   │                                                                                                      │
-   │   Delete                                                                                             │
-   │  Permanently delete 1 item                                                                           │ B
-   │  In    ~/demo/projects                                                                               │MB
-   │                                                                                                      │ B
-   │  1             3.52 KB                                                                               │ B
-   │  file          freed                                                                                 │KB
-   │                                                                                                      │ B
+ TA│                                                                                                      │
+  ●│   Delete                                                                                             │
+  ●│  Permanently delete 1 item                                                                           │ B
+  ●│  In    ~/demo/projects                                                                               │MB
+  ●│                                                                                                      │ B
+  ●│  1             3.52 KB                                                                               │ B
+  ●│  file          freed                                                                                 │KB
+  ●│                                                                                                      │ B
    │  ▲ PERMANENT: this cannot be undone                                                                  │ B
    │                                                                                                      │ B
    │  What will happen                                                                                    │ B

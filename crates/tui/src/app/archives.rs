@@ -93,7 +93,7 @@ impl App {
             ),
             1 => {
                 let archive = archives[0].clone();
-                let dest = self.cwd.clone();
+                let dest = self.folder_for_new(std::slice::from_ref(&archive));
                 if here {
                     self.plan_extract_now(archive, Vec::new(), dest, ExtractInto::Here);
                 } else {
@@ -162,14 +162,16 @@ impl App {
         } else {
             self.cwd
                 .file_name()
+                .filter(|_| self.tag_view().is_none())
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "archive".into())
         };
         let text = format!("{base}{}", format.extension());
+        let dir = self.folder_for_new(&sources);
         self.modal = Some(Modal::Input(InputView::new(
             InputKind::Compress {
                 sources,
-                dir: self.cwd.clone(),
+                dir,
                 format,
             },
             text,

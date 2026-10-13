@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use crate::Error;
 use crate::Result;
+use crate::tagsearch::{self, ScanLimits, TagQuery};
 
 /// The Finder's colours, as the menu lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -258,10 +259,9 @@ pub fn without_tag(tags: &[Tag], name: &str) -> Vec<Tag> {
 pub fn encode_finder(tags: &[Tag]) -> Vec<u8> {
     let items: Vec<String> = tags
         .iter()
-        .map(|t| match t.color {
-            Some(c) => format!("{}\n{}", t.name, c.finder_index()),
-            None => t.name.clone(),
-        })
+        // The number is always written, 0 for a tag with no colour: what the Finder reads back
+        // is then what was meant, whatever the name says.
+        .map(|t| format!("{}\n{}", t.name, t.color.map_or(0, TagColor::finder_index)))
         .collect();
     crate::platform::bplist::encode_string_array(&items)
 }
@@ -329,12 +329,31 @@ pub trait TagStore: Send + Sync {
     fn language(&self) -> String {
         language_from_env()
     }
+
+    /// The items under `root` (or anywhere, where the system has an index) that carry the tag.
+    /// Slow: call it from a worker, and stop early when `cancel` says so.
+    fn find(
+        &self,
+        query: &TagQuery,
+        root: &Path,
+        cancel: &dyn Fn() -> bool,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        Ok(tagsearch::scan(
+            self,
+            root,
+            query,
+            cancel,
+            ScanLimits::default(),
+        ))
+    }
 }
 
 /// Tags kept in an extended attribute.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub struct XattrTags {
     format: Format,
+    /// Where to look for the search tool (`mdfind`, `baloosearch`); `None`: in `PATH`.
+    tool_dir: Option<std::path::PathBuf>,
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -350,6 +369,7 @@ impl XattrTags {
     pub fn finder() -> XattrTags {
         XattrTags {
             format: Format::Finder,
+            tool_dir: None,
         }
     }
 
@@ -357,7 +377,57 @@ impl XattrTags {
     pub fn freedesktop() -> XattrTags {
         XattrTags {
             format: Format::Freedesktop,
+            tool_dir: None,
         }
+    }
+
+    /// Look for the search tool in this folder only (for tests, with a stand-in).
+    pub fn with_tool_dir(mut self, dir: std::path::PathBuf) -> XattrTags {
+        self.tool_dir = Some(dir);
+        self
+    }
+
+    /// The first of `names` that is a program, in the tool folder or in `PATH`.
+    fn tool(&self, names: &[&str]) -> Option<std::path::PathBuf> {
+        let dirs: Vec<std::path::PathBuf> = match &self.tool_dir {
+            Some(d) => vec![d.clone()],
+            None => std::env::split_paths(&std::env::var_os("PATH")?).collect(),
+        };
+        names.iter().find_map(|n| {
+            dirs.iter().map(|d| d.join(n)).find(|p| {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::metadata(p)
+                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            })
+        })
+    }
+
+    /// What the system's own index says carries the tag: Spotlight on a Mac, Baloo where it
+    /// runs. `None` when there is no index to ask or it did not answer.
+    fn indexed(
+        &self,
+        query: &TagQuery,
+        cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<std::path::PathBuf>> {
+        const WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+        let (program, args) = match self.format {
+            Format::Finder => {
+                let q = query.name.replace('\\', "\\\\").replace('\'', "\\'");
+                (
+                    self.tool(&["mdfind"])?,
+                    vec![format!("kMDItemUserTags == '{q}'c")],
+                )
+            }
+            Format::Freedesktop => {
+                let q = query.name.replace('"', "");
+                (
+                    self.tool(&["baloosearch6", "baloosearch"])?,
+                    vec![format!("tag:\"{q}\"")],
+                )
+            }
+        };
+        let out = tagsearch::run_tool(&program, &args, WAIT, cancel)?;
+        Some(tagsearch::paths_from_output(&out))
     }
 
     fn attribute(&self) -> &'static str {
@@ -405,6 +475,33 @@ impl TagStore for XattrTags {
             Format::Finder => "Finder tags",
             Format::Freedesktop => "tags",
         }
+    }
+
+    fn find(
+        &self,
+        query: &TagQuery,
+        root: &Path,
+        cancel: &dyn Fn() -> bool,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        // The index is asked first; what it names is checked against the tags themselves (an
+        // index lags behind, and matches loosely). An index with nothing to offer, or none,
+        // sends the search to the disk.
+        if let Some(listed) = self.indexed(query, cancel) {
+            let found: Vec<_> = listed
+                .into_iter()
+                .filter(|p| self.read(p).is_ok_and(|t| query.matches(&t)))
+                .collect();
+            if !found.is_empty() {
+                return Ok(found);
+            }
+        }
+        Ok(tagsearch::scan(
+            self,
+            root,
+            query,
+            cancel,
+            ScanLimits::default(),
+        ))
     }
 
     fn language(&self) -> String {
@@ -705,6 +802,28 @@ mod tests {
                 assert_eq!(decode_finder(&bytes).unwrap(), [tag]);
             }
         }
+    }
+
+    #[test]
+    fn the_colour_number_is_always_written_and_zero_means_none() {
+        let bytes = encode_finder(&[
+            t("Lavoro", None),
+            Tag::standard_in(TagColor::Red, "it"),
+            t("Clienti", Some(TagColor::Blue)),
+        ]);
+        assert_eq!(
+            crate::platform::bplist::decode_string_array(&bytes).unwrap(),
+            ["Lavoro\n0", "Rosso\n6", "Clienti\n4"]
+        );
+        // And back: the number is the colour, 0 is none.
+        assert_eq!(
+            decode_finder(&bytes).unwrap(),
+            [
+                t("Lavoro", None),
+                t("Rosso", Some(TagColor::Red)),
+                t("Clienti", Some(TagColor::Blue))
+            ]
+        );
     }
 
     #[test]

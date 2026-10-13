@@ -344,6 +344,17 @@ fn row<'a>(
             ));
         }
     }
+    // In the list of a tag's items, the folder each one is in, dim after the name.
+    if app.tag_view().is_some() {
+        let room = cols.name.saturating_sub(used);
+        if room > 8
+            && let Some(parent) = e.path.parent()
+        {
+            let n = display::truncate(&format!("  {}", fmt::short_path(parent, app.home())), room);
+            used += n.width();
+            spans.push(Span::styled(n, with(dim)));
+        }
+    }
     if let Some(l) = &e.link {
         let room = cols.name.saturating_sub(used);
         if room > 5 {

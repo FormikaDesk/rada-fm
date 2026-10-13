@@ -264,7 +264,9 @@ impl App {
             Rename => self.start_rename(),
             BulkRename => self.start_bulk_rename(),
             NewFolder => {
-                if !self.refuse_in_archive("create a folder") {
+                if !self.refuse_in_archive("create a folder")
+                    && !self.refuse_in_tag_view("create a folder")
+                {
                     self.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewDir,
                         String::new(),
@@ -329,7 +331,10 @@ impl App {
             ToggleSidebar => self.toggle_sidebar(),
 
             NewFile => {
-                if !self.refuse_if_busy() && !self.refuse_in_archive("create a file") {
+                if !self.refuse_if_busy()
+                    && !self.refuse_in_archive("create a file")
+                    && !self.refuse_in_tag_view("create a file")
+                {
                     self.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewFile,
                         String::new(),
@@ -454,6 +459,18 @@ impl App {
     fn open_terminal_here(&mut self) {
         let dir = match &self.archive {
             Some(a) => a.archive.parent().map(Path::to_path_buf),
+            None if self.tag_view().is_some() => {
+                // Where the item under the cursor is.
+                Some(
+                    self.folder_for_new(
+                        &self
+                            .current()
+                            .map(|e| e.path.clone())
+                            .into_iter()
+                            .collect::<Vec<_>>(),
+                    ),
+                )
+            }
             None => Some(self.cwd.clone()),
         };
         let Some(dir) = dir else { return };

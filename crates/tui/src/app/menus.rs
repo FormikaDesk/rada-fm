@@ -26,10 +26,12 @@ impl App {
     fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
         use Action::*;
         let ro = self.archive.is_some();
+        // Nothing is made *in* a list of tagged items.
+        let nowhere = ro || self.tag_view().is_some();
         match kind {
             MenuKind::New => vec![
-                MenuItem::act(NewFolder, !ro, false),
-                MenuItem::act(NewFile, !ro, false),
+                MenuItem::act(NewFolder, !nowhere, false),
+                MenuItem::act(NewFile, !nowhere, false),
             ],
             MenuKind::Sort => {
                 let key = |k: SortKey, label: &str, gap: bool| {
@@ -96,6 +98,7 @@ impl App {
         let has_clip = self.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();
         let ro = self.archive.is_some();
+        let nowhere = ro || self.tag_view().is_some();
         let on_archive = self.on_archive_item();
         if on_item {
             let cur = self.current();
@@ -117,7 +120,7 @@ impl App {
             }
             items.push(MenuItem::act(Cut, !ro, !(on_archive || ro)));
             items.push(MenuItem::act(Copy, true, false));
-            items.push(MenuItem::act(Paste, has_clip && !ro, false));
+            items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
             items.push(MenuItem::act(Rename, !ro, true));
             if !ro {
                 items.push(MenuItem::act(Compress, true, false));
@@ -145,8 +148,8 @@ impl App {
             items.push(MenuItem::act(Trash, !ro, true));
             items.push(MenuItem::act(Properties, true, true));
         } else {
-            items.push(MenuItem::sub(MenuKind::New, "New", !ro, false));
-            items.push(MenuItem::act(Paste, has_clip && !ro, false));
+            items.push(MenuItem::sub(MenuKind::New, "New", !nowhere, false));
+            items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
             items.push(MenuItem::sub(MenuKind::Sort, "Sort by", true, true));
             items.push(MenuItem::sub(MenuKind::View, "View", true, false));
             items.push(MenuItem::act(Refresh, true, true));

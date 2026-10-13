@@ -26,13 +26,13 @@ expression: shot(&mut h)
   ⏏ USB drive               │ ☐ · README.md                            Tod│ Copy                   Ctrl+C│        145 B
     ━━━━━━───────── 35.4 GB │ ☐ · report.pdf                           4 d│ Paste                  Ctrl+V│      2.29 MB
                             │ ☐ · screenshot.png                       Yes│──────────────────────────────│      5.34 KB
-                            │ ☐ · setup.sh                             12 │ Rename                     F2│         21 B
-                            │ ☐ · song.mp3                             30/│ Compress…               Alt+z│      7.44 MB
-                            │                                             │──────────────────────────────│
-                            │                                             │ Tags                        ▸│
-                            │                                             │──────────────────────────────│
-                            │                                             │ Copy the path    Ctrl+Shift+C│
-                            │                                             │──────────────────────────────│
+ TAGS                       │ ☐ · setup.sh                             12 │ Rename                     F2│         21 B
+  ● Red                     │ ☐ · song.mp3                             30/│ Compress…               Alt+z│      7.44 MB
+  ● Orange                  │                                             │──────────────────────────────│
+  ● Yellow                  │                                             │ Tags                        ▸│
+  ● Green                   │                                             │──────────────────────────────│
+  ● Blue                    │                                             │ Copy the path    Ctrl+Shift+C│
+  ● Purple                  │                                             │──────────────────────────────│
  19 items                                                                 │ Move to trash             Del│━━────  ≣  ▦
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Esc  close                                                             │ Properties          Alt+Enter│

@@ -94,7 +94,10 @@ impl App {
     /// Ask for the sizes of these entries (indices into the listing), those not known yet.
     /// Called while drawing: it only notes what is wanted and sends it to the worker.
     pub fn want_folder_sizes(&mut self, indices: impl Iterator<Item = usize>) {
-        if self.folder_size_mode() == SizeMode::Off || self.archive.is_some() {
+        if self.folder_size_mode() == SizeMode::Off
+            || self.archive.is_some()
+            || self.tag_view().is_some()
+        {
             return;
         }
         self.follow_folder_for_sizes();

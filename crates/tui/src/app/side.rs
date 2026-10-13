@@ -198,6 +198,14 @@ impl App {
     /// The menu of a sidebar item: open it, and add or remove it from the bookmarks.
     pub(super) fn side_menu(&self, path: &Path, at: (u16, u16)) -> MenuView {
         let mut items = vec![MenuItem::go("Open".into(), path.to_path_buf())];
+        if rada_core::tagsearch::view_name(path).is_some() {
+            // A tag is not a folder: nothing to pin or eject.
+            return MenuView {
+                at,
+                items,
+                selected: 0,
+            };
+        }
         let is_state = self.paths.bookmarks.iter().any(|b| b == path);
         let is_config = self.cfg_bookmarks.iter().any(|b| b == path);
         if is_state {

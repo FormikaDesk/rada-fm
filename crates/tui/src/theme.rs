@@ -894,6 +894,11 @@ impl Theme {
         for c in [self.accent, self.success, self.warn, self.error] {
             v.push(self.tint(c));
         }
+        // The dots of the seven tag colours, and the dim one of a tag with none.
+        for c in rada_core::platform::TagColor::ALL {
+            v.push(self.tag_color(Some(c)));
+        }
+        v.push(self.tag_color(None));
         v
     }
 

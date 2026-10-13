@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -59,6 +59,9 @@ enum DirReq {
 #[derive(Clone)]
 pub struct DirLoader {
     tx: Sender<DirReq>,
+    /// The newest generation asked for: a search that is still running for an older one
+    /// stops.
+    latest: Arc<AtomicU64>,
 }
 
 impl DirLoader {
@@ -68,20 +71,24 @@ impl DirLoader {
         out: Sender<CoreEvent>,
     ) -> DirLoader {
         let (tx, rx) = unbounded::<DirReq>();
+        let latest = Arc::new(AtomicU64::new(0));
+        let seen = latest.clone();
         std::thread::Builder::new()
             .name("rada-dir".into())
-            .spawn(move || dir_loop(rx, fs, platform, out))
+            .spawn(move || dir_loop(rx, fs, platform, out, seen))
             .expect("spawn dir worker");
-        DirLoader { tx }
+        DirLoader { tx, latest }
     }
 
-    /// Read a whole directory.
+    /// Read a whole directory (or, for a `tag:` path, look for the items with that tag).
     pub fn load(&self, path: PathBuf, generation: u64) {
+        self.latest.fetch_max(generation, Ordering::SeqCst);
         let _ = self.tx.send(DirReq::Load { path, generation });
     }
 
     /// Re-inspect only these paths of `dir`.
     pub fn patch(&self, dir: PathBuf, paths: Vec<PathBuf>, generation: u64) {
+        self.latest.fetch_max(generation, Ordering::SeqCst);
         let _ = self.tx.send(DirReq::Patch {
             dir,
             paths,
@@ -95,6 +102,7 @@ fn dir_loop(
     fs: Arc<dyn FsEngine>,
     platform: Arc<dyn Platform>,
     out: Sender<CoreEvent>,
+    latest: Arc<AtomicU64>,
 ) {
     while let Ok(first) = rx.recv() {
         // Coalesce: only the newest full load matters; patches for the same dir merge.
@@ -121,6 +129,35 @@ fn dir_loop(
         }
 
         if let Some((path, generation)) = load {
+            if let Some(name) = crate::tagsearch::view_name(&path) {
+                // A search can take a while: on a thread of its own, so that the next folder
+                // the person opens is not kept waiting behind it.
+                let (fs, platform, out, latest) =
+                    (fs.clone(), platform.clone(), out.clone(), latest.clone());
+                let _ = std::thread::Builder::new()
+                    .name("rada-tag-view".into())
+                    .spawn(move || {
+                        let stale = || latest.load(Ordering::SeqCst) != generation;
+                        let query = crate::tagsearch::TagQuery::new(&name);
+                        let result = crate::tagsearch::entries(
+                            fs.as_ref(),
+                            platform.as_ref(),
+                            &query,
+                            &stale,
+                        );
+                        if stale() {
+                            return;
+                        }
+                        let _ = out.send(CoreEvent::Dir(DirEvent::Loaded {
+                            generation,
+                            path,
+                            result,
+                            archive: None,
+                            denied: None,
+                        }));
+                    });
+                continue;
+            }
             // A path that runs through a file is inside an archive. An ordinary folder costs
             // one `stat` to find that out.
             let mut denied = None;

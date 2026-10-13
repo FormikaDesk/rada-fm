@@ -10,14 +10,14 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
   ⌂ Home                    │ ☐   Name ↑                               Date modified   Type                        Size
                             │▌☐ · README.md                            10/10/2026      Markdown                     3 B
-      ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-      │                                                                                                          │
-      │   Copy                                                                                                   │
-      │  Copy 2 items                                                                                            │
-      │  From  ~/demo/projects                                                                                   │
-      │  To    ~/demo/backup                                                                                     │
-      │                                                                                                          │
-      │  2             79 B                                                                                      │
+ TAGS ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  ● Re│                                                                                                          │
+  ● Or│   Copy                                                                                                   │
+  ● Ye│  Copy 2 items                                                                                            │
+  ● Gr│  From  ~/demo/projects                                                                                   │
+  ● Bl│  To    ~/demo/backup                                                                                     │
+  ● Pu│                                                                                                          │
+  ● Gr│  2             79 B                                                                                      │
       │  files         in total                                                                                  │
       │                                                                                                          │
       │  If a name already exists    skip  keep both  overwrite    c to change                                   │

@@ -23,8 +23,8 @@ expression: shot(&mut h)
   ⏏ USB drive               │ ☐ · README.md        Today 13:28     Markdown                   145 B
     ━━━━━━───────── 35.4 GB │ ☐ · report.pdf       4 days ago      PDF document             2.29 MB
                             │ ☐ · screenshot.png   Yesterday       PNG image                5.34 KB
-                            │ ☐ · setup.sh         12 days ago     Shell script                21 B
-                            │ ☐ · song.mp3         30/07/2026      MP3 audio                7.44 MB
-                            │
+ TAGS                       │ ☐ · setup.sh         12 days ago     Shell script                21 B
+  ● Red                     │ ☐ · song.mp3         30/07/2026      MP3 audio                7.44 MB
+  ● Orange                  │
  19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste     183 GB free ━━━━━━────  ≣  ▦
    Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all

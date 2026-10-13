@@ -62,6 +62,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     let bar = Style::default().bg(th.cmdbar);
     let set = app.icons;
     let ro = app.archive.is_some();
+    let nowhere = ro || app.tag_view().is_some();
     let has_target = !app.marked.is_empty() || app.current().is_some();
     let mut b = Bar::default();
     b.push(Span::styled(" ", bar));
@@ -72,7 +73,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         Level::Icons => format!(" {new_icon}▾ "),
         _ => format!(" {new_icon}{}New ▾ ", level.inner()),
     };
-    if ro {
+    if nowhere {
         b.push(Span::styled(new_text, th.faint().patch(bar)));
     } else {
         b.push_hit(
@@ -134,7 +135,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Paste,
         "Paste",
-        app.clipboard.is_some() && !ro,
+        app.clipboard.is_some() && !nowhere,
         Target::Act(Action::Paste),
     );
     if !reduced {

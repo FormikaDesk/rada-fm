@@ -620,16 +620,17 @@ fn mouse_motion_never_triggers_a_redraw() {
     let mut h = harness();
     let _ = h.screen();
     h.app.dirty = false;
-    h.mouse(MouseEventKind::Moved, 10, 10, KeyModifiers::NONE);
+    // (In the list, not on a sidebar item: those redraw when the pointer enters them.)
+    h.mouse(MouseEventKind::Moved, 60, 10, KeyModifiers::NONE);
     h.mouse(
         MouseEventKind::Drag(MouseButton::Left),
-        11,
+        61,
         10,
         KeyModifiers::NONE,
     );
     h.mouse(
         MouseEventKind::Up(MouseButton::Left),
-        11,
+        61,
         10,
         KeyModifiers::NONE,
     );
