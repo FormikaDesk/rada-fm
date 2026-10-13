@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.3] - 2026-10-13
+### Added
+- **Two terminal profiles, chosen before anything is drawn** (`crates/tui/src/caps.rs`). *Modern* is the same interface on Windows Terminal, Terminal.app, GNOME Terminal and Konsole, with what only some of them offer (24-bit colour, Sixel, the clipboard sequence) used where it exists. *Basic* is one fixed fallback for plain terminals (`TERM` empty, `dumb`, `linux`, `vt100`…, or a non-UTF-8 locale): ASCII glyphs, 16 colours, no mouse, no pictures, no terminal queries. `profile = "auto" | "modern" | "basic"`, `--profile`, `RADA_PROFILE`. The README has the table of what each terminal supports.
+- `rada doctor` prints the profile and every capability, with the reason.
+- The basic profile is a backend in front of the real one (`compat.rs`) that replaces the interface's glyphs with ASCII ones of the same width: the interface itself is drawn once, the same way. A test reads the sources and fails when a glyph has no stand-in.
+- `NO_COLOR` is honoured: no colour is written, bold and reverse video carry the meaning.
+- Copy path uses the system's clipboard program (`pbcopy`, `wl-copy` / `xclip` / `xsel`, `clip.exe`) on the terminals that ignore OSC 52 (Terminal.app, GNOME Terminal, Konsole).
+- `Ctrl+O` / `Ctrl+G` go back and forward and `F6` shows or hides the details pane: every action now has a key without `Alt` or `Ctrl+Shift`, and a test keeps it so.
+- Nerd Font detection reads Windows Terminal's `settings.json` and Konsole's profiles.
+- **Three icon sets with a fallback between them.** `nerd` when the terminal is set to use a Nerd Font; `unicode-icons` (the former `unicode`, still accepted under that name) when the system has a symbol font for the terminal to draw the rarer symbols from (Segoe UI Symbol, Apple Symbols, DejaVu Sans, Noto Sans Symbols…); `unicode-std` otherwise, which draws the same marks with only the 46 glyphs that every default monospace font has. `icons = "auto"` walks that chain; `rada doctor` prints the result.
+
+### Changed
+- Windows: colours are 24-bit (the console sets neither `TERM` nor `COLORTERM`, so they were the 16 ANSI ones); pictures are Sixel in Windows Terminal, with the cell size asked to the terminal because the system does not report it; a theme that follows the background now asks the console for its colour, as on Unix.
+- Pictures drawn with half blocks are brought down to 256 or 16 colours where the terminal has no more (Terminal.app before macOS 26).
+- GNOME Terminal and Terminal.app are no longer asked about graphics at start: they have none.
+
 ## [0.6.0-rc.2] - 2026-10-13
 
 The release of the first real try-out on a Mac. Still a **pre-release**: Windows and macOS are tested by CI on GitHub's machines and, for macOS, by one real Mac; please report what looks odd.

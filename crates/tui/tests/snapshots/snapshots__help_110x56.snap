@@ -25,8 +25,8 @@ expression: shot(&mut h)
        │  Half page up                  Ctrl+U                                                        │
        │  Half page down                Ctrl+D                                                        │
        │  Go to home                    ~                                                             │
-       │  Back to the previous folder                                 Alt+←                           │
-       │  Forward to the next folder    Alt+→                         Alt+→                           │
+       │  Back to the previous folder   Ctrl+O                        Alt+← Ctrl+O                    │
+       │  Forward to the next folder    Alt+→ Ctrl+G                  Alt+→ Ctrl+G                    │
        │                                                                                              │
        │  Selecting                                                                                   │
        │  Select / unselect item        Space                         Space Ctrl+Space Ins            │

@@ -119,7 +119,7 @@ impl Item {
         };
         match set {
             IconSet::Nerd => nerd,
-            IconSet::Unicode => plain,
+            IconSet::UnicodeIcons | IconSet::UnicodeStd => plain,
             IconSet::None => "",
         }
     }

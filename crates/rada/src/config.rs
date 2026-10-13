@@ -1,7 +1,12 @@
 //! Optional `config.toml` in the rada config folder.
 //!
 //! ```toml
-//! icons = "nerd"      # nerd | unicode | none
+//! profile = "auto"   # auto | modern | basic: how much is asked of the terminal. `basic` is
+//!                     # ASCII, 16 colours, no mouse and no pictures, for terminals without
+//!                     # UTF-8 or the xterm extensions; `auto` chooses from TERM and the locale
+//! icons = "auto"      # auto | nerd | unicode-icons | unicode-std | none. `auto` takes the
+//!                     # first the font can draw: Nerd Font symbols, Unicode symbols (needs a
+//!                     # symbol font on the system), or only what every monospace font has
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
@@ -63,6 +68,7 @@ use serde::Deserialize;
 
 #[derive(Debug)]
 pub struct FileConfig {
+    pub profile: Option<String>,
     pub icons: Option<String>,
     pub show_hidden: bool,
     pub sort: SortSpec,
@@ -159,6 +165,7 @@ struct DevicesRaw {
 
 #[derive(Deserialize, Default)]
 struct Raw {
+    profile: Option<String>,
     icons: Option<String>,
     show_hidden: Option<bool>,
     sort: Option<String>,
@@ -224,6 +231,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         },
         archive_preview_entries: archives.preview_entries.unwrap_or(200).clamp(10, 5000),
         archive_preview_seconds: archives.preview_seconds.unwrap_or(1.5).clamp(0.0, 30.0),
+        profile: raw.profile,
         icons: raw.icons,
         show_hidden: raw.show_hidden.unwrap_or(false),
         sort: SortSpec {
@@ -305,6 +313,15 @@ mod tests {
         let d = with_config("sidebar = true\n");
         assert_eq!(d.archive_limits, ArchiveLimits::default());
         assert_eq!(d.archive_preview_entries, 200);
+    }
+
+    #[test]
+    fn the_profile_is_read_and_absent_means_auto() {
+        assert_eq!(
+            with_config("profile = \"basic\"\n").profile.as_deref(),
+            Some("basic")
+        );
+        assert_eq!(with_config("sidebar = true\n").profile, None);
     }
 
     #[test]

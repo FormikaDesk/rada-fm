@@ -42,6 +42,8 @@ enum Command {
         #[arg(short, long)]
         yes: bool,
     },
+    /// Say what rada found out about this terminal, and which profile it will use.
+    Doctor,
 }
 
 #[derive(Subcommand, Debug)]
@@ -88,9 +90,16 @@ struct Cli {
     #[arg(long)]
     spawn_terminal: bool,
 
-    /// Icons: `auto` (default: Nerd Font if the terminal uses one, or is Ghostty), `nerd`, `unicode` or `none`.
+    /// Icons: `auto` (default: the best set the terminal's font can draw; Nerd Font symbols
+    /// if the terminal uses such a font, or is Ghostty), `nerd`, `unicode-icons`,
+    /// `unicode-std` or `none`.
     #[arg(long, value_name = "SET")]
     icons: Option<String>,
+
+    /// How much is asked of the terminal: `auto` (default), `modern` (UTF-8, colours,
+    /// mouse, pictures) or `basic` (ASCII, 16 colours, keyboard only).
+    #[arg(long, value_name = "NAME")]
+    profile: Option<String>,
 
     /// Image previews: `auto` (default), `halfblocks`, `kitty`, `sixel`, `iterm2` or `off`.
     #[arg(long, value_name = "MODE")]
@@ -214,6 +223,21 @@ fn main() -> Result<()> {
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
 
+    // What the terminal can do comes first: the icons, the colours and the pictures follow.
+    let profile_name = cli
+        .profile
+        .clone()
+        .or_else(|| std::env::var("RADA_PROFILE").ok())
+        .or(cfg_file.profile.clone());
+    let forced_profile = match profile_name {
+        Some(n) => rada_tui::Profile::parse(&n)
+            .with_context(|| format!("unknown profile {n:?} (use auto, modern or basic)"))?,
+        None => None,
+    };
+    let caps = rada_tui::TermCaps::detect_here(forced_profile);
+    let basic = caps.profile == rada_tui::Profile::Basic;
+    let windows_terminal = caps.terminal == rada_tui::caps::TerminalKind::WindowsTerminal;
+
     let start = match cli.path.first() {
         Some(p) => p.clone(),
         None => std::env::current_dir().context("cannot read the current folder")?,
@@ -234,28 +258,68 @@ fn main() -> Result<()> {
         .or_else(|| std::env::var("RADA_ICONS").ok())
         .or(cfg_file.icons.clone());
     let icons = match icons_name.as_deref() {
+        // A terminal that draws only ASCII has no icons to show.
+        None | Some("auto") if basic => rada_tui::IconSet::None,
+        // The best set the terminal's font can draw: Nerd Font symbols when the terminal is
+        // set to use such a font; Unicode symbols when the system has a symbol font for the
+        // terminal to fall back on; otherwise only the glyphs every monospace font has. The
+        // classic Windows console draws with its one font and falls back on nothing.
         None | Some("auto") => {
             // Ghostty comes with a Nerd Font symbols fallback: its icons draw with no setup.
-            if fonts::terminal_uses_nerd_font(&dirs.home) || fontsetup::running_in_ghostty() {
+            if fonts::terminal_uses_nerd_font(&dirs.home, windows_terminal)
+                || fontsetup::running_in_ghostty()
+            {
                 rada_tui::IconSet::Nerd
+            } else if caps.terminal != rada_tui::caps::TerminalKind::WindowsConsole
+                && fonts::system_has_symbol_font(&dirs.home)
+            {
+                rada_tui::IconSet::UnicodeIcons
             } else {
-                rada_tui::IconSet::Unicode
+                rada_tui::IconSet::UnicodeStd
             }
         }
-        Some(n) => rada_tui::IconSet::parse(n)
-            .with_context(|| format!("unknown icon set {n:?} (use auto, nerd, unicode or none)"))?,
+        Some(n) => rada_tui::IconSet::parse(n).with_context(|| {
+            format!(
+                "unknown icon set {n:?} (use auto, {})",
+                rada_tui::IconSet::NAMES.join(", ")
+            )
+        })?,
     };
+    if let Some(Command::Doctor) = &cli.command {
+        for line in caps.describe() {
+            println!("{line}");
+        }
+        // Why this set: the font the terminal is set to draw with, when it could be read.
+        let chosen = !matches!(icons_name.as_deref(), None | Some("auto"));
+        match fonts::terminal_nerd_font(&dirs.home, windows_terminal) {
+            _ if chosen => println!("icons: {} (set by you: icons / RADA_ICONS)", icons.name()),
+            Some(font) => println!(
+                "icons: {} (the terminal's font is a Nerd Font: {})",
+                icons.name(),
+                font.trim()
+            ),
+            None => println!(
+                "icons: {} (no Nerd Font found in the terminal's configuration)",
+                icons.name()
+            ),
+        }
+        return Ok(());
+    }
 
     // The offer to install a Nerd Font: only where the icons were left to rada to decide, they
-    // would not draw, and it has not been made before. Never made without being asked.
+    // would not draw (one of the Unicode sets stands in for them), and it has not been made
+    // before. Never made without being asked.
     let font_offer = (matches!(icons_name.as_deref(), None | Some("auto"))
-        && icons == rada_tui::IconSet::Unicode
+        && matches!(
+            icons,
+            rada_tui::IconSet::UnicodeIcons | rada_tui::IconSet::UnicodeStd
+        )
         && request.is_none()
         && cli.demo.is_none()
         && !font_offered(&dirs))
     .then(|| make_font_offer(&dirs));
 
-    let depth = rada_tui::theme::ColorDepth::detect();
+    let depth = caps.depth;
     let theme_name = cli
         .theme
         .clone()
@@ -312,6 +376,7 @@ fn main() -> Result<()> {
         Some(n) => rada_tui::ImageMode::parse(&n).with_context(|| {
             format!("unknown image mode {n:?} (use auto, halfblocks, kitty, sixel, iterm2 or off)")
         })?,
+        None if caps.images == rada_tui::caps::ImagePlan::Off => rada_tui::ImageMode::Off,
         None => rada_tui::ImageMode::Auto,
     };
 
@@ -432,7 +497,7 @@ fn main() -> Result<()> {
         },
     };
 
-    let outcome = rada_tui::run::run(cfg, services).context("terminal error")?;
+    let outcome = rada_tui::run::run(cfg, services, caps).context("terminal error")?;
     if let Some(f) = &cli.cwd_file {
         write_cwd(f, &outcome.last_dir).with_context(|| format!("cannot write {}", f.display()))?;
     }
