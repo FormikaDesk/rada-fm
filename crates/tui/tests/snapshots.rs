@@ -195,6 +195,10 @@ fn help_lists_both_schemes() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the menu of a system with no tags has no Tags entry, which the Linux snapshot has"
+)]
 fn context_menu() {
     let mut h = scene(110, 30);
     on(&mut h, "main.rs");

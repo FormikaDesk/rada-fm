@@ -181,6 +181,10 @@ fn the_icons_view() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "the menu of a system with no tags has no Tags entry, which the Linux snapshot has"
+)]
 fn the_context_menus() {
     let mut h = scene(120, 35);
     h.right_click(&Target::Row(h.app.cursor));
