@@ -12,7 +12,7 @@ use crate::Result;
 use crate::fs::FsMeta;
 use crate::platform::{
     AccessDenied, Attrs, Dirs, Fidelity, FileAttributes, Opener, PathRules, PlaceKind, Platform,
-    TrashBackend, UserDirs, Volume, VolumeLister,
+    TagStore, TrashBackend, UserDirs, Volume, VolumeLister,
 };
 
 /// What the stand-in says and has.
@@ -210,5 +210,94 @@ impl Platform for MacLike {
             .iter()
             .find(|d| path.starts_with(&d.folder))
             .cloned()
+    }
+}
+
+/// The sandbox's platform: the machine's own, except that nothing is ever opened. What the
+/// program asks the system to open (a file, a folder in the file manager, a program with a
+/// file, a terminal, an address) is written to the log, and nothing is started: a test must
+/// not open a window on the desktop of whoever runs it.
+pub struct Recording {
+    inner: Arc<dyn Platform>,
+    opener: Recorder,
+}
+
+struct Recorder {
+    log: CallLog,
+}
+
+impl Recorder {
+    fn note(&self, what: String) -> Result<()> {
+        self.log.lock().unwrap().push(what);
+        Ok(())
+    }
+}
+
+impl Opener for Recorder {
+    fn open(&self, path: &Path) -> Result<()> {
+        self.note(format!("open {}", path.display()))
+    }
+    fn reveal(&self, path: &Path) -> Result<()> {
+        self.note(format!("reveal {}", path.display()))
+    }
+    fn open_with(&self, path: &Path, program: &str) -> Result<()> {
+        self.note(format!("open_with {program} {}", path.display()))
+    }
+    fn open_terminal(&self, dir: &Path) -> Result<()> {
+        self.note(format!("open_terminal {}", dir.display()))
+    }
+    fn open_url(&self, url: &str) -> Result<()> {
+        self.note(format!("open_url {url}"))
+    }
+}
+
+impl Recording {
+    pub fn new(inner: Arc<dyn Platform>, log: CallLog) -> Recording {
+        Recording {
+            inner,
+            opener: Recorder { log },
+        }
+    }
+}
+
+impl Platform for Recording {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+    fn dirs(&self) -> &Dirs {
+        self.inner.dirs()
+    }
+    fn trash(&self) -> &dyn TrashBackend {
+        self.inner.trash()
+    }
+    fn volumes(&self) -> &dyn VolumeLister {
+        self.inner.volumes()
+    }
+    fn attributes(&self) -> &dyn FileAttributes {
+        self.inner.attributes()
+    }
+    fn opener(&self) -> &dyn Opener {
+        &self.opener
+    }
+    fn path_rules(&self) -> PathRules {
+        self.inner.path_rules()
+    }
+    fn fidelity(&self) -> &dyn Fidelity {
+        self.inner.fidelity()
+    }
+    fn user_dirs(&self) -> UserDirs {
+        self.inner.user_dirs()
+    }
+    fn display_names(&self, places: &[PathBuf]) -> Vec<(PathBuf, String)> {
+        self.inner.display_names(places)
+    }
+    fn extra_places(&self) -> Vec<(PlaceKind, PathBuf)> {
+        self.inner.extra_places()
+    }
+    fn tags(&self) -> Option<&dyn TagStore> {
+        self.inner.tags()
+    }
+    fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
+        self.inner.explain_denied(path, err)
     }
 }

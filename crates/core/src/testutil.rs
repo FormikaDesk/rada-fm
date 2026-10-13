@@ -120,6 +120,63 @@ fn walk(p: &Path, out: &mut BTreeMap<String, String>, depth: usize) {
 struct Process {
     guard: RealPathGuard,
     scratch: PathBuf,
+    /// Where the stand-ins for the system's openers write down that they were run.
+    launches: PathBuf,
+}
+
+/// The programs the system opens things with. In the tests none of them is the real one:
+/// each name is a script at the front of `PATH` that only writes down that it was run.
+#[cfg(unix)]
+const OPENERS: &[&str] = &[
+    "xdg-open",
+    "gio",
+    "kde-open",
+    "kde-open5",
+    "kde-open6",
+    "gnome-open",
+    "exo-open",
+    "open",
+    "start",
+];
+
+/// Write the stand-ins into `bin`: scripts that add a line to `log` and fail.
+#[cfg(unix)]
+fn write_opener_traps(bin: &Path, log: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::create_dir_all(bin);
+    for name in OPENERS {
+        let script = format!(
+            "#!/bin/sh\necho \"{name} $*\" >> '{}'\nexit 1\n",
+            log.display()
+        );
+        let exe = bin.join(name);
+        if std::fs::write(&exe, script).is_ok() {
+            let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
+        }
+    }
+}
+
+/// Put stand-ins for the openers at the front of `PATH` (Unix; on Windows `ShellExecute`
+/// does not read `PATH`, and the sandbox's platform never reaches it).
+#[cfg(unix)]
+fn install_opener_traps(scratch: &Path) -> PathBuf {
+    let bin = scratch.join("bin");
+    let launches = scratch.join("real-opener-launches.log");
+    write_opener_traps(&bin, &launches);
+    let mut dirs = vec![bin];
+    if let Some(old) = std::env::var_os("PATH") {
+        dirs.extend(std::env::split_paths(&old));
+    }
+    if let Ok(path) = std::env::join_paths(dirs) {
+        // SAFETY: executed once, before any sandbox exists (see `process`).
+        unsafe { std::env::set_var("PATH", path) };
+    }
+    launches
+}
+
+#[cfg(not(unix))]
+fn install_opener_traps(scratch: &Path) -> PathBuf {
+    scratch.join("real-opener-launches.log")
 }
 
 static PROCESS: OnceLock<Process> = OnceLock::new();
@@ -232,7 +289,12 @@ fn process() -> &'static Process {
             // The tests do not speak the language of whoever runs them.
             std::env::set_var("RADA_TAG_LANGUAGE", "en");
         }
-        Process { guard, scratch }
+        let launches = install_opener_traps(&scratch);
+        Process {
+            guard,
+            scratch,
+            launches,
+        }
     })
 }
 
@@ -241,6 +303,18 @@ pub fn assert_real_paths_untouched() {
     if let Err(msg) = process().guard.check() {
         panic!("{msg}");
     }
+    assert_no_real_opener_run();
+}
+
+/// Fail (panic) if anything in this test process tried to run the system's real opener
+/// (`xdg-open`, `open`, `gio`, `kde-open`, `start`…): that would open a program on the
+/// desktop of whoever runs the tests. Opening goes through the sandbox's recording opener.
+pub fn assert_no_real_opener_run() {
+    let log = std::fs::read_to_string(&process().launches).unwrap_or_default();
+    assert!(
+        log.trim().is_empty(),
+        "a test tried to run the system's opener (it was not run):\n{log}"
+    );
 }
 
 // ---------------------------------------------------------------------------------
@@ -254,6 +328,7 @@ pub struct Sandbox {
     pub work: PathBuf,
     pub dirs: Dirs,
     platform: Arc<dyn Platform>,
+    opened: crate::testplatform::CallLog,
 }
 
 impl Sandbox {
@@ -276,14 +351,26 @@ impl Sandbox {
         ] {
             std::fs::create_dir_all(d).expect("create sandbox dir");
         }
-        let platform = platform::sandboxed(dirs.clone());
+        let opened = crate::testplatform::CallLog::default();
+        let platform: Arc<dyn Platform> = Arc::new(crate::testplatform::Recording::new(
+            platform::sandboxed(dirs.clone()),
+            opened.clone(),
+        ));
         Sandbox {
             _tmp: tmp,
             root,
             work,
             dirs,
             platform,
+            opened,
         }
+    }
+
+    /// What the program asked the system to open, in order (`open <path>`, `reveal <path>`,
+    /// `open_with <program> <path>`, `open_terminal <dir>`, `open_url <url>`): the sandbox's
+    /// opener writes it down and starts nothing.
+    pub fn opened(&self) -> Vec<String> {
+        self.opened.lock().unwrap().clone()
     }
 
     pub fn platform(&self) -> Arc<dyn Platform> {
@@ -1129,5 +1216,47 @@ mod tests {
     fn sandbox_drop_checks_real_paths() {
         let sb = Sandbox::new();
         drop(sb); // would panic if a real path had been modified
+    }
+}
+
+#[cfg(all(test, unix))]
+mod opener_trap_tests {
+    use super::*;
+
+    #[test]
+    fn a_stand_in_opener_writes_down_the_call_and_fails() {
+        let tmp = tempfile::Builder::new()
+            .prefix("trap-")
+            .tempdir_in(process().scratch.clone())
+            .unwrap();
+        let (bin, log) = (tmp.path().join("bin"), tmp.path().join("log"));
+        write_opener_traps(&bin, &log);
+        for name in OPENERS {
+            let status = std::process::Command::new(bin.join(name))
+                .arg("/some/file.docx")
+                .status()
+                .unwrap();
+            assert!(!status.success(), "{name}");
+        }
+        let text = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(text.lines().count(), OPENERS.len(), "{text}");
+        assert!(text.contains("xdg-open /some/file.docx"), "{text}");
+    }
+
+    #[test]
+    fn the_openers_in_the_path_of_the_tests_are_the_stand_ins() {
+        let _ = process();
+        let path = std::env::var_os("PATH").unwrap();
+        for name in OPENERS {
+            let found = std::env::split_paths(&path)
+                .map(|d| d.join(name))
+                .find(|p| p.is_file())
+                .unwrap();
+            assert!(
+                found.starts_with(&process().scratch),
+                "{name} resolves to {}",
+                found.display()
+            );
+        }
     }
 }

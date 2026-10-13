@@ -32,6 +32,11 @@ pub struct H {
 }
 
 impl H {
+    /// What the program asked the system to open (the sandbox's opener starts nothing).
+    pub fn opened(&self) -> Vec<String> {
+        self._sb.opened()
+    }
+
     pub fn new(sb: Sandbox, start: PathBuf, w: u16, h: u16) -> H {
         H::with_images(
             sb,

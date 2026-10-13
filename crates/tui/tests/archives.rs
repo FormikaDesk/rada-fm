@@ -109,6 +109,12 @@ fn a_file_whose_content_is_an_archive_is_recognised_by_its_preview() {
         h.app.archive.is_none(),
         "opened with its program, not as a folder"
     );
+    // ... and it is the system that is asked to open it, here a recording stand-in.
+    let opened = h.opened();
+    assert!(
+        opened.len() == 1 && opened[0].starts_with("open ") && opened[0].ends_with("letter.docx"),
+        "{opened:?}"
+    );
 }
 
 #[test]
