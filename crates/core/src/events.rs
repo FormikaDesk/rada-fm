@@ -152,4 +152,12 @@ pub enum CoreEvent {
         name: String,
         result: Result<(), String>,
     },
+    /// The programs that can open a file (for "Open with…"), in the order to list them, and
+    /// the one chosen to be used always for this kind of file, if any.
+    OpenChoices {
+        path: PathBuf,
+        kind: Option<String>,
+        apps: Vec<crate::platform::OpenApp>,
+        always: Option<String>,
+    },
 }

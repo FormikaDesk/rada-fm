@@ -744,6 +744,49 @@ mod tests {
         assert!(!hidden("Documents", None));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn launch_services_is_asked_through_osascript_with_the_file_as_its_argument() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("args.log");
+        let fake = dir.path().join("osascript");
+        std::fs::write(
+            &fake,
+            format!(
+                "#!/bin/sh\nfor a in \"$@\"; do echo \"[$a]\" >> '{}'; done\nprintf '*/Applications/TextEdit.app\\n-/Applications/Visual Studio Code.app\\n'\n",
+                log.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let opener = MacOpener {
+            quick_look: false,
+            osascript: Some(fake),
+        };
+        let file = Path::new("/Users/me/My Notes.txt");
+        let choices = Opener::apps_for(&opener, file);
+        assert_eq!(choices.kind.as_deref(), Some("txt"));
+        let got: Vec<(&str, bool)> = choices
+            .apps
+            .iter()
+            .map(|a| (a.name.as_str(), a.is_default))
+            .collect();
+        assert_eq!(got, [("TextEdit", true), ("Visual Studio Code", false)]);
+        // The script, then the file as one argument: nothing of the name is in the script.
+        let args = std::fs::read_to_string(&log).unwrap();
+        let lines: Vec<&str> = args.lines().collect();
+        assert_eq!(&lines[..3], ["[-l]", "[JavaScript]", "[-e]"]);
+        assert_eq!(lines.last().copied(), Some("[/Users/me/My Notes.txt]"));
+        assert!(!args.lines().nth(3).unwrap().contains("My Notes"));
+        // A tool that fails is no list, not a failure.
+        let broken = MacOpener {
+            quick_look: false,
+            osascript: Some(dir.path().join("missing")),
+        };
+        assert!(Opener::apps_for(&broken, file).apps.is_empty());
+    }
+
     #[test]
     fn a_folder_the_finder_marked_as_a_bundle_is_a_package() {
         let mut info = [0u8; 32];

@@ -57,6 +57,10 @@ pub enum Target {
     ViewMode(crate::view::ViewMode),
     /// The button of the details pane that shows the preview over the whole screen.
     FullPreview,
+    /// A program in the "Open with" window (index into the rows shown).
+    OpenWithRow(usize),
+    /// The "always use this program for this kind of file" box of that window.
+    OpenWithAlways,
     /// The version in the status bar: look for a newer one now.
     CheckUpdates,
     /// Inside a window but on nothing in particular.

@@ -819,9 +819,8 @@ fn the_details_pane_shows_the_item_its_properties_and_buttons() {
     assert!(open < size, "{s}");
     // Each button works.
     h.click(&Target::Act(Action::OpenWith));
-    assert!(
-        matches!(&h.app.modal, Some(Modal::Input(iv)) if matches!(iv.kind, rada_tui::app::InputKind::OpenWith { .. }))
-    );
+    // (The window of programs; the free field is its last line.)
+    assert!(matches!(&h.app.modal, Some(Modal::OpenWith(_))));
     h.press("esc");
     h.click(&Target::FullPreview);
     assert!(matches!(h.app.modal, Some(Modal::FullPreview)));

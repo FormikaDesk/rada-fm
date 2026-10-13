@@ -58,6 +58,11 @@ fn hints(app: &App) -> Vec<Hint> {
             Modal::Plan(_) => vec![Hint::fixed("Enter", "run"), Hint::fixed("Esc", "cancel")],
             Modal::Input(_) => vec![Hint::fixed("Enter", "ok"), Hint::fixed("Esc", "cancel")],
             Modal::Palette(_) => vec![Hint::fixed("Enter", "go"), Hint::fixed("Esc", "close")],
+            Modal::OpenWith(_) => vec![
+                Hint::fixed("Enter", "open"),
+                Hint::fixed("Tab", "always"),
+                Hint::fixed("Esc", "close"),
+            ],
             Modal::ConfirmQuit => vec![Hint::fixed("Enter", "quit"), Hint::fixed("Esc", "stay")],
             Modal::Scanning { .. } => vec![Hint::fixed("Esc", "cancel")],
             _ => vec![Hint::fixed("Esc", "close")],

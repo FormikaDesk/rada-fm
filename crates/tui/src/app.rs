@@ -325,6 +325,8 @@ pub enum Modal {
     Eject(EjectView),
     /// The offer to install a Nerd Font.
     Font(FontView),
+    /// "Open with…": the programs that can open the file, to choose from.
+    OpenWith(Box<OpenWithView>),
 }
 
 /// The offer to install a Nerd Font, made once at the first start where the icons would not
@@ -438,6 +440,7 @@ mod eject;
 mod font;
 mod input;
 mod menus;
+mod openwith;
 mod props;
 mod side;
 mod sizes;
@@ -450,6 +453,7 @@ pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView, TagCmd};
 pub use menus::MenuKind;
+pub use openwith::{OpenRow, OpenWithView};
 pub use props::PropsView;
 pub use tabs::TabState;
 pub use update::{UpdateStatus, UpdateView};
@@ -1087,8 +1091,14 @@ impl App {
             let path = e.path.clone();
             let platform = self.svc.platform.clone();
             let notes = self.svc.notes.clone();
+            let state = platform.dirs().rada_state();
             // Spawning a process is I/O: keep it off the UI thread.
             std::thread::spawn(move || {
+                // A program chosen in "Open with…" to be used always for this kind of file
+                // takes the place of the system's default.
+                if openwith::open_with_chosen(platform.as_ref(), &state, &path) {
+                    return;
+                }
                 if let Err(err) = platform.opener().open(&path) {
                     tracing::warn!("open {}: {err}", path.display());
                     let _ = notes.send(CoreEvent::Note {
@@ -1177,6 +1187,12 @@ impl App {
                 result,
             } => self.on_ejected(mount, name, result),
             CoreEvent::FontInstalled(r) => self.on_font_installed(r),
+            CoreEvent::OpenChoices {
+                path,
+                kind,
+                apps,
+                always,
+            } => self.on_open_choices(path, kind, apps, always),
             CoreEvent::Note { text, error } => {
                 self.toast(
                     if error {
@@ -2447,6 +2463,7 @@ impl App {
                 }
                 _ => self.modal = Some(Modal::History(h)),
             },
+            Modal::OpenWith(v) => self.on_open_with_key(v, key),
             Modal::Palette(mut p) => match key.code {
                 KeyCode::Esc => {}
                 KeyCode::Enter => {

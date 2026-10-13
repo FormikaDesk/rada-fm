@@ -442,10 +442,7 @@ impl App {
         if self.refuse_in_archive("open with a program") {
             return;
         }
-        self.modal = Some(Modal::Input(InputView::new(
-            InputKind::OpenWith { path },
-            String::new(),
-        )));
+        self.open_with_window(path);
     }
 
     /// Put the path of the selection (or of the item under the cursor) on the system clipboard.
@@ -667,6 +664,7 @@ impl App {
         if let Some(modal) = &mut self.modal {
             match modal {
                 Modal::Palette(p) => p.move_by(if down { 1 } else { -1 }),
+                Modal::OpenWith(v) => v.move_by(if down { 1 } else { -1 }),
                 Modal::History(h) => {
                     h.selected = if down {
                         (h.selected + 1).min(h.entries.len().saturating_sub(1))
@@ -872,6 +870,13 @@ impl App {
                     self.on_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
                 }
             }
+            (Some(Modal::OpenWith(v)), Some(Target::OpenWithRow(i))) => {
+                if i < v.rows().len() {
+                    v.select(i);
+                    self.on_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+                }
+            }
+            (Some(Modal::OpenWith(v)), Some(Target::OpenWithAlways)) => v.toggle_always(),
             (Some(Modal::History(h)), Some(Target::HistoryRow(i))) => {
                 if h.selected == i {
                     self.on_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));

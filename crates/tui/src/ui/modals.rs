@@ -183,6 +183,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         }
         Modal::Plan(pv) => draw_plan(f, &th, pv, &home, area, &mut app.hits),
         Modal::Palette(p) => draw_palette(f, &th, p, area, &mut app.hits),
+        Modal::OpenWith(v) => draw_open_with(f, &th, v, area, &mut app.hits),
         Modal::Failure { info, .. } => {
             let w = 88.min(area.width.saturating_sub(4));
             let msg = fmt::wrap(&info.message, (w as usize).saturating_sub(6));
@@ -1112,6 +1113,213 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
     ]);
     f.render_widget(
         Paragraph::new(foot),
+        Rect {
+            y: inner.y + inner.height.saturating_sub(1),
+            height: 1,
+            ..inner
+        },
+    );
+}
+
+// ----------------------------------------------------------------------------- open with
+
+fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits: &mut Hits) {
+    let rows = v.rows();
+    let w = 72.min(area.width.saturating_sub(6));
+    let list_h = rows.len().clamp(3, 12) as u16;
+    let h = (list_h + 11).min(area.height.saturating_sub(2));
+    let r = centered(area, w, h);
+    let inner = frame(f, th, r, th.accent);
+    let iw = inner.width as usize;
+
+    // Title: what is being opened.
+    let title = Line::from(vec![
+        chip(th, "Open with", th.accent),
+        Span::styled(
+            format!("  {}", display::truncate(&v.file, iw.saturating_sub(14))),
+            th.base().add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    f.render_widget(Paragraph::new(title), Rect { height: 1, ..inner });
+
+    // What is typed filters the list.
+    let mut input = vec![Span::styled(
+        "⌕  ",
+        th.accent_style().add_modifier(Modifier::BOLD),
+    )];
+    if v.filter.is_empty() {
+        input.push(Span::styled(
+            " ",
+            Style::default().add_modifier(Modifier::REVERSED),
+        ));
+        input.push(Span::styled("Type to find a program…", th.faint()));
+    } else {
+        let before: String = v.filter.chars().take(v.cursor).collect();
+        let at: String = v
+            .filter
+            .chars()
+            .nth(v.cursor)
+            .map(String::from)
+            .unwrap_or_else(|| " ".into());
+        let after: String = v.filter.chars().skip(v.cursor + 1).collect();
+        input.push(Span::styled(before, th.base()));
+        input.push(Span::styled(
+            at,
+            Style::default().add_modifier(Modifier::REVERSED),
+        ));
+        input.push(Span::styled(after, th.base()));
+    }
+    f.render_widget(
+        Paragraph::new(Line::from(input)),
+        Rect {
+            y: inner.y + 2,
+            height: 1,
+            ..inner
+        },
+    );
+    f.render_widget(
+        Paragraph::new(Span::styled("─".repeat(iw), th.faint())),
+        Rect {
+            y: inner.y + 3,
+            height: 1,
+            ..inner
+        },
+    );
+
+    let list = Rect {
+        y: inner.y + 4,
+        height: inner.height.saturating_sub(7),
+        ..inner
+    };
+    let visible = list.height as usize;
+    let start = v.selected.saturating_sub(visible.saturating_sub(1));
+    let mut lines: Vec<Line> = Vec::new();
+    if v.loading {
+        lines.push(Line::from(Span::styled(
+            "  Looking for the programs that open it…",
+            th.dim(),
+        )));
+    } else if rows.len() == 1 && v.apps.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  No installed program says it opens this kind of file.",
+            th.dim(),
+        )));
+    } else if rows.len() == 1 {
+        lines.push(Line::from(Span::styled(
+            "  No program matches what you typed.",
+            th.dim(),
+        )));
+    }
+    let shown_from = lines.len();
+    for (i, row) in rows.iter().enumerate().skip(start).take(visible) {
+        let sel = i == v.selected;
+        let style = if sel { th.selected() } else { Style::default() };
+        let (label, tag, tone) = match row {
+            OpenRow::App(a) => {
+                let (tag, tone) = if v.always_id.as_deref() == Some(a.id.as_str()) {
+                    ("always", th.accent)
+                } else if a.is_default {
+                    ("default", th.success)
+                } else if a.terminal {
+                    ("in a terminal", th.text_dim)
+                } else {
+                    ("", th.text_dim)
+                };
+                (a.name.clone(), tag, tone)
+            }
+            OpenRow::Other => ("Other program…".to_string(), "", th.text_dim),
+        };
+        let tag_w = 15;
+        let label_w = iw.saturating_sub(4 + tag_w);
+        let mut spans = vec![
+            Span::styled(if sel { "▎" } else { " " }, th.accent_style().patch(style)),
+            Span::styled(
+                match row {
+                    OpenRow::App(_) => "   ",
+                    OpenRow::Other => " → ",
+                },
+                th.dim().patch(style),
+            ),
+            Span::styled(
+                pad(&display::truncate(&label, label_w), label_w),
+                if sel {
+                    th.base().add_modifier(Modifier::BOLD)
+                } else {
+                    th.base()
+                }
+                .patch(style),
+            ),
+            Span::styled(pad_left(tag, tag_w), Style::default().fg(tone).patch(style)),
+        ];
+        let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
+        if drawn < iw {
+            spans.push(Span::styled(" ".repeat(iw - drawn), style));
+        }
+        lines.push(Line::from(spans));
+        hits.add(
+            Rect {
+                y: list.y + (shown_from + i - start) as u16,
+                height: 1,
+                ..list
+            },
+            Target::OpenWithRow(i),
+        );
+    }
+    f.render_widget(Paragraph::new(lines), list);
+
+    // The box, and the keys.
+    let mark = if v.always { "☑" } else { "☐" };
+    let kind = v.kind.as_deref().unwrap_or("this kind of file");
+    let box_text = match v.current() {
+        Some(a) => format!(
+            "{mark} Always use {} for {kind}",
+            display::truncate(&a.name, 24)
+        ),
+        None => format!("{mark} Always use the program for {kind}"),
+    };
+    let foot_y = inner.y + inner.height.saturating_sub(3);
+    let box_area = Rect {
+        y: foot_y,
+        height: 1,
+        ..inner
+    };
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                display::truncate(&box_text, iw.saturating_sub(8)),
+                if v.current().is_some() {
+                    th.base()
+                } else {
+                    th.faint()
+                },
+            ),
+            Span::styled("  Tab", th.key()),
+        ])),
+        box_area,
+    );
+    if v.current().is_some() {
+        hits.add(box_area, Target::OpenWithAlways);
+    }
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "Only in rada: the system's own choice is not changed.",
+            th.faint(),
+        ))),
+        Rect {
+            y: foot_y + 1,
+            height: 1,
+            ..inner
+        },
+    );
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("↑↓", th.key()),
+            Span::styled(" move   ", th.dim()),
+            Span::styled("Enter", th.key()),
+            Span::styled(" open   ", th.dim()),
+            Span::styled("Esc", th.key()),
+            Span::styled(" close", th.dim()),
+        ])),
         Rect {
             y: inner.y + inner.height.saturating_sub(1),
             height: 1,
