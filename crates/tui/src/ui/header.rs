@@ -7,6 +7,7 @@
 //! last resort do the key hints of the two buttons go. The words "Filter" and "Go to"
 //! stay.
 
+use rada_core::i18n::Key;
 use std::path::PathBuf;
 
 use rada_core::display;
@@ -213,7 +214,7 @@ fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
         let text = if app.filter.is_some() {
             format!("{} of {}", app.visible.len(), total)
         } else {
-            fmt::count(app.visible.len() as u64, "item", "items")
+            fmt::count(app.visible.len() as u64, Key::ItemOne, Key::ItemMany)
         };
         b.push(Span::styled(format!("  {text}"), th.dim().patch(band)));
     }

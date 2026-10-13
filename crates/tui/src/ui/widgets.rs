@@ -27,6 +27,17 @@ pub fn field_ends(
     ))
 }
 
+/// The name of a key as the language in use writes it on the cap: `Enter` is `Invio`.
+pub fn key_name(key: &str) -> &str {
+    use rada_core::i18n::Key;
+    match key {
+        "Enter" => Key::KeyEnter.tr(),
+        "Space" => Key::KeySpace.tr(),
+        "Del" => Key::KeyDel.tr(),
+        other => other,
+    }
+}
+
 pub fn pad(s: &str, width: usize) -> String {
     let w = s.width();
     if w >= width {
@@ -244,7 +255,7 @@ pub fn button<'a>(
     color: Option<Color>,
     enabled: bool,
 ) -> Span<'a> {
-    let text = format!(" {key}  {label} ");
+    let text = format!(" {}  {label} ", key_name(key));
     if !enabled {
         return Span::styled(text, th.faint().add_modifier(Modifier::CROSSED_OUT));
     }

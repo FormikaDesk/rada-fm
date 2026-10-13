@@ -137,7 +137,8 @@ pub fn truncate(s: &str, max: usize) -> String {
     out
 }
 
-/// Human readable size (`1.5 MB`), in powers of 1024 labelled the way Windows does.
+/// Human readable size (`1.5 MB`, `1,5 MB` in Italian), in powers of 1024 labelled the way
+/// Windows does.
 pub fn bytes(n: u64) -> String {
     const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
     if n < 1024 {
@@ -149,13 +150,14 @@ pub fn bytes(n: u64) -> String {
         v /= 1024.0;
         u += 1;
     }
-    if v >= 100.0 {
-        format!("{v:.0} {}", UNITS[u])
+    let number = if v >= 100.0 {
+        format!("{v:.0}")
     } else if v >= 10.0 {
-        format!("{v:.1} {}", UNITS[u])
+        format!("{v:.1}")
     } else {
-        format!("{v:.2} {}", UNITS[u])
-    }
+        format!("{v:.2}")
+    };
+    format!("{} {}", crate::i18n::decimal(&number), UNITS[u])
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@
 //! right. The hints depend on what is going on: a selection, the folder filter, an open
 //! window. Each one is clickable.
 
+use rada_core::i18n::Key;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
@@ -178,7 +179,7 @@ fn status<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             format!(
                 "{icon} {} {verb}",
-                fmt::count(c.paths.len() as u64, "item", "items")
+                fmt::count(c.paths.len() as u64, Key::ItemOne, Key::ItemMany)
             ),
             th.fg(th.kinds.vector).patch(band),
         ));

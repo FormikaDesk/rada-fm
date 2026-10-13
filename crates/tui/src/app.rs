@@ -2,6 +2,7 @@
 //! touches the disk is a request to a worker; everything the workers say arrives as an
 //! event and changes state here.
 
+use rada_core::i18n::Key;
 use std::collections::{BTreeSet, HashMap};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -176,6 +177,15 @@ pub struct PlanView {
     pub details: bool,
 }
 
+/// Whether what was typed is the word that confirms a dangerous operation: "yes", or "sì" /
+/// "si" (written the way the Italian interface asks for it).
+pub fn is_confirmation(typed: &str) -> bool {
+    matches!(
+        typed.trim().to_lowercase().as_str(),
+        "yes" | "si" | "sì"
+    )
+}
+
 impl PlanView {
     /// Permanent deletion, and the extraction of what may be an archive bomb, ask for a typed
     /// confirmation (undoing something is not "irreversible" in that sense).
@@ -191,7 +201,7 @@ impl PlanView {
     pub fn can_run(&self) -> bool {
         self.plan.is_executable()
             && self.replanning.is_none()
-            && (!self.needs_typed_confirmation() || self.typed.trim() == "yes")
+            && (!self.needs_typed_confirmation() || is_confirmation(&self.typed))
     }
 }
 
@@ -1572,7 +1582,7 @@ impl App {
                 ToastKind::Warn,
                 format!(
                     "not preserved: {what} — {}, for example {}",
-                    fmt::count(paths.len() as u64, "item", "items"),
+                    fmt::count(paths.len() as u64, Key::ItemOne, Key::ItemMany),
                     fmt::short_path(paths[0], self.home())
                 ),
             ));
@@ -2021,7 +2031,7 @@ impl App {
             ToastKind::Info,
             format!(
                 "{} {verb} — go to the destination and press {}",
-                fmt::count(n as u64, "item", "items"),
+                fmt::count(n as u64, Key::ItemOne, Key::ItemMany),
                 self.key_for(Action::Paste)
                     .unwrap_or_else(|| "paste".into()),
             ),

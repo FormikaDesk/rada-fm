@@ -161,6 +161,13 @@ const LABELS: [(&str, [&str; 7]); 9] = [
 /// from `RADA_TAG_LANGUAGE` (to choose by hand), `LC_ALL`, `LC_MESSAGES`, `LANG`; English
 /// when none says.
 pub fn language_from_env() -> String {
+    // The language the person chose for the interface wins over the environment, unless the
+    // tag language itself was set by hand.
+    if std::env::var_os("RADA_TAG_LANGUAGE").is_none()
+        && let Some(l) = crate::i18n::chosen_lang()
+    {
+        return l.code().to_string();
+    }
     ["RADA_TAG_LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
         .into_iter()
         .filter_map(|k| std::env::var(k).ok())

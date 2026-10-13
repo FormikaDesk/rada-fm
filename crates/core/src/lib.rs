@@ -8,6 +8,7 @@ pub mod events;
 pub mod filetype;
 pub mod foldersize;
 pub mod fs;
+pub mod i18n;
 pub mod jobs;
 pub mod journal;
 pub mod model;

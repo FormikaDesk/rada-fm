@@ -1,6 +1,7 @@
 //! The window of the update: the release notes and what accepting would do, or why an
 //! update did not work.
 
+use rada_core::i18n::{Key, tf};
 use rada_core::update::Mode;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -32,11 +33,8 @@ fn chip<'a>(th: &Theme, text: &str, color: Color) -> Span<'a> {
 /// What accepting would do, in the words of the person.
 pub fn what_happens(how: &Result<Mode, String>) -> String {
     match how {
-        Ok(Mode::Binary) => "rada will download the program for this system, check it against the release's SHA256SUMS and replace this one. The old one is kept: `rada update --rollback` brings it back.".into(),
-        Ok(Mode::Source { dir }) => format!(
-            "rada will update the git checkout in {} (it must be on main with nothing uncommitted), build it, put the new program in place of this one and clean the build folder. This takes a few minutes; you can keep working.",
-            dir.display()
-        ),
+        Ok(Mode::Binary) => Key::UpdateBinary.tr().into(),
+        Ok(Mode::Source { dir }) => tf(Key::UpdateSource, &[&dir.display()]),
         Ok(Mode::Package { hint }) => hint.clone(),
         Err(e) => e.clone(),
     }
@@ -57,25 +55,30 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             scroll,
         } => {
             head.push(Line::from(vec![
-                chip(th, "Update", th.accent),
+                chip(th, Key::ChipUpdate.tr(), th.accent),
                 Span::styled(
                     format!(
-                        "  rada {} is available{}",
-                        notice.version,
-                        if notice.prerelease {
-                            " (pre-release)"
-                        } else {
-                            ""
-                        }
+                        "  {}",
+                        tf(
+                            Key::UpdateAvailable,
+                            &[
+                                &notice.version,
+                                &if notice.prerelease {
+                                    Key::PreRelease.tr()
+                                } else {
+                                    ""
+                                }
+                            ]
+                        )
                     ),
                     th.base().add_modifier(Modifier::BOLD),
                 ),
             ]));
             head.push(Line::raw(""));
-            head.push(Line::from(Span::styled("What is new", th.dim())));
+            head.push(Line::from(Span::styled(Key::WhatIsNew.tr(), th.dim())));
             let notes = notice.notes.trim();
             if notes.is_empty() {
-                body.push(Line::from(Span::styled("(no release notes)", th.faint())));
+                body.push(Line::from(Span::styled(Key::NoReleaseNotes.tr(), th.faint())));
             }
             for raw in notes.lines() {
                 let raw = raw.trim_end();
@@ -103,23 +106,23 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             let mut spans = Vec::new();
             let mut targets = Vec::new();
             if can {
-                spans.push(button(th, "Enter", "Update now", Some(th.accent), true));
+                spans.push(button(th, "Enter", Key::BtnUpdateNow.tr(), Some(th.accent), true));
                 spans.push(Span::raw("  "));
                 targets.push((0, Target::Key(KeyCode::Enter)));
                 targets.push((2, Target::Key(KeyCode::Esc)));
-                spans.push(button(th, "Esc", "Later", None, true));
+                spans.push(button(th, "Esc", Key::BtnLater.tr(), None, true));
             } else {
                 targets.push((0, Target::Key(KeyCode::Esc)));
-                spans.push(button(th, "Esc", "Close", None, true));
+                spans.push(button(th, "Esc", Key::BtnClose.tr(), None, true));
             }
             buttons = (spans, targets);
             (th.accent, *scroll)
         }
         UpdateView::Failed { message, log } => {
             head.push(Line::from(vec![
-                chip(th, "Update", th.error),
+                chip(th, Key::ChipUpdate.tr(), th.error),
                 Span::styled(
-                    "  The update did not work",
+                    format!("  {}", Key::UpdateFailed.tr()),
                     th.base().add_modifier(Modifier::BOLD),
                 ),
             ]));
@@ -129,22 +132,25 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             }
             foot.push(Line::raw(""));
             foot.push(Line::from(Span::styled(
-                "The program that was running is untouched.",
+                Key::UpdateUntouched.tr(),
                 th.dim(),
             )));
             foot.push(Line::from(Span::styled(
-                format!(
-                    "Log: {}",
-                    crate::ui::widgets::tail(&log.to_string_lossy(), text_w.saturating_sub(5))
+                tf(
+                    Key::LogLine,
+                    &[&crate::ui::widgets::tail(
+                        &log.to_string_lossy(),
+                        text_w.saturating_sub(5),
+                    )],
                 ),
                 th.faint(),
             )));
             foot.push(Line::raw(""));
             buttons = (
                 vec![
-                    button(th, "o", "Open the log", Some(th.accent), true),
+                    button(th, "o", Key::BtnOpenLog.tr(), Some(th.accent), true),
                     Span::raw("  "),
-                    button(th, "Esc", "Close", None, true),
+                    button(th, "Esc", Key::BtnClose.tr(), None, true),
                 ],
                 vec![
                     (0, Target::Key(KeyCode::Char('o'))),

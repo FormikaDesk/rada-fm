@@ -1,6 +1,7 @@
 //! The preview pane: no frame, just a title and the content, in the same calm style as
 //! the list. Images are drawn by the terminal graphics protocol; everything else is text.
 
+use rada_core::i18n::Key;
 use rada_core::display;
 use rada_core::ops::LinkState;
 use rada_core::preview::Preview;
@@ -265,7 +266,7 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                     lines.push(Line::from(Span::styled(
                         format!(
                             "{} protected by a password",
-                            fmt::count(a.encrypted, "item is", "items are")
+                            fmt::count(a.encrypted, Key::ItemIsOne, Key::ItemsAreMany)
                         ),
                         th.fg(th.warn),
                     )));
@@ -391,7 +392,7 @@ fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
             } else {
                 format!(
                     "{} shown{}",
-                    fmt::count(d.entries.len() as u64, "item", "items"),
+                    fmt::count(d.entries.len() as u64, Key::ItemOne, Key::ItemMany),
                     if d.truncated {
                         " · more not listed"
                     } else {
@@ -416,13 +417,13 @@ fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
 fn archive_counts(files: u64, dirs: u64, links: u64) -> String {
     let mut parts = Vec::new();
     if files > 0 || (dirs == 0 && links == 0) {
-        parts.push(fmt::count(files, "file", "files"));
+        parts.push(fmt::count(files, Key::FileOne, Key::FileMany));
     }
     if dirs > 0 {
-        parts.push(fmt::count(dirs, "folder", "folders"));
+        parts.push(fmt::count(dirs, Key::FolderOne, Key::FolderMany));
     }
     if links > 0 {
-        parts.push(fmt::count(links, "link", "links"));
+        parts.push(fmt::count(links, Key::LinkOne, Key::LinkMany));
     }
     parts.join(", ")
 }

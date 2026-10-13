@@ -2,6 +2,7 @@
 //! "···" until the background worker has counted, kept while the folder stays as it is. The
 //! counting itself is `rada_core::foldersize`; nothing here waits for it.
 
+use rada_core::i18n::Key;
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -161,7 +162,7 @@ impl App {
                 Some(b) if c.complete => fmt::size(b),
                 Some(b) => format!("> {}", fmt::size(b)),
                 None => {
-                    let full = fmt::count(c.items, "item", "items");
+                    let full = fmt::count(c.items, Key::ItemOne, Key::ItemMany);
                     if full.chars().count() <= width {
                         full
                     } else {
@@ -182,9 +183,9 @@ impl App {
     pub fn folder_summary(&self, e: &Entry) -> Option<String> {
         match self.folder_size_view(e) {
             FolderSizeView::Nothing => None,
-            FolderSizeView::Counting => Some(format!("{} · ···", e.type_label)),
+            FolderSizeView::Counting => Some(format!("{} · ···", rada_core::i18n::type_label(&e.type_label))),
             FolderSizeView::Counted(c) => {
-                let items = fmt::count(c.items, "item", "items");
+                let items = fmt::count(c.items, Key::ItemOne, Key::ItemMany);
                 Some(match c.bytes {
                     Some(b) if c.complete => format!("{items} · {}", fmt::size(b)),
                     Some(b) => format!("{items} · > {}", fmt::size(b)),

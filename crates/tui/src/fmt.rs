@@ -2,6 +2,8 @@
 
 use std::time::{Duration, SystemTime};
 
+use rada_core::i18n::{self, Key, tf};
+
 pub use rada_core::display::bytes as size;
 
 pub fn date(t: Option<SystemTime>) -> String {
@@ -31,28 +33,28 @@ pub fn short_path(p: &std::path::Path, home: &std::path::Path) -> String {
     }
 }
 
-/// "2 h ago", "yesterday", "Sep 17": a date read at a glance.
+/// "2 h ago", "yesterday", "Sep 17": a date read at a glance (in the language in use).
 pub fn relative(t: Option<SystemTime>, now: SystemTime) -> String {
     let Some(t) = t else { return "—".into() };
     let Ok(age) = now.duration_since(t) else {
-        return "just now".into();
+        return Key::JustNow.tr().into();
     };
     let s = age.as_secs();
     let (m, h, d) = (s / 60, s / 3600, s / 86400);
     if s < 45 {
-        "just now".into()
+        Key::JustNow.tr().into()
     } else if m < 2 {
-        "1 min ago".into()
+        Key::MinAgoOne.tr().into()
     } else if m < 60 {
-        format!("{m} min ago")
+        tf(Key::MinAgo, &[&m])
     } else if h < 24 {
-        format!("{h} h ago")
+        tf(Key::HoursAgo, &[&h])
     } else if h < 48 {
-        "yesterday".into()
+        Key::YesterdayLower.tr().into()
     } else if d < 14 {
-        format!("{d} days ago")
+        tf(Key::DaysAgo, &[&d])
     } else if d < 60 {
-        format!("{} weeks ago", d / 7)
+        tf(Key::WeeksAgo, &[&(d / 7)])
     } else {
         match jiff::Timestamp::try_from(t) {
             Ok(ts) => {
@@ -61,8 +63,11 @@ pub fn relative(t: Option<SystemTime>, now: SystemTime) -> String {
                     .map(|n| n.to_zoned(jiff::tz::TimeZone::system()).year())
                     .ok()
                     == Some(z.year());
-                z.strftime(if this_year { "%b %d" } else { "%b %Y" })
-                    .to_string()
+                if this_year {
+                    format!("{} {:02}", month_name(z.month()), z.day())
+                } else {
+                    format!("{} {}", month_name(z.month()), z.year())
+                }
             }
             Err(_) => "—".into(),
         }
@@ -193,10 +198,13 @@ pub fn explorer_date_in(
     let days = (zn.date() - z.date()).get_days();
     match days {
         d if d < 0 => full,
-        0 => format!("Today {:02}:{:02}", z.hour(), z.minute()),
-        1 => "Yesterday".into(),
-        2..=13 => format!("{days} days ago"),
-        14..=55 => format!("{} weeks ago", days / 7),
+        0 => tf(
+            Key::Today,
+            &[&format!("{:02}:{:02}", z.hour(), z.minute())],
+        ),
+        1 => Key::Yesterday.tr().into(),
+        2..=13 => tf(Key::DaysAgo, &[&days]),
+        14..=55 => tf(Key::WeeksAgo, &[&(days / 7)]),
         _ => format.write(z.year(), z.month(), z.day()),
     }
 }
@@ -216,20 +224,36 @@ pub fn date_with_day(
     let (z, zn) = (ts.to_zoned(tz.clone()), now_ts.to_zoned(tz.clone()));
     let clock = format!("{:02}:{:02}", z.hour(), z.minute());
     match (zn.date() - z.date()).get_days() {
-        0 => format!("Today, {clock}"),
-        1 => format!("Yesterday, {clock}"),
+        0 => tf(Key::TodayComma, &[&clock]),
+        1 => tf(Key::YesterdayComma, &[&clock]),
         _ => format!("{} {clock}", format.write(z.year(), z.month(), z.day())),
     }
 }
 
 pub fn clock(unix_secs: i64) -> String {
     match jiff::Timestamp::from_second(unix_secs) {
-        Ok(ts) => ts
-            .to_zoned(jiff::tz::TimeZone::system())
-            .strftime("%b %d %H:%M")
-            .to_string(),
+        Ok(ts) => {
+            let z = ts.to_zoned(jiff::tz::TimeZone::system());
+            format!(
+                "{} {:02} {:02}:{:02}",
+                month_name(z.month()),
+                z.day(),
+                z.hour(),
+                z.minute()
+            )
+        }
         Err(_) => "—".into(),
     }
+}
+
+/// The short name of a month (1 to 12) in the language in use.
+pub fn month_name(month: i8) -> &'static str {
+    use Key::*;
+    const MONTHS: [Key; 12] = [
+        MonJan, MonFeb, MonMar, MonApr, MonMay, MonJun, MonJul, MonAug, MonSep, MonOct, MonNov,
+        MonDec,
+    ];
+    MONTHS[(month.clamp(1, 12) - 1) as usize].tr()
 }
 
 pub fn duration(d: Duration) -> String {
@@ -247,24 +271,22 @@ pub fn rate(bytes_per_sec: f64) -> String {
     format!("{}/s", size(bytes_per_sec.max(0.0) as u64))
 }
 
-pub fn count(n: u64, one: &str, many: &str) -> String {
+/// "1 item", "3 items" (or "1 elemento", "3 elementi").
+pub fn count(n: u64, one: Key, many: Key) -> String {
+    i18n::count(n, one, many)
+}
+
+/// "3 items selected" / "3 elementi selezionati".
+pub fn selected_items(n: u64) -> String {
     if n == 1 {
-        format!("1 {one}")
+        Key::SelItemsOne.tr().to_string()
     } else {
-        format!("{} {many}", thousands(n))
+        tf(Key::SelItemsMany, &[&thousands(n)])
     }
 }
 
 pub fn thousands(n: u64) -> String {
-    let s = n.to_string();
-    let mut out = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
+    i18n::thousands(n)
 }
 
 /// Word-wrap by display width without ever dropping a character (long paths included).

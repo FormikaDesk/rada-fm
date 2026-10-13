@@ -1,6 +1,7 @@
 //! Small windows about the system and its disks: a folder the system has not let the
 //! terminal open yet, and ejecting a disk.
 
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -37,7 +38,7 @@ pub fn draw_access(
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
         Line::from(vec![
-            chip(th, "No access", th.warn),
+            chip(th, Key::ChipNoAccess.tr(), th.warn),
             Span::styled(
                 format!("  {}", d.message()),
                 th.base().add_modifier(Modifier::BOLD),
@@ -45,10 +46,7 @@ pub fn draw_access(
         ]),
         Line::raw(""),
     ];
-    for l in fmt::wrap(
-        "macOS asks you once, for each program, before it lets it into the Desktop, Documents, Downloads, iCloud Drive and external or network disks.",
-        text_w,
-    ) {
+    for l in fmt::wrap(Key::MacAsksOnce.tr(), text_w) {
         lines.push(Line::from(Span::styled(l, th.dim())));
     }
     lines.push(Line::raw(""));
@@ -73,14 +71,14 @@ pub fn draw_access(
         button(
             th,
             "Enter",
-            "Open Files & Folders settings",
+            Key::BtnOpenFilesSettings.tr(),
             Some(th.accent),
             true,
         ),
         Span::raw("  "),
-        button(th, "f", "Full Disk Access", None, true),
+        button(th, "f", Key::BtnFullDisk.tr(), None, true),
         Span::raw("  "),
-        button(th, "Esc", "Close", None, true),
+        button(th, "Esc", Key::BtnClose.tr(), None, true),
     ];
     let h = (lines.len() as u16 + 1 + 4).min(area.height.saturating_sub(2));
     let rect = centered(area, w, h);
@@ -113,7 +111,7 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
         Line::from(vec![
-            chip(th, "Eject", th.accent),
+            chip(th, Key::BtnEject.tr(), th.accent),
             Span::styled(
                 format!("  {}", e.name),
                 th.base().add_modifier(Modifier::BOLD),
@@ -123,17 +121,14 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
     ];
     let (spans, targets, tone): (Vec<Span>, Vec<(usize, Target)>, Color) = match &e.stage {
         EjectStage::Confirm => {
-            for l in fmt::wrap(
-                "Everything in progress on this disk is finished first. After this you can unplug it.",
-                text_w,
-            ) {
+            for l in fmt::wrap(Key::EjectFinishFirst.tr(), text_w) {
                 lines.push(Line::from(Span::styled(l, th.dim())));
             }
             (
                 vec![
-                    button(th, "Enter", "Eject", Some(th.accent), true),
+                    button(th, "Enter", Key::BtnEject.tr(), Some(th.accent), true),
                     Span::raw("  "),
-                    button(th, "Esc", "Cancel", None, true),
+                    button(th, "Esc", Key::BtnCancel.tr(), None, true),
                 ],
                 vec![
                     (0, Target::Key(KeyCode::Enter)),
@@ -143,22 +138,22 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
             )
         }
         EjectStage::Working => {
-            lines.push(Line::from(Span::styled("Ejecting…", th.base())));
+            lines.push(Line::from(Span::styled(Key::Ejecting.tr(), th.base())));
             (
-                vec![button(th, "Esc", "Hide", None, true)],
+                vec![button(th, "Esc", Key::BtnHide.tr(), None, true)],
                 vec![(0, Target::Key(KeyCode::Esc))],
                 th.accent,
             )
         }
         EjectStage::Failed(why) => {
-            for l in fmt::wrap(&format!("It was not ejected: {why}"), text_w) {
+            for l in fmt::wrap(&tf(Key::NotEjected, &[why]), text_w) {
                 lines.push(Line::from(Span::styled(l, th.fg(th.error))));
             }
             (
                 vec![
-                    button(th, "Enter", "Try again", Some(th.accent), true),
+                    button(th, "Enter", Key::BtnTryAgain.tr(), Some(th.accent), true),
                     Span::raw("  "),
-                    button(th, "Esc", "Close", None, true),
+                    button(th, "Esc", Key::BtnClose.tr(), None, true),
                 ],
                 vec![
                     (0, Target::Key(KeyCode::Enter)),
@@ -197,9 +192,9 @@ pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
         Line::from(vec![
-            chip(th, "Icons", th.accent),
+            chip(th, Key::ChipIcons.tr(), th.accent),
             Span::styled(
-                "  Your terminal cannot draw rada's icons yet",
+                format!("  {}", Key::FontCannotDraw.tr()),
                 th.base().add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -207,18 +202,18 @@ pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut
     ];
     let (spans, targets): (Vec<Span>, Vec<(usize, Target)>) = match v.stage {
         FontStage::Ask => {
-            let body = format!(
-                "File-type icons need a Nerd Font, and this terminal is not set to use one. rada can install {} for you: about {:.0} MB, taken from the Nerd Fonts project at a fixed release and checked against its checksums, for your account only (no administrator rights). Afterwards you choose it in your terminal's font setting. This is asked only once.",
-                v.offer.family, v.offer.megabytes
+            let body = tf(
+                Key::FontOffer,
+                &[&v.offer.family, &format!("{:.0}", v.offer.megabytes)],
             );
             for l in fmt::wrap(&body, text_w) {
                 lines.push(Line::from(Span::styled(l, th.dim())));
             }
             (
                 vec![
-                    button(th, "Enter", "Install the font", Some(th.accent), true),
+                    button(th, "Enter", Key::BtnInstallFont.tr(), Some(th.accent), true),
                     Span::raw("  "),
-                    button(th, "Esc", "Not now", None, true),
+                    button(th, "Esc", Key::BtnNotNow.tr(), None, true),
                 ],
                 vec![
                     (0, Target::Key(KeyCode::Enter)),
@@ -227,12 +222,9 @@ pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut
             )
         }
         FontStage::Working => {
-            lines.push(Line::from(Span::styled(
-                "Downloading and installing…",
-                th.base(),
-            )));
+            lines.push(Line::from(Span::styled(Key::FontWorking.tr(), th.base())));
             (
-                vec![button(th, "Esc", "Hide", None, true)],
+                vec![button(th, "Esc", Key::BtnHide.tr(), None, true)],
                 vec![(0, Target::Key(KeyCode::Esc))],
             )
         }

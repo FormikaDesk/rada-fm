@@ -21,6 +21,7 @@ mod tagdots;
 mod updates;
 pub mod widgets;
 
+use rada_core::i18n::Key;
 use std::path::Path;
 
 use rada_core::display;
@@ -384,7 +385,7 @@ fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
         right.push_str(&format!(
             "{} / {}",
             p.steps_done,
-            fmt::count(p.steps_total, "step", "steps")
+            fmt::count(p.steps_total, Key::StepOne, Key::StepMany)
         ));
     }
     let head_right = format!("{pct:>3}%   {right}   Esc cancel");

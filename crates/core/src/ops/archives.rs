@@ -23,6 +23,7 @@ use crate::archive::index::{Index, ListControl, open_cached};
 use crate::archive::writer::CompressItem;
 use crate::archive::{ArchiveKind, EntryKind, Format, NameIssue, archive_stem, link_escapes};
 use crate::fs::{FileKind, Stamp};
+use crate::i18n::{self, Key, tf};
 use crate::{Error, Result, display};
 
 /// Where the members of an archive land.
@@ -334,7 +335,7 @@ impl Engine {
         if ex.ws.has_blocking() {
             let mut plan = Plan::empty(
                 OpKind::Extract,
-                format!("Extract {}", display::name(&archive_name)),
+                tf(Key::TitleExtract, &[&display::name(&archive_name)]),
             );
             plan.destination = Some(root);
             plan.policy = policy;
@@ -640,21 +641,18 @@ impl Engine {
         }
 
         let title = if selection.is_empty() {
-            format!(
-                "Extract {} to {}",
-                display::name(&archive_name),
-                display::path(&root)
+            tf(
+                Key::TitleExtractTo,
+                &[&display::name(&archive_name), &display::path(&root)],
             )
         } else {
-            format!(
-                "Extract {} from {} to {}",
-                if selection.len() == 1 {
-                    "1 item".to_string()
-                } else {
-                    format!("{} items", selection.len())
-                },
-                display::name(&archive_name),
-                display::path(&root)
+            tf(
+                Key::TitleExtractFrom,
+                &[
+                    &i18n::count(selection.len() as u64, Key::ItemOne, Key::ItemMany),
+                    &display::name(&archive_name),
+                    &display::path(&root),
+                ],
             )
         };
         let mut plan = Plan::empty(OpKind::Extract, title);
@@ -725,14 +723,12 @@ impl Engine {
         let dir = archive.parent().unwrap_or(Path::new("."));
         let mut plan = Plan::empty(
             OpKind::Compress,
-            format!(
-                "Compress {} into {}",
-                if scan.roots.len() == 1 {
-                    "1 item".to_string()
-                } else {
-                    format!("{} items", scan.roots.len())
-                },
-                display::name(&name)
+            tf(
+                Key::TitleCompress,
+                &[
+                    &i18n::count(scan.roots.len() as u64, Key::ItemOne, Key::ItemMany),
+                    &display::name(&name),
+                ],
             ),
         );
         plan.policy = policy;

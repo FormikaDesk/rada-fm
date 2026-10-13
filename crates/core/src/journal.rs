@@ -18,6 +18,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{t, tf};
 use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
 use crate::pathcodec;
 use crate::{Error, Result};
@@ -227,24 +228,20 @@ impl JournalEntry {
     /// The operation in a few words, as the Undo button says what it would undo:
     /// "copy of 3 items", "new folder", "trash of 1 item".
     pub fn describe(&self) -> String {
-        let n = self.totals.items.max(1);
-        let items = if n == 1 {
-            "1 item".to_string()
-        } else {
-            format!("{n} items")
-        };
+        use crate::i18n::Key::*;
+        let items = crate::i18n::count(self.totals.items.max(1), ItemOne, ItemMany);
         match self.kind {
-            OpKind::Copy => format!("copy of {items}"),
-            OpKind::Move => format!("move of {items}"),
-            OpKind::Rename | OpKind::BulkRename => format!("rename of {items}"),
-            OpKind::MakeDir => "new folder".to_string(),
-            OpKind::MakeFile => "new file".to_string(),
-            OpKind::Trash => format!("trash of {items}"),
-            OpKind::Delete => format!("deletion of {items}"),
-            OpKind::Extract => format!("extraction of {items}"),
-            OpKind::Compress => format!("compression of {items}"),
-            OpKind::SetTags => format!("tag change of {items}"),
-            OpKind::Undo => "undo".to_string(),
+            OpKind::Copy => tf(DoneCopy, &[&items]),
+            OpKind::Move => tf(DoneMove, &[&items]),
+            OpKind::Rename | OpKind::BulkRename => tf(DoneRename, &[&items]),
+            OpKind::MakeDir => t(DoneNewFolder).to_string(),
+            OpKind::MakeFile => t(DoneNewFile).to_string(),
+            OpKind::Trash => tf(DoneTrash, &[&items]),
+            OpKind::Delete => tf(DoneDelete, &[&items]),
+            OpKind::Extract => tf(DoneExtract, &[&items]),
+            OpKind::Compress => tf(DoneCompress, &[&items]),
+            OpKind::SetTags => tf(DoneTags, &[&items]),
+            OpKind::Undo => t(DoneUndo).to_string(),
         }
     }
 }

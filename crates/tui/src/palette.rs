@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use rada_core::i18n::Key;
+
 use crate::fuzzy;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,13 +22,13 @@ pub enum PaletteKind {
 impl PaletteKind {
     pub fn tag(self) -> &'static str {
         match self {
-            PaletteKind::Typed => "go to",
-            PaletteKind::Bookmark => "bookmark",
-            PaletteKind::Recent => "recent",
-            PaletteKind::Place => "place",
-            PaletteKind::Disk => "disk",
-            PaletteKind::Parent => "parent",
-            PaletteKind::Folder => "folder",
+            PaletteKind::Typed => Key::PalGoTo.tr(),
+            PaletteKind::Bookmark => Key::PalBookmark.tr(),
+            PaletteKind::Recent => Key::PalRecent.tr(),
+            PaletteKind::Place => Key::PalPlace.tr(),
+            PaletteKind::Disk => Key::PalDisk.tr(),
+            PaletteKind::Parent => Key::PalParent.tr(),
+            PaletteKind::Folder => Key::PalFolder.tr(),
         }
     }
 

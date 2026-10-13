@@ -2,6 +2,7 @@
 //! One window at a time, centred, with everything behind it dimmed.
 
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use rada_core::fs::FileKind;
 use rada_core::journal::{EntryStatus, UndoState};
 use rada_core::ops::{ConflictPolicy, ItemAction, OpKind, RunStatus, Severity, Step};
@@ -60,9 +61,9 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" Esc ", th.chip().add_modifier(Modifier::BOLD)),
-            Span::styled(" close   ", th.dim()),
+            Span::styled(format!(" {}   ", Key::HintClose.tr()), th.dim()),
             Span::styled(" ↑↓ ", th.chip().add_modifier(Modifier::BOLD)),
-            Span::styled(" scroll", th.dim()),
+            Span::styled(format!(" {}", Key::HintScroll.tr()), th.dim()),
             if app.quick_look_available() {
                 Span::styled("   ", th.dim())
             } else {
@@ -74,7 +75,7 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::raw("")
             },
             if app.quick_look_available() {
-                Span::styled(" Quick Look", th.dim())
+                Span::styled(format!(" {}", Key::BtnQuickLook.tr()), th.dim())
             } else {
                 Span::raw("")
             },
@@ -108,7 +109,7 @@ fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &
     let scroll = p.scroll.min(lines.len().saturating_sub(rows));
     let mut out = vec![
         Line::from(vec![
-            chip(th, "Properties", th.accent),
+            chip(th, Key::ChipProperties.tr(), th.accent),
             Span::styled(
                 format!(
                     "  {}",
@@ -121,7 +122,7 @@ fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &
     ];
     out.extend(lines.into_iter().skip(scroll).take(rows));
     out.push(Line::raw(""));
-    out.push(Line::from(vec![button(th, "Esc", "Close", None, true)]));
+    out.push(Line::from(vec![button(th, "Esc", Key::BtnClose.tr(), None, true)]));
     f.render_widget(Paragraph::new(out), inner);
     hits.add(
         Rect {
@@ -161,11 +162,13 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 ]),
                 Line::raw(""),
                 Line::from(Span::styled(
-                    format!(
-                        "{} files · {} folders · {}",
-                        fmt::thousands(*files),
-                        fmt::thousands(*dirs),
-                        fmt::size(*bytes)
+                    tf(
+                        Key::ScanTotals,
+                        &[
+                            &fmt::thousands(*files),
+                            &fmt::thousands(*dirs),
+                            &fmt::size(*bytes),
+                        ],
                     ),
                     th.base(),
                 )),
@@ -176,7 +179,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::raw(""),
                 Line::from(vec![
                     Span::styled("Esc", th.key()),
-                    Span::styled(" cancel", th.dim()),
+                    Span::styled(format!(" {}", Key::HintCancel.tr()), th.dim()),
                 ]),
             ];
             f.render_widget(Paragraph::new(lines), inner);
@@ -192,9 +195,9 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let inner = frame(f, &th, r, th.error);
             let mut lines = vec![
                 Line::from(vec![
-                    chip(&th, "Error", th.error),
+                    chip(&th, Key::ChipError.tr(), th.error),
                     Span::styled(
-                        "  Something went wrong",
+                        format!("  {}", Key::WentWrong.tr()),
                         th.base().add_modifier(Modifier::BOLD),
                     ),
                 ]),
@@ -205,19 +208,19 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             }
             if info.attempt > 1 {
                 lines.push(Line::from(Span::styled(
-                    format!("attempt {}", info.attempt),
+                    tf(Key::AttemptN, &[&info.attempt]),
                     th.dim(),
                 )));
             }
             lines.push(Line::raw(""));
             let btns = vec![
-                button(&th, "s", "Skip", Some(th.accent), true),
+                button(&th, "s", Key::BtnSkip.tr(), Some(th.accent), true),
                 Span::raw("  "),
-                button(&th, "S", "Skip all", None, true),
+                button(&th, "S", Key::BtnSkipAll.tr(), None, true),
                 Span::raw("  "),
-                button(&th, "r", "Retry", None, true),
+                button(&th, "r", Key::BtnRetry.tr(), None, true),
                 Span::raw("  "),
-                button(&th, "a", "Abort", None, true),
+                button(&th, "a", Key::BtnAbort.tr(), None, true),
             ];
             hit_spans(
                 &mut app.hits,
@@ -233,7 +236,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             );
             lines.push(Line::from(btns));
             lines.push(Line::from(Span::styled(
-                "Abort keeps what is already done; u undoes it.",
+                Key::AbortKeeps.tr(),
                 th.faint(),
             )));
             f.render_widget(Paragraph::new(lines), inner);
@@ -258,7 +261,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let title = display::truncate(&r.title, (w as usize).saturating_sub(10));
             let mut lines = vec![
                 Line::from(vec![
-                    chip(&th, "Done", th.warn),
+                    chip(&th, Key::ChipDone.tr(), th.warn),
                     Span::styled(format!("  {title}"), th.base().add_modifier(Modifier::BOLD)),
                 ]),
                 Line::raw(""),
@@ -277,9 +280,9 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             }
             lines.push(Line::raw(""));
             let btns = vec![
-                button(&th, "u", "Undo what was done", Some(th.accent), true),
+                button(&th, "u", Key::BtnUndoDone.tr(), Some(th.accent), true),
                 Span::raw("  "),
-                button(&th, "Esc", "Close", None, true),
+                button(&th, "Esc", Key::BtnClose.tr(), None, true),
             ];
             hit_spans(
                 &mut app.hits,
@@ -299,29 +302,26 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let inner = frame(f, &th, r, th.warn);
             let lines = vec![
                 Line::from(vec![
-                    chip(&th, "Running", th.warn),
+                    chip(&th, Key::ChipRunning.tr(), th.warn),
                     Span::styled(
-                        "  An operation is in progress",
+                        format!("  {}", Key::OpInProgress.tr()),
                         th.base().add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::raw(""),
-                Line::from(Span::styled(
-                    "Quitting cancels it. Steps already finished stay in the",
-                    th.dim(),
-                )),
-                Line::from(Span::styled("journal and can be undone.", th.dim())),
+                Line::from(Span::styled(Key::QuitWarn1.tr(), th.dim())),
+                Line::from(Span::styled(Key::QuitWarn2.tr(), th.dim())),
                 Line::raw(""),
                 Line::from(vec![
-                    button(&th, "y", "Quit anyway", Some(th.warn), true),
+                    button(&th, "y", Key::BtnQuitAnyway.tr(), Some(th.warn), true),
                     Span::raw("  "),
-                    button(&th, "Esc", "Stay", None, true),
+                    button(&th, "Esc", Key::BtnStay.tr(), None, true),
                 ]),
             ];
             let btns = vec![
-                button(&th, "y", "Quit anyway", Some(th.warn), true),
+                button(&th, "y", Key::BtnQuitAnyway.tr(), Some(th.warn), true),
                 Span::raw("  "),
-                button(&th, "Esc", "Stay", None, true),
+                button(&th, "Esc", Key::BtnStay.tr(), None, true),
             ];
             hit_spans(
                 &mut app.hits,
@@ -350,18 +350,19 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn verb(kind: OpKind) -> &'static str {
     match kind {
-        OpKind::Copy => "Copy",
-        OpKind::Move => "Move",
-        OpKind::Rename | OpKind::BulkRename => "Rename",
-        OpKind::MakeDir => "New folder",
-        OpKind::MakeFile => "New file",
-        OpKind::Trash => "Trash",
-        OpKind::Delete => "Delete",
-        OpKind::Undo => "Undo",
-        OpKind::Extract => "Extract",
-        OpKind::Compress => "Compress",
-        OpKind::SetTags => "Tags",
+        OpKind::Copy => Key::VCopy,
+        OpKind::Move => Key::VMove,
+        OpKind::Rename | OpKind::BulkRename => Key::VRename,
+        OpKind::MakeDir => Key::VNewFolder,
+        OpKind::MakeFile => Key::VNewFile,
+        OpKind::Trash => Key::VTrash,
+        OpKind::Delete => Key::VDelete,
+        OpKind::Undo => Key::VUndo,
+        OpKind::Extract => Key::VExtract,
+        OpKind::Compress => Key::VCompress,
+        OpKind::SetTags => Key::VTags,
     }
+    .tr()
 }
 
 fn action_color(th: &Theme, a: ItemAction) -> Color {
@@ -422,14 +423,14 @@ fn draw_plan(
     };
     match (&bases.src, &bases.dst) {
         (Some(s), Some(d)) => {
-            body.push(base_line("From", s));
-            body.push(base_line("To", d));
+            body.push(base_line(Key::BaseFrom.tr(), s));
+            body.push(base_line(Key::BaseTo.tr(), d));
         }
-        (Some(s), None) => body.push(base_line("In", s)),
-        (None, Some(d)) => body.push(base_line("In", d)),
+        (Some(s), None) => body.push(base_line(Key::BaseIn.tr(), s)),
+        (None, Some(d)) => body.push(base_line(Key::BaseIn.tr(), d)),
         (None, None) => {
             if let Some(p) = &titled_path {
-                body.push(base_line("In", std::path::Path::new(p)));
+                body.push(base_line(Key::BaseIn.tr(), std::path::Path::new(p)));
             }
         }
     }
@@ -448,9 +449,9 @@ fn draw_plan(
             stats.push((
                 fmt::thousands(plan.steps.len() as u64),
                 if plan.steps.len() == 1 {
-                    "step"
+                    Key::StepOne.tr()
                 } else {
-                    "steps"
+                    Key::StepMany.tr()
                 },
                 true,
             ));
@@ -459,21 +460,21 @@ fn draw_plan(
             if t.files > 0 {
                 stats.push((
                     fmt::thousands(t.files),
-                    if t.files == 1 { "file" } else { "files" },
+                    if t.files == 1 { Key::FileOne.tr() } else { Key::FileMany.tr() },
                     false,
                 ));
             }
             if t.dirs > 0 {
                 stats.push((
                     fmt::thousands(t.dirs),
-                    if t.dirs == 1 { "folder" } else { "folders" },
+                    if t.dirs == 1 { Key::FolderOne.tr() } else { Key::FolderMany.tr() },
                     false,
                 ));
             }
             if t.symlinks > 0 {
                 stats.push((
                     fmt::thousands(t.symlinks),
-                    if t.symlinks == 1 { "link" } else { "links" },
+                    if t.symlinks == 1 { Key::LinkOne.tr() } else { Key::LinkMany.tr() },
                     false,
                 ));
             }
@@ -481,11 +482,11 @@ fn draw_plan(
                 stats.push((
                     fmt::size(t.bytes),
                     if delete {
-                        "freed"
+                        Key::StatFreed.tr()
                     } else if plan.kind == OpKind::Trash {
-                        "to the trash"
+                        Key::StatToTrash.tr()
                     } else {
-                        "in total"
+                        Key::StatInTotal.tr()
                     },
                     true,
                 ));
@@ -508,7 +509,7 @@ fn draw_plan(
     body.push(Line::from(labels));
     if plan.total_bytes() > 0 && plan.total_bytes() != t.bytes {
         body.push(Line::from(Span::styled(
-            format!("{} will actually be written", fmt::size(plan.total_bytes())),
+            tf(Key::WillBeWritten, &[&fmt::size(plan.total_bytes())]),
             th.faint(),
         )));
     }
@@ -544,16 +545,16 @@ fn draw_plan(
     // How name clashes are settled: a segmented control.
     if !matches!(pv.replan, Replan::None) {
         seg_line = Some(body.len());
-        let mut seg: Vec<Span> = vec![Span::styled("If a name already exists   ", th.dim())];
+        let mut seg: Vec<Span> = vec![Span::styled(format!("{}   ", Key::PolicyAsk.tr()), th.dim())];
         for p in [
             ConflictPolicy::Skip,
             ConflictPolicy::KeepBoth,
             ConflictPolicy::Overwrite,
         ] {
             let label = match p {
-                ConflictPolicy::Skip => "skip",
-                ConflictPolicy::KeepBoth => "keep both",
-                ConflictPolicy::Overwrite => "overwrite",
+                ConflictPolicy::Skip => Key::PolSkip.tr(),
+                ConflictPolicy::KeepBoth => Key::PolKeep.tr(),
+                ConflictPolicy::Overwrite => Key::PolOver.tr(),
             };
             seg_hits.push((seg.len(), Target::Policy(p)));
             if plan.policy == p {
@@ -568,12 +569,12 @@ fn draw_plan(
                 seg.push(Span::styled(format!(" {label} "), th.dim()));
             }
         }
-        seg.push(Span::styled("   c to change", th.faint()));
+        seg.push(Span::styled(format!("   {}", Key::PolicyChange.tr()), th.faint()));
         seg_spans = seg.clone();
         body.push(Line::from(seg));
         if plan.policy == ConflictPolicy::Overwrite {
             body.push(Line::from(Span::styled(
-                "replaced items go to the trash first, so undo brings them back",
+                Key::PolicyTrashNote.tr(),
                 th.faint(),
             )));
         }
@@ -583,7 +584,7 @@ fn draw_plan(
     // The overview: one line per selected item (or every step, on request).
     if !plan.renames.is_empty() {
         body.push(Line::from(Span::styled(
-            "Renames",
+            Key::PlanRenames.tr(),
             th.dim().add_modifier(Modifier::BOLD),
         )));
         for (from, to) in plan.renames.iter().take(400) {
@@ -598,12 +599,12 @@ fn draw_plan(
         }
     } else if !pv.details && !plan.items.is_empty() {
         body.push(Line::from(vec![
-            Span::styled("What will happen", th.dim().add_modifier(Modifier::BOLD)),
+            Span::styled(Key::PlanWhat.tr(), th.dim().add_modifier(Modifier::BOLD)),
             Span::styled(
                 if plan.steps.len() > plan.items.len() {
-                    "   Tab: every step"
+                    format!("   {}", Key::PlanTabSteps.tr())
                 } else {
-                    ""
+                    String::new()
                 },
                 th.faint(),
             ),
@@ -617,21 +618,21 @@ fn draw_plan(
                 .unwrap_or_else(|| display::path(&it.path));
             let name = if is_dir { format!("{name}/") } else { name };
             let tag = match (plan.kind, it.action) {
-                (OpKind::Extract, ItemAction::Copy) => "extract",
-                (OpKind::Compress, ItemAction::Copy) => "add",
+                (OpKind::Extract, ItemAction::Copy) => Key::ActExtractItem.tr(),
+                (OpKind::Compress, ItemAction::Copy) => Key::ActAddItem.tr(),
                 _ => it.action.verb(),
             };
             let mut counts: Vec<String> = Vec::new();
             if it.files > 0 && (is_dir || it.files > 1) {
-                counts.push(fmt::count(it.files, "file", "files"));
+                counts.push(fmt::count(it.files, Key::FileOne, Key::FileMany));
             }
             // A folder's own count includes itself.
             let own = u64::from(is_dir);
             if it.dirs > own {
-                counts.push(fmt::count(it.dirs - own, "folder", "folders"));
+                counts.push(fmt::count(it.dirs - own, Key::FolderOne, Key::FolderMany));
             }
             if it.symlinks > 0 && is_dir {
-                counts.push(fmt::count(it.symlinks, "link", "links"));
+                counts.push(fmt::count(it.symlinks, Key::LinkOne, Key::LinkMany));
             }
             let counts = counts.join(" · ");
             let size = if it.bytes > 0 {
@@ -670,8 +671,11 @@ fn draw_plan(
             {
                 spans.push(Span::styled(
                     format!(
-                        "  as {}",
-                        tg.file_name().map(display::name).unwrap_or_default()
+                        "  {}",
+                        tf(
+                            Key::AsName,
+                            &[&tg.file_name().map(display::name).unwrap_or_default()]
+                        )
                     ),
                     th.faint(),
                 ));
@@ -680,7 +684,7 @@ fn draw_plan(
         }
         if plan.items.len() > 300 {
             body.push(Line::from(Span::styled(
-                format!("… and {} more", plan.items.len() - 300),
+                tf(Key::AndNMore, &[&(plan.items.len() - 300)]),
                 th.faint(),
             )));
         }
@@ -688,14 +692,14 @@ fn draw_plan(
         let n = plan.steps.len() as u64;
         body.push(Line::from(vec![
             Span::styled(
-                format!("What will happen ({})", fmt::count(n, "step", "steps")),
+                tf(Key::PlanWhatN, &[&fmt::count(n, Key::StepOne, Key::StepMany)]),
                 th.dim().add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 if !plan.items.is_empty() {
-                    "   Tab: summary"
+                    format!("   {}", Key::PlanTabSummary.tr())
                 } else {
-                    ""
+                    String::new()
                 },
                 th.faint(),
             ),
@@ -707,7 +711,7 @@ fn draw_plan(
             };
             if shown == 500 {
                 body.push(Line::from(Span::styled(
-                    "… more steps not listed",
+                    Key::MoreStepsNotListed.tr(),
                     th.faint(),
                 )));
                 break;
@@ -722,16 +726,19 @@ fn draw_plan(
     if typed {
         foot.push(Line::from(vec![
             Span::styled(
-                if delete {
-                    "This cannot be undone.  "
-                } else {
-                    "This archive may be a bomb.  "
-                },
+                format!(
+                    "{}  ",
+                    if delete {
+                        Key::CannotBeUndone.tr()
+                    } else {
+                        Key::ArchiveMayBeBomb.tr()
+                    }
+                ),
                 Style::default().fg(th.error).add_modifier(Modifier::BOLD),
             ),
-            Span::styled("Type ", th.dim()),
-            Span::styled("yes", th.key()),
-            Span::styled(" to confirm: ", th.dim()),
+            Span::styled(Key::TypePrefix.tr(), th.dim()),
+            Span::styled(Key::ConfirmWord.tr(), th.key()),
+            Span::styled(Key::ToConfirm.tr(), th.dim()),
             Span::styled(pv.typed.clone(), th.base()),
             Span::styled("▏", th.accent_style()),
         ]));
@@ -740,24 +747,24 @@ fn draw_plan(
     let mut buttons: Vec<Span> = Vec::new();
     let mut button_hits: Vec<(usize, Target)> = Vec::new();
     if pv.replanning.is_some() {
-        buttons.push(Span::styled("re-planning…   ", th.fg(th.warn)));
+        buttons.push(Span::styled(format!("{}   ", Key::Replanning.tr()), th.fg(th.warn)));
     }
     if blocked {
         buttons.push(Span::styled(
-            "Blocked: nothing will be done   ",
+            format!("{}   ", Key::BlockedNothing.tr()),
             th.fg(th.error),
         ));
     } else {
         if can_run {
             button_hits.push((buttons.len(), Target::Key(KeyCode::Enter)));
         }
-        buttons.push(button(th, "Enter", "Run", Some(tone), can_run));
+        buttons.push(button(th, "Enter", Key::BtnRun.tr(), Some(tone), can_run));
         buttons.push(Span::raw("  "));
     }
     button_hits.push((buttons.len(), Target::Key(KeyCode::Esc)));
-    buttons.push(button(th, "Esc", "Cancel", None, true));
+    buttons.push(button(th, "Esc", Key::BtnCancel.tr(), None, true));
     if !typed {
-        buttons.push(Span::styled("      ↑↓ scroll", th.faint()));
+        buttons.push(Span::styled(format!("      {}", Key::ArrowsScroll.tr()), th.faint()));
     }
     foot.push(Line::raw(""));
     foot.push(Line::from(buttons.clone()));
@@ -887,7 +894,7 @@ impl Bases {
 
 /// "Copy 5 items to /home/x/backup" -> ("Copy 5 items", Some("/home/x/backup")).
 fn split_title(title: &str) -> (String, Option<String>) {
-    for marker in [" to /", " to ~"] {
+    for marker in [" to /", " to ~", " in /", " in ~"] {
         if let Some(i) = title.rfind(marker) {
             return (title[..i].to_string(), Some(title[i + 4..].to_string()));
         }
@@ -895,17 +902,32 @@ fn split_title(title: &str) -> (String, Option<String>) {
     (title.to_string(), None)
 }
 
+/// A word of the first column of the list of steps, padded to nine cells (and kept apart
+/// from what follows when it is longer).
+fn step_word(w: Key) -> String {
+    let w = w.tr();
+    if w.width() >= 9 {
+        format!("{w} ")
+    } else {
+        pad(w, 9)
+    }
+}
+
 /// One line per step, paths relative to the plan's bases.
 fn step_label(step: &Step, b: &Bases) -> Option<String> {
     Some(match step {
-        Step::MakeDir { path, .. } => format!("folder   {}", b.rel_dst(path)),
-        Step::MakeFile { path, .. } => format!("file     {}", b.rel_dst(path)),
+        Step::MakeDir { path, .. } => format!("{}{}", step_word(Key::StepWFolder), b.rel_dst(path)),
+        Step::MakeFile { path, .. } => format!("{}{}", step_word(Key::StepWFile), b.rel_dst(path)),
         Step::FinishDir { .. } => return None,
         Step::CopyFile {
             dst, remove_source, ..
         } => format!(
-            "{}   {}",
-            if *remove_source { "move  " } else { "copy  " },
+            "{}{}",
+            step_word(if *remove_source {
+                Key::StepWMove
+            } else {
+                Key::StepWCopy
+            }),
             b.rel_dst(dst)
         ),
         Step::CopySymlink {
@@ -914,8 +936,15 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             remove_source,
             ..
         } => format!(
-            "{}   {} → {}",
-            if *remove_source { "link↪ " } else { "link  " },
+            "{}{} → {}",
+            pad(
+                &format!(
+                    "{}{}",
+                    Key::StepWLink.tr(),
+                    if *remove_source { "↪" } else { "" }
+                ),
+                9
+            ),
             b.rel_dst(dst),
             display::path(target)
         ),
@@ -925,35 +954,56 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             src_link,
             ..
         } => format!(
-            "{}   {} = {}",
-            if src_link.is_some() {
-                "link⇄ "
-            } else {
-                "hlink "
-            },
+            "{}{} = {}",
+            pad(
+                &if src_link.is_some() {
+                    format!("{}⇄", Key::StepWLink.tr())
+                } else {
+                    Key::StepWHardLink.tr().to_string()
+                },
+                9
+            ),
             b.rel_dst(link),
             b.rel_dst(existing)
         ),
-        Step::ExtractFile { dst, .. } => format!("extract  {}", b.rel_dst(dst)),
-        Step::ExtractSymlink { dst, target, .. } => {
-            format!("link     {} → {}", b.rel_dst(dst), display::path(target))
+        Step::ExtractFile { dst, .. } => {
+            format!("{}{}", step_word(Key::StepWExtract), b.rel_dst(dst))
         }
-        Step::Compress { dst, items, .. } => format!(
-            "archive  {} ({})",
+        Step::ExtractSymlink { dst, target, .. } => format!(
+            "{}{} → {}",
+            step_word(Key::StepWLink),
             b.rel_dst(dst),
-            fmt::count(items.len() as u64, "item", "items")
+            display::path(target)
         ),
-        Step::Rename { from, to } => format!("rename   {} → {}", b.rel_src(from), b.rel(to)),
-        Step::TrashItem { path } => format!("trash    {}", b.rel_src(path)),
-        Step::RemoveFile { path, .. } => format!("delete   {}", b.rel_src(path)),
-        Step::RemoveDir { path } => format!("remove   {}/", b.rel_src(path)),
-        Step::Restore { item } => format!("restore  {}", b.rel_src(&item.original)),
+        Step::Compress { dst, items, .. } => format!(
+            "{}{} ({})",
+            step_word(Key::StepWArchive),
+            b.rel_dst(dst),
+            fmt::count(items.len() as u64, Key::ItemOne, Key::ItemMany)
+        ),
+        Step::Rename { from, to } => format!(
+            "{}{} → {}",
+            step_word(Key::StepWRename),
+            b.rel_src(from),
+            b.rel(to)
+        ),
+        Step::TrashItem { path } => format!("{}{}", step_word(Key::StepWTrash), b.rel_src(path)),
+        Step::RemoveFile { path, .. } => {
+            format!("{}{}", step_word(Key::StepWDelete), b.rel_src(path))
+        }
+        Step::RemoveDir { path } => format!("{}{}/", step_word(Key::StepWRemove), b.rel_src(path)),
+        Step::Restore { item } => format!(
+            "{}{}",
+            step_word(Key::StepWRestore),
+            b.rel_src(&item.original)
+        ),
         Step::SetTags {
             path,
             before,
             after,
         } => format!(
-            "tags     {}: {} → {}",
+            "{}{}: {} → {}",
+            step_word(Key::StepWTags),
             b.rel_src(path),
             rada_core::ops::tag_names(before),
             rada_core::ops::tag_names(after)
@@ -992,7 +1042,7 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
             Style::default().add_modifier(Modifier::REVERSED),
         ));
         input.push(Span::styled(
-            "Jump to a folder, bookmark or disk…",
+            Key::PaletteHint.tr(),
             th.faint(),
         ));
     } else {
@@ -1026,7 +1076,7 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
     let mut lines: Vec<Line> = Vec::new();
     if p.hits.is_empty() {
         lines.push(Line::from(Span::styled(
-            "No matches. Type a path starting with / or ~ to go anywhere.",
+            Key::PaletteNone.tr(),
             th.dim(),
         )));
     }
@@ -1101,13 +1151,13 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
 
     let foot = Line::from(vec![
         Span::styled("↑↓", th.key()),
-        Span::styled(" move   ", th.dim()),
-        Span::styled("Enter", th.key()),
-        Span::styled(" go   ", th.dim()),
+        Span::styled(format!(" {}   ", Key::HintMove.tr()), th.dim()),
+        Span::styled(super::widgets::key_name("Enter"), th.key()),
+        Span::styled(format!(" {}   ", Key::HintGo.tr()), th.dim()),
         Span::styled("Esc", th.key()),
-        Span::styled(" close   ", th.dim()),
+        Span::styled(format!(" {}   ", Key::HintClose.tr()), th.dim()),
         Span::styled(
-            fmt::count(p.hits.len() as u64, "result", "results"),
+            fmt::count(p.hits.len() as u64, Key::ResultOne, Key::ResultMany),
             th.faint(),
         ),
     ]);
@@ -1134,7 +1184,7 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
 
     // Title: what is being opened.
     let title = Line::from(vec![
-        chip(th, "Open with", th.accent),
+        chip(th, Key::ChipOpenWith.tr(), th.accent),
         Span::styled(
             format!("  {}", display::truncate(&v.file, iw.saturating_sub(14))),
             th.base().add_modifier(Modifier::BOLD),
@@ -1152,7 +1202,7 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
             " ",
             Style::default().add_modifier(Modifier::REVERSED),
         ));
-        input.push(Span::styled("Type to find a program…", th.faint()));
+        input.push(Span::styled(Key::OpenWithHint.tr(), th.faint()));
     } else {
         let before: String = v.filter.chars().take(v.cursor).collect();
         let at: String = v
@@ -1196,17 +1246,17 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
     let mut lines: Vec<Line> = Vec::new();
     if v.loading {
         lines.push(Line::from(Span::styled(
-            "  Looking for the programs that open it…",
+            format!("  {}", Key::OpenWithLooking.tr()),
             th.dim(),
         )));
     } else if rows.len() == 1 && v.apps.is_empty() {
         lines.push(Line::from(Span::styled(
-            "  No installed program says it opens this kind of file.",
+            format!("  {}", Key::OpenWithNone.tr()),
             th.dim(),
         )));
     } else if rows.len() == 1 {
         lines.push(Line::from(Span::styled(
-            "  No program matches what you typed.",
+            format!("  {}", Key::OpenWithNoMatch.tr()),
             th.dim(),
         )));
     }
@@ -1217,17 +1267,17 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
         let (label, tag, tone) = match row {
             OpenRow::App(a) => {
                 let (tag, tone) = if v.always_id.as_deref() == Some(a.id.as_str()) {
-                    ("always", th.accent)
+                    (Key::TagAlways.tr(), th.accent)
                 } else if a.is_default {
-                    ("default", th.success)
+                    (Key::TagDefault.tr(), th.success)
                 } else if a.terminal {
-                    ("in a terminal", th.text_dim)
+                    (Key::TagInTerminal.tr(), th.text_dim)
                 } else {
                     ("", th.text_dim)
                 };
                 (a.name.clone(), tag, tone)
             }
-            OpenRow::Other => ("Other program…".to_string(), "", th.text_dim),
+            OpenRow::Other => (Key::OtherProgram.tr().to_string(), "", th.text_dim),
         };
         let tag_w = 15;
         let label_w = iw.saturating_sub(4 + tag_w);
@@ -1269,13 +1319,13 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
 
     // The box, and the keys.
     let mark = if v.always { "☑" } else { "☐" };
-    let kind = v.kind.as_deref().unwrap_or("this kind of file");
+    let kind = v.kind.as_deref().unwrap_or(Key::ThisKindOfFile.tr());
     let box_text = match v.current() {
-        Some(a) => format!(
-            "{mark} Always use {} for {kind}",
-            display::truncate(&a.name, 24)
+        Some(a) => tf(
+            Key::AlwaysUseFor,
+            &[&mark, &display::truncate(&a.name, 24), &kind],
         ),
-        None => format!("{mark} Always use the program for {kind}"),
+        None => tf(Key::AlwaysUseProgram, &[&mark, &kind]),
     };
     let foot_y = inner.y + inner.height.saturating_sub(3);
     let box_area = Rect {
@@ -1302,7 +1352,7 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
     }
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            "Only in rada: the system's own choice is not changed.",
+            Key::OnlyInRada.tr(),
             th.faint(),
         ))),
         Rect {
@@ -1314,11 +1364,11 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled("↑↓", th.key()),
-            Span::styled(" move   ", th.dim()),
-            Span::styled("Enter", th.key()),
-            Span::styled(" open   ", th.dim()),
+            Span::styled(format!(" {}   ", Key::HintMove.tr()), th.dim()),
+            Span::styled(super::widgets::key_name("Enter"), th.key()),
+            Span::styled(format!(" {}   ", Key::HintOpen.tr()), th.dim()),
             Span::styled("Esc", th.key()),
-            Span::styled(" close", th.dim()),
+            Span::styled(format!(" {}", Key::HintClose.tr()), th.dim()),
         ])),
         Rect {
             y: inner.y + inner.height.saturating_sub(1),
@@ -1331,40 +1381,30 @@ fn draw_open_with(f: &mut Frame, th: &Theme, v: &OpenWithView, area: Rect, hits:
 // -------------------------------------------------------------------------------- others
 
 fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
-    let (title, hint) = match &iv.kind {
-        InputKind::Rename { .. } => ("Rename", "New name"),
-        InputKind::NewDir => ("New folder", "Name"),
-        InputKind::NewFile => ("New file", "Name (an empty file is created)"),
-        InputKind::NewTag { .. } => ("New tag", "Name of the tag (the selected items get it)"),
-        InputKind::OpenWith { .. } => (
-            "Open with",
-            "Program, with options if you like — for example: code, vlc --fullscreen",
-        ),
-        InputKind::ExtractTo { .. } => (
-            "Extract",
-            "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)",
-        ),
-        InputKind::Compress { format, .. } => (
-            "Compress",
-            match format {
-                rada_core::archive::ArchiveKind::Zip => {
-                    "Archive name — Tab changes the format: [zip]  tar.gz  tar.zst  tar.xz"
-                }
-                rada_core::archive::ArchiveKind::TarGz => {
-                    "Archive name — Tab changes the format: zip  [tar.gz]  tar.zst  tar.xz"
-                }
-                rada_core::archive::ArchiveKind::TarZst => {
-                    "Archive name — Tab changes the format: zip  tar.gz  [tar.zst]  tar.xz"
-                }
-                rada_core::archive::ArchiveKind::TarXz => {
-                    "Archive name — Tab changes the format: zip  tar.gz  tar.zst  [tar.xz]"
-                }
-            },
-        ),
-        InputKind::BulkRename { .. } => (
-            "Bulk rename",
-            "Pattern:  {name} {ext} {n} {n:3} {parent} {name:lower}   or   s/find/replace/",
-        ),
+    let (title, hint): (&str, String) = match &iv.kind {
+        InputKind::Rename { .. } => (Key::VRename.tr(), Key::InNewName.tr().into()),
+        InputKind::NewDir => (Key::VNewFolder.tr(), Key::InName.tr().into()),
+        InputKind::NewFile => (Key::VNewFile.tr(), Key::InNewFileHint.tr().into()),
+        InputKind::NewTag { .. } => (Key::ChipNewTag.tr(), Key::InNewTagHint.tr().into()),
+        InputKind::OpenWith { .. } => (Key::ChipOpenWith.tr(), Key::InOpenWithHint.tr().into()),
+        InputKind::ExtractTo { .. } => (Key::VExtract.tr(), Key::InExtractHint.tr().into()),
+        InputKind::Compress { format, .. } => {
+            use rada_core::archive::ArchiveKind::*;
+            let all = [(Zip, "zip"), (TarGz, "tar.gz"), (TarZst, "tar.zst"), (TarXz, "tar.xz")];
+            let formats = all
+                .iter()
+                .map(|(k, name)| {
+                    if k == format {
+                        format!("[{name}]")
+                    } else {
+                        (*name).to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("  ");
+            (Key::VCompress.tr(), tf(Key::InArchiveHint, &[&formats]))
+        }
+        InputKind::BulkRename { .. } => (Key::VerbBulkRename.tr(), Key::InBulkHint.tr().into()),
     };
     let preview: Vec<(String, String)> = match &iv.kind {
         InputKind::BulkRename { items } => match rada_core::ops::Pattern::parse(&iv.text) {
@@ -1400,7 +1440,7 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     let mut lines = vec![
         Line::from(vec![chip(th, title, th.accent)]),
         Line::raw(""),
-        Line::from(Span::styled(display::truncate(hint, w), th.dim())),
+        Line::from(Span::styled(display::truncate(&hint, w), th.dim())),
         Line::from(vec![
             Span::styled("› ", th.accent_style().add_modifier(Modifier::BOLD)),
             Span::styled(before, th.base()),
@@ -1432,14 +1472,14 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
     }
     lines.push(Line::raw(""));
     let go = if matches!(iv.kind, InputKind::OpenWith { .. }) {
-        "Open"
+        Key::BtnOpen.tr()
     } else {
-        "Plan"
+        Key::BtnPlan.tr()
     };
     lines.push(Line::from(vec![
         button(th, "Enter", go, Some(th.accent), true),
         Span::raw("  "),
-        button(th, "Esc", "Cancel", None, true),
+        button(th, "Esc", Key::BtnCancel.tr(), None, true),
     ]));
     f.render_widget(Paragraph::new(lines), inner);
 }
@@ -1457,16 +1497,16 @@ fn draw_history(
     let inner = frame(f, th, r, th.accent);
     let w = inner.width as usize;
     let mut lines: Vec<Line> = vec![
-        Line::from(vec![chip(th, "History", th.accent)]),
+        Line::from(vec![chip(th, Key::ChipHistory.tr(), th.accent)]),
         Line::raw(""),
     ];
     if h.loading {
         lines.push(Line::from(Span::styled(
-            format!("{spinner} reading the journal…"),
+            tf(Key::ReadingJournal, &[&spinner]),
             th.dim(),
         )));
     } else if h.entries.is_empty() {
-        lines.push(Line::from(Span::styled("No operations yet.", th.dim())));
+        lines.push(Line::from(Span::styled(Key::NoOpsYet.tr(), th.dim())));
     }
     let visible = inner.height.saturating_sub(5) as usize;
     let start = h.selected.saturating_sub(visible.saturating_sub(1));
@@ -1481,17 +1521,14 @@ fn draw_history(
             EntryStatus::Finished(RunStatus::Interrupted) => ("?", th.warn),
             EntryStatus::Interrupted => ("?", th.error),
         };
-        let tag = match (&e.undo_state, e.reversible) {
-            (UndoState::Undone, _) => "undone".to_string(),
-            (UndoState::Partial { remaining }, _) => format!("partly undone ({remaining} left)"),
-            (_, false) => "permanent".to_string(),
-            _ if e.undo_steps == 0 => "nothing to undo".to_string(),
-            _ => "can undo".to_string(),
-        };
-        let tag_color = match tag.as_str() {
-            "can undo" => th.accent,
-            "permanent" => th.error,
-            _ => th.muted,
+        let (tag, tag_color) = match (&e.undo_state, e.reversible) {
+            (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
+            (UndoState::Partial { remaining }, _) => {
+                (tf(Key::HistPartly, &[remaining]), th.muted)
+            }
+            (_, false) => (Key::HistPermanent.tr().to_string(), th.error),
+            _ if e.undo_steps == 0 => (Key::HistNothing.tr().to_string(), th.muted),
+            _ => (Key::HistCanUndo.tr().to_string(), th.accent),
         };
         let when = fmt::clock(e.time);
         let right = format!(" {tag}");
@@ -1525,9 +1562,9 @@ fn draw_history(
         lines.push(Line::raw(""));
     }
     let btns = vec![
-        button(th, "Enter", "Undo selected", Some(th.accent), true),
+        button(th, "Enter", Key::BtnUndoSelected.tr(), Some(th.accent), true),
         Span::raw("  "),
-        button(th, "Esc", "Close", None, true),
+        button(th, "Esc", Key::BtnClose.tr(), None, true),
     ];
     hit_spans(
         hits,
@@ -1578,7 +1615,7 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
             pad("Vim", vim_w),
             th.accent_style().add_modifier(Modifier::BOLD),
         ),
-        Span::styled("Classic", th.accent_style().add_modifier(Modifier::BOLD)),
+        Span::styled(Key::HelpClassic.tr(), th.accent_style().add_modifier(Modifier::BOLD)),
     ]));
     for g in Group::ALL {
         lines.push(Line::raw(""));
@@ -1608,33 +1645,33 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
-        "Mouse",
+        Key::HelpMouse.tr(),
         th.dim().add_modifier(Modifier::BOLD),
     )));
     let mouse_lines: Vec<&str> = if mouse {
         vec![
-            "Click a name to put the cursor there · the box on the left (or Space) selects · double-click opens.",
-            "Ctrl+click adds one item · Shift+click selects a range · right-click opens a menu · wheel scrolls.",
-            "Every button of the bars is clickable and does what its key does; middle-click closes a tab.",
-            "Click the path (outside its words) to type an address; click a column title to sort by it.",
-            "Shift+drag selects text in the terminal (the mouse belongs to rada while it runs).",
+            Key::HelpMouse1.tr(),
+            Key::HelpMouse2.tr(),
+            Key::HelpMouse3.tr(),
+            Key::HelpMouse4.tr(),
+            Key::HelpMouse5.tr(),
         ]
     } else {
-        vec!["The mouse is off (mouse = false in the configuration)."]
+        vec![Key::HelpMouseOff.tr()]
     };
     for l in mouse_lines {
         lines.push(Line::from(Span::styled(l, th.base())));
     }
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
-        "Also",
+        Key::HelpAlso.tr(),
         th.dim().add_modifier(Modifier::BOLD),
     )));
     for l in [
-        "Alt+1 … Alt+9 jump to a tab · Alt+P shows or hides the details pane.",
-        "Ctrl+1 / Ctrl+2 (or v) switch between Details and Icons; in Icons the arrows and h j k l move across the grid.",
-        "Backspace goes to the parent folder with the vim keys on, and back with the classic keys alone.",
-        "Shift+Del deletes for good: the plan says so, and it cannot be undone.",
+        Key::HelpAlso1.tr(),
+        Key::HelpAlso2.tr(),
+        Key::HelpAlso3.tr(),
+        Key::HelpAlso4.tr(),
     ] {
         lines.push(Line::from(Span::styled(l, th.base())));
     }
@@ -1643,11 +1680,11 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
         .hint(Action::Quit)
         .unwrap_or_else(|| "Ctrl+Q".to_string());
     for l in [
-        "Enter on an archive opens it like a folder, read-only: copy items out (Ctrl+C), paste in a folder.".to_string(),
-        "Extract here / to a folder and Compress… need no archive tool installed; RAR needs 7z or unrar.".to_string(),
-        format!("Ctrl+C copies; it never quits. Quit with {quit}."),
-        "Every operation shows a plan first. Every finished operation can be undone.".to_string(),
-        "Rebind keys in the [keys] section of the configuration file.".to_string(),
+        Key::HelpEnd1.tr().to_string(),
+        Key::HelpEnd2.tr().to_string(),
+        tf(Key::HelpEnd3, &[&quit]),
+        Key::HelpEnd4.tr().to_string(),
+        Key::HelpEnd5.tr().to_string(),
     ] {
         lines.push(Line::from(Span::styled(l, th.dim())));
     }
@@ -1657,12 +1694,12 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
     let scroll = scroll.min(max_scroll);
     let mut out: Vec<Line> = vec![
         Line::from(vec![
-            chip(th, "Keys", th.accent),
+            chip(th, Key::ChipKeys.tr(), th.accent),
             Span::styled(
                 if max_scroll > 0 {
-                    "   ↑↓ scroll · Esc close"
+                    format!("   {}", Key::HelpScrollClose.tr())
                 } else {
-                    "   Esc close"
+                    format!("   {}", Key::HelpClose.tr())
                 },
                 th.faint(),
             ),

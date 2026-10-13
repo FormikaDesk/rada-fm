@@ -1,6 +1,8 @@
 //! The Properties window: what is known about the item under the cursor, or about the
 //! selection, taken from the listing already in memory (nothing is read from the disk).
 
+use rada_core::i18n::{Key, tf};
+
 use super::*;
 
 pub struct PropsView {
@@ -32,35 +34,36 @@ impl App {
         let folders = chosen.iter().filter(|e| e.is_dir()).count();
         let mut rows = vec![
             (
-                "Items".to_string(),
-                format!(
-                    "{} ({} files, {})",
-                    chosen.len(),
-                    chosen.len() - folders,
-                    fmt::count(folders as u64, "folder", "folders")
+                Key::PropItems.tr().to_string(),
+                tf(
+                    Key::PropItemsValue,
+                    &[
+                        &chosen.len(),
+                        &(chosen.len() - folders),
+                        &fmt::count(folders as u64, Key::FolderOne, Key::FolderMany),
+                    ],
                 ),
             ),
             (
-                "Size".to_string(),
-                format!(
-                    "{} ({} bytes), folders not counted",
-                    fmt::size(size),
-                    fmt::thousands(size)
+                Key::PropSize.tr().to_string(),
+                tf(
+                    Key::PropSizeNoFolders,
+                    &[&fmt::size(size), &fmt::thousands(size)],
                 ),
             ),
             (
-                "Location".to_string(),
+                Key::PropLocation.tr().to_string(),
                 match self.tag_view() {
-                    Some(tag) => format!("Tag: {tag}"),
+                    Some(tag) => tf(Key::TagViewTitle, &[&tag]),
                     None => fmt::short_path(&self.cwd, self.home()),
                 },
             ),
         ];
         if self.archive.is_some() {
-            rows.push(("Inside".to_string(), "an archive (read-only)".to_string()));
+            rows.push((Key::PropInside.tr().to_string(), Key::PropInArchive.tr().to_string()));
         }
         PropsView {
-            title: format!("{} selected", chosen.len()),
+            title: tf(Key::PropsSelected, &[&chosen.len()]),
             rows,
             scroll: 0,
         }
@@ -70,58 +73,61 @@ impl App {
         let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &self.tz);
         let mut rows: Vec<(String, String)> = vec![
             (
-                "Name".into(),
+                Key::PropName.tr().into(),
                 e.path
                     .file_name()
                     .map(rada_core::display::name)
                     .unwrap_or_else(|| rada_core::display::name(&e.name)),
             ),
-            ("Type".into(), e.type_label.to_string()),
+            (Key::PropType.tr().into(), rada_core::i18n::type_label(&e.type_label).into_owned()),
             (
-                "Location".into(),
+                Key::PropLocation.tr().into(),
                 fmt::short_path(e.path.parent().unwrap_or(&self.cwd), self.home()),
             ),
         ];
         if let Some(l) = &e.link {
-            rows.push(("Link to".into(), rada_core::display::path(&l.target)));
+            rows.push((Key::PropLinkTo.tr().into(), rada_core::display::path(&l.target)));
         }
         if !e.is_dir() {
             rows.push((
-                "Size".into(),
-                format!("{} ({} bytes)", fmt::size(e.size), fmt::thousands(e.size)),
+                Key::PropSize.tr().into(),
+                tf(
+                    Key::PropSizeBytes,
+                    &[&fmt::size(e.size), &fmt::thousands(e.size)],
+                ),
             ));
         }
-        rows.push(("Modified".into(), when(e.mtime)));
+        rows.push((Key::PropModified.tr().into(), when(e.mtime)));
         if e.created.is_some() {
-            rows.push(("Created".into(), when(e.created)));
+            rows.push((Key::PropCreated.tr().into(), when(e.created)));
         }
         if let Some(m) = e.mode {
             rows.push((
-                "Permissions".into(),
+                Key::PropPermissions.tr().into(),
                 format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
             ));
         }
         let mut flags: Vec<&str> = Vec::new();
         if e.hidden {
-            flags.push("hidden");
+            flags.push(Key::FlagHidden.tr());
         }
         if e.system {
-            flags.push("system");
+            flags.push(Key::FlagSystem.tr());
         }
         if e.readonly {
-            flags.push("read-only");
+            flags.push(Key::FlagReadOnly.tr());
         }
         if e.executable {
-            flags.push("executable");
+            flags.push(Key::FlagExecutable.tr());
         }
         if !flags.is_empty() {
-            rows.push(("Attributes".into(), flags.join(", ")));
+            rows.push((Key::PropAttributes.tr().into(), flags.join(", ")));
         }
         if let Some(err) = &e.error {
-            rows.push(("Problem".into(), err.clone()));
+            rows.push((Key::PropProblem.tr().into(), err.clone()));
         }
         if self.archive.is_some() {
-            rows.push(("Inside".into(), "an archive (read-only)".into()));
+            rows.push((Key::PropInside.tr().into(), Key::PropInArchive.tr().into()));
         }
         PropsView {
             title: e.display.clone(),

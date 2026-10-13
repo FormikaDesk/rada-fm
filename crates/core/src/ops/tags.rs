@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::engine::Engine;
 use super::plan::{ItemAction, ItemSummary, OpKind, Plan, Severity, Step, WarningKind, WarningSet};
 use crate::fs::FileKind;
+use crate::i18n::{self, Key, t, tf};
 use crate::platform::{Tag, tags};
 use crate::{Error, Result, display};
 
@@ -48,10 +49,10 @@ impl TagChange {
     /// In a few words, for the title of the plan.
     pub fn describe(&self) -> String {
         match self {
-            TagChange::Add { tag } | TagChange::Toggle { tag } => format!("tag {}", tag.name),
-            TagChange::Remove { name } => format!("remove tag {name}"),
-            TagChange::Clear => "remove all tags".to_string(),
-            TagChange::Set { tags } => format!("set tags to {}", super::plan::tag_names(tags)),
+            TagChange::Add { tag } | TagChange::Toggle { tag } => tf(Key::TagAdd, &[&tag.name]),
+            TagChange::Remove { name } => tf(Key::TagRemove, &[name]),
+            TagChange::Clear => t(Key::TagClear).to_string(),
+            TagChange::Set { tags } => tf(Key::TagSet, &[&super::plan::tag_names(tags)]),
         }
     }
 
@@ -84,7 +85,7 @@ impl Engine {
                     .map(display::name)
                     .unwrap_or_else(|| display::path(&items[0]))
             } else {
-                format!("{} items", items.len())
+                i18n::count(items.len() as u64, Key::ItemOne, Key::ItemMany)
             };
             let d = change.describe();
             let mut head = d.chars();
@@ -92,7 +93,7 @@ impl Engine {
                 .next()
                 .map(|c| c.to_uppercase().collect::<String>())
                 .unwrap_or_default();
-            format!("{first}{} on {what}", head.as_str())
+            tf(Key::TitleTagsOn, &[&format!("{first}{}", head.as_str()), &what])
         });
         let mut ws = WarningSet::default();
         let Some(store) = self.platform.tags() else {
@@ -100,7 +101,7 @@ impl Engine {
                 WarningKind::CannotTag,
                 Severity::Blocking,
                 None,
-                Some("this system keeps no tags".into()),
+                Some(t(Key::TagsNoStore).into()),
             );
             plan.warnings = ws.finish();
             return plan;

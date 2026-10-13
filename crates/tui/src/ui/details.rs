@@ -6,6 +6,7 @@
 //! user asks for it on a narrower one (`Alt+P`).
 
 use rada_core::display;
+use rada_core::i18n::{Key, tf};
 use rada_core::preview::Preview;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -25,33 +26,33 @@ use crate::keymap::Action;
 const KEY_W: usize = 12;
 
 /// The properties of the item under the cursor, as label and value.
-fn properties(app: &App) -> Vec<(&'static str, String)> {
+fn properties(app: &App) -> Vec<(Key, String)> {
     let Some(e) = app.current() else {
         return Vec::new();
     };
     let when = |t| fmt::date_with_day(t, app.now(), app.date_format, &app.tz);
-    let mut rows: Vec<(&'static str, String)> = Vec::new();
+    let mut rows: Vec<(Key, String)> = Vec::new();
     if let Some(img) = &app.preview.image
         && app.preview.name == e.display
         && let (Some(w), Some(h)) = (img.info.width, img.info.height)
     {
-        rows.push(("Dimensions", format!("{w} × {h}")));
+        rows.push((Key::PropDimensions, format!("{w} × {h}")));
     }
     if let Some(img) = &app.preview.image
         && app.preview.name == e.display
         && let Some(d) = &img.info.doc
     {
         let pages = match d.pages {
-            Some(1) => "1 page".to_string(),
-            Some(n) => format!("{n} pages"),
-            None => "unknown".to_string(),
+            Some(1) => Key::PageOne.tr().to_string(),
+            Some(n) => tf(Key::PageMany, &[&n]),
+            None => Key::PagesUnknown.tr().to_string(),
         };
-        rows.push(("Pages", pages));
+        rows.push((Key::PropPages, pages));
         if let Some(t) = &d.title {
-            rows.push(("Title", t.clone()));
+            rows.push((Key::PropTitle, t.clone()));
         }
         if let Some(a) = &d.author {
-            rows.push(("Author", a.clone()));
+            rows.push((Key::PropAuthor, a.clone()));
         }
     }
     if e.is_dir() {
@@ -61,20 +62,23 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
             let n = d.entries.len() as u64;
             let more = if d.truncated { "+" } else { "" };
             rows.push((
-                "Contains",
-                format!("{}{more}", fmt::count(n, "item", "items")),
+                Key::PropContains,
+                format!("{}{more}", fmt::count(n, Key::ItemOne, Key::ItemMany)),
             ));
         }
     } else {
         rows.push((
-            "Size",
-            format!("{} ({} bytes)", fmt::size(e.size), fmt::thousands(e.size)),
+            Key::PropSize,
+            tf(
+                Key::PropSizeBytes,
+                &[&fmt::size(e.size), &fmt::thousands(e.size)],
+            ),
         ));
     }
     if !e.tags.is_empty() {
         // Drawn with its coloured dots (see `draw_details`); the text is for the width.
         rows.push((
-            "Tags",
+            Key::PropTags,
             e.tags
                 .iter()
                 .map(|t| format!("● {}", t.name))
@@ -82,32 +86,32 @@ fn properties(app: &App) -> Vec<(&'static str, String)> {
                 .join("  "),
         ));
     }
-    rows.push(("Modified", when(e.mtime)));
+    rows.push((Key::PropModified, when(e.mtime)));
     if e.created.is_some() {
-        rows.push(("Created", when(e.created)));
+        rows.push((Key::PropCreated, when(e.created)));
     }
     rows.push((
-        "Location",
+        Key::PropLocation,
         fmt::short_path(e.path.parent().unwrap_or(&app.cwd), app.home()),
     ));
     if let Some(m) = e.mode {
-        rows.push(("Permissions", rada_core::preview::mode_string(m)));
+        rows.push((Key::PropPermissions, rada_core::preview::mode_string(m)));
     } else {
         // Windows has attributes where Unix has permissions.
         let mut flags: Vec<&str> = Vec::new();
         if e.readonly {
-            flags.push("read-only");
+            flags.push(Key::FlagReadOnly.tr());
         }
         if e.hidden {
-            flags.push("hidden");
+            flags.push(Key::FlagHidden.tr());
         }
         if e.system {
-            flags.push("system");
+            flags.push(Key::FlagSystem.tr());
         }
         rows.push((
-            "Attributes",
+            Key::PropAttributes,
             if flags.is_empty() {
-                "normal".to_string()
+                Key::FlagNormal.tr().to_string()
             } else {
                 flags.join(", ")
             },
@@ -140,17 +144,17 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             .sum();
         let lines = vec![
             Line::from(Span::styled(
-                fmt::count(app.marked.len() as u64, "item", "items") + " selected",
+                fmt::selected_items(app.marked.len() as u64),
                 th.base().add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled(fmt::size(size) + " in files", th.dim())),
+            Line::from(Span::styled(tf(Key::InFiles, &[&fmt::size(size)]), th.dim())),
         ];
         f.render_widget(Paragraph::new(lines), Rect { height: 2, ..inner });
         return;
     }
     let Some(e) = app.current().cloned() else {
         f.render_widget(
-            Paragraph::new(Span::styled("Select a file to see its details", th.dim())),
+            Paragraph::new(Span::styled(Key::SelectToSee.tr(), th.dim())),
             Rect { height: 1, ..inner },
         );
         return;
@@ -174,9 +178,9 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     app.want_folder_sizes(app.current_index().into_iter());
     let sub = if e.is_dir() {
         app.folder_summary(&e)
-            .unwrap_or_else(|| e.type_label.to_string())
+            .unwrap_or_else(|| rada_core::i18n::type_label(&e.type_label).into_owned())
     } else {
-        format!("{} · {}", e.type_label, fmt::size(e.size))
+        format!("{} · {}", rada_core::i18n::type_label(&e.type_label), fmt::size(e.size))
     };
     f.render_widget(
         Paragraph::new(Span::styled(display::truncate(&sub, w), th.dim())),
@@ -247,18 +251,18 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             height: 1,
             ..inner
         };
-        let open = format!("{} Open", icons::ui(set, Glyph::Open));
+        let open = format!("{} {}", icons::ui(set, Glyph::Open), Key::BtnOpen.tr());
         let open_rect = row(by);
         draw_pill(f, open_rect, open.trim(), primary, rounded);
         app.hits.add(open_rect, Target::Act(Action::Open));
 
         if by + 2 < end {
             let row2 = row(by + 2);
-            let preview_label = format!("{} Preview", icons::ui(set, Glyph::Eye));
+            let preview_label = format!("{} {}", icons::ui(set, Glyph::Eye), Key::BtnPreview.tr());
             let preview_label = preview_label.trim().to_string();
             // What takes the second place: Preview, or Quick Look when it has no row of its own.
             let (second, second_target) = if quick_look && !quick_look_below {
-                ("Quick Look".to_string(), Target::Act(Action::QuickLook))
+                (Key::BtnQuickLook.tr().to_string(), Target::Act(Action::QuickLook))
             } else {
                 (preview_label, Target::FullPreview)
             };
@@ -276,7 +280,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
                     width: (w - half - 1) as u16,
                     ..row2
                 };
-                draw_pill(f, left, "Open with…", secondary, rounded);
+                draw_pill(f, left, Key::BtnOpenWith.tr(), secondary, rounded);
                 draw_pill(f, right, &second, secondary, rounded);
                 app.hits.add(left, Target::Act(Action::OpenWith));
                 app.hits.add(right, second_target);
@@ -285,7 +289,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         // macOS: the Finder's own preview, under the others.
         if quick_look_below && by + 4 < end {
             let row3 = row(by + 4);
-            draw_pill(f, row3, "Quick Look", secondary, rounded);
+            draw_pill(f, row3, Key::BtnQuickLook.tr(), secondary, rounded);
             app.hits.add(row3, Target::Act(Action::QuickLook));
         }
     }
@@ -297,8 +301,8 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|(k, v)| {
             let room = w.saturating_sub(KEY_W);
-            let mut spans = vec![Span::styled(format!("{k:<KEY_W$}"), th.dim())];
-            if *k == "Tags" {
+            let mut spans = vec![Span::styled(format!("{:<KEY_W$}", k.tr()), th.dim())];
+            if *k == Key::PropTags {
                 // A dot in each tag's colour, then its name; what does not fit is cut.
                 let mut left = room;
                 for (i, t) in tags.iter().enumerate() {

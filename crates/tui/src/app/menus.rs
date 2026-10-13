@@ -1,5 +1,7 @@
 //! The menus: the one on the right button, and the dropdowns of the command bar.
 
+use rada_core::i18n::Key;
+
 use super::*;
 
 /// Which dropdown a button of the command bar opens.
@@ -39,19 +41,19 @@ impl App {
                     MenuItem::choice(MenuCmd::SortBy(k), label, self.sort.key == k, gap)
                 };
                 vec![
-                    key(SortKey::Name, "Name", false),
-                    key(SortKey::Modified, "Date modified", false),
-                    key(SortKey::Type, "Type", false),
-                    key(SortKey::Size, "Size", false),
+                    key(SortKey::Name, Key::ColName.tr(), false),
+                    key(SortKey::Modified, Key::SortModified.tr(), false),
+                    key(SortKey::Type, Key::ColType.tr(), false),
+                    key(SortKey::Size, Key::ColSize.tr(), false),
                     MenuItem::choice(
                         MenuCmd::SortOrder(false),
-                        "Ascending",
+                        Key::Ascending.tr(),
                         !self.sort.reverse,
                         true,
                     ),
                     MenuItem::choice(
                         MenuCmd::SortOrder(true),
-                        "Descending",
+                        Key::Descending.tr(),
                         self.sort.reverse,
                         false,
                     ),
@@ -60,25 +62,25 @@ impl App {
             MenuKind::View => vec![
                 MenuItem::choice(
                     MenuCmd::View(ViewMode::Details),
-                    "Details",
+                    Key::ViewDetails.tr(),
                     self.view == ViewMode::Details,
                     false,
                 ),
                 MenuItem::choice(
                     MenuCmd::View(ViewMode::Icons),
-                    "Icons",
+                    Key::ViewIcons.tr(),
                     self.view == ViewMode::Icons,
                     false,
                 ),
-                MenuItem::toggle(ToggleDetails, "Details pane", self.details_visible(), true),
-                MenuItem::toggle(ToggleHidden, "Hidden files", self.show_hidden, false),
-                MenuItem::toggle(ToggleSidebar, "Navigation pane", self.side_on, false),
+                MenuItem::toggle(ToggleDetails, Key::MenuDetailsPane.tr(), self.details_visible(), true),
+                MenuItem::toggle(ToggleHidden, Key::MenuHiddenFiles.tr(), self.show_hidden, false),
+                MenuItem::toggle(ToggleSidebar, Key::MenuNavPane.tr(), self.side_on, false),
             ],
             MenuKind::Tags => self.tag_menu_items(),
             MenuKind::Help => vec![
                 MenuItem::act(Help, true, false),
-                MenuItem::command(MenuCmd::CheckUpdates, "Check for updates", true),
-                MenuItem::command(MenuCmd::About, "About rada", false),
+                MenuItem::command(MenuCmd::CheckUpdates, Key::MenuCheckUpdates.tr(), true),
+                MenuItem::command(MenuCmd::About, Key::MenuAbout.tr(), false),
             ],
             MenuKind::More => {
                 let mut v = vec![
@@ -134,7 +136,7 @@ impl App {
             if self.tags_available() {
                 items.push(MenuItem::sub(
                     MenuKind::Tags,
-                    "Tags",
+                    Key::MenuTags.tr(),
                     !ro,
                     !(on_archive || ro),
                 ));
@@ -154,10 +156,10 @@ impl App {
             items.push(MenuItem::act(Trash, !ro, true));
             items.push(MenuItem::act(Properties, true, true));
         } else {
-            items.push(MenuItem::sub(MenuKind::New, "New", !nowhere, false));
+            items.push(MenuItem::sub(MenuKind::New, Key::MenuNew.tr(), !nowhere, false));
             items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
-            items.push(MenuItem::sub(MenuKind::Sort, "Sort by", true, true));
-            items.push(MenuItem::sub(MenuKind::View, "View", true, false));
+            items.push(MenuItem::sub(MenuKind::Sort, Key::MenuSortBy.tr(), true, true));
+            items.push(MenuItem::sub(MenuKind::View, Key::MenuView.tr(), true, false));
             items.push(MenuItem::act(Refresh, true, true));
             items.push(MenuItem::act(SelectAll, true, false));
             if ro {
@@ -278,14 +280,14 @@ impl App {
         }
         items.push(MenuItem {
             cmd: MenuCmd::Tag(TagCmd::New),
-            label: "New tag…".into(),
+            label: Key::MenuNewTag.tr().into(),
             enabled: !targets.is_empty(),
             gap_before: true,
             checked: None,
         });
         items.push(MenuItem {
             cmd: MenuCmd::Tag(TagCmd::Clear),
-            label: "Remove all tags".into(),
+            label: Key::MenuRemoveAllTags.tr().into(),
             enabled: targets.iter().any(|e| !e.tags.is_empty()),
             gap_before: false,
             checked: None,
@@ -296,7 +298,7 @@ impl App {
     pub(super) fn run_tag_cmd(&mut self, cmd: TagCmd) {
         use rada_core::ops::TagChange;
         let items = self.targets();
-        if items.is_empty() || self.refuse_in_archive("change tags") || self.refuse_if_busy() {
+        if items.is_empty() || self.refuse_in_archive(Key::WhatChangeTags.tr()) || self.refuse_if_busy() {
             return;
         }
         let change = match cmd {
@@ -314,6 +316,6 @@ impl App {
             .svc
             .jobs
             .plan_request(OpRequest::SetTags { items, change });
-        self.begin_plan("Planning", h);
+        self.begin_plan(Key::PlanningTags.tr(), h);
     }
 }

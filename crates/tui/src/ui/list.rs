@@ -376,7 +376,7 @@ fn row<'a>(
     }
     if cols.kind > 0 {
         spans.push(gap());
-        let text = display::truncate(&e.type_label, cols.kind);
+        let text = display::truncate(&rada_core::i18n::type_label(&e.type_label), cols.kind);
         spans.push(Span::styled(pad(&text, cols.kind), with(dim)));
     }
     if cols.size > 0 {

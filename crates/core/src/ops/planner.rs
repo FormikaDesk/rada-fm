@@ -11,6 +11,7 @@ use super::plan::*;
 use super::scan::{LinkState, Scan, ScanNode};
 use crate::display;
 use crate::fs::FileKind;
+use crate::i18n::{self, Key, tf};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransferMode {
@@ -58,11 +59,7 @@ fn summary_of(r: &ScanNode, action: ItemAction) -> ItemSummary {
 }
 
 fn items_label(n: u64) -> String {
-    if n == 1 {
-        "1 item".into()
-    } else {
-        format!("{n} items")
-    }
+    i18n::count(n, Key::ItemOne, Key::ItemMany)
 }
 
 fn not_found(e: &io::Error) -> bool {
@@ -91,11 +88,13 @@ impl Engine {
             TransferMode::Copy => OpKind::Copy,
             TransferMode::Move => OpKind::Move,
         };
-        let title = format!(
-            "{} {} to {}",
-            kind.verb(),
-            items_label(scan.roots.len() as u64),
-            display::path(dest_dir)
+        let title = tf(
+            Key::TitleTransfer,
+            &[
+                &kind.verb(),
+                &items_label(scan.roots.len() as u64),
+                &display::path(dest_dir),
+            ],
         );
         let mut plan = Plan::empty(kind, title);
         plan.destination = Some(dest_dir.to_path_buf());
@@ -218,7 +217,7 @@ impl Engine {
     pub fn plan_trash(&self, scan: &Scan) -> Plan {
         let mut plan = Plan::empty(
             OpKind::Trash,
-            format!("Move {} to the trash", items_label(scan.roots.len() as u64)),
+            tf(Key::TitleTrash, &[&items_label(scan.roots.len() as u64)]),
         );
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
@@ -252,10 +251,7 @@ impl Engine {
     pub fn plan_delete(&self, scan: &Scan) -> Plan {
         let mut plan = Plan::empty(
             OpKind::Delete,
-            format!(
-                "Permanently delete {}",
-                items_label(scan.roots.len() as u64)
-            ),
+            tf(Key::TitleDelete, &[&items_label(scan.roots.len() as u64)]),
         );
         plan.reversible = false;
         let mut ws = WarningSet::default();
@@ -319,10 +315,9 @@ impl Engine {
     pub fn plan_rename(&self, from: &Path, new_name: &OsStr) -> Plan {
         let mut plan = Plan::empty(
             OpKind::Rename,
-            format!(
-                "Rename {} to {}",
-                display::path(from),
-                display::name(new_name)
+            tf(
+                Key::TitleRename,
+                &[&display::path(from), &display::name(new_name)],
             ),
         );
         let mut ws = WarningSet::default();
@@ -406,7 +401,7 @@ impl Engine {
         let path = parent.join(name);
         let mut plan = Plan::empty(
             OpKind::MakeDir,
-            format!("Create folder {}", display::name(name)),
+            tf(Key::TitleMkdir, &[&display::name(name)]),
         );
         let mut ws = WarningSet::default();
         plan.destination = Some(parent.to_path_buf());
@@ -449,7 +444,7 @@ impl Engine {
         let path = parent.join(name);
         let mut plan = Plan::empty(
             OpKind::MakeFile,
-            format!("Create file {}", display::name(name)),
+            tf(Key::TitleMkfile, &[&display::name(name)]),
         );
         let mut ws = WarningSet::default();
         plan.destination = Some(parent.to_path_buf());

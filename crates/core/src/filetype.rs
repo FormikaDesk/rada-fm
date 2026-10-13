@@ -197,6 +197,20 @@ const COMPOUND: &[(&str, &str)] = &[
     (".tar.z", "Archive (tar.Z)"),
 ];
 
+/// Every label the tables above can give, for the tests of the translations.
+pub fn all_labels() -> Vec<&'static str> {
+    let mut v: Vec<&'static str> = BY_EXTENSION
+        .iter()
+        .chain(BY_NAME)
+        .chain(COMPOUND)
+        .map(|(_, l)| *l)
+        .collect();
+    v.extend(["Folder", "Link", "Special file", "File", "Program"]);
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
 /// The label for a name. `kind` and `executable` only matter for things that are not plain
 /// files or have no extension.
 pub fn label(name: &str, kind: FileKind, is_dir: bool, executable: bool) -> Cow<'static, str> {

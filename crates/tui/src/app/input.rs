@@ -1,5 +1,6 @@
 //! Keyboard and mouse: from key chords and clicks to [`Action`]s, and what each action does.
 
+use rada_core::i18n::Key;
 use crossterm::event::{KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 
 use super::*;
@@ -962,18 +963,18 @@ impl App {
         let t = &r.totals;
         let what = |files_first: bool| {
             if files_first && t.files > 0 {
-                fmt::count(t.files, "file", "files")
+                fmt::count(t.files, Key::FileOne, Key::FileMany)
             } else if files_first && t.dirs > 0 {
-                fmt::count(t.dirs, "folder", "folders")
+                fmt::count(t.dirs, Key::FolderOne, Key::FolderMany)
             } else {
-                fmt::count(t.items.max(1), "item", "items")
+                fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany)
             }
         };
         let base = match r.kind {
             OpKind::Copy => format!("Copied {}", what(true)),
             OpKind::Move => format!("Moved {}", what(true)),
             OpKind::Rename | OpKind::BulkRename => {
-                format!("Renamed {}", fmt::count(t.items.max(1), "item", "items"))
+                format!("Renamed {}", fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany))
             }
             OpKind::MakeDir => "Folder created".to_string(),
             OpKind::MakeFile => "File created".to_string(),
@@ -984,7 +985,7 @@ impl App {
             OpKind::Compress => "Archive created".to_string(),
             OpKind::SetTags => format!(
                 "Tags changed on {}",
-                fmt::count(t.items.max(1), "item", "items")
+                fmt::count(t.items.max(1), Key::ItemOne, Key::ItemMany)
             ),
         };
         let tail = match r.kind {

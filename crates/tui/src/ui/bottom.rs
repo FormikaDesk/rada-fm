@@ -5,6 +5,7 @@
 //! The hints come from the real keymap, so they follow the scheme in use and whatever the
 //! user rebound, and each one can be clicked.
 
+use rada_core::i18n::Key;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -151,10 +152,10 @@ fn count_text(app: &App) -> String {
         format!(
             "{} of {}",
             app.visible.len(),
-            fmt::count(total as u64, "item", "items")
+            fmt::count(total as u64, Key::ItemOne, Key::ItemMany)
         )
     } else {
-        fmt::count(app.visible.len() as u64, "item", "items")
+        fmt::count(app.visible.len() as u64, Key::ItemOne, Key::ItemMany)
     }
 }
 
@@ -207,7 +208,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             format!(
                 "{icon} {} {verb}",
-                fmt::count(c.paths.len() as u64, "item", "items")
+                fmt::count(c.paths.len() as u64, Key::ItemOne, Key::ItemMany)
             ),
             th.fg(th.kinds.vector).patch(band),
         ));

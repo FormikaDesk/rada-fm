@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::archive::ArchiveKind;
 use crate::archive::writer::CompressItem;
 use crate::fs::{Fingerprint, Stamp};
+use crate::i18n::{self, Key, t, tf};
 use crate::platform::TrashedItem;
 use crate::{display, pathcodec};
 
@@ -36,18 +37,18 @@ pub enum OpKind {
 impl OpKind {
     pub fn verb(self) -> &'static str {
         match self {
-            OpKind::Copy => "Copy",
-            OpKind::Move => "Move",
-            OpKind::Rename => "Rename",
-            OpKind::BulkRename => "Bulk rename",
-            OpKind::MakeDir => "New folder",
-            OpKind::MakeFile => "New file",
-            OpKind::Trash => "Move to trash",
-            OpKind::Delete => "Delete permanently",
-            OpKind::Undo => "Undo",
-            OpKind::Extract => "Extract",
-            OpKind::Compress => "Compress",
-            OpKind::SetTags => "Change tags",
+            OpKind::Copy => t(Key::VerbCopy),
+            OpKind::Move => t(Key::VerbMove),
+            OpKind::Rename => t(Key::VerbRename),
+            OpKind::BulkRename => t(Key::VerbBulkRename),
+            OpKind::MakeDir => t(Key::VerbNewFolder),
+            OpKind::MakeFile => t(Key::VerbNewFile),
+            OpKind::Trash => t(Key::VerbTrash),
+            OpKind::Delete => t(Key::VerbDelete),
+            OpKind::Undo => t(Key::VerbUndo),
+            OpKind::Extract => t(Key::VerbExtract),
+            OpKind::Compress => t(Key::VerbCompress),
+            OpKind::SetTags => t(Key::VerbTags),
         }
     }
 }
@@ -243,7 +244,7 @@ pub enum Step {
 /// Tag names for a sentence: `Red, Work`, or `none`.
 pub fn tag_names(tags: &[crate::platform::Tag]) -> String {
     if tags.is_empty() {
-        "none".to_string()
+        t(Key::TagNone).to_string()
     } else {
         tags.iter()
             .map(|t| t.name.as_str())
@@ -297,64 +298,46 @@ impl Step {
     }
 
     pub fn describe(&self) -> String {
+        use Key::*;
+        let p = |x: &Path| display::path(x);
         match self {
-            Step::MakeDir { path, .. } => format!("create folder {}", display::path(path)),
-            Step::MakeFile { path, .. } => format!("create file {}", display::path(path)),
-            Step::FinishDir { path, .. } => format!("finish folder {}", display::path(path)),
+            Step::MakeDir { path, .. } => tf(StepMakeDir, &[&p(path)]),
+            Step::MakeFile { path, .. } => tf(StepMakeFile, &[&p(path)]),
+            Step::FinishDir { path, .. } => tf(StepFinishDir, &[&p(path)]),
             Step::CopyFile {
                 src,
                 dst,
                 remove_source,
                 ..
-            } => format!(
-                "{} {} -> {}",
-                if *remove_source { "move" } else { "copy" },
-                display::path(src),
-                display::path(dst)
+            } => tf(
+                if *remove_source { StepMoveFile } else { StepCopy },
+                &[&p(src), &p(dst)],
             ),
             Step::CopySymlink {
                 src,
                 dst,
                 remove_source,
                 ..
-            } => format!(
-                "{} link {} -> {}",
-                if *remove_source { "move" } else { "copy" },
-                display::path(src),
-                display::path(dst)
+            } => tf(
+                if *remove_source { StepMoveLink } else { StepCopyLink },
+                &[&p(src), &p(dst)],
             ),
-            Step::ExtractFile { src, dst, .. } => {
-                format!("extract {} -> {}", display::path(src), display::path(dst))
-            }
-            Step::ExtractSymlink { src, dst, .. } => format!(
-                "extract link {} -> {}",
-                display::path(src),
-                display::path(dst)
-            ),
-            Step::Compress { dst, items, .. } => {
-                format!("compress {} items into {}", items.len(), display::path(dst))
-            }
-            Step::HardLink { existing, link, .. } => format!(
-                "hard link {} -> {}",
-                display::path(existing),
-                display::path(link)
-            ),
-            Step::Rename { from, to } => {
-                format!("rename {} -> {}", display::path(from), display::path(to))
-            }
-            Step::TrashItem { path } => format!("trash {}", display::path(path)),
-            Step::RemoveFile { path, .. } => format!("delete {}", display::path(path)),
-            Step::RemoveDir { path } => format!("remove folder {}", display::path(path)),
-            Step::Restore { item } => format!("restore {}", display::path(&item.original)),
+            Step::ExtractFile { src, dst, .. } => tf(StepExtract, &[&p(src), &p(dst)]),
+            Step::ExtractSymlink { src, dst, .. } => tf(StepExtractLink, &[&p(src), &p(dst)]),
+            Step::Compress { dst, items, .. } => tf(StepCompress, &[&items.len(), &p(dst)]),
+            Step::HardLink { existing, link, .. } => tf(StepHardLink, &[&p(existing), &p(link)]),
+            Step::Rename { from, to } => tf(StepRename, &[&p(from), &p(to)]),
+            Step::TrashItem { path } => tf(StepTrash, &[&p(path)]),
+            Step::RemoveFile { path, .. } => tf(StepRemoveFile, &[&p(path)]),
+            Step::RemoveDir { path } => tf(StepRemoveDir, &[&p(path)]),
+            Step::Restore { item } => tf(StepRestore, &[&p(&item.original)]),
             Step::SetTags {
                 path,
                 before,
                 after,
-            } => format!(
-                "tags of {}: {} -> {}",
-                display::path(path),
-                tag_names(before),
-                tag_names(after)
+            } => tf(
+                StepTags,
+                &[&p(path), &tag_names(before), &tag_names(after)],
             ),
         }
     }
@@ -680,145 +663,55 @@ impl WarningSet {
     }
 }
 
-fn plural(n: u64, one: &str, many: &str) -> String {
-    if n == 1 {
-        format!("1 {one}")
-    } else {
-        format!("{n} {many}")
-    }
+/// A sentence that depends on a count: the key for one, the key for many (`{0}` is the count,
+/// `{1}` the detail).
+fn pl(n: u64, one: Key, many: Key, extra: &str) -> String {
+    let count = i18n::thousands(n);
+    i18n::tf(if n == 1 { one } else { many }, &[&count, &extra])
 }
 
 fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
+    use Key::*;
     let extra = detail.map(|d| format!(" ({d})")).unwrap_or_default();
+    let x = extra.as_str();
     match kind {
-        WarningKind::Irreversible => "PERMANENT: this cannot be undone".to_string(),
-        WarningKind::InsideItself => format!(
-            "{} is being copied or moved into itself",
-            plural(n, "folder", "folders")
-        ),
-        WarningKind::NotWritable => format!("destination is not writable{extra}"),
-        WarningKind::LowSpace => format!("not enough free space{extra}"),
-        WarningKind::Conflict => format!(
-            "{} already exist{}",
-            plural(n, "item", "items"),
-            if n == 1 { "s" } else { "" }
-        ),
-        WarningKind::Overwrite => format!(
-            "{} will be replaced (the old version goes to the trash, so undo restores it)",
-            plural(n, "item", "items")
-        ),
-        WarningKind::Unreadable => format!(
-            "{} cannot be read and will probably fail{extra}",
-            plural(n, "item", "items")
-        ),
-        WarningKind::SpecialFile => format!(
-            "{} (device, socket or pipe) will be skipped",
-            plural(n, "special file", "special files")
-        ),
-        WarningKind::BrokenSymlink => format!(
-            "{} point to nothing; they are kept as broken links",
-            plural(n, "symlink", "symlinks")
-        ),
-        WarningKind::Symlink => format!(
-            "{} will be kept as links (not followed)",
-            plural(n, "symlink", "symlinks")
-        ),
-        WarningKind::CircularLink => format!(
-            "{} form a loop; kept as links, not followed",
-            plural(n, "symlink", "symlinks")
-        ),
-        WarningKind::MountLoop => format!(
-            "{} loop back to a parent (mount cycle) and will be skipped",
-            plural(n, "folder", "folders")
-        ),
-        WarningKind::CrossDevice => {
-            "different filesystem: files are copied, verified, then removed from the source"
-                .to_string()
-        }
-        WarningKind::SameLocation => format!(
-            "{} already in the destination folder",
-            plural(n, "item is", "items are")
-        ),
-        WarningKind::HardLinks => format!(
-            "{} also have hard links outside the selection; their copies are independent files",
-            plural(n, "file", "files")
-        ),
-        WarningKind::HardLinksKept => format!(
-            "{} stay hard links of each other in the copy",
-            plural(n, "hard link", "hard links")
-        ),
-        WarningKind::SparseFiles => format!(
-            "{} sparse: the holes are kept, only the data is copied",
-            plural(n, "file is", "files are")
-        ),
-        WarningKind::XattrsLost => format!(
-            "{} carry extended attributes that the destination does not support; they are copied without them",
-            plural(n, "item", "items")
-        ),
-        WarningKind::AclLost => format!(
-            "{} carry ACLs that the destination does not support; they are copied without them",
-            plural(n, "item", "items")
-        ),
-        WarningKind::OwnerNotKept => format!(
-            "{} belong to someone else; the copies will belong to you (only the owner or root can keep owner and group)",
-            plural(n, "item", "items")
-        ),
-        WarningKind::AttributesNotKept => {
-            "extended attributes and ACLs are not preserved on this platform yet (tags are, where the system has them)"
-                .to_string()
-        }
-        WarningKind::CannotTag => format!(
-            "{} cannot carry tags here and will be left as they are{extra}",
-            plural(n, "item", "items")
-        ),
-        WarningKind::InvalidName => format!("invalid name{extra}"),
-        WarningKind::Missing => format!("{} no longer exist", plural(n, "item", "items")),
-        WarningKind::Merge => format!(
-            "{} will be merged with existing folders",
-            plural(n, "folder", "folders")
-        ),
-        WarningKind::ModifiedSince => format!(
-            "{} changed since the operation and will be left untouched",
-            plural(n, "item", "items")
-        ),
-        WarningKind::CannotUndo => {
-            format!("{} cannot be undone{extra}", plural(n, "step", "steps"))
-        }
-        WarningKind::UnsafePath => format!(
-            "{} NOT extracted: their paths would write outside the destination{extra}",
-            plural(n, "item is", "items are")
-        ),
-        WarningKind::LinkOutside => format!(
-            "{} point outside the extracted folder; they are created as links and never followed",
-            plural(n, "link", "links")
-        ),
-        WarningKind::ArchiveBomb => format!(
-            "this archive may be a decompression bomb{extra}; type yes to extract it anyway"
-        ),
-        WarningKind::ArchiveDamaged => {
-            format!("the archive is damaged or incomplete{extra}: only what could be read is shown")
-        }
-        WarningKind::Encrypted => format!(
-            "{} protected by a password, which rada cannot use yet",
-            plural(n, "item is", "items are")
-        ),
-        WarningKind::ZipLinks => format!(
-            "{} stored as links; programs that do not know ZIP links (Windows Explorer, for one) extract them as small text files",
-            plural(n, "symlink is", "symlinks are")
-        ),
-        WarningKind::NamesChanged => format!(
-            "{} cannot be stored exactly in this format and will be changed{extra}",
-            plural(n, "name", "names")
-        ),
-        WarningKind::SetuidDropped => format!(
-            "setuid/setgid permission bits are dropped from {}",
-            plural(n, "file", "files")
-        ),
-        WarningKind::LinkTargetMissing => format!(
-            "{} point to a file that is not part of the selection and are skipped",
-            plural(n, "hard link", "hard links")
-        ),
-        WarningKind::Other => detail.unwrap_or("see details").to_string(),
+        WarningKind::Irreversible => t(WIrreversible).to_string(),
+        WarningKind::InsideItself => pl(n, WInsideItselfOne, WInsideItselfMany, x),
+        WarningKind::NotWritable => tf(WNotWritable, &[&x]),
+        WarningKind::LowSpace => tf(WLowSpace, &[&x]),
+        WarningKind::Conflict => pl(n, WConflictOne, WConflictMany, x),
+        WarningKind::Overwrite => pl(n, WOverwriteOne, WOverwriteMany, x),
+        WarningKind::Unreadable => pl(n, WUnreadableOne, WUnreadableMany, x),
+        WarningKind::SpecialFile => pl(n, WSpecialFileOne, WSpecialFileMany, x),
+        WarningKind::BrokenSymlink => pl(n, WBrokenSymlinkOne, WBrokenSymlinkMany, x),
+        WarningKind::Symlink => pl(n, WSymlinkOne, WSymlinkMany, x),
+        WarningKind::CircularLink => pl(n, WCircularLinkOne, WCircularLinkMany, x),
+        WarningKind::MountLoop => pl(n, WMountLoopOne, WMountLoopMany, x),
+        WarningKind::CrossDevice => t(WCrossDevice).to_string(),
+        WarningKind::SameLocation => pl(n, WSameLocationOne, WSameLocationMany, x),
+        WarningKind::HardLinks => pl(n, WHardLinksOne, WHardLinksMany, x),
+        WarningKind::HardLinksKept => pl(n, WHardLinksKeptOne, WHardLinksKeptMany, x),
+        WarningKind::SparseFiles => pl(n, WSparseOne, WSparseMany, x),
+        WarningKind::XattrsLost => pl(n, WXattrsLostOne, WXattrsLostMany, x),
+        WarningKind::AclLost => pl(n, WAclLostOne, WAclLostMany, x),
+        WarningKind::OwnerNotKept => pl(n, WOwnerNotKeptOne, WOwnerNotKeptMany, x),
+        WarningKind::AttributesNotKept => t(WAttributesNotKept).to_string(),
+        WarningKind::CannotTag => pl(n, WCannotTagOne, WCannotTagMany, x),
+        WarningKind::InvalidName => tf(WInvalidName, &[&x]),
+        WarningKind::Missing => pl(n, WMissingOne, WMissingMany, x),
+        WarningKind::Merge => pl(n, WMergeOne, WMergeMany, x),
+        WarningKind::ModifiedSince => pl(n, WModifiedSinceOne, WModifiedSinceMany, x),
+        WarningKind::CannotUndo => pl(n, WCannotUndoOne, WCannotUndoMany, x),
+        WarningKind::UnsafePath => pl(n, WUnsafePathOne, WUnsafePathMany, x),
+        WarningKind::LinkOutside => pl(n, WLinkOutsideOne, WLinkOutsideMany, x),
+        WarningKind::ArchiveBomb => tf(WArchiveBomb, &[&x]),
+        WarningKind::ArchiveDamaged => tf(WArchiveDamaged, &[&x]),
+        WarningKind::Encrypted => pl(n, WEncryptedOne, WEncryptedMany, x),
+        WarningKind::ZipLinks => pl(n, WZipLinksOne, WZipLinksMany, x),
+        WarningKind::NamesChanged => pl(n, WNamesChangedOne, WNamesChangedMany, x),
+        WarningKind::SetuidDropped => pl(n, WSetuidDroppedOne, WSetuidDroppedMany, x),
+        WarningKind::LinkTargetMissing => pl(n, WLinkTargetMissingOne, WLinkTargetMissingMany, x),
+        WarningKind::Other => detail.map_or_else(|| t(WOther).to_string(), str::to_string),
     }
 }
 
@@ -846,9 +739,9 @@ impl ConflictPolicy {
 
     pub fn label(self) -> &'static str {
         match self {
-            ConflictPolicy::Skip => "skip existing",
-            ConflictPolicy::KeepBoth => "keep both",
-            ConflictPolicy::Overwrite => "overwrite (old goes to trash)",
+            ConflictPolicy::Skip => t(Key::PolicySkip),
+            ConflictPolicy::KeepBoth => t(Key::PolicyKeepBoth),
+            ConflictPolicy::Overwrite => t(Key::PolicyOverwrite),
         }
     }
 }
@@ -886,17 +779,17 @@ pub enum ItemAction {
 impl ItemAction {
     pub fn verb(self) -> &'static str {
         match self {
-            ItemAction::Copy => "copy",
-            ItemAction::Move => "move",
-            ItemAction::Merge => "merge",
-            ItemAction::KeepBoth => "keep both",
-            ItemAction::Overwrite => "replace",
-            ItemAction::Skip => "skip",
-            ItemAction::Trash => "trash",
-            ItemAction::Delete => "delete",
-            ItemAction::Rename => "rename",
-            ItemAction::Create => "create",
-            ItemAction::Retag => "retag",
+            ItemAction::Copy => t(Key::ActCopy),
+            ItemAction::Move => t(Key::ActMove),
+            ItemAction::Merge => t(Key::ActMerge),
+            ItemAction::KeepBoth => t(Key::ActKeepBoth),
+            ItemAction::Overwrite => t(Key::ActReplace),
+            ItemAction::Skip => t(Key::ActSkip),
+            ItemAction::Trash => t(Key::ActTrash),
+            ItemAction::Delete => t(Key::ActDelete),
+            ItemAction::Rename => t(Key::ActRename),
+            ItemAction::Create => t(Key::ActCreate),
+            ItemAction::Retag => t(Key::ActRetag),
         }
     }
 }
