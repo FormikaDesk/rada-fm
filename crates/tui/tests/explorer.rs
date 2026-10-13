@@ -874,10 +874,15 @@ fn the_buttons_have_blank_rows_between_them_and_the_properties_a_blank_row_befor
         .lines()
         .position(|l| l.contains("GB free"))
         .unwrap();
+    // (Windows has no row of permissions: the last property is whichever comes last.)
     let last = rows
         .iter()
-        .rposition(|l| l.contains("Permissions"))
-        .unwrap();
+        .rposition(|l| {
+            ["Permissions", "Location", "Created", "Modified", "Size"]
+                .iter()
+                .any(|k| l.trim_start().starts_with(k))
+        })
+        .expect("a property row");
     assert!(status >= last + 2, "last property {last}, status {status}");
 }
 

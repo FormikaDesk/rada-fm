@@ -501,15 +501,26 @@ mod tests {
     }
 
     #[test]
-    fn links_are_not_followed_and_a_file_with_two_names_counts_once() {
+    fn links_are_not_followed() {
         let sb = Sandbox::new();
         sb.write("outside/big", vec![0u8; 10_000]);
         sb.write("d/a", vec![0u8; 10]);
         sb.symlink(sb.path("outside"), "d/to-folder");
         sb.symlink(sb.path("outside/big"), "d/to-file");
+        let c = counted(count(&sb, "d", SizeMode::Auto, SizeLimits::default()));
+        assert_eq!(c.bytes, Some(10), "nothing from the targets");
+    }
+
+    /// Windows gives no file number in the listing, so there a file with two names is counted
+    /// under each (as the folder's size in Explorer's properties does).
+    #[cfg(unix)]
+    #[test]
+    fn a_file_with_two_names_counts_once() {
+        let sb = Sandbox::new();
+        sb.write("d/a", vec![0u8; 10]);
         std::fs::hard_link(sb.path("d/a"), sb.path("d/a-again")).unwrap();
         let c = counted(count(&sb, "d", SizeMode::Auto, SizeLimits::default()));
-        assert_eq!(c.bytes, Some(10), "nothing from the targets, 10 once");
+        assert_eq!(c.bytes, Some(10), "10 once");
     }
 
     #[test]
