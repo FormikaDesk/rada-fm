@@ -18,7 +18,8 @@ use rada_tui::{Theme, ViewMode};
 use ratatui::style::Color;
 use unicode_width::UnicodeWidthStr;
 
-const SIZES: [(u16, u16); 7] = [
+const SIZES: [(u16, u16); 8] = [
+    (170, 37),
     (170, 35),
     (140, 35),
     (120, 30),
