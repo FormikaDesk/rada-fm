@@ -57,6 +57,12 @@ impl LinuxVolumes {
     }
 }
 
+/// Whether a program of that name is in one of the folders of `PATH`.
+fn on_path(program: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(program).is_file()))
+}
+
 impl Default for LinuxVolumes {
     fn default() -> Self {
         Self::new()
@@ -84,6 +90,14 @@ impl VolumeLister for LinuxVolumes {
             });
         }
         Ok(out)
+    }
+
+    fn can_eject(&self, v: &Volume) -> bool {
+        v.kind == VolumeKind::Removable && v.device.starts_with("/dev/") && on_path("udisksctl")
+    }
+
+    fn eject(&self, v: &Volume) -> Result<()> {
+        crate::platform::eject::eject_with_udisks(&v.device)
     }
 
     fn wait_for_change(&self, timeout: Duration) -> bool {

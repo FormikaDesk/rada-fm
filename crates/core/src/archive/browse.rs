@@ -110,6 +110,7 @@ pub fn read_dir(
                 readonly: true,
                 executable,
                 reparse: None,
+                package: false,
                 error: None,
             }
         })

@@ -123,6 +123,7 @@ fn dir_loop(
         if let Some((path, generation)) = load {
             // A path that runs through a file is inside an archive. An ordinary folder costs
             // one `stat` to find that out.
+            let mut denied = None;
             let (result, archive) = match crate::archive::locate(fs.as_ref(), &path) {
                 Some(loc) => {
                     // A newer request waiting means nobody wants this listing any more.
@@ -134,8 +135,13 @@ fn dir_loop(
                     }
                 }
                 None => (
-                    model::read_entries(fs.as_ref(), platform.as_ref(), &path)
-                        .map_err(|e| e.to_string()),
+                    model::read_entries(fs.as_ref(), platform.as_ref(), &path).map_err(|e| {
+                        // The system waiting for the person's consent is not a broken folder.
+                        if let crate::Error::Io { source, .. } = &e {
+                            denied = platform.explain_denied(&path, source).map(Box::new);
+                        }
+                        e.to_string()
+                    }),
                     None,
                 ),
             };
@@ -145,6 +151,7 @@ fn dir_loop(
                     path,
                     result,
                     archive,
+                    denied,
                 }))
                 .is_err()
             {

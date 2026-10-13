@@ -131,6 +131,8 @@ pub fn categorize(e: &Entry) -> Category {
         return Category::Link;
     }
     match e.kind {
+        // A package is one thing for the person, like a program.
+        FileKind::Dir if e.package => Category::Binary,
         FileKind::Dir => Category::Folder,
         FileKind::Other => Category::Other,
         _ => {

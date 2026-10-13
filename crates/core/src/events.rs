@@ -91,6 +91,9 @@ pub enum DirEvent {
         result: Result<Vec<Entry>, String>,
         /// Set when `path` is an archive or a folder inside one.
         archive: Option<crate::archive::ArchiveView>,
+        /// Set when the folder could not be opened because the system is waiting for the
+        /// person to allow it (macOS asks per terminal and per folder).
+        denied: Option<Box<crate::platform::AccessDenied>>,
     },
     Patched {
         generation: u64,
@@ -139,4 +142,10 @@ pub enum CoreEvent {
     },
     /// The update worker: a newer version, progress, the end.
     Update(crate::update::UpdateEvent),
+    /// A disk was ejected, or the system said why not.
+    Ejected {
+        mount: PathBuf,
+        name: String,
+        result: Result<(), String>,
+    },
 }

@@ -11,7 +11,7 @@ use rada_core::fs::FsEngine;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
 use rada_core::ops::Engine;
-use rada_core::places::{PlacesStore, standard_places};
+use rada_core::places::{PlacesStore, standard_places, with_extra_places};
 use rada_core::platform::Platform;
 use rada_core::watch::DirWatcher;
 use rada_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
@@ -68,15 +68,24 @@ impl Services {
             loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn(fs.clone(), tx.clone()),
             watcher: DirWatcher::spawn(tx.clone()),
-            places: PlacesStore::spawn(
-                platform.dirs().rada_state(),
-                standard_places(
-                    &platform.dirs().home,
-                    &platform.user_dirs(),
-                    &platform.dirs().home_trash().join("files"),
-                ),
-                tx.clone(),
-            ),
+            places: {
+                let standard = with_extra_places(
+                    standard_places(
+                        &platform.dirs().home,
+                        &platform.user_dirs(),
+                        &platform.dirs().home_trash().join("files"),
+                    ),
+                    platform.extra_places(),
+                );
+                let candidates: Vec<PathBuf> = standard.iter().map(|p| p.path.clone()).collect();
+                let for_names = platform.clone();
+                PlacesStore::spawn_with_names(
+                    platform.dirs().rada_state(),
+                    standard,
+                    Box::new(move || for_names.display_names(&candidates)),
+                    tx.clone(),
+                )
+            },
             volumes: VolumesWorker::spawn(platform.clone(), Duration::from_secs(5), tx.clone()),
             home: platform.dirs().home.clone(),
             platform,

@@ -3,6 +3,7 @@
 //! Reading and writing happen on a worker thread; the interface only sends requests and
 //! receives [`PathLists`] events.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
@@ -29,6 +30,7 @@ impl Place {
         match self.kind {
             PlaceKind::Home => "Home".into(),
             PlaceKind::Trash => "Trash".into(),
+            PlaceKind::ICloud => "iCloud Drive".into(),
             _ => self
                 .path
                 .file_name()
@@ -45,6 +47,29 @@ pub struct PathLists {
     pub bookmarks: Vec<PathBuf>,
     /// Standard places that exist: Home, Documents, Downloads…, Trash.
     pub places: Vec<Place>,
+    /// The names the system's file manager shows for some folders and drives, where they are
+    /// not the names on disk ("Scrivania" for `Desktop`). Arrives a moment after the places.
+    pub names: HashMap<PathBuf, String>,
+}
+
+impl PathLists {
+    /// The name to show for a folder: the system's, or `None` when it is the name on disk.
+    pub fn shown_name(&self, path: &Path) -> Option<&str> {
+        self.names.get(path).map(String::as_str)
+    }
+}
+
+/// `standard` with the places a system has beyond the usual ones (iCloud Drive), put before
+/// the trash.
+pub fn with_extra_places(mut standard: Vec<Place>, extra: Vec<(PlaceKind, PathBuf)>) -> Vec<Place> {
+    let at = standard
+        .iter()
+        .position(|p| p.kind == PlaceKind::Trash)
+        .unwrap_or(standard.len());
+    for (i, (kind, path)) in extra.into_iter().enumerate() {
+        standard.insert(at + i, Place { kind, path });
+    }
+    standard
 }
 
 /// The standard places a system defines, whether or not they exist yet: Home first, then
@@ -83,6 +108,17 @@ impl PlacesStore {
     /// `state_dir` is `$XDG_STATE_HOME/rada`; `standard` are the candidate standard places
     /// (see [`standard_places`]), of which the ones that exist are reported.
     pub fn spawn(state_dir: PathBuf, standard: Vec<Place>, out: Sender<CoreEvent>) -> PlacesStore {
+        PlacesStore::spawn_with_names(state_dir, standard, Box::new(Vec::new), out)
+    }
+
+    /// [`spawn`](Self::spawn), and `names` is asked once, after the first report, for the
+    /// names the system shows for folders and drives; they follow in a second report.
+    pub fn spawn_with_names(
+        state_dir: PathBuf,
+        standard: Vec<Place>,
+        names: Box<dyn FnOnce() -> Vec<(PathBuf, String)> + Send>,
+        out: Sender<CoreEvent>,
+    ) -> PlacesStore {
         let (tx, rx) = mpsc::channel::<Req>();
         std::thread::Builder::new()
             .name("rada-places".into())
@@ -91,7 +127,9 @@ impl PlacesStore {
                 let mark_file = state_dir.join("bookmarks.json");
                 let mut recents = read(&recent_file);
                 let mut bookmarks = read(&mark_file);
-                let send = |r: &Vec<PathBuf>, b: &Vec<PathBuf>| {
+                let mut names = Some(names);
+                let mut known: HashMap<PathBuf, String> = HashMap::new();
+                let send = |r: &Vec<PathBuf>, b: &Vec<PathBuf>, n: &HashMap<PathBuf, String>| {
                     // Checked on every report, here on the worker: a folder created or
                     // removed since the last one comes and goes.
                     let places = standard
@@ -103,6 +141,7 @@ impl PlacesStore {
                         recents: r.clone(),
                         bookmarks: b.clone(),
                         places,
+                        names: n.clone(),
                     }))
                     .is_ok()
                 };
@@ -124,8 +163,15 @@ impl PlacesStore {
                             write(&state_dir, &mark_file, &bookmarks);
                         }
                     }
-                    if !send(&recents, &bookmarks) {
+                    if !send(&recents, &bookmarks, &known) {
                         return;
+                    }
+                    // The names come second: asking the system may take a moment.
+                    if let Some(ask) = names.take() {
+                        known = ask().into_iter().collect();
+                        if !known.is_empty() && !send(&recents, &bookmarks, &known) {
+                            return;
+                        }
                     }
                 }
             })

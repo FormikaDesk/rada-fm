@@ -84,6 +84,9 @@ pub enum Action {
     CloseTab,
     NextTab,
     PrevTab,
+    // Quick Look and packages (macOS; the keys exist everywhere)
+    QuickLook,
+    ShowPackage,
 }
 
 /// Where an action appears in the help, in this order.
@@ -120,7 +123,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 64] = [
+    pub const ALL: [Action; 66] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -185,6 +188,8 @@ impl Action {
         Action::NextTab,
         Action::PrevTab,
         Action::Update,
+        Action::QuickLook,
+        Action::ShowPackage,
     ];
 
     /// The name used in the configuration file.
@@ -254,6 +259,8 @@ impl Action {
             Action::NextTab => "next_tab",
             Action::PrevTab => "prev_tab",
             Action::Update => "update",
+            Action::QuickLook => "quick_look",
+            Action::ShowPackage => "show_package",
         }
     }
 
@@ -328,6 +335,8 @@ impl Action {
             Action::NextTab => "Next tab",
             Action::PrevTab => "Previous tab",
             Action::Update => "Update rada",
+            Action::QuickLook => "Quick Look",
+            Action::ShowPackage => "Show package contents",
         }
     }
 
@@ -340,7 +349,7 @@ impl Action {
             | ClearSelection => Group::Select,
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
             | NewFile | ExtractHere | ExtractToFolder | Compress | Undo | Redo | History
-            | Properties | OpenWith | CopyPath => Group::Files,
+            | Properties | OpenWith | CopyPath | QuickLook | ShowPackage => Group::Files,
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
             | PreviewUp | Bookmark | SwitchPane | ToggleSidebar | Refresh | FocusAddress
             | ToggleDetails | ViewDetails | ViewIcons | ToggleView | OpenTerminal | ContextMenu => {
@@ -648,6 +657,8 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::PrevTab, &["ctrl+shift+tab", "ctrl+pageup"]),
     // `U` is the history in the vim scheme, so the update has a key of its own.
     (Action::Update, &["alt+u"]),
+    (Action::QuickLook, &["alt+y"]),
+    (Action::ShowPackage, &["alt+down"]),
 ];
 
 #[derive(Clone, Debug)]
@@ -1135,7 +1146,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 64);
+        assert_eq!(Action::ALL.len(), 66);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();

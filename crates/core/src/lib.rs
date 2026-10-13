@@ -24,6 +24,8 @@ pub mod workers;
 pub use error::{Error, Result};
 
 #[cfg(any(test, feature = "testutil"))]
+pub mod testplatform;
+#[cfg(any(test, feature = "testutil"))]
 pub mod testutil;
 #[cfg(any(test, feature = "testutil"))]
 pub mod testweb;

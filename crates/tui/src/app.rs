@@ -315,6 +315,10 @@ pub enum Modal {
     Properties(PropsView),
     /// A newer version: its notes and the question, or why an update did not work.
     Update(UpdateView),
+    /// The system has not allowed the terminal to open a folder yet.
+    Access(rada_core::platform::AccessDenied),
+    /// Ejecting a disk.
+    Eject(EjectView),
 }
 
 pub struct Config {
@@ -405,6 +409,7 @@ pub struct Demo {
 
 mod address;
 mod archives;
+mod eject;
 mod input;
 mod menus;
 mod props;
@@ -413,6 +418,7 @@ mod tabs;
 mod update;
 
 pub use address::AddressEdit;
+pub use eject::{EjectStage, EjectView};
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
 pub use menus::MenuKind;
 pub use props::PropsView;
@@ -519,6 +525,9 @@ pub struct App {
     saved_ui: rada_core::uistate::UiState,
     /// Layout the last frame used, for the keyboard and the tests.
     pub screen: (u16, u16),
+    /// Folders the system is waiting for the person to allow (macOS), as learnt from the folders
+    /// that could not be opened.
+    pub denied: Vec<rada_core::platform::AccessDenied>,
     /// What the update worker last told.
     pub update: UpdateStatus,
     /// Somebody asked to look for updates and is waiting for the answer.
@@ -644,6 +653,7 @@ impl App {
             details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
+            denied: Vec::new(),
             update: UpdateStatus::None,
             update_asked: false,
             svc,
@@ -675,6 +685,20 @@ impl App {
             app.begin_plan("Planning", h);
         }
         app
+    }
+
+    /// The name to show for a folder or drive: the one the system's file manager shows, else
+    /// `on_disk`.
+    pub fn shown_name(&self, path: &Path, on_disk: String) -> String {
+        self.paths
+            .shown_name(path)
+            .map(str::to_string)
+            .unwrap_or(on_disk)
+    }
+
+    /// The refusal that covers `path`, if the system is holding it back.
+    pub fn denied_for(&self, path: &Path) -> Option<&rada_core::platform::AccessDenied> {
+        self.denied.iter().find(|d| path.starts_with(&d.folder))
     }
 
     /// "Now" for relative dates.
@@ -895,7 +919,7 @@ impl App {
 
     fn enter(&mut self) {
         let Some(e) = self.current() else { return };
-        if e.is_dir() {
+        if e.is_navigable_dir() {
             let target = e.path.clone();
             self.open_dir(target);
         } else if self.archive.is_some() {
@@ -939,6 +963,46 @@ impl App {
         }
     }
 
+    /// Whether this system has a Quick Look to offer.
+    pub fn quick_look_available(&self) -> bool {
+        self.svc.platform.opener().can_quick_look()
+    }
+
+    /// Go inside a package (`.app`, `.photoslibrary`…) instead of opening it.
+    pub(super) fn show_package(&mut self) {
+        match self.current() {
+            Some(e) if e.package => {
+                let path = e.path.clone();
+                self.open_dir(path);
+            }
+            _ => self.toast(ToastKind::Info, "this is not a package", 2),
+        }
+    }
+
+    /// The system's quick look at the item under the cursor (macOS).
+    pub(super) fn quick_look(&mut self) {
+        let Some(path) = self.current().map(|e| e.path.clone()) else {
+            return;
+        };
+        if !self.svc.platform.opener().can_quick_look() {
+            self.toast(ToastKind::Info, "Quick Look is a macOS feature", 3);
+            return;
+        }
+        if self.refuse_in_archive("preview with Quick Look") {
+            return;
+        }
+        let platform = self.svc.platform.clone();
+        let notes = self.svc.notes.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = platform.opener().quick_look(&path) {
+                let _ = notes.send(CoreEvent::Note {
+                    text: format!("Quick Look: {e}"),
+                    error: true,
+                });
+            }
+        });
+    }
+
     // ------------------------------------------------------------------ core events
 
     pub fn on_core_event(&mut self, ev: CoreEvent) {
@@ -958,6 +1022,11 @@ impl App {
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
             CoreEvent::Update(u) => self.on_update_event(u),
+            CoreEvent::Ejected {
+                mount,
+                name,
+                result,
+            } => self.on_ejected(mount, name, result),
             CoreEvent::Note { text, error } => {
                 self.toast(
                     if error {
@@ -979,12 +1048,16 @@ impl App {
                 path,
                 result,
                 archive,
+                denied,
             } => {
                 if generation != self.dir_gen {
                     return; // an answer to a request that has been superseded
                 }
                 match result {
                     Ok(entries) => {
+                        // It opened: whatever the system was holding back for this place, it
+                        // is not any more.
+                        self.denied.retain(|d| !path.starts_with(&d.folder));
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
                             // Before the first listing there is no cursor yet: use the
@@ -1030,7 +1103,10 @@ impl App {
                     Err(msg) => {
                         self.nav_move = None;
                         self.load = LoadState::Ready;
-                        self.toast(ToastKind::Error, msg, 6);
+                        match denied {
+                            Some(d) => self.on_access_denied(*d),
+                            None => self.toast(ToastKind::Error, msg, 6),
+                        }
                     }
                 }
             }
@@ -2287,11 +2363,17 @@ impl App {
                     self.dispatch(Action::ToggleHex);
                     self.modal = Some(Modal::FullPreview);
                 }
+                KeyCode::Char('Q') => {
+                    self.dispatch(Action::QuickLook);
+                    self.modal = Some(Modal::FullPreview);
+                }
                 // Closing is deliberate: Esc, q, Space or Enter.
                 KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
                 _ => self.modal = Some(Modal::FullPreview),
             },
             Modal::Update(view) => self.on_update_key(view, key),
+            Modal::Access(d) => self.on_access_key(d, key),
+            Modal::Eject(v) => self.on_eject_key(v, key),
             Modal::Properties(mut p) => match key.code {
                 KeyCode::Down | KeyCode::Char('j') => {
                     p.scroll += 1;

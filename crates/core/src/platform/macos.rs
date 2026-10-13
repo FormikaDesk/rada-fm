@@ -7,17 +7,160 @@
 //! * Opening goes through `open(1)`: the default program, `open -a <App>` for "Open with…",
 //!   `open -R` to reveal, and the terminal the user is in (Terminal, iTerm2, Ghostty).
 //! * Names are case-insensitive and Unicode-normalisation-insensitive.
+//! * Names that the Finder shows differently (localized folders, the startup disk) come from
+//!   `NSFileManager`; packages (`.app`, `.photoslibrary`…) are what the system says they are;
+//!   `UF_HIDDEN` folders (`~/Library`) are hidden like in the Finder.
 //! * Extended attributes and ACLs are not carried over by a copy yet: the plan says so.
 
 use std::path::Path;
 use std::sync::Arc;
 
+use super::attrs::{Attrs, ReparseKind};
 use super::dirtrash::DirTrash;
 use super::trash::TrashBackend;
 use super::volumes::{Volume, VolumeKind, VolumeLister};
-use super::{Dirs, FileAttributes, Opener, PathRules, Platform, UserDirs};
-use crate::fs::LocalFs;
+use super::{AccessDenied, Dirs, FileAttributes, Opener, PathRules, PlaceKind, Platform, UserDirs};
+use crate::fs::{FileKind, FsMeta, LocalFs};
 use crate::{Error, Result};
+
+/// The BSD flag that hides a file from the Finder (`chflags hidden`): `~/Library`, `/usr`…
+pub const UF_HIDDEN: u32 = 0x8000;
+
+/// The `kHasBundle` bit of the Finder flags (the high-order bytes of `com.apple.FinderInfo`
+/// at offset 8): a folder with it set is a package even without an extension the system
+/// knows.
+pub fn finder_info_marks_bundle(finder_info: &[u8]) -> bool {
+    finder_info
+        .get(8..10)
+        .is_some_and(|f| u16::from_be_bytes([f[0], f[1]]) & 0x2000 != 0)
+}
+
+/// iCloud Drive, where macOS keeps it.
+pub fn icloud_drive(home: &Path) -> std::path::PathBuf {
+    home.join("Library/Mobile Documents/com~apple~CloudDocs")
+}
+
+/// What the Finder hides: dot files (which include `.DS_Store`, `._*` and `.localized`), and
+/// anything the system flagged hidden.
+pub struct MacAttributes;
+
+impl FileAttributes for MacAttributes {
+    fn attrs(&self, name: &std::ffi::OsStr, meta: &FsMeta) -> Attrs {
+        use std::os::unix::ffi::OsStrExt;
+        let mode = meta.mode.unwrap_or(0);
+        Attrs {
+            hidden: name.as_bytes().first() == Some(&b'.')
+                || meta.os_attrs.is_some_and(|f| f & UF_HIDDEN != 0),
+            system: false,
+            readonly: mode & 0o222 == 0,
+            executable: meta.kind == FileKind::File && mode & 0o111 != 0,
+            reparse: (meta.kind == FileKind::Symlink).then_some(ReparseKind::Symlink),
+        }
+    }
+
+    fn is_package(&self, path: &Path, meta: &FsMeta) -> bool {
+        meta.kind == FileKind::Dir && native::is_package(path)
+    }
+}
+
+/// The parts that call into the system.
+mod native {
+    use std::path::Path;
+
+    /// Ask Launch Services whether the folder is a package (`NSURLIsPackageKey`), which knows
+    /// every extension that apps declare, and fall back on the Finder's bundle bit.
+    #[cfg(target_os = "macos")]
+    pub fn is_package(path: &Path) -> bool {
+        use objc2_foundation::{NSArray, NSNumber, NSString, NSURL, NSURLIsPackageKey};
+        let Some(text) = path.to_str() else {
+            return false;
+        };
+        let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(text), true);
+        // SAFETY: NSURLIsPackageKey is a constant string provided by Foundation.
+        let key = unsafe { NSURLIsPackageKey };
+        let keys = NSArray::from_slice(&[key]);
+        // SAFETY: a call with a valid array of resource keys; the result is a dictionary or an
+        // error, both handled.
+        if let Ok(values) = unsafe { url.resourceValuesForKeys_error(&keys) }
+            && let Some(v) = values.objectForKey(key)
+            && let Some(n) = v.downcast_ref::<NSNumber>()
+            && n.as_bool()
+        {
+            return true;
+        }
+        has_bundle_bit(path)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn is_package(_path: &Path) -> bool {
+        false
+    }
+
+    #[cfg(target_os = "macos")]
+    fn has_bundle_bit(path: &Path) -> bool {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        let Ok(p) = CString::new(path.as_os_str().as_bytes()) else {
+            return false;
+        };
+        let mut info = [0u8; 32];
+        // SAFETY: both strings are NUL-terminated and the buffer is 32 bytes long.
+        let n = unsafe {
+            libc::getxattr(
+                p.as_ptr(),
+                c"com.apple.FinderInfo".as_ptr(),
+                info.as_mut_ptr().cast(),
+                info.len(),
+                0,
+                0,
+            )
+        };
+        n >= 10 && super::finder_info_marks_bundle(&info)
+    }
+
+    /// The name the Finder shows for a file or folder.
+    #[cfg(target_os = "macos")]
+    pub fn display_name(path: &Path) -> Option<String> {
+        use objc2_foundation::{NSFileManager, NSString};
+        let text = path.to_str()?;
+        let fm = NSFileManager::defaultManager();
+        let name = fm.displayNameAtPath(&NSString::from_str(text));
+        Some(name.to_string())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn display_name(_path: &Path) -> Option<String> {
+        None
+    }
+}
+
+/// The folders and disks worth looking up: the standard places and the few the system names.
+pub fn name_candidates(places: &[std::path::PathBuf], home: &Path) -> Vec<std::path::PathBuf> {
+    let mut out: Vec<std::path::PathBuf> = places.to_vec();
+    for extra in [
+        Path::new("/").to_path_buf(),
+        Path::new("/Applications").to_path_buf(),
+        home.to_path_buf(),
+        home.join("Applications"),
+        home.join("Library"),
+        home.join("Public"),
+        icloud_drive(home),
+    ] {
+        if !out.contains(&extra) {
+            out.push(extra);
+        }
+    }
+    out
+}
+
+/// Keep the names that differ from the name on disk.
+pub fn only_different(path: &Path, shown: String) -> Option<(std::path::PathBuf, String)> {
+    let on_disk = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/".to_string());
+    (!shown.is_empty() && shown != on_disk).then(|| (path.to_path_buf(), shown))
+}
 
 /// The folder a volume's own trash is, for an item under `/Volumes/<name>/`.
 pub fn volume_trash_of(path: &Path, uid: u32) -> Option<std::path::PathBuf> {
@@ -141,6 +284,15 @@ mod native_volumes {
 }
 
 impl VolumeLister for MacVolumes {
+    /// The startup disk and the disks the system never lets go of are not ejectable.
+    fn can_eject(&self, v: &Volume) -> bool {
+        v.mount_point != Path::new("/") && v.mount_point.starts_with("/Volumes")
+    }
+
+    fn eject(&self, v: &Volume) -> Result<()> {
+        super::eject::eject_with_diskutil(&v.mount_point)
+    }
+
     #[cfg(target_os = "macos")]
     fn list(&self) -> Result<Vec<Volume>> {
         native_volumes::list()
@@ -207,6 +359,13 @@ mod native_open {
         detach(c, "start the program for", path)
     }
 
+    /// `qlmanage -p`: the preview window of the Finder's Quick Look, for as long as it is open.
+    pub fn quick_look(path: &Path) -> Result<()> {
+        let mut c = Command::new("qlmanage");
+        c.arg("-p").arg(path);
+        detach(c, "start Quick Look for", path)
+    }
+
     pub fn open_terminal(dir: &Path) -> Result<()> {
         let app = terminal_app(std::env::var("TERM_PROGRAM").ok().as_deref());
         let mut c = Command::new("open");
@@ -240,25 +399,32 @@ impl Opener for MacOpener {
     fn open_terminal(&self, dir: &Path) -> Result<()> {
         native_open::open_terminal(dir)
     }
+    fn can_quick_look(&self) -> bool {
+        cfg!(target_os = "macos")
+    }
+    #[cfg(unix)]
+    fn quick_look(&self, path: &Path) -> Result<()> {
+        native_open::quick_look(path)
+    }
 }
 
 #[cfg(unix)]
-type Attrs = super::unix::UnixAttributes;
+type PlatformAttrs = MacAttributes;
 #[cfg(not(unix))]
-type Attrs = super::windows::WindowsAttributes;
+type PlatformAttrs = super::windows::WindowsAttributes;
 
 #[cfg(unix)]
-fn attrs() -> Attrs {
-    super::unix::UnixAttributes
+fn attrs() -> PlatformAttrs {
+    MacAttributes
 }
 #[cfg(not(unix))]
-fn attrs() -> Attrs {
+fn attrs() -> PlatformAttrs {
     super::windows::WindowsAttributes
 }
 
 pub struct MacPlatform {
     dirs: Dirs,
-    attrs: Attrs,
+    attrs: PlatformAttrs,
     trash: Box<dyn TrashBackend>,
     volumes: MacVolumes,
     opener: MacOpener,
@@ -335,6 +501,32 @@ impl Platform for MacPlatform {
         }
         // The Finder's standard folders: they have fixed names under the home folder.
         UserDirs::conventional(&self.dirs.home, "Movies")
+    }
+    fn display_names(&self, places: &[std::path::PathBuf]) -> Vec<(std::path::PathBuf, String)> {
+        if self.sandbox_user_dirs {
+            return Vec::new();
+        }
+        name_candidates(places, &self.dirs.home)
+            .into_iter()
+            .filter(|p| p.exists())
+            .filter_map(|p| native::display_name(&p).and_then(|n| only_different(&p, n)))
+            .collect()
+    }
+    fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
+        let cloud = icloud_drive(&self.dirs.home);
+        if cloud.is_dir() {
+            vec![(PlaceKind::ICloud, cloud)]
+        } else {
+            Vec::new()
+        }
+    }
+    fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
+        super::access::explain(
+            path,
+            err.raw_os_error(),
+            std::env::var("TERM_PROGRAM").ok().as_deref(),
+            &self.dirs.home,
+        )
     }
     fn path_rules(&self) -> PathRules {
         PathRules {

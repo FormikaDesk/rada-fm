@@ -32,6 +32,9 @@ pub struct Entry {
     pub readonly: bool,
     pub executable: bool,
     pub reparse: Option<ReparseKind>,
+    /// A folder the system treats as one thing, like a file (a macOS `.app` or
+    /// `.photoslibrary`): it is opened with its program, and entered only on request.
+    pub package: bool,
     /// Set when the entry itself could not be inspected.
     pub error: Option<String>,
     /// Escaped for display (control characters, bidi, invalid bytes made visible).
@@ -53,6 +56,12 @@ impl Entry {
         self.kind == FileKind::Dir || matches!(&self.link, Some(l) if l.state == LinkState::ToDir)
     }
 
+    /// A folder that is entered when opened and listed with the folders: a folder that is
+    /// not a package.
+    pub fn is_navigable_dir(&self) -> bool {
+        self.is_dir() && !self.package
+    }
+
     pub fn from_meta(
         fs: &dyn FsEngine,
         platform: &dyn Platform,
@@ -72,6 +81,7 @@ impl Entry {
             LinkInfo { target, state }
         });
         let shown = display::name(&name);
+        let package = meta.kind == FileKind::Dir && platform.attributes().is_package(&path, meta);
         let type_label = match &link {
             Some(l) if matches!(l.state, LinkState::Broken | LinkState::Circular) => {
                 Cow::Borrowed("Broken link")
@@ -82,6 +92,7 @@ impl Entry {
                 l.state == LinkState::ToDir,
                 attrs.executable,
             ),
+            None if package => Cow::Borrowed(package_label(&shown)),
             None => crate::filetype::label(&shown, meta.kind, false, attrs.executable),
         };
         Entry {
@@ -101,6 +112,7 @@ impl Entry {
             readonly: attrs.readonly,
             executable: attrs.executable,
             reparse: attrs.reparse,
+            package,
             error: None,
         }
     }
@@ -125,8 +137,26 @@ impl Entry {
             readonly: false,
             executable: false,
             reparse: None,
+            package: false,
             error: Some(error),
         }
+    }
+}
+
+/// What a package is called in the "Type" column.
+fn package_label(name: &str) -> &'static str {
+    let ext = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("app") => "Application",
+        Some("framework") => "Framework",
+        Some("bundle" | "plugin" | "kext" | "appex") => "Bundle",
+        Some("pages") => "Pages document",
+        Some("numbers") => "Numbers spreadsheet",
+        Some("key") => "Keynote presentation",
+        Some("rtfd") => "Rich text document",
+        Some("photoslibrary") => "Photos library",
+        Some("dmg") => "Disk image",
+        _ => "Package",
     }
 }
 
@@ -214,6 +244,9 @@ pub struct SortSpec {
     pub key: SortKey,
     pub reverse: bool,
     pub dirs_first: bool,
+    /// Names in natural order, as the Finder and Explorer have them: `file2` before `file10`,
+    /// capitals and small letters mixed. Off, they go letter by letter.
+    pub natural: bool,
 }
 
 impl Default for SortSpec {
@@ -222,6 +255,7 @@ impl Default for SortSpec {
             key: SortKey::Name,
             reverse: false,
             dirs_first: true,
+            natural: true,
         }
     }
 }
@@ -288,14 +322,20 @@ fn os_bytes_cmp(a: &OsString, b: &OsString) -> Ordering {
 
 pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
     if spec.dirs_first {
-        match (a.is_dir(), b.is_dir()) {
+        // A package sorts with the files, as in the Finder.
+        match (a.is_navigable_dir(), b.is_navigable_dir()) {
             (true, false) => return Ordering::Less,
             (false, true) => return Ordering::Greater,
             _ => {}
         }
     }
     let by_name = || {
-        natural_cmp(&a.sort_name, &b.sort_name)
+        let order = if spec.natural {
+            natural_cmp(&a.sort_name, &b.sort_name)
+        } else {
+            a.sort_name.cmp(&b.sort_name)
+        };
+        order
             .then_with(|| a.display.cmp(&b.display))
             .then_with(|| os_bytes_cmp(&a.name, &b.name))
     };
@@ -427,6 +467,36 @@ mod tests {
     }
 
     #[test]
+    fn names_can_be_ordered_letter_by_letter_instead() {
+        let mut v = vec![
+            e("file10", FileKind::File, 1, 1),
+            e("File2", FileKind::File, 1, 1),
+            e("file1", FileKind::File, 1, 1),
+        ];
+        let spec = |natural| SortSpec {
+            natural,
+            ..SortSpec::default()
+        };
+        sort_entries(&mut v, &spec(true));
+        assert_eq!(names(&v), ["file1", "File2", "file10"]);
+        sort_entries(&mut v, &spec(false));
+        assert_eq!(names(&v), ["file1", "file10", "File2"]);
+    }
+
+    #[test]
+    fn a_package_sorts_with_the_files_not_the_folders() {
+        let mut app = e("App.app", FileKind::Dir, 0, 1);
+        app.package = true;
+        let mut v = vec![
+            e("b.txt", FileKind::File, 1, 1),
+            app,
+            e("zdir", FileKind::Dir, 0, 1),
+        ];
+        sort_entries(&mut v, &SortSpec::default());
+        assert_eq!(names(&v), ["zdir", "App.app", "b.txt"]);
+    }
+
+    #[test]
     fn natural_order() {
         assert_eq!(natural_cmp("file2", "file10"), Ordering::Less);
         assert_eq!(natural_cmp("a01", "a1"), Ordering::Greater);
@@ -459,6 +529,7 @@ mod tests {
                 key,
                 reverse: false,
                 dirs_first: true,
+                natural: true,
             };
             let mut expected = base.clone();
             sort_entries(&mut expected, &spec);
@@ -483,6 +554,7 @@ mod tests {
             key,
             reverse,
             dirs_first: true,
+            natural: true,
         };
         sort_entries(&mut v, &by(SortKey::Size, false));
         assert_eq!(names(&v), ["small", "mid", "big"]);

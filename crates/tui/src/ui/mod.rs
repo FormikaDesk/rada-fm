@@ -10,6 +10,7 @@ mod address;
 mod bottom;
 mod commands;
 mod details;
+mod dialogs;
 mod grid;
 mod list;
 mod modals;

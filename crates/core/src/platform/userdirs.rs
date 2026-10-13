@@ -17,6 +17,8 @@ pub enum PlaceKind {
     Music,
     Pictures,
     Videos,
+    /// iCloud Drive (macOS).
+    ICloud,
     Trash,
 }
 

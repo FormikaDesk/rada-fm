@@ -98,11 +98,17 @@ impl App {
         if on_item {
             let cur = self.current();
             items.push(MenuItem::act(Open, true, false));
+            if cur.is_some_and(|e| e.package) {
+                items.push(MenuItem::act(ShowPackage, true, false));
+            }
             items.push(MenuItem::act(
                 OpenWith,
-                cur.is_some_and(|e| !e.is_dir()) && !ro,
+                cur.is_some_and(|e| !e.is_navigable_dir()) && !ro,
                 false,
             ));
+            if self.svc.platform.opener().can_quick_look() {
+                items.push(MenuItem::act(QuickLook, !ro, false));
+            }
             if on_archive || ro {
                 items.push(MenuItem::act(ExtractHere, true, true));
                 items.push(MenuItem::act(ExtractToFolder, true, false));
@@ -115,7 +121,7 @@ impl App {
                 items.push(MenuItem::act(Compress, true, false));
             }
             if let Some(e) = cur
-                && e.is_dir()
+                && e.is_navigable_dir()
             {
                 let pinned =
                     self.paths.bookmarks.contains(&e.path) || self.cfg_bookmarks.contains(&e.path);
@@ -124,7 +130,7 @@ impl App {
             items.push(MenuItem::act(
                 CopyPath,
                 true,
-                cur.is_none_or(|e| !e.is_dir()),
+                cur.is_none_or(|e| !e.is_navigable_dir()),
             ));
             items.push(MenuItem::act(Trash, !ro, true));
             items.push(MenuItem::act(Properties, true, true));
@@ -171,6 +177,7 @@ impl App {
                 }
             }
             MenuCmd::View(mode) => self.set_view(mode),
+            MenuCmd::Eject(mount) => self.start_eject(&mount),
         }
     }
 }

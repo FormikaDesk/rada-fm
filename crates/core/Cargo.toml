@@ -50,6 +50,11 @@ sha2 = "0.10"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The names and the kinds of things the Finder shows (localized folder names, packages).
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSFileManager", "NSURL", "NSError", "NSArray", "NSDictionary", "NSObject", "NSValue", "NSEnumerator"] }
+
 [target.'cfg(windows)'.dependencies]
 # Drive letters, Known Folders and ShellExecute: the Win32 calls, with no wrapper around them.
 windows-sys = { version = "0.61", features = [

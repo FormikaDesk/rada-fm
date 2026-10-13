@@ -20,6 +20,48 @@ const PASS_THROUGH: &[Action] = &[
 ];
 
 impl App {
+    /// A folder could not be opened because the system is waiting for the person to allow it:
+    /// say so with the way to do it, and remember it for the sidebar.
+    pub(super) fn on_access_denied(&mut self, d: rada_core::platform::AccessDenied) {
+        self.denied.retain(|x| x.folder != d.folder);
+        self.denied.push(d.clone());
+        if self.modal.is_none() {
+            self.modal = Some(Modal::Access(d));
+        } else {
+            self.toast(ToastKind::Error, d.message(), 6);
+        }
+    }
+
+    /// Keys of the window about a refused folder: open the page of the system settings, or
+    /// close.
+    pub(super) fn on_access_key(&mut self, d: rada_core::platform::AccessDenied, key: KeyEvent) {
+        let url = match key.code {
+            KeyCode::Enter | KeyCode::Char('o') => Some(d.settings_url),
+            KeyCode::Char('f') => Some(d.full_disk_url),
+            KeyCode::Esc | KeyCode::Char('q') => return,
+            _ => None,
+        };
+        if let Some(url) = url {
+            let platform = self.svc.platform.clone();
+            let notes = self.svc.notes.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = platform.opener().open_url(url) {
+                    let _ = notes.send(CoreEvent::Note {
+                        text: format!("cannot open the system settings: {e}"),
+                        error: true,
+                    });
+                }
+            });
+            self.toast(
+                ToastKind::Info,
+                "System Settings opened — allow it there, then try the folder again",
+                6,
+            );
+            return;
+        }
+        self.modal = Some(Modal::Access(d));
+    }
+
     pub fn config_bookmarks(&self) -> &[PathBuf] {
         &self.cfg_bookmarks
     }
@@ -42,6 +84,11 @@ impl App {
             let h = self.hover.as_ref()?;
             items.iter().find(|i| &i.path == h)
         }?;
+        if item.locked
+            && let Some(d) = self.denied_for(&item.path)
+        {
+            return Some(d.message());
+        }
         Some(match &item.usage {
             Some(u) => format!("{} · {} free", item.name, fmt::size(u.free)),
             None => item.name.clone(),
@@ -116,13 +163,17 @@ impl App {
                 }
             }
             Trash | DeletePermanently => match items.get(self.side_cursor).map(|i| &i.origin) {
+                Some(Origin::Device(_)) => {
+                    let mount = items[self.side_cursor].path.clone();
+                    self.start_eject(&mount);
+                }
                 Some(Origin::Bookmark { removable: true }) => {
                     let path = items[self.side_cursor].path.clone();
                     self.set_bookmark(path, false);
                 }
                 _ => self.toast(
                     ToastKind::Info,
-                    "only bookmarks can be removed from the sidebar",
+                    "only bookmarks can be removed from the sidebar (a disk is ejected with this key)",
                     3,
                 ),
             },
@@ -153,6 +204,15 @@ impl App {
             items.push(MenuItem::bookmark(path.to_path_buf(), false, true));
         } else if !is_config {
             items.push(MenuItem::bookmark(path.to_path_buf(), true, true));
+        }
+        if self.ejectable(path).is_some() {
+            items.push(MenuItem {
+                cmd: MenuCmd::Eject(path.to_path_buf()),
+                label: "Eject".into(),
+                enabled: true,
+                gap_before: true,
+                checked: None,
+            });
         }
         MenuView {
             at,

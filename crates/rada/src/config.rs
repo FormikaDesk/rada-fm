@@ -5,6 +5,8 @@
 //! show_hidden = false
 //! sort = "name"       # name | size | date
 //! reverse = false
+//! natural_sort = true       # file2 before file10, capitals and small letters mixed (as the
+//!                           # Finder and Explorer do); false: letter by letter
 //! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:
 //!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
 //!                            # | tokyo-night-dark | tokyo-night-day
@@ -158,6 +160,7 @@ struct Raw {
     show_hidden: Option<bool>,
     sort: Option<String>,
     reverse: Option<bool>,
+    natural_sort: Option<bool>,
     images: Option<String>,
     theme: Option<String>,
     appearance: Option<String>,
@@ -223,6 +226,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
             key,
             reverse: raw.reverse.unwrap_or(false),
             dirs_first: true,
+            natural: raw.natural_sort.unwrap_or(true),
         },
         images: raw.images,
         theme: raw.theme,

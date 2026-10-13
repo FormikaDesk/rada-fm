@@ -63,6 +63,21 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(" close   ", th.dim()),
             Span::styled(" ↑↓ ", th.chip().add_modifier(Modifier::BOLD)),
             Span::styled(" scroll", th.dim()),
+            if app.quick_look_available() {
+                Span::styled("   ", th.dim())
+            } else {
+                Span::raw("")
+            },
+            if app.quick_look_available() {
+                Span::styled(" Q ", th.chip().add_modifier(Modifier::BOLD))
+            } else {
+                Span::raw("")
+            },
+            if app.quick_look_available() {
+                Span::styled(" Quick Look", th.dim())
+            } else {
+                Span::raw("")
+            },
         ])),
         Rect {
             y: area.y + area.height - 1,
@@ -323,6 +338,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         Modal::Menu(m) => draw_menu(f, &th, &app.keymap, m, area, &mut app.hits),
         Modal::Properties(p) => draw_properties(f, &th, p, area, &mut app.hits),
         Modal::Update(u) => super::updates::draw_update(f, &th, u, area, &mut app.hits),
+        Modal::Access(d) => super::dialogs::draw_access(f, &th, d, area, &mut app.hits),
+        Modal::Eject(e) => super::dialogs::draw_eject(f, &th, e, area, &mut app.hits),
         Modal::FullPreview => {}
     }
 }

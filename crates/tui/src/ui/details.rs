@@ -176,7 +176,8 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Below the header: the preview, the buttons, then the properties.
     let mut props = properties(app);
-    let buttons_h = 2u16;
+    let quick_look = app.quick_look_available();
+    let buttons_h = if quick_look { 3u16 } else { 2u16 };
     let fixed_top = 3u16;
     // Blank lines: under the preview and over the properties.
     let avail = inner.height.saturating_sub(fixed_top + 1 + buttons_h + 1);
@@ -236,7 +237,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         let secondary = th.base().patch(Style::default().bg(th.button));
         let preview_label = format!("{} Preview", icons::ui(set, Glyph::Eye));
         let preview_label = preview_label.trim().to_string();
-        if e.is_dir() {
+        if e.is_navigable_dir() {
             f.render_widget(
                 Paragraph::new(Span::styled(centered_text(&preview_label, w), secondary)),
                 row2,
@@ -266,6 +267,19 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             );
             app.hits.add(left, Target::Act(Action::OpenWith));
             app.hits.add(right, Target::FullPreview);
+        }
+        // macOS: the Finder's own preview, one row below.
+        if quick_look && by + 2 < inner.y + inner.height {
+            let row3 = Rect {
+                y: by + 2,
+                height: 1,
+                ..inner
+            };
+            f.render_widget(
+                Paragraph::new(Span::styled(centered_text("Quick Look", w), secondary)),
+                row3,
+            );
+            app.hits.add(row3, Target::Act(Action::QuickLook));
         }
     }
 

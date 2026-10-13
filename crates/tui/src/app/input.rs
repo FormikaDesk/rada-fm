@@ -24,6 +24,8 @@ pub enum MenuCmd {
     },
     /// Open another menu in its place.
     Sub(MenuKind),
+    /// Eject the disk mounted here.
+    Eject(PathBuf),
     SortBy(SortKey),
     /// `true`: descending.
     SortOrder(bool),
@@ -333,6 +335,8 @@ impl App {
             PrevTab => self.prev_tab(),
 
             Update => self.start_update_action(),
+            QuickLook => self.quick_look(),
+            ShowPackage => self.show_package(),
             Help => {
                 self.help_scroll = 0;
                 self.modal = Some(Modal::Help);

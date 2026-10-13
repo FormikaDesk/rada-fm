@@ -19,6 +19,12 @@ use ratatui::backend::TestBackend;
 /// Adjusts the configuration before the interface starts.
 pub type Tweak = Box<dyn FnOnce(&mut Config)>;
 
+/// A filesystem and a platform other than the sandbox's own.
+pub type System = (
+    Arc<dyn rada_core::fs::FsEngine>,
+    Arc<dyn rada_core::platform::Platform>,
+);
+
 pub struct H {
     pub app: App,
     pub term: Terminal<TestBackend>,
@@ -85,6 +91,31 @@ impl H {
             None,
             limits,
             None,
+            None,
+        )
+    }
+
+    /// On a system other than the sandbox's own (a stand-in for macOS, a filesystem that
+    /// refuses), with the configuration adjusted by `tweak`.
+    pub fn with_system(
+        sb: Sandbox,
+        start: PathBuf,
+        w: u16,
+        h: u16,
+        system: System,
+        tweak: impl FnOnce(&mut Config) + 'static,
+    ) -> H {
+        H::build_with(
+            sb,
+            start,
+            w,
+            h,
+            Some(rada_tui::ImageUi::halfblocks()),
+            Default::default(),
+            None,
+            Default::default(),
+            Some(Box::new(tweak)),
+            Some(system),
         )
     }
 
@@ -106,6 +137,7 @@ impl H {
             None,
             Default::default(),
             Some(Box::new(tweak)),
+            None,
         )
     }
 
@@ -128,6 +160,7 @@ impl H {
             request,
             Default::default(),
             None,
+            None,
         )
     }
 
@@ -142,13 +175,10 @@ impl H {
         request: Option<rada_core::ops::OpRequest>,
         archive_limits: rada_core::archive::ArchiveLimits,
         tweak: Option<Tweak>,
+        system: Option<System>,
     ) -> H {
-        let svc = Services::start_with(
-            Arc::new(LocalFs),
-            sb.platform(),
-            Some(sb.journal()),
-            archive_limits,
-        );
+        let (fs, platform) = system.unwrap_or_else(|| (Arc::new(LocalFs), sb.platform()));
+        let svc = Services::start_with(fs, platform, Some(sb.journal()), archive_limits);
         let mut cfg = Config {
             start_dir: start,
             icons: IconSet::Unicode,

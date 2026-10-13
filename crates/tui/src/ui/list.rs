@@ -271,13 +271,13 @@ fn row<'a>(
         th.error
     } else if e.hidden {
         th.text_dim
-    } else if e.is_dir() {
+    } else if e.is_navigable_dir() {
         th.kinds.folder
     } else {
         th.text
     };
     let mut name_style = Style::default().fg(name_color);
-    if e.is_dir() || is_cursor || marked {
+    if e.is_navigable_dir() || is_cursor || marked {
         name_style = name_style.add_modifier(Modifier::BOLD);
     }
 

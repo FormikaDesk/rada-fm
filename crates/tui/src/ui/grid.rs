@@ -24,7 +24,7 @@ const ART_W: usize = 5;
 
 /// The big icon: three lines of `ART_W` cells.
 fn art(e: &Entry, set: IconSet, glyph: &str) -> [String; 3] {
-    if e.is_dir() {
+    if e.is_navigable_dir() {
         return [
             "▄▄▄  ".to_string(),
             "█████".to_string(),
@@ -125,7 +125,11 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 Style::default()
             };
             let (glyph, gcolor) = icons::icon(e, app.icons, &th);
-            let color: Color = if e.is_dir() { th.kinds.folder } else { gcolor };
+            let color: Color = if e.is_navigable_dir() {
+                th.kinds.folder
+            } else {
+                gcolor
+            };
             let lines_of_art = art(e, app.icons, glyph);
             let pad_l = (TILE_W - ART_W) / 2;
             for (i, a) in lines_of_art.iter().enumerate() {
@@ -149,7 +153,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 th.error
             } else if e.hidden {
                 th.text_dim
-            } else if e.is_dir() {
+            } else if e.is_navigable_dir() {
                 th.kinds.folder
             } else {
                 th.text
@@ -159,7 +163,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 Style::default().fg(name_color)
             };
-            if e.is_dir() || cursor || marked {
+            if e.is_navigable_dir() || cursor || marked {
                 st = st.add_modifier(Modifier::BOLD);
             }
             let name = display::truncate(&e.display, TILE_W - 2);

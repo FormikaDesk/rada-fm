@@ -39,6 +39,19 @@ pub trait VolumeLister: Send + Sync {
         std::thread::sleep(timeout);
         false
     }
+
+    /// Whether the system can eject this volume safely (an external disk, a disk image, a
+    /// network share), so that the Eject entry is offered for it.
+    fn can_eject(&self, _volume: &Volume) -> bool {
+        false
+    }
+
+    /// Eject it: unmount, and where the system can, power the drive off. The error says in
+    /// plain words why not (the disk is busy, and who is using it where that is known). May
+    /// block: call it from a thread of its own.
+    fn eject(&self, _volume: &Volume) -> Result<()> {
+        Err(crate::Error::Unsupported("eject"))
+    }
 }
 
 /// Which mounts are not disks a person would want to see: virtual and system filesystems,

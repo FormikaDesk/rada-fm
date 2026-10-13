@@ -5,9 +5,11 @@
 //! those systems need (drive letters, NTFS junctions and reparse points,
 //! hidden/system attributes, the Windows Recycle Bin, Finder trash).
 
+pub mod access;
 pub mod attrs;
 pub mod dirs;
 pub mod dirtrash;
+pub mod eject;
 pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
@@ -26,6 +28,7 @@ pub mod linux;
 use std::path::Path;
 use std::sync::Arc;
 
+pub use access::AccessDenied;
 pub use attrs::{Attrs, FileAttributes, ReparseKind};
 pub use dirs::Dirs;
 pub use fidelity::{AttrOutcome, DestSupport, Fidelity, NotYet, Preserve, SourceAttrs};
@@ -71,6 +74,19 @@ pub trait Opener: Send + Sync {
     /// Open a new terminal window in `dir`.
     fn open_terminal(&self, _dir: &Path) -> Result<()> {
         Err(crate::Error::Unsupported("open a terminal"))
+    }
+    /// Open an address (a page of the system settings: `x-apple.systempreferences:…`) with
+    /// the program that handles it.
+    fn open_url(&self, url: &str) -> Result<()> {
+        self.open(Path::new(url))
+    }
+    /// Whether this system has a quick look (macOS) for [`quick_look`](Self::quick_look).
+    fn can_quick_look(&self) -> bool {
+        false
+    }
+    /// Show the system's quick preview of the item, in a window of its own.
+    fn quick_look(&self, _path: &Path) -> Result<()> {
+        Err(crate::Error::Unsupported("quick look"))
     }
 }
 
@@ -133,6 +149,23 @@ pub trait Platform: Send + Sync {
     /// The user's standard folders under their real names. May read files: call it from
     /// a worker, not from the interface thread.
     fn user_dirs(&self) -> UserDirs;
+    /// The names the system's own file manager shows for these folders and drives when they
+    /// differ from the name on disk ("Scrivania" for `Desktop`, "Macintosh HD" for `/`). Only
+    /// the ones that differ are returned. The platform adds the places it knows are worth
+    /// naming. May talk to the system: call it from a worker.
+    fn display_names(&self, _places: &[std::path::PathBuf]) -> Vec<(std::path::PathBuf, String)> {
+        Vec::new()
+    }
+    /// Places of this system that the standard folders do not cover (iCloud Drive on macOS),
+    /// those that exist.
+    fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
+        Vec::new()
+    }
+    /// When opening `path` failed with `err`: whether the system is waiting for the person's
+    /// consent, and what to tell them.
+    fn explain_denied(&self, _path: &Path, _err: &std::io::Error) -> Option<AccessDenied> {
+        None
+    }
 }
 
 /// Choices of the user that reach the platform layer.

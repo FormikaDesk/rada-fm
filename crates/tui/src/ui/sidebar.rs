@@ -164,14 +164,30 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     // ones pinned by hand).
                     let pinned = matches!(item.section, Section::Pinned)
                         && !matches!(item.origin, Origin::Device(_));
-                    let pin_w = if pinned && !pin.is_empty() { 3 } else { 0 };
+                    let lock = match app.icons {
+                        icons::IconSet::Nerd => "\u{f023}",
+                        icons::IconSet::Unicode => "⊘",
+                        icons::IconSet::None => "!",
+                    };
+                    let pin_w = if item.locked || (pinned && !pin.is_empty()) {
+                        3
+                    } else {
+                        0
+                    };
                     let room = w.saturating_sub(head + pin_w + 1);
                     let name = rada_core::display::truncate(&item.name, room);
                     spans.push(Span::styled(
                         pad(&name, w.saturating_sub(head + pin_w)),
                         name_style.patch(row_style),
                     ));
-                    if pin_w > 0 {
+                    if item.locked {
+                        // The system has not allowed this place yet: the same words as in
+                        // the window that opens when it is clicked.
+                        spans.push(Span::styled(
+                            format!(" {lock} "),
+                            th.fg(th.warn).patch(row_style),
+                        ));
+                    } else if pin_w > 0 {
                         spans.push(Span::styled(
                             format!(" {pin} "),
                             th.faint().patch(row_style),

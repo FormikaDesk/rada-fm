@@ -91,7 +91,8 @@ pub struct FsMeta {
     /// 512-byte blocks really allocated (Unix); less than `size` means a sparse file.
     pub blocks: Option<u64>,
     pub readonly: bool,
-    /// Raw Windows file attributes (hidden, system, reparse point, ...). `None` elsewhere.
+    /// Raw file flags of the system: the Windows attributes (hidden, system, reparse point…)
+    /// or, on macOS, the BSD flags of `st_flags` (`UF_HIDDEN`…). `None` elsewhere.
     pub os_attrs: Option<u32>,
 }
 
@@ -234,7 +235,12 @@ fn os_attrs(m: &std::fs::Metadata) -> Option<u32> {
         use std::os::windows::fs::MetadataExt;
         Some(m.file_attributes())
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::macos::fs::MetadataExt;
+        Some(m.st_flags())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = m;
         None

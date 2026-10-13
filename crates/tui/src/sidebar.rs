@@ -95,6 +95,8 @@ pub struct Item {
     pub name: String,
     pub path: PathBuf,
     pub usage: Option<Usage>,
+    /// The system has refused this place until the person allows it.
+    pub locked: bool,
 }
 
 impl Item {
@@ -109,6 +111,7 @@ impl Item {
             Origin::Place(PlaceKind::Pictures) => ("\u{f03e}", "▣"),
             Origin::Place(PlaceKind::Videos) => ("\u{f03d}", "▶"),
             Origin::Place(PlaceKind::Trash) => ("\u{f1f8}", "⌫"),
+            Origin::Place(PlaceKind::ICloud) => ("\u{f0c2}", "☁"),
             Origin::Bookmark { .. } => ("\u{f02e}", "★"),
             Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
@@ -145,7 +148,13 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
     let place = |p: &rada_core::places::Place, section: Section| Item {
         section,
         origin: Origin::Place(p.kind),
-        name: p.name(),
+        // The Finder's and Explorer's names ("Scrivania"), except for the two this pane names
+        // itself.
+        name: match p.kind {
+            PlaceKind::Home | PlaceKind::Trash => p.name(),
+            _ => app.shown_name(&p.path, p.name()),
+        },
+        locked: app.denied_for(&p.path).is_some(),
         path: p.path.clone(),
         usage: None,
     };
@@ -197,14 +206,15 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         out.push(Item {
             section: Section::Pinned,
             origin: Origin::Bookmark { removable },
-            name: base_name(path),
+            name: app.shown_name(path, base_name(path)),
+            locked: app.denied_for(path).is_some(),
             path: path.clone(),
             usage: None,
         });
     }
 
     for v in app.volumes.iter().filter(|v| v.kind != VolumeKind::Virtual) {
-        let name = device_name(v);
+        let name = app.shown_name(&v.mount_point, device_name(v));
         let usage = match (v.total, v.available) {
             (Some(t), Some(a)) if t > 0 && v.responsive => Some(Usage {
                 used: (1.0 - a as f64 / t as f64).clamp(0.0, 1.0),
@@ -216,6 +226,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             section: Section::Devices,
             origin: Origin::Device(v.kind),
             name,
+            locked: app.denied_for(&v.mount_point).is_some(),
             path: v.mount_point.clone(),
             usage,
         });
