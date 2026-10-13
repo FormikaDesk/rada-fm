@@ -232,7 +232,13 @@ fn rows_stay_aligned_with_cjk_emoji_and_very_long_names() {
             .iter()
             .rposition(|l| l.contains(" items"))
             .unwrap_or(lines.len() - 1);
-        let body = &lines[head + 1..status];
+        // (A small window also carries the one-line advice to enlarge it, which is no row of
+        // the list.)
+        let body: Vec<&str> = lines[head + 1..status]
+            .iter()
+            .copied()
+            .filter(|l| !l.contains("Enlarge the window"))
+            .collect();
         let rows: Vec<&&str> = body.iter().filter(|l| !l.trim().is_empty()).collect();
         assert!(rows.len() >= 8, "{w}: {s}");
         // Whatever the names contain (wide glyphs, emoji, very long text), the columns

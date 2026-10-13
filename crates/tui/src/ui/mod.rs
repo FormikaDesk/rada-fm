@@ -76,6 +76,21 @@ pub fn details_mode(width: u16, chosen: Option<bool>, layout: LayoutKind) -> Det
     }
 }
 
+/// The smallest terminal that shows the whole explorer: the navigation pane in full, the
+/// command bar and the key hints.
+pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
+
+/// Whether the one-line advice to enlarge the window is shown on a terminal of this size:
+/// below [`FULL_LAYOUT_MIN`], with room to spare a row for it, in the explorer layout (the
+/// compact one is a choice of a small layout), and until the person has closed it.
+pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
+    app.layout == LayoutKind::Explorer
+        && !app.size_notice_dismissed
+        && (width < FULL_LAYOUT_MIN.0 || height < FULL_LAYOUT_MIN.1)
+        && width >= 24
+        && height >= 12
+}
+
 /// Rows of the command bar on a terminal `height` rows tall: three (the bar and a half-block
 /// padding above and below) while there is room, then one, then none. The padding of the
 /// hints goes before the padding of the command bar, the hints before the command bar.
@@ -121,11 +136,14 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let commands_h = commands_height(explorer, area.height);
     let hints_h = hints_height(explorer && app.show_hints, area.height);
     let progress_h = if app.running.is_some() { 4 } else { 0 };
+    let notice = size_notice_shown(app, area.width, area.height);
+    app.size_notice_visible = notice;
     let [
         tabs_row,
         address_row,
         commands_row,
         body,
+        notice_row,
         progress,
         status,
         hints_row,
@@ -134,6 +152,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Constraint::Length(address_h),
         Constraint::Length(commands_h),
         Constraint::Min(3),
+        Constraint::Length(u16::from(notice)),
         Constraint::Length(progress_h),
         Constraint::Length(1),
         Constraint::Length(hints_h),
@@ -204,6 +223,19 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if dmode == DetailsMode::Overlay {
         details::draw_overlay(f, app, main);
+    }
+    if notice {
+        let text = format!(
+            " Enlarge the window for the full layout (now {}×{})  Esc: hide",
+            area.width, area.height
+        );
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                display::truncate(&text, area.width as usize),
+                th.faint(),
+            )),
+            notice_row,
+        );
     }
     if app.running.is_some() {
         draw_progress(f, app, progress);

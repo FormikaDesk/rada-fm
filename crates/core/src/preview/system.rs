@@ -60,16 +60,13 @@ impl MacTools {
     }
 
     fn for_limits(limits: &ImageLimits) -> MacTools {
-        let path = limits
+        // The folder asked for (or `PATH`) first; then where the tools live, which a minimal
+        // `PATH` (a program started from the desktop) may leave out.
+        let mut path = limits
             .pdf_tools_path
             .clone()
-            // The tools live in /usr/bin and /usr/sbin; a minimal PATH (a program started
-            // from the desktop) still has them.
-            .unwrap_or_else(|| {
-                let mut p = std::env::var_os("PATH").unwrap_or_default();
-                p.push(":/usr/bin:/usr/sbin");
-                p
-            });
+            .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default());
+        path.push(":/usr/bin:/usr/sbin");
         MacTools::find_in(&path)
     }
 }
@@ -464,12 +461,12 @@ mod win {
                     "Windows has no preview for this file".into(),
                 ));
             }
-            for px in bgra.chunks_exact_mut(4) {
+            for px in bgra.as_chunks_mut::<4>().0 {
                 px.swap(0, 2);
             }
             // A thumbnail without an alpha channel is opaque.
-            if bgra.chunks_exact(4).all(|p| p[3] == 0) {
-                for px in bgra.chunks_exact_mut(4) {
+            if bgra.as_chunks::<4>().0.iter().all(|p| p[3] == 0) {
+                for px in bgra.as_chunks_mut::<4>().0 {
                     px[3] = 255;
                 }
             }

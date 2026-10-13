@@ -27,6 +27,13 @@ toml = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"
 
+[target.'cfg(windows)'.dependencies]
+# Shortcuts (.lnk): the shell's own COM interfaces.
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_UI_Shell"] }
+
+[build-dependencies]
+embed-resource = "3"
+
 [dev-dependencies]
 crossterm = "0.29"
 image = { version = "0.25", default-features = false, features = ["png"] }

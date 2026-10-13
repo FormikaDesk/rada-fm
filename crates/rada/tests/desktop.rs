@@ -2,7 +2,7 @@
 //! sandbox: HOME, every XDG folder and PATH point into a temporary folder, and the helper
 //! programs (`xdg-mime`, `update-desktop-database`, terminals) are small fake scripts that
 //! record how they were called. Nothing here can touch the real desktop configuration.
-#![cfg(unix)]
+#![cfg(all(unix, not(target_os = "macos")))]
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -381,7 +381,30 @@ fn spawn_terminal_falls_back_to_terminal_variable_then_known_terminals() {
     let o = sb.rada_with_terminal_var(&["--spawn-terminal"], "not-installed");
     assert!(o.status.success(), "{}", text(&o));
     let got = wait_for_file(&sb.p("terminal.log.ghostty"));
-    assert!(got.starts_with("ghostty -e "), "{got}");
+    // The window is given rada's own identity, so bars and workspaces show its icon.
+    assert!(
+        got.starts_with("ghostty --class=com.formikadesk.rada -e "),
+        "{got}"
+    );
+}
+
+#[test]
+fn every_known_terminal_is_started_with_rada_s_identity_where_it_takes_one() {
+    for (term, expect) in [
+        ("kitty", "kitty --class com.formikadesk.rada "),
+        ("foot", "foot --app-id=com.formikadesk.rada "),
+        ("alacritty", "alacritty --class com.formikadesk.rada -e "),
+        ("wezterm", "wezterm start --class com.formikadesk.rada -- "),
+        ("konsole", "konsole -e "),
+    ] {
+        let sb = Sandbox::new();
+        let log = sb.p("terminal.log");
+        sb.script(term, &format!(r#"echo "{term} $@" > '{}'"#, log.display()));
+        let o = sb.rada(&["--spawn-terminal"]);
+        assert!(o.status.success(), "{term}: {}", text(&o));
+        let got = wait_for_file(&log);
+        assert!(got.starts_with(expect), "{term}: {got}");
+    }
 }
 
 #[test]

@@ -8,7 +8,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph};
 
 use super::widgets::{button, centered, hit_spans};
-use crate::app::{EjectStage, EjectView};
+use crate::app::{EjectStage, EjectView, FontView};
 use crate::fmt;
 use crate::hits::{Hits, Target};
 use crate::theme::Theme;
@@ -176,6 +176,75 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(th.fg(tone))
+        .padding(Padding::new(2, 2, 1, 1));
+    let inner = blk.inner(rect);
+    f.render_widget(blk, rect);
+    hit_spans(
+        hits,
+        inner.x,
+        inner.y + lines.len() as u16,
+        &spans,
+        &targets,
+    );
+    lines.push(Line::from(spans));
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+/// The offer of a Nerd Font, made once.
+pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut Hits) {
+    use crate::app::FontStage;
+    let w = 80.min(area.width.saturating_sub(4));
+    let text_w = (w as usize).saturating_sub(6);
+    let mut lines = vec![
+        Line::from(vec![
+            chip(th, "Icons", th.accent),
+            Span::styled(
+                "  Your terminal cannot draw rada's icons yet",
+                th.base().add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::raw(""),
+    ];
+    let (spans, targets): (Vec<Span>, Vec<(usize, Target)>) = match v.stage {
+        FontStage::Ask => {
+            let body = format!(
+                "File-type icons need a Nerd Font, and this terminal is not set to use one. rada can install {} for you: about {:.0} MB, taken from the Nerd Fonts project at a fixed release and checked against its checksums, for your account only (no administrator rights). Afterwards you choose it in your terminal's font setting. This is asked only once.",
+                v.offer.family, v.offer.megabytes
+            );
+            for l in fmt::wrap(&body, text_w) {
+                lines.push(Line::from(Span::styled(l, th.dim())));
+            }
+            (
+                vec![
+                    button(th, "Enter", "Install the font", Some(th.accent), true),
+                    Span::raw("  "),
+                    button(th, "Esc", "Not now", None, true),
+                ],
+                vec![
+                    (0, Target::Key(KeyCode::Enter)),
+                    (2, Target::Key(KeyCode::Esc)),
+                ],
+            )
+        }
+        FontStage::Working => {
+            lines.push(Line::from(Span::styled(
+                "Downloading and installing…",
+                th.base(),
+            )));
+            (
+                vec![button(th, "Esc", "Hide", None, true)],
+                vec![(0, Target::Key(KeyCode::Esc))],
+            )
+        }
+    };
+    lines.push(Line::raw(""));
+    let h = (lines.len() as u16 + 1 + 4).min(area.height.saturating_sub(2));
+    let rect = centered(area, w, h);
+    f.render_widget(Clear, rect);
+    let blk = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(th.fg(th.accent))
         .padding(Padding::new(2, 2, 1, 1));
     let inner = blk.inner(rect);
     f.render_widget(blk, rect);

@@ -272,6 +272,8 @@ fn without_poppler_the_user_is_told_how_to_get_it() {
     std::fs::write(&p, make_pdf("T", "A", 1, "x")).unwrap();
     let mut l = limits(&sb);
     l.image.pdf_tools_path = Some(sb.mkdir("empty").into_os_string());
+    // A system with nothing of its own to draw PDFs with: this is about poppler being missing.
+    l.image.system_renderer = None;
     let (w, rx) = worker();
     w.request(p, 1, l);
     let i = settled(&rx, 1);

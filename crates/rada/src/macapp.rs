@@ -68,7 +68,11 @@ impl MacSetup {
             std::fs::remove_dir_all(&app)
                 .with_context(|| format!("cannot replace {}", app.display()))?;
         }
-        write(&contents.join("Info.plist"), info_plist(&self.version).as_bytes(), false)?;
+        write(
+            &contents.join("Info.plist"),
+            info_plist(&self.version).as_bytes(),
+            false,
+        )?;
         write(
             &contents.join("MacOS/Rada"),
             launcher_script(&self.exe).as_bytes(),
@@ -91,7 +95,10 @@ impl MacSetup {
         if desktop {
             let alias = self.alias();
             make_alias(&app, &alias)?;
-            say.push(format!("made a link to it on the Desktop: {}", alias.display()));
+            say.push(format!(
+                "made a link to it on the Desktop: {}",
+                alias.display()
+            ));
             written.push(alias);
         }
         let mut manifest = self.read_manifest();
@@ -372,7 +379,10 @@ mod tests {
     #[test]
     fn the_ghostty_settings_free_the_keys_rada_uses() {
         let c = ghostty_config();
-        assert!(c.contains("window-width = 180\nwindow-height = 45\n"), "{c}");
+        assert!(
+            c.contains("window-width = 180\nwindow-height = 45\n"),
+            "{c}"
+        );
         assert!(c.contains("quit-after-last-window-closed = true"), "{c}");
         for key in [
             "super+c",
@@ -385,10 +395,17 @@ mod tests {
             "super+bracket_left",
             "super+bracket_right",
         ] {
-            assert!(c.contains(&format!("keybind = {key}=unbind\n")), "{key}\n{c}");
+            assert!(
+                c.contains(&format!("keybind = {key}=unbind\n")),
+                "{key}\n{c}"
+            );
         }
         // Only unbinding: nothing that takes keys away from the terminal.
-        assert!(c.lines().filter(|l| l.starts_with("keybind")).all(|l| l.ends_with("=unbind")));
+        assert!(
+            c.lines()
+                .filter(|l| l.starts_with("keybind"))
+                .all(|l| l.ends_with("=unbind"))
+        );
         assert!(!c.contains("clear"));
     }
 
@@ -405,7 +422,10 @@ mod tests {
                 .replace("arrow_up", "up");
             let chord = Chord::parse(&rada).unwrap_or_else(|e| panic!("{key}: {e}"));
             let ev = crossterm::event::KeyEvent::new(chord.code, chord.mods);
-            assert!(km.action_for(&ev).is_some(), "{key} ({rada}) means nothing to rada");
+            assert!(
+                km.action_for(&ev).is_some(),
+                "{key} ({rada}) means nothing to rada"
+            );
         }
     }
 
@@ -461,11 +481,17 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let s = setup(d.path());
         s.install(false).unwrap();
-        let stale = d.path().join("Applications/Rada.app/Contents/Resources/old-thing");
+        let stale = d
+            .path()
+            .join("Applications/Rada.app/Contents/Resources/old-thing");
         std::fs::write(&stale, "x").unwrap();
         s.install(false).unwrap();
         assert!(!stale.exists());
-        assert!(d.path().join("Applications/Rada.app/Contents/MacOS/Rada").is_file());
+        assert!(
+            d.path()
+                .join("Applications/Rada.app/Contents/MacOS/Rada")
+                .is_file()
+        );
     }
 
     #[cfg(unix)]
@@ -476,7 +502,10 @@ mod tests {
         let say = s.install(true).unwrap();
         assert!(say.iter().any(|l| l.contains("Desktop")), "{say:?}");
         let link = d.path().join("Desktop/Rada");
-        assert_eq!(std::fs::read_link(&link).unwrap(), d.path().join("Applications/Rada.app"));
+        assert_eq!(
+            std::fs::read_link(&link).unwrap(),
+            d.path().join("Applications/Rada.app")
+        );
         // Something else with that name is not ours to replace.
         let other = tempfile::tempdir().unwrap();
         let s2 = setup(other.path());
@@ -484,7 +513,10 @@ mod tests {
         std::fs::write(other.path().join("Desktop/Rada"), "mine").unwrap();
         let err = s2.install(true).unwrap_err().to_string();
         assert!(err.contains("left alone"), "{err}");
-        assert_eq!(std::fs::read_to_string(other.path().join("Desktop/Rada")).unwrap(), "mine");
+        assert_eq!(
+            std::fs::read_to_string(other.path().join("Desktop/Rada")).unwrap(),
+            "mine"
+        );
 
         let say = s.remove().unwrap();
         assert!(say.iter().any(|l| l.contains("Rada.app")), "{say:?}");
@@ -504,7 +536,10 @@ mod tests {
         std::fs::remove_file(&link).unwrap();
         std::os::unix::fs::symlink("/somewhere/else", &link).unwrap();
         s.remove().unwrap();
-        assert_eq!(std::fs::read_link(&link).unwrap(), Path::new("/somewhere/else"));
+        assert_eq!(
+            std::fs::read_link(&link).unwrap(),
+            Path::new("/somewhere/else")
+        );
     }
 
     /// Run the launcher of a made application, with `open` and the application folders
@@ -525,8 +560,11 @@ mod tests {
         let open = bin.join("open");
         std::fs::write(
             &open,
-            format!("#!/bin/sh
-for a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n", log.display()),
+            format!(
+                "#!/bin/sh
+for a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n",
+                log.display()
+            ),
         )
         .unwrap();
         std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o755)).unwrap();

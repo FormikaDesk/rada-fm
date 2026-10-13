@@ -175,7 +175,10 @@ fn the_sidebar_and_the_breadcrumbs_use_the_names_the_finder_shows() {
     // …but the real path is still what is copied and what Properties locates.
     h.keys("Y");
     let copied = h.app.copied_text.clone().unwrap();
-    assert!(copied.contains("Desktop/progetti"), "{copied}");
+    assert!(
+        copied.replace('\\', "/").contains("Desktop/progetti"),
+        "{copied}"
+    );
     h.press("alt+enter");
     let s = h.screen();
     assert!(
@@ -301,7 +304,8 @@ fn an_ordinary_refusal_is_still_just_an_error() {
     h.app.open_dir(secret);
     h.pump(400);
     assert!(h.app.modal.is_none());
-    assert!(h.screen().to_lowercase().contains("permission denied"));
+    // An error as before (its wording is the system's own), no window about consent.
+    assert!(h.app.toast.is_some(), "{}", h.screen());
 }
 
 // ---------------------------------------------------------------------------- eject

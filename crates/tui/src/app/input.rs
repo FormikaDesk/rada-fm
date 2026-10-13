@@ -237,6 +237,10 @@ impl App {
                     self.clear_marks();
                 } else if self.filter.is_some() {
                     self.set_filter(None);
+                } else if self.size_notice_visible {
+                    // Nothing else for Esc to do: it closes the advice about the window size,
+                    // which then stays closed for the session.
+                    self.size_notice_dismissed = true;
                 }
             }
 

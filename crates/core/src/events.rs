@@ -142,6 +142,8 @@ pub enum CoreEvent {
     },
     /// The update worker: a newer version, progress, the end.
     Update(crate::update::UpdateEvent),
+    /// The font offered at the first start was installed (a sentence to show), or why not.
+    FontInstalled(Result<String, String>),
     /// A disk was ejected, or the system said why not.
     Ejected {
         mount: PathBuf,

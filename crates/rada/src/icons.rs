@@ -3,6 +3,9 @@
 //! `examples/make-icons.rs` draws the logo at every size and writes the two files into
 //! `assets/`, which the program then embeds.
 
+// The builders are for the example and the tests; the program only embeds the files.
+#![allow(dead_code)]
+
 /// The sizes an `.icns` file carries, with the type code of each entry. The 2× entries
 /// repeat a size under another code (a 32-pixel picture is both `icp5` and the 2× of 16).
 pub const ICNS_ENTRIES: &[(&[u8; 4], u32)] = &[

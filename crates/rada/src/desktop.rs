@@ -530,28 +530,63 @@ mod tests {
         let one = |term: &str| picks(None, &[term]).unwrap();
         assert_eq!(
             one("ghostty"),
-            ["ghostty", "--class=com.formikadesk.rada", "-e", "/usr/bin/rada", "/tmp/x"]
+            [
+                "ghostty",
+                "--class=com.formikadesk.rada",
+                "-e",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
         assert_eq!(
             one("kitty"),
-            ["kitty", "--class", "com.formikadesk.rada", "/usr/bin/rada", "/tmp/x"]
+            [
+                "kitty",
+                "--class",
+                "com.formikadesk.rada",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
         assert_eq!(
             one("alacritty"),
-            ["alacritty", "--class", "com.formikadesk.rada", "-e", "/usr/bin/rada", "/tmp/x"]
+            [
+                "alacritty",
+                "--class",
+                "com.formikadesk.rada",
+                "-e",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
         // The class goes to `wezterm start`, before the `--` that ends its options.
         assert_eq!(
             one("wezterm"),
-            ["wezterm", "start", "--class", "com.formikadesk.rada", "--", "/usr/bin/rada", "/tmp/x"]
+            [
+                "wezterm",
+                "start",
+                "--class",
+                "com.formikadesk.rada",
+                "--",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
         assert_eq!(
             one("foot"),
-            ["foot", "--app-id=com.formikadesk.rada", "/usr/bin/rada", "/tmp/x"]
+            [
+                "foot",
+                "--app-id=com.formikadesk.rada",
+                "/usr/bin/rada",
+                "/tmp/x"
+            ]
         );
         // The others are started as before.
         assert_eq!(one("konsole"), ["konsole", "-e", "/usr/bin/rada", "/tmp/x"]);
-        assert_eq!(one("gnome-terminal"), ["gnome-terminal", "--", "/usr/bin/rada", "/tmp/x"]);
+        assert_eq!(
+            one("gnome-terminal"),
+            ["gnome-terminal", "--", "/usr/bin/rada", "/tmp/x"]
+        );
         assert_eq!(one("xterm"), ["xterm", "-e", "/usr/bin/rada", "/tmp/x"]);
         // xdg-terminal-exec chooses for itself.
         assert_eq!(

@@ -319,6 +319,23 @@ pub enum Modal {
     Access(rada_core::platform::AccessDenied),
     /// Ejecting a disk.
     Eject(EjectView),
+    /// The offer to install a Nerd Font.
+    Font(FontView),
+}
+
+/// The offer to install a Nerd Font, made once at the first start where the icons would not
+/// draw. Never made automatically: the person says yes.
+#[derive(Clone)]
+pub struct FontOffer {
+    /// The font's name, as the terminal's font setting calls it.
+    pub family: String,
+    /// The size of the download, in megabytes.
+    pub megabytes: f32,
+    /// Download and install it (blocks: run on a thread of its own). The sentence to show
+    /// when done, or why not.
+    pub install: Arc<dyn Fn() -> Result<String, String> + Send + Sync>,
+    /// Called when the offer is first shown, so that it is not made again.
+    pub shown: Arc<dyn Fn() + Send + Sync>,
 }
 
 pub struct Config {
@@ -338,6 +355,8 @@ pub struct Config {
     pub bookmarks: Vec<PathBuf>,
     pub demo: Option<Demo>,
     pub keymap: Keymap,
+    /// Offer to install a Nerd Font at the start.
+    pub font_offer: Option<FontOffer>,
     /// On a Mac, ask the terminal to report the Cmd key (`cmd_keys` in the configuration).
     pub cmd_keys: bool,
     /// Mouse capture on/off (`mouse = false` in the configuration).
@@ -412,6 +431,7 @@ pub struct Demo {
 mod address;
 mod archives;
 mod eject;
+mod font;
 mod input;
 mod menus;
 mod props;
@@ -421,6 +441,7 @@ mod update;
 
 pub use address::AddressEdit;
 pub use eject::{EjectStage, EjectView};
+pub use font::{FontStage, FontView};
 pub use input::{FilterState, MenuCmd, MenuItem, MenuView};
 pub use menus::MenuKind;
 pub use props::PropsView;
@@ -530,6 +551,10 @@ pub struct App {
     /// Folders the system is waiting for the person to allow (macOS), as learnt from the folders
     /// that could not be opened.
     pub denied: Vec<rada_core::platform::AccessDenied>,
+    /// The advice to enlarge a small window was closed (for the rest of this session).
+    pub size_notice_dismissed: bool,
+    /// The last frame showed it.
+    pub size_notice_visible: bool,
     /// What the update worker last told.
     pub update: UpdateStatus,
     /// Somebody asked to look for updates and is waiting for the answer.
@@ -656,6 +681,8 @@ impl App {
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
             denied: Vec::new(),
+            size_notice_dismissed: false,
+            size_notice_visible: false,
             update: UpdateStatus::None,
             update_asked: false,
             svc,
@@ -686,6 +713,7 @@ impl App {
             let h = app.svc.jobs.plan_request(req);
             app.begin_plan("Planning", h);
         }
+        app.maybe_offer_font(cfg.font_offer);
         app
     }
 
@@ -1029,6 +1057,7 @@ impl App {
                 name,
                 result,
             } => self.on_ejected(mount, name, result),
+            CoreEvent::FontInstalled(r) => self.on_font_installed(r),
             CoreEvent::Note { text, error } => {
                 self.toast(
                     if error {
@@ -2376,6 +2405,7 @@ impl App {
             Modal::Update(view) => self.on_update_key(view, key),
             Modal::Access(d) => self.on_access_key(d, key),
             Modal::Eject(v) => self.on_eject_key(v, key),
+            Modal::Font(v) => self.on_font_key(v, key),
             Modal::Properties(mut p) => match key.code {
                 KeyCode::Down | KeyCode::Char('j') => {
                     p.scroll += 1;

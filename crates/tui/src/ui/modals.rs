@@ -340,6 +340,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         Modal::Update(u) => super::updates::draw_update(f, &th, u, area, &mut app.hits),
         Modal::Access(d) => super::dialogs::draw_access(f, &th, d, area, &mut app.hits),
         Modal::Eject(e) => super::dialogs::draw_eject(f, &th, e, area, &mut app.hits),
+        Modal::Font(v) => super::dialogs::draw_font(f, &th, v, area, &mut app.hits),
         Modal::FullPreview => {}
     }
 }

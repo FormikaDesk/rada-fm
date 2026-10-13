@@ -21,7 +21,7 @@ pub mod theme;
 pub mod ui;
 pub mod view;
 
-pub use app::Config;
+pub use app::{Config, FontOffer};
 pub use icons::IconSet;
 pub use images::{ImageMode, ImageUi};
 pub use services::Services;

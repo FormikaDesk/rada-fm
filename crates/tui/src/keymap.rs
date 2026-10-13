@@ -729,7 +729,9 @@ pub struct Keymap {
 
 impl Default for Keymap {
     fn default() -> Self {
-        Keymap::new(Preset::VimClassic, &HashMap::new())
+        // Without the Mac's Cmd keys, so that tests (and anything built from the default)
+        // read the same on every system; the program asks for them with `Keymap::new`.
+        Keymap::new_for(Preset::VimClassic, &HashMap::new(), false)
     }
 }
 

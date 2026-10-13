@@ -4,11 +4,13 @@ mod config;
 mod demo;
 mod desktop;
 mod fonts;
+mod fontsetup;
 mod icons;
 mod macapp;
 mod setup;
 mod shell;
 mod update_cmd;
+mod winsetup;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -56,6 +58,13 @@ enum SetupWhat {
         /// Also put a launcher on the Desktop (macOS and Windows).
         #[arg(long)]
         desktop: bool,
+    },
+    /// Download and install JetBrainsMono Nerd Font Mono for this user (a fixed release,
+    /// checked against its checksums; nothing needs administrator rights), so that the icons draw.
+    Font {
+        /// Take away what a previous setup installed.
+        #[arg(long)]
+        remove: bool,
     },
 }
 
@@ -147,6 +156,7 @@ fn main() -> Result<()> {
                     desktop: *desktop,
                 },
             )?,
+            SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
         };
         for l in lines {
             println!("{l}");
@@ -224,7 +234,8 @@ fn main() -> Result<()> {
         .or(cfg_file.icons.clone());
     let icons = match icons_name.as_deref() {
         None | Some("auto") => {
-            if fonts::terminal_uses_nerd_font(&dirs.home) {
+            // Ghostty comes with a Nerd Font symbols fallback: its icons draw with no setup.
+            if fonts::terminal_uses_nerd_font(&dirs.home) || fontsetup::running_in_ghostty() {
                 rada_tui::IconSet::Nerd
             } else {
                 rada_tui::IconSet::Unicode
@@ -233,6 +244,15 @@ fn main() -> Result<()> {
         Some(n) => rada_tui::IconSet::parse(n)
             .with_context(|| format!("unknown icon set {n:?} (use auto, nerd, unicode or none)"))?,
     };
+
+    // The offer to install a Nerd Font: only where the icons were left to rada to decide, they
+    // would not draw, and it has not been made before. Never made without being asked.
+    let font_offer = (matches!(icons_name.as_deref(), None | Some("auto"))
+        && icons == rada_tui::IconSet::Unicode
+        && request.is_none()
+        && cli.demo.is_none()
+        && !font_offered(&dirs))
+    .then(|| make_font_offer(&dirs));
 
     let depth = rada_tui::theme::ColorDepth::detect();
     let theme_name = cli
@@ -397,6 +417,7 @@ fn main() -> Result<()> {
         image_mode,
         keymap,
         cmd_keys: cfg_file.cmd_keys,
+        font_offer,
         mouse,
         show_hints: cfg_file.hints,
         sidebar: saved_ui.sidebar.unwrap_or(cfg_file.sidebar),
@@ -415,6 +436,41 @@ fn main() -> Result<()> {
         write_cwd(f, &outcome.last_dir).with_context(|| format!("cannot write {}", f.display()))?;
     }
     Ok(())
+}
+
+fn font_offered_file(dirs: &Dirs) -> PathBuf {
+    dirs.rada_state().join("font-offered")
+}
+
+/// Has the offer of a Nerd Font been made before?
+fn font_offered(dirs: &Dirs) -> bool {
+    font_offered_file(dirs).exists()
+}
+
+/// The offer: what is shown, what installing does, and the note that it was made.
+fn make_font_offer(dirs: &Dirs) -> rada_tui::FontOffer {
+    let setup = fontsetup::FontSetup::for_this_system(dirs);
+    let total: u64 = setup.faces.iter().map(|f| f.size).sum();
+    let (install_dirs, note_dirs) = (dirs.clone(), dirs.clone());
+    rada_tui::FontOffer {
+        family: fontsetup::FAMILY.to_string(),
+        megabytes: total as f32 / 1_000_000.0,
+        install: Arc::new(move || {
+            let setup = fontsetup::FontSetup::for_this_system(&install_dirs);
+            setup.install(&mut |_| {}).map_err(|e| e.to_string())?;
+            Ok(format!(
+                "{} is installed: choose it as the font of your terminal, then start rada again",
+                fontsetup::FAMILY
+            ))
+        }),
+        shown: Arc::new(move || {
+            let file = font_offered_file(&note_dirs);
+            if let Some(dir) = file.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(file, "offered\n");
+        }),
+    }
 }
 
 /// What an update needs to know about this program and where its files are.

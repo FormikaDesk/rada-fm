@@ -356,7 +356,7 @@ pub struct Applied {
     pub restart: bool,
 }
 
-fn sha256_of(path: &Path) -> Result<String, String> {
+pub fn sha256_of(path: &Path) -> Result<String, String> {
     use std::io::Read;
     let mut f = fs::File::open(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let mut h = Sha256::new();

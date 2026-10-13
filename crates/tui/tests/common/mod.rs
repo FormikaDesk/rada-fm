@@ -193,6 +193,7 @@ impl H {
             demo: None,
             keymap: Default::default(),
             cmd_keys: false,
+            font_offer: None,
             request,
             mouse: true,
             show_hints: true,

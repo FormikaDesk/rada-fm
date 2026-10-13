@@ -294,7 +294,10 @@ impl VolumeLister for MacVolumes {
     }
 }
 
-struct MacOpener;
+struct MacOpener {
+    /// Off for the platform tests use: no test starts a window of the system.
+    quick_look: bool,
+}
 
 #[cfg(unix)]
 mod native_open {
@@ -391,7 +394,7 @@ impl Opener for MacOpener {
         native_open::open_terminal(dir)
     }
     fn can_quick_look(&self) -> bool {
-        cfg!(target_os = "macos")
+        cfg!(target_os = "macos") && self.quick_look
     }
     #[cfg(unix)]
     fn quick_look(&self, path: &Path) -> Result<()> {
@@ -445,7 +448,7 @@ impl MacPlatform {
             attrs: attrs(),
             trash,
             volumes: MacVolumes,
-            opener: MacOpener,
+            opener: MacOpener { quick_look: true },
             sandbox_user_dirs: false,
         }
     }
@@ -454,6 +457,7 @@ impl MacPlatform {
     /// Finder's names without it): for tests.
     pub fn with_sandbox_user_dirs(mut self) -> Self {
         self.sandbox_user_dirs = true;
+        self.opener.quick_look = false;
         self
     }
 }
