@@ -1214,6 +1214,12 @@ impl App {
                     return;
                 }
                 self.forget_folder_sizes(&dir, &paths, rescan);
+                // Going to another folder (or into an archive) is on its way: reading this one
+                // again now would take the place of that request, and the person would be left
+                // where they were. The folder that is opened is read as it is then.
+                if matches!(&self.load, LoadState::Loading(target) if *target != dir) {
+                    return;
+                }
                 self.dir_gen += 1;
                 // A full read in progress is answered only for the newest request: a patch
                 // would supersede it and leave the folder "loading" for good, so a change

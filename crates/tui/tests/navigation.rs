@@ -91,3 +91,28 @@ fn back_and_forward_can_be_rebound_and_are_listed_in_the_help() {
     assert!(s.contains("Back to the previous folder"), "{s}");
     assert!(s.contains("Alt+←"), "{s}");
 }
+
+#[test]
+fn a_change_in_the_folder_left_behind_does_not_cancel_going_somewhere_else() {
+    use rada_core::events::{CoreEvent, WatchEvent};
+    // The watcher reports a change of the folder the person is leaving, after they asked to
+    // go elsewhere and before the answer came. Reading the old folder again used to take
+    // the place of the request, and they stayed where they were (seen on a Mac, where the
+    // notifications of what was written a moment ago arrive late).
+    let (sb, dir) = sandbox_with_files();
+    sb.write("proj.v1/sub/inner.txt", "inner");
+    let mut h = H::new(sb, dir.clone(), 120, 30);
+    let target = dir.join("sub");
+    h.app.open_dir(target.clone());
+    for rescan in [false, true] {
+        h.app.on_core_event(CoreEvent::Watch(WatchEvent::Changed {
+            dir: dir.clone(),
+            paths: vec![dir.join("a.txt")],
+            rescan,
+        }));
+    }
+    h.wait("the folder asked for", |a| {
+        a.cwd == target && !a.is_loading()
+    });
+    assert_eq!(h.names(), ["inner.txt"]);
+}
