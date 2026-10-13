@@ -9,7 +9,7 @@ use rada_core::display;
 use rada_core::preview::Preview;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
@@ -187,19 +187,35 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         },
     );
 
-    // Below the header: the preview, the buttons, then the properties.
+    // Below the header: the preview, the buttons, then the properties, with a blank row
+    // between each and one more under the last property, before the status bar.
     let mut props = properties(app);
     let quick_look = app.quick_look_available();
-    let buttons_h = if quick_look { 3u16 } else { 2u16 };
     let fixed_top = 3u16;
-    // Blank lines: under the preview and over the properties.
-    let avail = inner.height.saturating_sub(fixed_top + 1 + buttons_h + 1);
-    props.truncate(avail.min(props.len() as u16) as usize);
+    let bottom_gap = 1u16;
+    let fit = |buttons_h: u16| {
+        let avail = inner
+            .height
+            .saturating_sub(fixed_top + 1 + buttons_h + 1 + bottom_gap);
+        let n = (avail as usize).min(props.len());
+        let gaps = if n > 0 { 2 } else { 1 };
+        let preview_h = inner
+            .height
+            .saturating_sub(fixed_top + buttons_h + n as u16 + gaps + bottom_gap);
+        (n, preview_h)
+    };
+    // Open, a blank row, Open with… and Preview side by side; on a Mac Quick Look under them
+    // after another blank row, or in the place of Preview when the pane is too short.
+    let mut buttons_h = if quick_look { 5u16 } else { 3u16 };
+    let mut quick_look_below = quick_look;
+    let (mut n, mut preview_h) = fit(buttons_h);
+    if quick_look && preview_h < 3 {
+        buttons_h = 3;
+        quick_look_below = false;
+        (n, preview_h) = fit(buttons_h);
+    }
+    props.truncate(n);
     let props_h = props.len() as u16;
-    let gaps = if props_h > 0 { 2 } else { 1 };
-    let preview_h = inner
-        .height
-        .saturating_sub(fixed_top + buttons_h + props_h + gaps);
 
     if preview_h >= 3 {
         let body = Rect {
@@ -211,93 +227,71 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         preview::content(f, app, body, false);
     }
 
-    // Buttons, right under the preview: Open across the whole width, rounded where the font
-    // allows; under it Open with… and Preview side by side.
+    // Buttons, right under the preview. All are pills: rounded where the font allows, plain
+    // rectangles otherwise.
     let by = inner.y + fixed_top + preview_h + 1;
-    if by + 1 < inner.y + inner.height {
+    let end = inner.y + inner.height;
+    if by < end {
         let set = app.icons;
         let rounded = set == icons::IconSet::Nerd;
-        let open_rect = Rect {
-            y: by,
+        let primary = (
+            th.accent,
+            Style::default()
+                .fg(th.on_accent)
+                .bg(th.accent)
+                .add_modifier(Modifier::BOLD),
+        );
+        let secondary = (th.button, th.base().patch(Style::default().bg(th.button)));
+        let row = |y: u16| Rect {
+            y,
             height: 1,
             ..inner
         };
-        let on_accent = Style::default()
-            .fg(th.on_accent)
-            .bg(th.accent)
-            .add_modifier(Modifier::BOLD);
-        let label = format!("{} Open", icons::ui(set, Glyph::Open));
-        let label = label.trim().to_string();
-        let mid = w.saturating_sub(2);
-        let text = centered_text(&label, mid);
-        let line = if rounded {
-            Line::from(vec![
-                Span::styled("\u{e0b6}", Style::default().fg(th.accent)),
-                Span::styled(text, on_accent),
-                Span::styled("\u{e0b4}", Style::default().fg(th.accent)),
-            ])
-        } else {
-            Line::from(Span::styled(centered_text(&label, w), on_accent))
-        };
-        f.render_widget(Paragraph::new(line), open_rect);
+        let open = format!("{} Open", icons::ui(set, Glyph::Open));
+        let open_rect = row(by);
+        draw_pill(f, open_rect, open.trim(), primary, rounded);
         app.hits.add(open_rect, Target::Act(Action::Open));
 
-        let row2 = Rect {
-            y: by + 1,
-            height: 1,
-            ..inner
-        };
-        let secondary = th.base().patch(Style::default().bg(th.button));
-        let preview_label = format!("{} Preview", icons::ui(set, Glyph::Eye));
-        let preview_label = preview_label.trim().to_string();
-        if e.is_navigable_dir() {
-            f.render_widget(
-                Paragraph::new(Span::styled(centered_text(&preview_label, w), secondary)),
-                row2,
-            );
-            app.hits.add(row2, Target::FullPreview);
-        } else {
-            let half = (w.saturating_sub(1)) / 2;
-            let left = Rect {
-                width: half as u16,
-                ..row2
+        if by + 2 < end {
+            let row2 = row(by + 2);
+            let preview_label = format!("{} Preview", icons::ui(set, Glyph::Eye));
+            let preview_label = preview_label.trim().to_string();
+            // What takes the second place: Preview, or Quick Look when it has no row of its own.
+            let (second, second_target) = if quick_look && !quick_look_below {
+                ("Quick Look".to_string(), Target::Act(Action::QuickLook))
+            } else {
+                (preview_label, Target::FullPreview)
             };
-            let right = Rect {
-                x: row2.x + half as u16 + 1,
-                width: (w - half - 1) as u16,
-                ..row2
-            };
-            f.render_widget(
-                Paragraph::new(Span::styled(centered_text("Open with…", half), secondary)),
-                left,
-            );
-            f.render_widget(
-                Paragraph::new(Span::styled(
-                    centered_text(&preview_label, w - half - 1),
-                    secondary,
-                )),
-                right,
-            );
-            app.hits.add(left, Target::Act(Action::OpenWith));
-            app.hits.add(right, Target::FullPreview);
+            if e.is_navigable_dir() {
+                draw_pill(f, row2, &second, secondary, rounded);
+                app.hits.add(row2, second_target);
+            } else {
+                let half = (w.saturating_sub(1)) / 2;
+                let left = Rect {
+                    width: half as u16,
+                    ..row2
+                };
+                let right = Rect {
+                    x: row2.x + half as u16 + 1,
+                    width: (w - half - 1) as u16,
+                    ..row2
+                };
+                draw_pill(f, left, "Open with…", secondary, rounded);
+                draw_pill(f, right, &second, secondary, rounded);
+                app.hits.add(left, Target::Act(Action::OpenWith));
+                app.hits.add(right, second_target);
+            }
         }
-        // macOS: the Finder's own preview, one row below.
-        if quick_look && by + 2 < inner.y + inner.height {
-            let row3 = Rect {
-                y: by + 2,
-                height: 1,
-                ..inner
-            };
-            f.render_widget(
-                Paragraph::new(Span::styled(centered_text("Quick Look", w), secondary)),
-                row3,
-            );
+        // macOS: the Finder's own preview, under the others.
+        if quick_look_below && by + 4 < end {
+            let row3 = row(by + 4);
+            draw_pill(f, row3, "Quick Look", secondary, rounded);
             app.hits.add(row3, Target::Act(Action::QuickLook));
         }
     }
 
-    // Properties, at the bottom.
-    let props_y = inner.y + inner.height.saturating_sub(props_h);
+    // Properties, at the bottom, a blank row above the status bar.
+    let props_y = inner.y + inner.height.saturating_sub(props_h + bottom_gap);
     let tags = app.current().map(|e| e.tags.clone()).unwrap_or_default();
     let lines: Vec<Line> = props
         .iter()
@@ -337,6 +331,24 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             ..inner
         },
     );
+}
+
+/// A button: `label` centred on `fill.0`, with `fill.1` as its text style; the ends are
+/// rounded when `rounded` (Nerd Font glyphs), else the button is a plain rectangle.
+fn draw_pill(f: &mut Frame, area: Rect, label: &str, fill: (Color, Style), rounded: bool) {
+    let w = area.width as usize;
+    let (color, text_style) = fill;
+    let line = if rounded && w > 2 {
+        let edge = Style::default().fg(color);
+        Line::from(vec![
+            Span::styled("\u{e0b6}", edge),
+            Span::styled(centered_text(label, w - 2), text_style),
+            Span::styled("\u{e0b4}", edge),
+        ])
+    } else {
+        Line::from(Span::styled(centered_text(label, w), text_style))
+    };
+    f.render_widget(Paragraph::new(line), area);
 }
 
 /// `text` centred in `width` cells (cut with "…" when it does not fit).
