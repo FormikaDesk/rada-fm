@@ -653,7 +653,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     #[test]
     fn a_localized_folder_is_shown_without_the_suffix() {
         use std::ffi::OsStr;
@@ -674,6 +673,7 @@ mod tests {
         assert_eq!(shown("Photos.localized.bak", true), None);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_finder_hides_dot_files_and_folders_flagged_hidden() {
         use std::ffi::OsStr;

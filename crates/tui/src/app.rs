@@ -457,14 +457,15 @@ pub use update::{UpdateStatus, UpdateView};
 /// Whether an entry carries a tag matching `want` (lower case): a name that contains it, or
 /// the colour of that name. An empty `want` (`tag:` alone) means "any tag".
 fn matches_tag(e: &Entry, want: &str) -> bool {
+    use rada_core::platform::TagColor as Hue;
     if want.is_empty() {
         return !e.tags.is_empty();
     }
     // A colour by any of its names ("red", "rosso") is the tags of that colour.
-    let colour = rada_core::platform::TagColor::from_name(want);
+    let hue = Hue::from_name(want);
     e.tags
         .iter()
-        .any(|t| t.name.to_lowercase().contains(want) || (colour.is_some() && t.color == colour))
+        .any(|t| t.name.to_lowercase().contains(want) || (hue.is_some() && t.color == hue))
 }
 
 /// The language of the system's tag names (where there are tags).
