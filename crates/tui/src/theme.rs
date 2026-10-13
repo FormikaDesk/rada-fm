@@ -15,19 +15,32 @@ pub enum ColorDepth {
 
 impl ColorDepth {
     pub fn detect() -> ColorDepth {
-        let ct = std::env::var("COLORTERM")
-            .unwrap_or_default()
-            .to_lowercase();
-        let term = std::env::var("TERM").unwrap_or_default();
+        ColorDepth::from_env(&|k| std::env::var(k).ok(), cfg!(windows))
+    }
+
+    /// What the environment says about colours. `windows` is whether this is a Windows
+    /// console, where `TERM` and `COLORTERM` are normally not set at all.
+    pub fn from_env(var: &dyn Fn(&str) -> Option<String>, windows: bool) -> ColorDepth {
+        let get = |k: &str| var(k).unwrap_or_default();
+        let ct = get("COLORTERM").to_lowercase();
+        let term = get("TERM");
         if ct.contains("truecolor")
             || ct.contains("24bit")
-            || std::env::var_os("RADA_TRUECOLOR").is_some()
+            || var("RADA_TRUECOLOR").is_some()
             || term.contains("ghostty")
             || term.contains("kitty")
+            // Windows Terminal, GNOME Terminal (and every VTE terminal) and Konsole all
+            // draw 24-bit colour, whatever TERM says.
+            || !get("WT_SESSION").is_empty()
+            || !get("VTE_VERSION").is_empty()
+            || !get("KONSOLE_VERSION").is_empty()
         {
             ColorDepth::True
         } else if term.contains("256color") {
             ColorDepth::Ansi256
+        } else if windows && term.is_empty() {
+            // The Windows console host has drawn 24-bit colour since Windows 10 1703.
+            ColorDepth::True
         } else {
             ColorDepth::Ansi16
         }
@@ -908,6 +921,65 @@ impl Theme {
 
 // ---------------------------------------------------------------------------- colour maths
 
+/// A colour as the terminal can show it. Theme colours are already adapted when the theme
+/// is built; this is for colours that come from elsewhere (the pixels of a picture drawn
+/// with half blocks), applied where cells are written to the terminal.
+pub fn downgrade(c: Color, depth: ColorDepth) -> Color {
+    match depth {
+        ColorDepth::True => c,
+        ColorDepth::Ansi256 => to_256(c),
+        ColorDepth::Ansi16 => to_16(c),
+    }
+}
+
+/// The 16 ANSI colours with the values xterm gives them, in palette order.
+const ANSI16: [(Color, (u8, u8, u8)); 16] = [
+    (Color::Black, (0, 0, 0)),
+    (Color::Red, (205, 0, 0)),
+    (Color::Green, (0, 205, 0)),
+    (Color::Yellow, (205, 205, 0)),
+    (Color::Blue, (0, 0, 238)),
+    (Color::Magenta, (205, 0, 205)),
+    (Color::Cyan, (0, 205, 205)),
+    (Color::Gray, (229, 229, 229)),
+    (Color::DarkGray, (127, 127, 127)),
+    (Color::LightRed, (255, 0, 0)),
+    (Color::LightGreen, (0, 255, 0)),
+    (Color::LightYellow, (255, 255, 0)),
+    (Color::LightBlue, (92, 92, 255)),
+    (Color::LightMagenta, (255, 0, 255)),
+    (Color::LightCyan, (0, 255, 255)),
+    (Color::White, (255, 255, 255)),
+];
+
+/// Nearest of the 16 ANSI colours. Named colours and "no colour" are left alone.
+fn to_16(c: Color) -> Color {
+    let (r, g, b) = match c {
+        Color::Rgb(r, g, b) => (r, g, b),
+        Color::Indexed(n) if n < 16 => return ANSI16[n as usize].0,
+        Color::Indexed(n) if n >= 232 => {
+            let v = 8 + 10 * (n - 232);
+            (v, v, v)
+        }
+        Color::Indexed(n) => {
+            const STEPS: [u8; 6] = [0, 95, 135, 175, 215, 255];
+            let n = n - 16;
+            (
+                STEPS[(n / 36) as usize],
+                STEPS[(n / 6 % 6) as usize],
+                STEPS[(n % 6) as usize],
+            )
+        }
+        other => return other,
+    };
+    let d = |x: u8, y: u8| (x as i32 - y as i32).pow(2);
+    ANSI16
+        .iter()
+        .min_by_key(|(_, (ar, ag, ab))| d(*ar, r) + d(*ag, g) + d(*ab, b))
+        .map(|(named, _)| *named)
+        .unwrap_or(c)
+}
+
 /// Nearest entry of the xterm 256-colour palette (6x6x6 cube plus the grey ramp).
 fn to_256(c: Color) -> Color {
     let Color::Rgb(r, g, b) = c else { return c };
@@ -940,6 +1012,70 @@ fn to_256(c: Color) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn colours_from_outside_the_theme_are_brought_down_to_the_depth() {
+        let red = rgb(250, 10, 10);
+        assert_eq!(downgrade(red, ColorDepth::True), red);
+        assert_eq!(downgrade(red, ColorDepth::Ansi256), to_256(red));
+        assert_eq!(downgrade(red, ColorDepth::Ansi16), Color::LightRed);
+        assert_eq!(downgrade(rgb(0, 0, 0), ColorDepth::Ansi16), Color::Black);
+        assert_eq!(
+            downgrade(rgb(255, 255, 255), ColorDepth::Ansi16),
+            Color::White
+        );
+        // Palette entries too: the cube's pure blue (nearer to blue than to bright blue,
+        // which xterm draws pale) and a mid grey.
+        assert_eq!(
+            downgrade(Color::Indexed(21), ColorDepth::Ansi16),
+            Color::Blue
+        );
+        assert_eq!(
+            downgrade(Color::Indexed(244), ColorDepth::Ansi16),
+            Color::DarkGray
+        );
+        assert_eq!(downgrade(Color::Indexed(1), ColorDepth::Ansi16), Color::Red);
+        // What is already plain stays as it is.
+        for d in [ColorDepth::True, ColorDepth::Ansi256, ColorDepth::Ansi16] {
+            assert_eq!(downgrade(Color::Reset, d), Color::Reset);
+            assert_eq!(downgrade(Color::Blue, d), Color::Blue);
+        }
+    }
+
+    #[test]
+    fn the_colour_depth_follows_the_environment() {
+        let depth = |vars: &[(&str, &str)], windows: bool| {
+            let vars: Vec<(String, String)> = vars
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            ColorDepth::from_env(
+                &|k| vars.iter().find(|(n, _)| n == k).map(|(_, v)| v.clone()),
+                windows,
+            )
+        };
+        assert_eq!(
+            depth(&[("COLORTERM", "truecolor")], false),
+            ColorDepth::True
+        );
+        assert_eq!(
+            depth(&[("TERM", "xterm-256color")], false),
+            ColorDepth::Ansi256
+        );
+        assert_eq!(depth(&[("TERM", "xterm")], false), ColorDepth::Ansi16);
+        assert_eq!(depth(&[], false), ColorDepth::Ansi16);
+        // Windows sets neither variable.
+        assert_eq!(depth(&[("WT_SESSION", "x")], true), ColorDepth::True);
+        assert_eq!(depth(&[], true), ColorDepth::True);
+        assert_eq!(depth(&[("TERM", "xterm")], true), ColorDepth::Ansi16);
+        assert_eq!(
+            depth(
+                &[("TERM", "xterm-256color"), ("VTE_VERSION", "7600")],
+                false
+            ),
+            ColorDepth::True
+        );
+    }
 
     #[test]
     fn every_theme_resolves_at_every_depth() {

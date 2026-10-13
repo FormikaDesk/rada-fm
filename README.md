@@ -74,7 +74,7 @@ cargo install --path crates/rada
 
 Or just build it: `cargo build --release` and use `target/release/rada`.
 
-A [Nerd Font](https://www.nerdfonts.com/) in your terminal is recommended: rada then shows file-type icons. It looks for the font in the configuration of Ghostty, kitty, WezTerm, Alacritty and foot; otherwise it uses plain Unicode markers (`--icons nerd|unicode|none` overrides).
+A [Nerd Font](https://www.nerdfonts.com/) in your terminal is recommended: rada then shows file-type icons. It looks for the font in the configuration of Ghostty, kitty, WezTerm, Alacritty, foot, Windows Terminal and Konsole; otherwise it uses Unicode markers, chosen for what the fonts of the system can draw (`--icons nerd|unicode-icons|unicode-std|none` overrides; see [Terminals](#terminals)).
 
 Optional: make your shell follow rada's last folder (`v` instead of `rada`):
 
@@ -113,7 +113,8 @@ Large images: anything above 50 megapixels or 128 MiB is not decoded (a 12000×1
 Optional config: `$XDG_CONFIG_HOME/rada/config.toml`
 
 ```toml
-icons = "nerd"        # nerd | unicode | none
+profile = "auto"      # auto | modern | basic: see "Terminals"
+icons = "auto"        # auto | nerd | unicode-icons | unicode-std | none: see "Terminals"
 theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the terminal), or a fixed
                       # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
                       # | nebbia-light
@@ -337,6 +338,45 @@ The result will be shown by `rada doctor` when that command exists; until then i
 
 Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working; the bars and the sidebar use a slightly different tone of their own.
 
+## Terminals
+
+rada draws one interface, and decides before drawing how much to ask of the terminal. There are two profiles and nothing in between; `rada doctor` says which one was chosen and why.
+
+**Modern** is the default wherever the terminal speaks UTF-8 and the xterm extensions every current emulator has. The four terminals that come with a system get the same interface; what only some of them offer is used where it exists and replaced where it does not:
+
+| | Windows Terminal | Terminal.app | GNOME Terminal (VTE) | Konsole |
+|---|---|---|---|---|
+| Alternate screen, mouse (SGR), bracketed paste | yes | yes | yes | yes |
+| UTF-8, box drawing, block elements | yes | yes | yes | yes |
+| 256 colours | yes | yes | yes | yes |
+| 24-bit colour | yes | from macOS 26 (*) | yes | yes |
+| Sixel pictures | yes (from 1.22) | no | no (switched off in the builds) (*) | yes |
+| kitty / iTerm2 pictures | no | no | no | partly |
+| kitty keyboard protocol | (*) | no | no | no |
+| Clipboard sequence (OSC 52) | yes | no (*) | no (*) | (*) |
+| Background colour (OSC 11) | yes | yes | yes | yes |
+| A Nerd Font out of the box | no | no | no | no |
+| `Alt+key` delivered out of the box | yes | no (Option is not Meta unless set so) | yes | yes |
+
+(*) from documentation and memory, not yet measured on the terminal itself.
+
+So, in the modern profile:
+
+- **Colours** are 24-bit where the terminal announces them (`COLORTERM`, or a terminal known to draw them), the 256-colour palette otherwise. The pixels of a picture drawn with half blocks follow the same rule.
+- **Pictures** are Sixel on Windows Terminal and Konsole (and kitty graphics or iTerm2 images on the terminals that have those), coloured half blocks on Terminal.app and GNOME Terminal. `--images` overrides.
+- **Icons** are the best set the terminal's font can draw, tried in this order:
+  1. `nerd`: Nerd Font symbols, when the terminal's own configuration names a Nerd Font (Ghostty, kitty, WezTerm, Alacritty, foot, Windows Terminal and Konsole are looked at);
+  2. `unicode-icons`: Unicode symbols (dingbats, the rarer arrows, technical marks). No default monospace font has them all, so the terminal draws them from the system's symbol font; this set is chosen when there is one: Segoe UI Symbol on Windows, Apple Symbols on macOS, DejaVu Sans, Noto Sans Symbols, Symbola, FreeFont or Unifont elsewhere;
+  3. `unicode-std`: the same marks with only the 46 glyphs every monospace font has (measured: each is in both Consolas and Cascadia Mono), for a system without a symbol font and for the classic Windows console, which falls back on no other font. `✔` becomes `√`, `✖` `×`, `★` `*`, `⇅` `↕`, the spinner `| / - \`.
+
+  `icons = "…"` (`--icons`, `RADA_ICONS`) picks one by hand; `unicode` is still accepted as the old name of `unicode-icons`.
+- **Copy path** goes through the terminal where it takes the clipboard sequence, and through the system's own clipboard (`pbcopy`, `wl-copy` / `xclip` / `xsel`, `clip.exe`) where it does not.
+- **Keys**: every action has a key without `Alt` and without `Ctrl+Shift`, because not every terminal delivers those. On Terminal.app, *Settings → Profiles → Keyboard → Use Option as Meta key* makes the `Alt` shortcuts work too.
+
+**Basic** is the one fallback for everything else: `TERM` empty, `dumb`, `linux` (the console), `ansi` or a hardware terminal's name (`vt100`, `vt220`…), or a locale that names a character set other than UTF-8. It is the same interface with ASCII glyphs (`+-|` for frames, `>` `v` `~` for arrows and ellipses), the 16 ANSI colours with reverse video for the selection, no icons, no pictures, no mouse, and no question asked to the terminal. Nothing in it is negotiated, so it looks the same wherever it runs.
+
+`profile = "modern"` or `"basic"` (`--profile`, `RADA_PROFILE`) chooses by hand; `icons`, `images`, `theme` and `mouse` still override one thing at a time. `NO_COLOR` removes colour in either profile: bold and reverse video carry the meaning.
+
 ## Keys
 
 Both schemes are active together by default. `keymap = "vim"` or `"classic"` keeps only one. The help (`?` or `F1`) lists every action with its keys in both schemes side by side, and always reflects your own bindings.
@@ -354,14 +394,14 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | rename · bulk rename · new folder · new file | `r` · `R` · `n` · `N` | `F2` · — · `Ctrl+Shift+N` (also `Ctrl+N`, `F7`) · `Alt+N` |
 | extract here · extract into a folder · compress | `e` · `E` · `z` | `Ctrl+E` · `Alt+E` · `Alt+Z` |
 | undo · redo | `u` · `Ctrl+R` | `Ctrl+Z` · `Ctrl+Y` (or `Ctrl+Shift+Z`) |
-| back · forward in the folder history | `Alt+←` · `Alt+→` (both schemes) | |
+| back · forward in the folder history | `Alt+←` · `Alt+→`, or `Ctrl+O` · `Ctrl+G` (both schemes) | |
 | history of operations | `U` | `F3` |
 | filter this folder | `/` | `Ctrl+F` |
 | jump palette (folders, recents, pinned, disks) | `m` | `Ctrl+P` |
 | edit the address · refresh | `Ctrl+L` `Alt+D` `F4` · `F5` (both schemes) | |
 | properties · open with… · copy path · terminal here | `i` · `O` · `Y` · `t` | `Alt+Enter` · `Alt+O` · `Ctrl+Shift+C` · `Ctrl+Alt+T` |
 | tabs: new · close · next · previous · jump | `Ctrl+T` `Ctrl+W` `Ctrl+Tab` `Ctrl+Shift+Tab` `Alt+1…9` (both schemes) | |
-| details pane · Details / Icons · context menu | `Alt+P` · `Ctrl+1` `Ctrl+2` or `v` · `Shift+F10` or `Menu` | |
+| details pane · Details / Icons · context menu | `Alt+P` or `F6` · `Ctrl+1` `Ctrl+2` or `v` · `Shift+F10` or `Menu` | |
 | sort key · reverse · hidden files | `s` `S` `.` | |
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
 | pin this folder (or the item in the navigation pane) · home | `B` · `~` | |

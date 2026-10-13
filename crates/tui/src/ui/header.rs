@@ -31,7 +31,7 @@ const SEP: &str = " › ";
 fn home_mark(icons: IconSet) -> &'static str {
     match icons {
         IconSet::Nerd => "\u{f015}",
-        IconSet::Unicode => "⌂",
+        IconSet::UnicodeIcons | IconSet::UnicodeStd => "⌂",
         IconSet::None => "~",
     }
 }

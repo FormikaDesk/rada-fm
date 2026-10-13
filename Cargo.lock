@@ -2188,6 +2188,7 @@ dependencies = [
  "signal-hook 0.4.5",
  "tracing",
  "unicode-width",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
