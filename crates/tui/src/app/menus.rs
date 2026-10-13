@@ -10,6 +10,7 @@ pub enum MenuKind {
     View,
     More,
     Tags,
+    Help,
 }
 
 impl App {
@@ -74,6 +75,11 @@ impl App {
                 MenuItem::toggle(ToggleSidebar, "Navigation pane", self.side_on, false),
             ],
             MenuKind::Tags => self.tag_menu_items(),
+            MenuKind::Help => vec![
+                MenuItem::act(Help, true, false),
+                MenuItem::command(MenuCmd::CheckUpdates, "Check for updates", true),
+                MenuItem::command(MenuCmd::About, "About rada", false),
+            ],
             MenuKind::More => {
                 let mut v = vec![
                     MenuItem::act(Redo, true, false),
@@ -192,6 +198,8 @@ impl App {
             MenuCmd::View(mode) => self.set_view(mode),
             MenuCmd::Eject(mount) => self.start_eject(&mount),
             MenuCmd::Tag(cmd) => self.run_tag_cmd(cmd),
+            MenuCmd::CheckUpdates => self.check_updates_now(),
+            MenuCmd::About => self.open_about(),
         }
     }
 }

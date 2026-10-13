@@ -7,7 +7,7 @@ M mark, B cmdbar, P panel, K key_bg, Y key_text, F field, U button, E selection,
 s success, w warn, e error, k file kind, + a tint, . none
 
 text colour
-AAAAAAttttttttddd.ddd.........................................................................................................................ddddddddddddddddddddAAAAAAAA
+AAAAAAttttttttddd.ddd.......................................................................................................................ddddddddddddddddddddAAAAAAAAAA
 MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 .mmm.mmm.ttt.ttt..ddddddmmmddddddddmmmtttt...............................................................................................ddddddddddddddddd........mmmmmmm.
 BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
@@ -38,7 +38,7 @@ A+++ttttttttttttttttttttttttm...................................................
 A+++ttttttttttttttttttttttttm......................................................................................................m......................................
 A+++ttttttttttttttttttttttttm......................................................................................................m......................................
 A+++ttttttttttttttttttttttttm......................................................................................................m......................................
-.ttttttttmmmmmAAAAAAAAAAAAAAAAAAAAAAmmmmmkkkkkkkkkkkkkkkkkkkkkkkk...........................................................................ddddddddddddAAAAAAmmmm.AAAddd.
+.ttttttttmmmmmAAAAAAAAAAAAAAAAAAAAAAmmmmmkkkkkkkkkkkkkkkkkkkkkkkk.................................................................dddddddd..ddddddddddddAAAAAAmmmm.AAAddd.
 PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
 ..YYYYYYYYddddd....YYYYYYYYdddd....YYYYYdddddd....YYYYYYYYYYYddddddd....YYYddddddddddd....YYYYYYYddddddddd....YYYYYYYYdddddd....YYYYYdddddd...............................
 PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP

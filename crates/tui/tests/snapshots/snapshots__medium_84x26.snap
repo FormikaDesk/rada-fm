@@ -2,7 +2,7 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ projects  ✕   +                                                     ? Help
+ rada  ▸ projects  ✕   +                                                   ? Help ▾
   ←   →   ↑   ⟳   ⌂ Home › demo › projects                        ⌕ Search… Ctrl+F
   +▾  │ ✂   ⧉   ⎘   ✎   ▣   ✗ │ ⇅   ≣ │ ↶                                          ⋯
   ⌂  │ ☐   Name ↑                                        Date modified         Size
@@ -26,5 +26,5 @@ expression: shot(&mut h)
      │
      │
  Enlarge the window for the full layout (now 84×26)  Esc: hide
- 12 items                                                                     ≣  ▦
+ 12 items                                                          v0.6.0 ⟳   ≣  ▦
    Enter  open     Space  select     Ctrl+C  copy     Ctrl+V  paste     Del  trash

@@ -57,6 +57,8 @@ pub enum Target {
     ViewMode(crate::view::ViewMode),
     /// The button of the details pane that shows the preview over the whole screen.
     FullPreview,
+    /// The version in the status bar: look for a newer one now.
+    CheckUpdates,
     /// Inside a window but on nothing in particular.
     Window,
 }

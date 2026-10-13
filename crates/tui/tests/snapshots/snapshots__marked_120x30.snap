@@ -2,7 +2,7 @@
 source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
- rada  ▸ projects  ✕   +                                                                    vim + classic keys   ? Help
+ rada  ▸ projects  ✕   +                                                                  vim + classic keys   ? Help ▾
   ←   →   ↑   ⟳   ⌂ Home › demo › projects                                                    ⌕ Search in proj… Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
@@ -28,7 +28,7 @@ expression: shot(&mut h)
                             │
                             │
                             │
- 12 items  │  ☑ 2 selected · 79 B                                                                                 ≣  ▦
+ 12 items  │  ☑ 2 selected · 79 B                                                                      v0.6.0 ⟳   ≣  ▦
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

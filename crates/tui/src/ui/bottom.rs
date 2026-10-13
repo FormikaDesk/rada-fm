@@ -305,10 +305,24 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
     let w = area.width as usize;
 
     let buttons = view_buttons(app);
-    let mut right = free_space(app, true);
+    // The running version, always there; a click asks whether there is a newer one.
+    let version = || {
+        let mut v = Bar::default();
+        if w >= 70 {
+            v.push_hit(
+                Span::styled(format!("v{} ⟳", app.version()), th.dim().patch(band)),
+                Target::CheckUpdates,
+            );
+            v.push(Span::styled("  ", band));
+        }
+        v
+    };
+    let mut right = version();
+    right.append(free_space(app, true));
     right.append(view_buttons(app));
     if right.width() > w / 2 {
-        right = free_space(app, false);
+        right = version();
+        right.append(free_space(app, false));
         right.append(view_buttons(app));
     }
     if right.width() > w.saturating_sub(12) {

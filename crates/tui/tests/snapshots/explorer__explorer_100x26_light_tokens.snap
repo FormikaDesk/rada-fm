@@ -7,7 +7,7 @@ M mark, B cmdbar, P panel, K key_bg, Y key_text, F field, U button, E selection,
 s success, w warn, e error, k file kind, + a tint, . none
 
 text colour
-AAAAAAttttttttddd.ddd...................................................ddddddddddddddddddddAAAAAAAA
+AAAAAAttttttttddd.ddd.................................................ddddddddddddddddddddAAAAAAAAAA
 .mmm.mmm.ttt.ttt..ddddddmmmddddddddmmmtttt...............................ddddddddddddddddd..mmmmmmm.
 .ooooooooo.m.ttttt..tttttt..ttttttt..tttttttt..tttttttttt..tttttttt.m.tttttttt..tttttttt.m.mmmmmm.tt
 Adddttttttttttttttttttttttttmmmm..AAAAAAAAAAAAAAA..dddddddddddddd..dddddddddddddddddddd..dddddddddd.
@@ -31,7 +31,7 @@ A...AAAAAAmmmmmmmmm.ddddddd.mAm.eetttttttttt.......dddddddddddddd..ddddddddddddd
 mmmmm.......................mAm.kktttttttt.........dddddddddddddd..dddddddddddddddddddd..dddddddddd.
 A+++ttttttttttttttttttttttttmAm.eetttttttt.........dddddddddddddd..dddddddddddddddddddd..dddddddddd.
 A+++ttttttttttttttttttttttttm.......................................................................
-.ttttttttmmmmmCCCCCCCCCCCCCCCCCCCCCCmmmmmkkkkkkkkkkkkkkkkkkkkkkkk.....ddddddddddddAAAAAAmmmm.AAAddd.
+.ttttttttmmmmmCCCCCCCCCCCCCCCCCCCCCCmmmmmkkkkkkkkkkkkkkkkkk.dddddddd..ddddddddddddAAAAAAmmmm.AAAddd.
 ..ttttttttddddd....ttttttttdddd....tttttdddddd....tttttttttttddddddd....tttddddddddddd..............
 
 background

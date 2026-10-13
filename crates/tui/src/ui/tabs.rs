@@ -12,7 +12,7 @@ use ratatui::widgets::Block;
 use unicode_width::UnicodeWidthStr;
 
 use super::widgets::Bar;
-use crate::app::App;
+use crate::app::{App, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::{Action, Preset};
@@ -35,6 +35,16 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let n = app.tab_count();
 
     let mut right = Bar::default();
+    // A newer version waits: a pill in the accent colour, a click (or the key) opens the notes.
+    if w >= 60
+        && let crate::app::UpdateStatus::Available { notice, .. } = &app.update
+    {
+        right.push_hit(
+            Span::styled(format!(" ↑ Update to {} ", notice.version), th.pill()),
+            Target::Act(Action::Update),
+        );
+        right.push(Span::styled("  ", band));
+    }
     if w >= 100 {
         right.push(Span::styled(
             format!("{}  ", scheme_label(app.keymap.preset)),
@@ -44,16 +54,16 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     if w >= 40 {
         let mark = icons::ui(set, Glyph::Help);
         let label = if mark.is_empty() {
-            " Help ".to_string()
+            " Help ▾ ".to_string()
         } else {
-            format!(" {mark} Help ")
+            format!(" {mark} Help ▾ ")
         };
         right.push_hit(
             Span::styled(
                 label,
                 th.accent_style().add_modifier(Modifier::BOLD).patch(band),
             ),
-            Target::Act(Action::Help),
+            Target::Menu(MenuKind::Help),
         );
     }
 

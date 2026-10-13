@@ -2,7 +2,7 @@
 source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
- rada  ▸ demo  ✕   +                                                                        vim + classic keys   ? Help
+ rada  ▸ demo  ✕   +                                                                      vim + classic keys   ? Help ▾
   ←   →   ↑   ⟳   ⌂ Home › projects › demo                                                    ⌕ Search in demo  Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
@@ -28,7 +28,7 @@ expression: shot(&mut h)
  TAGS                       │ ☐ · setup.sh                             12 days ago     Shell script                21 B
   ● Red                     │ ☐ · song.mp3                             30/07/2026      MP3 audio                7.44 MB
   ● Orange                  │
- 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste                         183 GB free ━━━━━━────  ≣  ▦
+ 19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items ready to paste               v0.6.0 ⟳  183 GB free ━━━━━━────  ≣  ▦
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+z  compress
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

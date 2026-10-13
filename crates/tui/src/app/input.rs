@@ -32,6 +32,10 @@ pub enum MenuCmd {
     /// `true`: descending.
     SortOrder(bool),
     View(ViewMode),
+    /// Ask the network for a newer version, now.
+    CheckUpdates,
+    /// The version, channel and way of updating.
+    About,
 }
 
 /// What a choice in the Tags menu does.
@@ -61,6 +65,17 @@ impl MenuItem {
             cmd: MenuCmd::Act(action),
             label: action.label().to_string(),
             enabled,
+            gap_before,
+            checked: None,
+        }
+    }
+
+    /// An entry that runs one of the menu's own commands.
+    pub fn command(cmd: MenuCmd, label: &str, gap_before: bool) -> MenuItem {
+        MenuItem {
+            cmd,
+            label: label.to_string(),
+            enabled: true,
             gap_before,
             checked: None,
         }
@@ -754,6 +769,7 @@ impl App {
             Some(Target::TabPrev) => self.prev_tab(),
             Some(Target::TabNext) => self.next_tab(),
             Some(Target::Address) => self.start_address_edit(),
+            Some(Target::CheckUpdates) => self.check_updates_now(),
             Some(Target::Menu(kind)) => {
                 let at = self
                     .hits

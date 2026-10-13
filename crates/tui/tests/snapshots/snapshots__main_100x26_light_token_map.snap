@@ -3,7 +3,7 @@ source: crates/tui/tests/snapshots.rs
 expression: out
 ---
 text colour: t text, d dim, m muted, A accent, k a file kind, + tint
-AAAAAAttttttttttttddd.ddd...............................................ddddddddddddddddddddAAAAAAAA
+AAAAAAttttttttttttddd.ddd.............................................ddddddddddddddddddddAAAAAAAAAA
 .mmm.mmm.ttt.ttt..ddddddmmmddddmmmtttttttt...............................dddddddddddddddddd.mmmmmmm.
 .ooooooooo.m.ttttt..tttttt..mmmmmmm..tttttttt..tttttttttt..tttttttt.m.tttttttt..tttttttt.m.mmmmmm.tt
 Adddttttttttttttttttttttttttmmmm..AAAAAAAAAAAAAAA..dddddddddddddd..dddddddddddddddddddd..dddddddddd.
@@ -27,7 +27,7 @@ A+++ttttttttttttttttttttttttmAoooooooooooooooooooooooooooooooooooooooooooooooooo
 ............................m.......................................................................
 ............................m.......................................................................
 ............................m.......................................................................
-.tttttttt....................................................................................AAAddd.
+.tttttttt..........................................................................dddddddd..AAAddd.
 ..tttttttddddd....tttttttddddddd....ttttttttddddd....ttttttttdddddd....tttttdddddd....ttttddddddd...
 
 background: . none, C cursor row, S selection, M mark, + tint

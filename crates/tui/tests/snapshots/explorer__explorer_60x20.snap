@@ -2,7 +2,7 @@
 source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
- rada  ▸ demo  ✕   +                                 ? Help
+ rada  ▸ demo  ✕   +                               ? Help ▾
   ←   →   ↑   ⟳   ⌂ Home › projects › demo
   +▾  │ ✂   ⧉   ⎘   ✎   ▣   ✗ │ ⇅   ≣ │ ↶                  ⋯
   ⌂  │ ☐   Name ↑                Date modified         Size

@@ -2,7 +2,7 @@
 source: crates/tui/tests/explorer.rs
 expression: shot(&mut h)
 ---
- rada  ▸ demo  ✕   ▸ docs  ✕   +                                                            vim + classic keys   ? Help
+ rada  ▸ demo  ✕   ▸ docs  ✕   +                                                          vim + classic keys   ? Help ▾
   ←   →   ↑   ⟳   ⌂ Home › projects › demo › docs                                             ⌕ Search in docs  Ctrl+F
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   + New ▾  │ ✂ Cut  ⧉ Copy  ⎘ Paste  ✎ Rename  ▣ Compress  ✗ Delete │ ⇅ Sort ▾  ≣ View ▾ │ ↶ Undo                      ⋯
@@ -28,7 +28,7 @@ expression: shot(&mut h)
  TAGS                       │
   ● Red                     │
   ● Orange                  │
- 0 items                                                                                  183 GB free ━━━━━━────  ≣  ▦
+ 0 items                                                                        v0.6.0 ⟳  183 GB free ━━━━━━────  ≣  ▦
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
    Enter  open     Space  select     Ctrl+C  copy     Ctrl+V  paste     Del  trash     F2  rename     Ctrl+Z  undo
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
