@@ -1,6 +1,8 @@
 # The card after a copy: what was done, Annulla and Mostra.
-Source docs/tapes/ambiente.tape
-Output docs/media/.scarto/notifica.gif
+Set Width 1584
+Set Height 800
+Source "docs/tapes/ambiente.tape"
+Output "docs/media/.scarto/notifica.gif"
 Type "rada --icons nerd --images halfblocks --demo main ~/projects/demo"
 Enter
 Sleep 2s
@@ -21,5 +23,5 @@ Sleep 800ms
 Ctrl+V
 Sleep 1s
 Enter
-Sleep 900ms
-Screenshot docs/screenshots/notifica.png
+Sleep 2500ms
+Screenshot "docs/screenshots/notifica.png"

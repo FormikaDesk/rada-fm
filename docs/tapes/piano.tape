@@ -1,6 +1,8 @@
 # The plan window: what a paste would do, before anything is touched.
-Source docs/tapes/ambiente.tape
-Output docs/media/.scarto/piano.gif
+Set Width 1584
+Set Height 800
+Source "docs/tapes/ambiente.tape"
+Output "docs/media/.scarto/piano.gif"
 Type "rada --icons nerd --images halfblocks --demo main ~/projects/demo"
 Enter
 Sleep 2s
@@ -19,5 +21,5 @@ Type "~/Documenti"
 Enter
 Sleep 800ms
 Ctrl+V
-Sleep 1500ms
-Screenshot docs/screenshots/piano.png
+Sleep 2500ms
+Screenshot "docs/screenshots/piano.png"

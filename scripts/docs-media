@@ -23,6 +23,16 @@ if [ ! -x "$bin" ]; then
 fi
 bin=$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")
 
+# The terminal this runs in must not leak into the recordings: rada decides what to draw from
+# the variables that name a terminal (Ghostty, kitty, WezTerm, VTE...), and a recording is of
+# the terminal VHS makes.
+for var in $(compgen -e); do
+  case "$var" in
+    TERM_PROGRAM* | GHOSTTY* | KITTY* | WEZTERM* | ITERM* | VTE_* | KONSOLE* | WT_* | TMUX* | STY | RADA_* | NO_COLOR | COLORFGBG)
+      unset "$var" ;;
+  esac
+done
+
 work=$(mktemp -d -t rada-docs-XXXXXX)
 mkdir -p "$work/bin" docs/screenshots docs/media/.scarto
 ln -s "$bin" "$work/bin/rada"
@@ -35,7 +45,25 @@ for tape in docs/tapes/*.tape; do
   echo "== $name"
   home="$work/home-$name"
   python3 scripts/demo-home "$home" > /dev/null
-  DEMO_HOME="$home" PATH="$work/bin:$PATH" vhs "$tape"
+  # What the tape promises (its Screenshot, and its Output unless that is a scrap): taken away
+  # first, so that a recording that silently makes nothing is seen and not mistaken for the
+  # picture of an earlier run.
+  promised=$(sed -n 's/^\(Screenshot\|Output\) "\(.*\)"$/\2/p' "$tape" | grep -v '/\.scarto/' || true)
+  # VHS now and then takes a picture of nothing: up to six tries are allowed.
+  attempt=1
+  while :; do
+    for file in $promised; do rm -f -- "$file"; done
+    DEMO_HOME="$home" PATH="$work/bin:$PATH" vhs "$tape"
+    missing=0
+    for file in $promised; do
+      [ -s "$file" ] || missing=1
+    done
+    [ "$missing" = 0 ] && break
+    [ "$attempt" -lt 6 ] || { echo "$tape made no picture" >&2; exit 1; }
+    attempt=$((attempt + 1))
+    python3 scripts/demo-home "$home-again" > /dev/null
+    home="$home-again"
+  done
 done
 
 rm -r docs/media/.scarto

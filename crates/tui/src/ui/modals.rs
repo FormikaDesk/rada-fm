@@ -1613,12 +1613,19 @@ fn draw_history(
 /// Every action with its keys in both schemes side by side, grouped, scrollable.
 fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, scroll: usize) {
     use crate::keymap::Group;
-    let w = 96.min(area.width.saturating_sub(4));
+    let w = 104.min(area.width.saturating_sub(4));
     let h = (area.height.saturating_sub(2)).min(46);
     let r = centered(area, w, h);
     let inner = frame(f, th, r, th.accent);
     let iw = inner.width as usize;
-    let label_w = 30usize;
+    // The widest label sets the column (Italian ones are longer), within reason.
+    let label_w = Action::ALL
+        .iter()
+        .map(|a| a.label().width())
+        .max()
+        .unwrap_or(30)
+        .clamp(30, 40)
+        + 2;
     let vim_w = ((iw.saturating_sub(label_w)) / 2).clamp(14, 30);
 
     let mut lines: Vec<Line> = Vec::new();
@@ -1667,7 +1674,10 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
                 }
             };
             lines.push(Line::from(vec![
-                Span::styled(pad(a.label(), label_w), th.base()),
+                Span::styled(
+                    pad(&display::truncate(a.label(), label_w - 1), label_w),
+                    th.base(),
+                ),
                 Span::styled(pad(&display::truncate(&vim, vim_w - 1), vim_w), style(&vim)),
                 Span::styled(
                     display::truncate(&classic, iw.saturating_sub(label_w + vim_w)),

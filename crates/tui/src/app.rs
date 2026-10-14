@@ -2350,7 +2350,7 @@ impl App {
                         .collect(),
                 });
             }
-            // The state the README's pictures show: three items selected, two waiting on the
+            // The state the README's pictures show: an item selected, two waiting on the
             // clipboard, the cursor on a picture, and a card saying the last copy went through.
             "vetrina" => {
                 let by_name = |app: &App, name: &str| {
@@ -2360,7 +2360,7 @@ impl App {
                         .find(|e| e.display == name)
                         .map(|e| (e.name.clone(), e.path.clone()))
                 };
-                let chosen: Vec<_> = ["archive.tar.gz", "backup.zip", "Cargo.toml"]
+                let chosen: Vec<_> = ["backup.zip"]
                     .iter()
                     .filter_map(|n| by_name(self, n))
                     .collect();

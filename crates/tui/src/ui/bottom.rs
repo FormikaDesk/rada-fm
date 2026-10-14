@@ -403,11 +403,15 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
     let strip = Style::default().bg(th.panel);
     let w = area.width as usize;
     let inner = if area.height >= 3 {
+        // The basic profile has ASCII only: there the edge rows are the strip's colour itself.
+        let basic = app.basic;
         let edge = |glyph: &str| {
-            Paragraph::new(Line::from(Span::styled(
-                glyph.repeat(w),
-                Style::default().fg(th.panel),
-            )))
+            let (glyph, style) = if basic {
+                (" ", strip)
+            } else {
+                (glyph, Style::default().fg(th.panel))
+            };
+            Paragraph::new(Line::from(Span::styled(glyph.repeat(w), style)))
         };
         f.render_widget(edge("▄"), Rect { height: 1, ..area });
         f.render_widget(

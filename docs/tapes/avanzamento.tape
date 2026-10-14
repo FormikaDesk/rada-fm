@@ -1,22 +1,25 @@
-# Progress counted in bytes: a big file copied slowly (RADA_DEMO_SLOW_MBPS) so that the bar is
-# there to be drawn.
-Source docs/tapes/ambiente.tape
-Output docs/media/.scarto/avanzamento.gif
-Type "RADA_DEMO_SLOW_MBPS=24 rada --icons nerd --images halfblocks --demo main ~/projects/demo"
+# Progress counted in bytes: two files with real data copied slowly (RADA_DEMO_SLOW_MBPS, a
+# developer aid that throttles the copy) so that the bar is there to be drawn.
+Set Width 1584
+Set Height 800
+Source "docs/tapes/ambiente.tape"
+Output "docs/media/.scarto/avanzamento.gif"
+Type "RADA_DEMO_SLOW_MBPS=0.5 rada --icons nerd --images halfblocks --demo main ~/projects/demo"
 Enter
 Sleep 2s
 Show
-Down 9
-Sleep 300ms
+Down 5
+Space
+Space
+Sleep 400ms
 Ctrl+C
 Sleep 300ms
 Ctrl+L
 Type "~/Documenti"
 Enter
-Sleep 800ms
+Sleep 1s
 Ctrl+V
-Sleep 1s
-Enter
 Sleep 1500ms
-Screenshot docs/screenshots/avanzamento.png
-Sleep 1s
+Enter
+Sleep 6s
+Screenshot "docs/screenshots/avanzamento.png"

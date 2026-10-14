@@ -3,8 +3,8 @@ Set Shell "bash"
 Set FontFamily "JetBrainsMono Nerd Font"
 Set FontSize 14
 Set Padding 14
-Set Width 1500
-Set Height 836
+# The size of the terminal (170x42 cells at this font) is set by each tape, before Source:
+# Set Width 1584 / Set Height 800.
 Set Theme { "name": "Carta", "black": "#3a3632", "red": "#a8454c", "green": "#4b7438", "yellow": "#8c5f16", "blue": "#3b659f", "magenta": "#77559e", "cyan": "#2c6e7d", "white": "#f6f3ee", "brightBlack": "#6a6359", "brightRed": "#a8454c", "brightGreen": "#4b7438", "brightYellow": "#8c5f16", "brightBlue": "#3b659f", "brightMagenta": "#77559e", "brightCyan": "#2c6e7d", "brightWhite": "#ffffff", "background": "#f6f3ee", "foreground": "#3a3632", "selection": "#e2e7ee", "cursor": "#3b659f" }
 Set TypingSpeed 70ms
 Set Framerate 24

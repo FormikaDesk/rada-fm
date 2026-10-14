@@ -216,11 +216,15 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
     let w = area.width as usize;
     // With three rows the outer two are half blocks in the bar's colour.
     let inner = if area.height >= 3 {
+        // The basic profile has ASCII only: there the edge rows are the bar's colour itself.
+        let basic = app.basic;
         let edge = |glyph: &str| {
-            Paragraph::new(Line::from(Span::styled(
-                glyph.repeat(w),
-                Style::default().fg(th.cmdbar),
-            )))
+            let (glyph, style) = if basic {
+                (" ", bar)
+            } else {
+                (glyph, Style::default().fg(th.cmdbar))
+            };
+            Paragraph::new(Line::from(Span::styled(glyph.repeat(w), style)))
         };
         f.render_widget(edge("▄"), Rect { height: 1, ..area });
         f.render_widget(

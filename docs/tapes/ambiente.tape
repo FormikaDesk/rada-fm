@@ -3,8 +3,8 @@ Set Shell "bash"
 Set FontFamily "JetBrainsMono Nerd Font"
 Set FontSize 14
 Set Padding 14
-Set Width 1500
-Set Height 836
+# The size of the terminal (170x42 cells at this font) is set by each tape, before Source:
+# Set Width 1584 / Set Height 800.
 Set Theme "TokyoNight"
 Set TypingSpeed 70ms
 Set Framerate 24

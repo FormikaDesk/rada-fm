@@ -18,7 +18,11 @@ Three items are selected, two wait on the clipboard, the cursor is on a picture,
 
 ![The same screen on the light Carta theme](docs/screenshots/principale-carta.png)
 
-The interface speaks **Italian and English** (the screenshots are in Italian); it follows the system, or `language = "it"` / `"en"`. Everything is drawn with soft shapes — rounded cards, pills, a shade behind the cursor — where the terminal's font has the glyphs for them, and plainly where it has not (see [Terminals](#terminals)).
+The interface speaks **Italian and English** (the screenshots are in Italian); it follows the system, or `language = "it"` / `"en"`. The same screen in English:
+
+![The same screen in English](docs/screenshots/principale-inglese.png)
+
+The names of the folders in the sidebar are the ones the system gives them (Italian, in these pictures). Everything is drawn with soft shapes — rounded cards, pills, a shade behind the cursor — where the terminal's font has the glyphs for them, and plainly where it has not (see [Terminals](#terminals)).
 
 | | |
 |---|---|
@@ -271,6 +275,8 @@ Things that do **not** work: `Cmd+Q`, `Cmd+W`, `Cmd+T`, `Cmd+N` and the rest of 
 - **Not supported**: tags (the menu entry is absent), ACLs and alternate data streams in copies.
 
 ## Tags
+
+![Giving a file a tag from the menu, with its plan, and the list of everything that carries it](docs/media/tag.gif)
 
 The Finder's tags on macOS (the extended attribute `com.apple.metadata:_kMDItemUserTags`, with the seven standard colours), and `user.xdg.tags` on Linux (the convention Dolphin and Baloo use: tag names separated by commas, no colours; a tag called "Red" is drawn red). Windows has no tags and offers nothing.
 

@@ -1,7 +1,9 @@
 # The main GIF: look around, select, copy with the plan, the card, Ctrl+Z takes it back.
-Source docs/tapes/ambiente.tape
-Output docs/media/demo.gif
 Set Framerate 15
+Set Width 1584
+Set Height 800
+Source "docs/tapes/ambiente.tape"
+Output "docs/media/demo.gif"
 Type "rada --icons nerd --images halfblocks --demo main ~/projects/demo"
 Enter
 Sleep 1500ms
@@ -31,8 +33,8 @@ Sleep 1s
 Ctrl+V
 Sleep 2500ms
 Enter
-Sleep 3s
+Sleep 2s
 Ctrl+Z
 Sleep 2500ms
 Enter
-Sleep 3s
+Sleep 1500ms

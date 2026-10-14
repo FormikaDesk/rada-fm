@@ -28,6 +28,12 @@ A restyling release: a softer look, the interface in Italian, one bar at the top
 - The command bar has *Tag ▾* in place of *View ▾* (the view is the pill on the right), and gives up its icons before its words on a narrower terminal.
 - The key hints close up their gaps before dropping one.
 - The list leaves a blank row under the column titles.
+- `v` goes through all three views (Details, Icons, Columns).
+- The help's column of names is as wide as the longest name, so the Italian ones no longer touch the keys.
+
+### Fixed
+- What a picture does not fill of its last cells is the background colour, not black.
+- In the basic profile the half-block rows that pad the bars are plain colour, not rows of `#`.
 
 ## [0.6.0-rc.4] - 2026-10-13
 

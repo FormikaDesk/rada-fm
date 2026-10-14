@@ -206,4 +206,6 @@ fn the_basic_profile_draws_the_plain_look() {
         text.is_ascii(),
         "only ASCII reaches the terminal in the basic profile"
     );
+    // The half blocks that pad the bars would turn into rows of `#`: they are plain colour.
+    assert!(!text.contains(&"#".repeat(20)), "{text}");
 }

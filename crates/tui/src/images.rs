@@ -207,6 +207,9 @@ impl ImageUi {
             };
             round_corners(&mut img, bg, share);
         }
+        // What the picture does not fill of its last cells is the background, not black.
+        self.picker
+            .set_background_color(bg.map(|c| [c[0], c[1], c[2], 255]));
         let p = self.picker.new_resize_protocol(img);
         self.proto.replace_protocol(p);
     }
