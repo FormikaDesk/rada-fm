@@ -85,7 +85,11 @@ fn right_on_a_file_stays_and_opens_nothing_but_enter_still_opens() {
     assert_eq!(h.app.cwd, dir, "a file is not a place to go to");
     assert!(h.opened().is_empty(), "and Right does not launch a program");
     h.key(KeyCode::Enter);
-    h.pump(50);
+    // The opening is made by a thread of its own: wait for it, not for a fixed time.
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while h.opened().is_empty() && std::time::Instant::now() < end {
+        h.pump(50);
+    }
     assert_eq!(h.opened().len(), 1, "Enter opens it as before");
 }
 
