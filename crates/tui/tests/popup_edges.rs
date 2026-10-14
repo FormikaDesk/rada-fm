@@ -71,6 +71,14 @@ fn cards(b: &Buffer, th: &Theme) -> Vec<Rect> {
     out
 }
 
+/// The menu and its submenu out of the cards found (in the order of the screen): the menu is
+/// the taller one.
+fn menu_and_submenu(rs: &[Rect]) -> (Rect, Rect) {
+    let mut v = rs.to_vec();
+    v.sort_by_key(|r| std::cmp::Reverse(r.height));
+    (v[0], v[1])
+}
+
 fn inside_any(rs: &[Rect], x: u16, y: u16) -> bool {
     rs.iter()
         .any(|r| x >= r.x && x < r.right() && y >= r.y && y < r.bottom())
@@ -133,11 +141,15 @@ fn assert_behind_rule(
     let norm = |c: Color| if c == Color::Reset { plain } else { c };
     for (cell, outside, inside) in border(after, r) {
         let bg = after[cell].bg;
-        assert_eq!(
-            after[inside].bg, plain,
-            "{what} {}: inside {cell:?}",
-            th.name
-        );
+        // The margin inside the sides is the plain background (under the line, at the top and
+        // the bottom, there may be the pill of the entry under the cursor).
+        if cell.0 == r.x || cell.0 == r.right() - 1 {
+            assert_eq!(
+                after[inside].bg, plain,
+                "{what} {}: inside {cell:?}",
+                th.name
+            );
+        }
         let Some(o) = outside else { continue };
         // Against the cell of another card (a submenu beside its parent) there is nothing to
         // compare with.
@@ -150,12 +162,8 @@ fn assert_behind_rule(
             "{what} {}: {cell:?} against what was outside",
             th.name
         );
-        if was == plain {
-            assert_eq!(
-                bg, after[inside].bg,
-                "{what} {}: {cell:?} against inside",
-                th.name
-            );
+        if was == plain && after[inside].bg == plain {
+            assert_eq!(bg, plain, "{what} {}: {cell:?} against inside", th.name);
         }
     }
 }
@@ -192,8 +200,26 @@ fn open_context_menu(h: &mut H, row: usize) {
     assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
 }
 
-/// Move the cursor of the menu to the entry that opens `Tag` and open it.
-fn open_tag_submenu(h: &mut H) {
+/// A right click at a cell.
+fn right_click_at(h: &mut H, x: u16, y: u16) {
+    h.mouse(
+        MouseEventKind::Down(MouseButton::Right),
+        x,
+        y,
+        KeyModifiers::NONE,
+    );
+    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+}
+
+/// Whether the menu in front has an entry that opens another menu.
+fn has_submenu(h: &H) -> bool {
+    matches!(&h.app.modal, Some(Modal::Menu(m))
+        if m.items.iter().any(|i| matches!(i.cmd, MenuCmd::Sub(_))))
+}
+
+/// Move the cursor of the menu to its first entry that opens another menu and open it.
+fn open_a_submenu(h: &mut H) {
+    assert!(has_submenu(h), "a menu with a submenu");
     for _ in 0..20 {
         let on_sub = matches!(
             &h.app.modal,
@@ -216,16 +242,16 @@ fn a_menu_and_its_submenu_have_a_border_of_the_colour_behind_them_and_no_shadow(
     for name in THEMES {
         let mut h = scene(name, 120, 36, 12);
         let th = h.app.th.clone();
-        // The menu is opened on the third row: the cursor is there before and after.
-        h.app.cursor = 3;
+        // The menu of the empty part of the list: New, Sort by and View open menus on every
+        // system (the menu of an item has Tags only where the system keeps them).
         let before = buffer(&mut h);
-        open_context_menu(&mut h, 3);
+        right_click_at(&mut h, 60, 28);
         let one = buffer(&mut h);
         let rs = cards(&one, &th);
         assert_eq!(rs.len(), 1, "{name}: one menu");
         assert_behind_rule(&before, &one, &th, rs[0], &rs, "menu");
         assert_no_shadow(&before, &one, &rs, "menu");
-        open_tag_submenu(&mut h);
+        open_a_submenu(&mut h);
         let two = buffer(&mut h);
         let rs = cards(&two, &th);
         assert_eq!(rs.len(), 2, "{name}: the menu and its submenu");
@@ -255,7 +281,11 @@ fn a_menu_opened_near_the_bottom_stays_above_the_status_bar_and_the_key_hints() 
         open_context_menu(&mut h, last_row);
         for chain in 0..2 {
             if chain == 1 {
-                open_tag_submenu(&mut h);
+                // Where the menu of an item has a submenu (Tags, on a system that keeps them).
+                if !has_submenu(&h) {
+                    break;
+                }
+                open_a_submenu(&mut h);
             }
             let after = buffer(&mut h);
             let rs = cards(&after, &th);
@@ -276,22 +306,15 @@ fn a_submenu_that_opens_on_the_left_has_no_dark_strip_and_no_empty_row() {
         // The menu opened at the right edge: its submenu has no room beside it on that side.
         let mut h = scene(name, 100, 30, 12);
         let th = h.app.th.clone();
-        h.app.cursor = 3;
         let before = buffer(&mut h);
-        let (_, y) = h.where_is(&Target::Row(3));
-        h.mouse(
-            MouseEventKind::Down(MouseButton::Right),
-            98,
-            y,
-            KeyModifiers::NONE,
-        );
-        assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
-        open_tag_submenu(&mut h);
+        right_click_at(&mut h, 98, 24);
+        open_a_submenu(&mut h);
         let after = buffer(&mut h);
         let rs = cards(&after, &th);
         assert_eq!(rs.len(), 2, "{name}");
+        let (parent, child) = menu_and_submenu(&rs);
         assert!(
-            rs[1].right() <= rs[0].x,
+            child.right() <= parent.x,
             "{name}: on the left of its parent: {rs:?}"
         );
         for r in &rs {
@@ -386,25 +409,18 @@ fn a_notification_is_still_a_card_with_its_colour_at_the_side() {
 #[test]
 fn a_submenu_is_right_against_its_menu_and_nothing_of_the_list_shows_between() {
     for name in THEMES {
-        for (side, click_x) in [("right", 31u16), ("left", 98u16)] {
-            let mut h = scene(name, 100, 30, 12);
+        for (side, click_x) in [("right", 31u16), ("left", 138u16)] {
+            let mut h = scene(name, 140, 30, 12);
             let th = h.app.th.clone();
-            // The last row: the menu has to move up, so that the cursor row is behind it.
-            h.app.cursor = 11;
+            // The cursor is on a row that the menu and its submenu both cover.
+            h.app.cursor = 8;
             let before = buffer(&mut h);
-            let (_, y) = h.where_is(&Target::Row(11));
-            h.mouse(
-                MouseEventKind::Down(MouseButton::Right),
-                click_x,
-                y,
-                KeyModifiers::NONE,
-            );
-            assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
-            open_tag_submenu(&mut h);
+            right_click_at(&mut h, click_x, 24);
+            open_a_submenu(&mut h);
             let after = buffer(&mut h);
             let rs = cards(&after, &th);
             assert_eq!(rs.len(), 2, "{name} {side}: {rs:?}");
-            let (parent, child) = (rs[0], rs[1]);
+            let (parent, child) = menu_and_submenu(&rs);
             let (left, right) = if side == "right" {
                 assert_eq!(child.x, parent.right(), "{name}: {parent:?} {child:?}");
                 (parent, child)
