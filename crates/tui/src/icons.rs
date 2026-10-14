@@ -133,8 +133,8 @@ fn by_extension(ext: &str) -> Option<Category> {
         }
         "md" | "markdown" | "mdx" => Category::Markup,
         "txt" | "log" | "rst" | "org" | "tex" => Category::Text,
-        "pdf" | "doc" | "docx" | "odt" | "rtf" | "epub" | "ppt" | "pptx" | "xls" | "xlsx"
-        | "ods" => Category::Doc,
+        "pdf" | "doc" | "docx" | "dot" | "dotx" | "docm" | "odt" | "ott" | "rtf" | "epub"
+        | "ppt" | "pptx" | "pptm" | "odp" | "xls" | "xlsx" | "xlsm" | "ods" => Category::Doc,
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "tif" | "tiff" | "avif"
         | "heic" => Category::Image,
         "svg" | "ai" | "eps" => Category::Vector,
@@ -196,6 +196,10 @@ const LINK: &str = "\u{f0c1}";
 const IMAGE: &str = "\u{f1c5}";
 const ARCHIVE: &str = "\u{f1c6}";
 const PDF: &str = "\u{f1c1}";
+const WORD: &str = "\u{f1c2}";
+const SHEET: &str = "\u{f1c3}";
+const SLIDES: &str = "\u{f1c4}";
+const BOOK: &str = "\u{f02d}";
 const AUDIO: &str = "\u{f1c7}";
 const VIDEO: &str = "\u{f1c8}";
 const LOCK: &str = "\u{f023}";
@@ -244,13 +248,18 @@ fn nerd_glyph(e: &Entry, cat: Category) -> &'static str {
         "java" => JAVA,
         "sh" | "bash" | "zsh" | "fish" => TERM,
         "pdf" => PDF,
+        // Each kind of document has its own mark: a Word file is not a PDF.
+        "doc" | "docx" | "dot" | "dotx" | "docm" | "odt" | "ott" | "rtf" => WORD,
+        "xls" | "xlsx" | "xlsm" | "ods" => SHEET,
+        "ppt" | "pptx" | "pptm" | "odp" => SLIDES,
+        "epub" => BOOK,
         "lock" => LOCK,
         _ => match cat {
             Category::Folder => FOLDER,
             Category::Link => LINK,
             Category::Code => CODE,
             Category::Text | Category::Markup => TEXT,
-            Category::Doc => PDF,
+            Category::Doc => TEXT,
             Category::Image => IMAGE,
             Category::Vector => VECTOR,
             Category::Audio => AUDIO,
@@ -533,5 +542,35 @@ mod ui_glyph_tests {
             }
             assert_eq!(action_icon(IconSet::None, a), "", "the basic set has none");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::ColorDepth;
+
+    #[test]
+    fn a_document_has_the_mark_of_its_own_kind_and_only_a_pdf_has_the_pdf_one() {
+        let th = Theme::named("rada", ColorDepth::True).unwrap();
+        let glyph = |name: &str| icon_for(name, FileKind::File, IconSet::Nerd, &th).0;
+        for name in ["a.pdf", "A.PDF"] {
+            assert_eq!(glyph(name), PDF, "{name}");
+        }
+        for name in [
+            "a.doc", "a.docx", "a.odt", "a.rtf", "a.xls", "a.xlsx", "a.ods", "a.ppt", "a.pptx",
+            "a.odp", "a.epub",
+        ] {
+            assert_ne!(glyph(name), PDF, "{name} is not a PDF");
+        }
+        assert_eq!(glyph("a.docx"), WORD);
+        assert_eq!(glyph("a.doc"), WORD);
+        assert_eq!(glyph("a.odt"), WORD);
+        assert_eq!(glyph("a.xlsx"), SHEET);
+        assert_eq!(glyph("a.pptx"), SLIDES);
+        // They are still documents: the colour of the kind.
+        let c = |name: &str| icon_for(name, FileKind::File, IconSet::Nerd, &th).1;
+        assert_eq!(c("a.docx"), th.kinds.doc);
+        assert_eq!(c("a.pdf"), th.kinds.doc);
     }
 }
