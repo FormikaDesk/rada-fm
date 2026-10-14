@@ -7,20 +7,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [0.6.0-rc.7] - 2026-10-14
 
-A correction to how popups are drawn, seen on a real terminal: the border, the surface and the shadow of the rc.6 left half a cell of the popup's colour outside the rounded line. Icons, layout and texts are as they were. Still a **pre-release**.
+A correction to how popups are drawn, seen on a real terminal (half a cell of the popup's colour stuck out of the rounded line), and with it a new look for the colours: one background for the whole interface. Icons, layout and texts are as they were. Still a **pre-release**.
 
 ### Fixed
-- **The border of a popup is never a colour of its own.** The cells of `╭─╮│╰─╯` take the colour of the cell just outside the line (on a plain background: the one behind the popup, so that no band of the popup's colour sticks out, and none is left between the line and the inside). A menu, a submenu and a notification are filled with the theme's background, no lighter surface; a window dims the screen behind it as before, and its border and inside are one tone, the dimmed background a little lighter. Where a row of another colour (a selected row) goes on beyond the line, the line keeps that colour on its side.
+- **The border of a popup is never a colour of its own.** The cells of `╭─╮│╰─╯` take the colour of the cell just outside the line, so no band of the popup's colour sticks out and none is left between the line and the inside. A menu, a submenu and a notification are filled with the theme's background, no lighter surface; a window dims the screen behind it and its border and inside are one tone (the dimmed background a little lighter; on a light theme, the paper itself). Where a row of another colour (a selected row) goes on beyond the line, the line keeps that colour on its side. The coloured left side and the bottom edge of a notification are drawn with the same rule.
 - **No shadows.** Menus, submenus, windows and notifications have none, in any theme; the `shadow` helper of the theme is gone.
-- **`popup_border` can be seen on the background in all seven themes** (non-text contrast of at least 3:1, also against the dimmed screen and the window), with a test. The `popup` token is now what a menu is filled with: the theme's background (the terminal's own where the theme leaves it alone).
+- **`popup_border` can be seen on the background in all seven themes** (non-text contrast of at least 3:1, against the menu and against the window), with a test. The `popup` token is now what a menu is filled with: the theme's background.
 - **Menus opened near the bottom stay above the status bar and the key hints** (they move up, leaving a row of air over the bar). A submenu that opens on the left no longer leaves dark strips or an empty row at the bottom.
 - **A submenu and the list of programs sit right against their menu**, on either side, with the plain background between the two lines: the cursor row that passes behind no longer shows through a column of space.
-- **`.docx`, `.doc`, `.odt` and the other office files showed the PDF icon** (every kind of document did, in the list and in the menu header). Word files and text documents have the Word mark, spreadsheets, presentations and e-books their own; only `.pdf` has the PDF one.
-- The notification's coloured left side and its bottom edge are drawn with the same rule (the cell keeps the colour behind it).
+- **`.docx`, `.doc`, `.odt` and the other office files showed the PDF icon** (every kind of document did, in the list and in the menu header). Word files and text documents have the Word mark; spreadsheets, presentations and e-books their own; only `.pdf` has the PDF one.
+- **`catppuccin-latte` and `tokyo-night-day`: the text of the cursor row was dark on a dark gradient.** It is white now, and the solid colour used without shades is where the gradient starts.
+- **macOS, Rada.app: one window, one tab.** Ghostty's own question *"Allow Ghostty to execute …?"* is asked for every file it is asked to open as a document (a double click in the Finder, a drop on the Dock, or a path among the arguments, which is how the first Rada.app, started with `-e`, reached it; that also opened a second tab). The maintainers keep it on purpose and it cannot be switched off, so rada does not try to get round it: the launcher gives Ghostty options only and the program is the `initial-command` of the window's settings file. Those settings now also say `window-save-state = never`, so that the windows of the last run are not given back beside the one that runs rada. An older Rada.app has to be made again with `rada setup desktop` (it replaces the whole bundle); the README says how to check it.
+- A flaky test of the order by size (it waited a fixed time for the list to be sorted again) now waits for the order.
+
+### Changed
+- **One background for every zone.** The tab bar, the bar of the path, the command bar, the sidebar, the list, the details, the menus, the windows, the status bar and the key hints are the same colour; panels are told apart by thin rounded lines (the `track` token); fields, pills and key caps are a step away from the background. Every theme follows this (`cmdbar`, `panel` and the strips of the bars are the canvas), and a test checks it.
+- **Carta, the paper theme, on warm parchment** (`#ecdfc6`, no white anywhere): lines `#cfbb96`, brown text `#3b2f22` and `#625340`, accent `#405c84`, the cursor row shaded from `#6d87ad` to `#8a78a8` with the darkest brown text, the selected row `#e0d2b8`, the border of popups `#8e7b5a`, quieter dots for the tags and status colours deepened a little where the contrast tests asked for it. `nebbia-light`, `catppuccin-latte` and `tokyo-night-day` keep their colours on the same scheme.
+- **The default dark theme is one night blue** (`#1b1d27`, painted, so it looks the same on any terminal and no longer shows through transparency; `catppuccin` and `tokyo-night` still leave the terminal's own background alone): lines `#2c3040`, accent `#86a0d4`, text `#c8cde0`, the cursor row shaded from `#3e5487` to `#5f4f88`, pills and keys a step lighter than the background.
+- **A light theme dims what is behind a window by darkening it a little**, not by making it paler (which turned parchment white), and the window is the paper itself.
+- The README starts with *The cross-platform terminal file manager where every destructive action is planned and undoable.*
 
 ### Added
-- Cell-by-cell tests of the border of a menu, a submenu, the delete window and the stacked notifications on the real buffer, in a dark theme and in Carta (`crates/tui/tests/popup_edges.rs`).
-- A demo scene `menubottom` and the tape `docs/tapes/menu-fondo.tape`: the menu of a file among the last rows of the list.
+- Cell-by-cell tests of the border of a menu, a submenu (on both sides of its menu), the delete window and the stacked notifications, on the real buffer, in a dark theme and in Carta (`crates/tui/tests/popup_edges.rs`); tests of the contrast of the new colours, of the one background and of the options Rada.app gives Ghostty.
+- A demo scene `menubottom` and the tapes `menu-fondo` (the menu of a file among the last rows of the list) and `apri-con-carta`; the tapes' terminals have the colours of the new themes.
 
 ## [0.6.0-rc.6] - 2026-10-14
 
