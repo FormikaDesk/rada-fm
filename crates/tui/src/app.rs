@@ -530,6 +530,9 @@ pub struct App {
     previewed: Option<PathBuf>,
 
     pub volumes: Vec<Volume>,
+    /// The list of volumes has arrived from the worker at least once (tests wait for it so
+    /// that a late answer does not replace the list they set).
+    pub volumes_seen: bool,
     /// Recent folders, state bookmarks and standard places (from the places worker).
     pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
@@ -720,6 +723,7 @@ impl App {
             preview_gen: 0,
             previewed: None,
             volumes: Vec::new(),
+            volumes_seen: false,
             paths: Default::default(),
             cfg_bookmarks: cfg.bookmarks,
             demo_volumes: cfg.demo.is_some(),
@@ -1294,6 +1298,7 @@ impl App {
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),
             CoreEvent::Volumes(v) => {
+                self.volumes_seen = true;
                 self.volumes = if self.demo_volumes { demo_volumes() } else { v };
                 self.folder_sizes.set_volumes(&self.volumes);
                 self.refresh_palette();
