@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Move the AUR package of rada to the release `<tag>`: pkgver, _tag, the checksum of the
+# tarball GitHub makes for the tag, and .SRCINFO. Nothing is published: the files are
+# changed in packaging/aur/rada, to be copied into the clone of the AUR repository.
+#
+#   scripts/aur-bump v0.6.0-rc.8
+#   scripts/aur-bump v0.6.0-rc.8 path/to/the-tarball.tar.gz   # no download: this file is the tarball
+#
+# AUR_DIR is the folder of the package (default: packaging/aur/rada), for trying it on a copy.
+set -euo pipefail
+
+usage() { echo "usage: $0 vX.Y.Z[-rc.N] [tarball]" >&2; exit 2; }
+[ $# -ge 1 ] && [ $# -le 2 ] || usage
+tag=$1
+local_tarball=${2:-}
+[[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z]+\.[0-9]+)?$ ]] || { echo "not a tag of rada: $tag" >&2; usage; }
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+dir=${AUR_DIR:-$root/packaging/aur/rada}
+[ -f "$dir/PKGBUILD" ] || { echo "no PKGBUILD in $dir" >&2; exit 1; }
+
+# v0.6.0-rc.8 -> 0.6.0rc8: a pkgver cannot hold a hyphen, and pacman puts rc before the release.
+version=${tag#v}
+core=${version%%-*}
+suffix=${version#"$core"}
+suffix=${suffix#-}
+pkgver=$core${suffix//./}
+
+url=$(sed -n 's/^url=.\(.*\).$/\1/p' "$dir/PKGBUILD")
+[ -n "$url" ] || { echo "no url in the PKGBUILD" >&2; exit 1; }
+
+work=$(mktemp -d)
+trap 'rm -r -- "$work"' EXIT
+if [ -n "$local_tarball" ]; then
+  cp -- "$local_tarball" "$work/source.tar.gz"
+else
+  curl -fsSL -o "$work/source.tar.gz" "$url/archive/refs/tags/$tag.tar.gz" \
+    || { echo "could not download the archive of $tag (is the tag pushed?)" >&2; exit 1; }
+fi
+# What GitHub sends for a missing tag is an error, but a file that is no archive is still refused.
+tar -tzf "$work/source.tar.gz" > /dev/null || { echo "the file is not a tarball" >&2; exit 1; }
+sum=$(sha256sum "$work/source.tar.gz" | cut -d' ' -f1)
+
+sed -i \
+  -e "s|^_tag=.*|_tag=$tag|" \
+  -e "s|^pkgver=.*|pkgver=$pkgver|" \
+  -e "s|^pkgrel=.*|pkgrel=1|" \
+  -e "s|^sha256sums=.*|sha256sums=('$sum')|" \
+  "$dir/PKGBUILD"
+(cd "$dir" && makepkg --printsrcinfo > .SRCINFO)
+
+echo "tag      $tag"
+echo "pkgver   $pkgver"
+echo "sha256   $sum"
+echo "changed  $dir/PKGBUILD and $dir/.SRCINFO"
