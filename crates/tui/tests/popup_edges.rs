@@ -77,7 +77,10 @@ fn inside_any(rs: &[Rect], x: u16, y: u16) -> bool {
 }
 
 /// The cells of the border of `r`, each with its neighbour straight out and straight in.
-fn border(b: &Buffer, r: Rect) -> Vec<((u16, u16), Option<(u16, u16)>, (u16, u16))> {
+/// A cell of a border, the cell straight out of it and the one straight into it.
+type EdgeCells = ((u16, u16), Option<(u16, u16)>, (u16, u16));
+
+fn border(b: &Buffer, r: Rect) -> Vec<EdgeCells> {
     let mut out = Vec::new();
     for y in r.y..r.bottom() {
         for x in r.x..r.right() {

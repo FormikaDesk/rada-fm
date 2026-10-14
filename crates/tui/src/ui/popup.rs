@@ -494,7 +494,10 @@ mod tests {
 
     /// The cells of the border of the card at `r` with the cells just outside and just inside
     /// each of them.
-    fn edge_triples(b: &Buffer, r: Rect) -> Vec<((u16, u16), Option<(u16, u16)>, (u16, u16))> {
+    /// A cell of a border, the cell straight out of it and the one straight into it.
+    type EdgeCells = ((u16, u16), Option<(u16, u16)>, (u16, u16));
+
+    fn edge_triples(b: &Buffer, r: Rect) -> Vec<EdgeCells> {
         let mut out = Vec::new();
         for y in r.y..r.bottom() {
             for x in r.x..r.right() {
