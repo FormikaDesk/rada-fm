@@ -426,11 +426,17 @@ fn demo_volumes() -> Vec<Volume> {
         responsive: true,
     };
     vec![
-        vol("/", "System", VolumeKind::Fixed, 512, 212),
-        vol("/run/media/user/Data", "Data", VolumeKind::Fixed, 1000, 640),
+        vol("/", Key::DiskSystem.tr(), VolumeKind::Fixed, 512, 212),
+        vol(
+            "/run/media/user/Data",
+            Key::DiskData.tr(),
+            VolumeKind::Fixed,
+            1000,
+            640,
+        ),
         vol(
             "/run/media/user/USB",
-            "USB drive",
+            Key::DiskUsb.tr(),
             VolumeKind::Removable,
             64,
             41,
@@ -2343,6 +2349,51 @@ impl App {
                         .map(|(_, p)| p.clone())
                         .collect(),
                 });
+            }
+            // The state the README's pictures show: three items selected, two waiting on the
+            // clipboard, the cursor on a picture, and a card saying the last copy went through.
+            "vetrina" => {
+                let by_name = |app: &App, name: &str| {
+                    app.listing
+                        .all()
+                        .iter()
+                        .find(|e| e.display == name)
+                        .map(|e| (e.name.clone(), e.path.clone()))
+                };
+                let chosen: Vec<_> = ["archive.tar.gz", "backup.zip", "Cargo.toml"]
+                    .iter()
+                    .filter_map(|n| by_name(self, n))
+                    .collect();
+                self.marked = chosen.iter().map(|(n, _)| n.clone()).collect();
+                let waiting: Vec<PathBuf> = ["data.json", "main.rs"]
+                    .iter()
+                    .filter_map(|n| by_name(self, n))
+                    .map(|(_, p)| p)
+                    .collect();
+                if !waiting.is_empty() {
+                    self.clipboard = Some(Clip {
+                        mode: TransferMode::Copy,
+                        paths: waiting,
+                    });
+                }
+                self.restore_cursor(Some(OsString::from("photo.jpg")));
+                self.ensure_visible();
+                self.request_preview();
+                let items = fmt::count(3, Key::ItemOne, Key::ItemMany);
+                self.undo_label = Some(tf(Key::DoneCopy, &[&items]));
+                let folder = self
+                    .paths
+                    .places
+                    .iter()
+                    .find(|p| p.kind == rada_core::platform::PlaceKind::Documents)
+                    .map(|p| p.path.clone())
+                    .unwrap_or_else(|| self.svc.home.clone());
+                let name = self.folder_label_for_demo(&folder);
+                self.notify(
+                    Notice::new(NoticeKind::Ok, tf(Key::NCopyMany, &[&3, &name]))
+                        .with_action(NoticeAction::Undo)
+                        .showing(folder, None),
+                );
             }
             "main" => {}
             "help" => self.modal = Some(Modal::Help),

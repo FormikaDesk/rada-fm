@@ -434,22 +434,35 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
     // A rounded pill has a glyph on each side, a plain one a space: two cells either way.
     let pill_w = |h: &Hint| h.key.width() + 2;
     let chunk = |h: &Hint| pill_w(h) + 1 + h.what.tr().width();
-    let mut shown: Vec<&Hint> = Vec::new();
-    let mut used = 2;
-    for h in &all {
-        let need = chunk(h) + if shown.is_empty() { 0 } else { 4 };
-        if used + need > w {
-            break;
+    // Four cells between hints; three, then two when that lets more of them in.
+    let fit = |gap: usize| -> Vec<&Hint> {
+        let mut shown: Vec<&Hint> = Vec::new();
+        let mut used = 2;
+        for h in &all {
+            let need = chunk(h) + if shown.is_empty() { 0 } else { gap };
+            if used + need > w {
+                break;
+            }
+            used += need;
+            shown.push(h);
         }
-        used += need;
-        shown.push(h);
+        shown
+    };
+    let mut gap = 4;
+    let mut shown = fit(4);
+    for g in [3, 2] {
+        let more = fit(g);
+        if more.len() > shown.len() {
+            shown = more;
+            gap = g;
+        }
     }
 
     let mut bar = Bar::default();
     bar.push(Span::styled("  ", strip));
     for (i, h) in shown.iter().enumerate() {
         if i > 0 {
-            bar.push(Span::styled("    ", strip));
+            bar.push(Span::styled(" ".repeat(gap), strip));
         }
         let pill = soft::pill(
             &th,

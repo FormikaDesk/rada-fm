@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Make a home folder of made-up files for the screenshots and the GIFs of the README.
+
+    scripts/demo-home DIR
+
+DIR becomes a complete HOME: the user folders (with Italian names, as on an Italian system),
+`projects/demo` with the files the images show, a trash, a configuration that keeps rada from
+remembering tabs, and a few tags. Nothing in it comes from the machine it is made on: the
+files are generated here, the dates are relative to the moment of the run (so "Today 15:21"
+and "3 days ago" read the same whenever the images are made).
+
+Needs python3, Pillow (the picture and the PDF), tar and zip. The tags are extended
+attributes (`user.xdg.tags`); on a filesystem without them the files simply have no tags.
+"""
+
+import gzip
+import io
+import json
+import math
+import random
+import os
+import shutil
+import sys
+import tarfile
+import time
+import zipfile
+
+from PIL import Image, ImageDraw, ImageFont
+
+NOW = time.time()
+DAY = 86400
+
+
+def age(path, seconds):
+    t = NOW - seconds
+    os.utime(path, (t, t), follow_symlinks=False)
+
+
+def write(path, data, seconds):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    mode = "wb" if isinstance(data, bytes) else "w"
+    with open(path, mode) as f:
+        f.write(data)
+    age(path, seconds)
+
+
+def sparse(path, size, seconds, head=b""):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(head)
+        f.truncate(size)
+    age(path, seconds)
+
+
+def tag(path, *names):
+    try:
+        os.setxattr(path, "user.xdg.tags", ",".join(names).encode())
+    except OSError:
+        pass
+
+
+def mix(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def landscape(w=1600, h=1066):
+    """A sunset over purple mountains: the picture of photo.jpg."""
+    img = Image.new("RGB", (w, h))
+    px = img.load()
+    top, bottom = (255, 168, 92), (255, 118, 106)
+    for y in range(h):
+        c = mix(top, bottom, y / h)
+        for x in range(w):
+            px[x, y] = c
+    d = ImageDraw.Draw(img)
+    # The sun, with a soft halo.
+    for r, col in [(300, (255, 190, 120)), (240, (255, 214, 150)), (190, (255, 238, 190))]:
+        d.ellipse([w * 0.74 - r, h * 0.36 - r, w * 0.74 + r, h * 0.36 + r], fill=col)
+    layers = [
+        ((139, 105, 168), 0.62, 0.0),
+        ((104, 78, 148), 0.70, 1.7),
+        ((72, 56, 112), 0.80, 3.1),
+        ((46, 36, 82), 0.90, 4.4),
+    ]
+    for col, base, phase in layers:
+        pts = [(0, h)]
+        for x in range(0, w + 1, 8):
+            y = h * base + 90 * math.sin(x / 190 + phase) + 48 * math.sin(x / 71 + phase * 2)
+            pts.append((x, y))
+        pts.append((w, h))
+        d.polygon(pts, fill=col)
+    return img
+
+
+def pdf(path, seconds):
+    font = None
+    for name in ("DejaVuSans-Bold.ttf", "DejaVuSans.ttf"):
+        try:
+            font = ImageFont.truetype(name, 40)
+            break
+        except OSError:
+            continue
+    pages = []
+    for n, title in enumerate(["Relazione trimestrale", "Risultati", "Prossimi passi"], 1):
+        page = Image.new("RGB", (794, 1123), (252, 251, 248))
+        d = ImageDraw.Draw(page)
+        d.rectangle([60, 60, 734, 64], fill=(61, 89, 161))
+        d.text((60, 90), title, fill=(40, 40, 60), font=font)
+        for i in range(14):
+            d.rectangle([60, 220 + i * 54, 734 - (i * 37) % 160, 232 + i * 54], fill=(214, 216, 224))
+        d.text((60, 1040), f"{n}", fill=(120, 120, 140), font=font)
+        pages.append(page)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    pages[0].save(path, "PDF", save_all=True, append_images=pages[1:], resolution=96.0)
+    age(path, seconds)
+
+
+def screenshot_png(path, seconds):
+    img = Image.new("RGB", (640, 400), (30, 32, 48))
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, 640, 28], fill=(41, 46, 66))
+    for i in range(7):
+        d.rectangle([24, 52 + i * 44, 24 + 300 - (i * 41) % 140, 70 + i * 44], fill=(122, 162, 247))
+    d.rectangle([360, 52, 616, 372], fill=(36, 40, 59))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img.save(path)
+    age(path, seconds)
+
+
+def targz(path, seconds):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as t:
+        rng = random.Random(7)
+        for name, size in [("progetto/README.md", 1200), ("progetto/src/main.rs", 4800),
+                           ("progetto/src/lib.rs", 9100), ("progetto/Cargo.toml", 380),
+                           ("progetto/docs/guida.md", 16500), ("progetto/dati.bin", 1_700_000)]:
+            info = tarfile.TarInfo(name)
+            info.size = size
+            info.mtime = NOW - 12 * DAY
+            data = rng.randbytes(size) if name.endswith(".bin") else (name.encode() * (size // len(name) + 1))[:size]
+            t.addfile(info, io.BytesIO(data))
+    with gzip.open(path, "wb", compresslevel=9) as f:
+        f.write(buf.getvalue())
+    age(path, seconds)
+
+
+def zipfile_(path, seconds):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        rng = random.Random(11)
+        for name, size in [("copia/progetto.md", 8000), ("copia/dati.csv", 52000), ("copia/note.txt", 900),
+                           ("copia/archivio.bin", 3_800_000)]:
+            data = rng.randbytes(size) if name.endswith(".bin") else (name.encode() * (size // len(name) + 1))[:size]
+            z.writestr(name, data)
+    age(path, seconds)
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    home = os.path.abspath(sys.argv[1])
+    if home in (os.path.expanduser("~"), "/", os.getcwd()):
+        sys.exit("refusing to use your own home (or the root, or the current folder)")
+    if os.path.exists(home) and os.listdir(home):
+        sys.exit(f"{home} is not empty: refusing to write into it")
+    os.makedirs(home, exist_ok=True)
+
+    # The user folders, named as an Italian system names them.
+    names = {
+        "XDG_DESKTOP_DIR": "Scrivania",
+        "XDG_DOWNLOAD_DIR": "Download",
+        "XDG_DOCUMENTS_DIR": "Documenti",
+        "XDG_PICTURES_DIR": "Immagini",
+        "XDG_MUSIC_DIR": "Musica",
+        "XDG_VIDEOS_DIR": "Video",
+    }
+    os.makedirs(os.path.join(home, ".config/rada"), exist_ok=True)
+    with open(os.path.join(home, ".config/user-dirs.dirs"), "w") as f:
+        for k, v in names.items():
+            f.write(f'{k}="$HOME/{v}"\n')
+    for v in names.values():
+        os.makedirs(os.path.join(home, v), exist_ok=True)
+    with open(os.path.join(home, ".config/rada/config.toml"), "w") as f:
+        # No tabs remembered, nothing asked of the network, and a key for the context menu
+        # that a recording can press (a tape has no mouse).
+        f.write(
+            'remember_tabs = false\n\n[update]\ncheck = false\n\n'
+            '[keys]\ncontext_menu = ["ctrl+k"]\n'
+        )
+    # A few programs that "Open with…" can list: made up, and harmless to start.
+    apps = os.path.join(home, ".local/share/applications")
+    os.makedirs(apps, exist_ok=True)
+    for file, name, kinds in [
+        ("visualizzatore.desktop", "Visualizzatore di immagini", "image/jpeg;image/png;image/svg+xml;"),
+        ("ritocco.desktop", "Ritocco foto", "image/jpeg;image/png;"),
+        ("disegno.desktop", "Disegno vettoriale", "image/svg+xml;image/png;image/jpeg;"),
+        ("browser.desktop", "Browser web", "image/jpeg;image/png;text/html;"),
+        ("presentazioni.desktop", "Presentazioni", "image/jpeg;image/png;"),
+    ]:
+        with open(os.path.join(apps, file), "w") as f:
+            f.write(
+                f"[Desktop Entry]\nType=Application\nName={name}\nExec=true %f\n"
+                f"MimeType={kinds}\nNoDisplay=false\n"
+            )
+    with open(os.path.join(home, ".config/mimeapps.list"), "w") as f:
+        f.write("[Default Applications]\nimage/jpeg=visualizzatore.desktop\n")
+    # The trash, so that the sidebar has its place at the bottom.
+    os.makedirs(os.path.join(home, ".local/share/Trash/files"), exist_ok=True)
+    os.makedirs(os.path.join(home, ".local/share/Trash/info"), exist_ok=True)
+
+    demo = os.path.join(home, "projects/demo")
+    for d, secs in [("assets", 3 * DAY), ("docs", DAY + 3600), ("scripts", 9 * DAY),
+                    ("src", 5 * 3600), ("tests", 2 * DAY)]:
+        os.makedirs(os.path.join(demo, d), exist_ok=True)
+        age(os.path.join(demo, d), secs)
+    write(os.path.join(demo, "src/main.rs"), 'fn main() {\n    println!("ciao");\n}\n', 5 * 3600)
+    write(os.path.join(demo, "src/lib.rs"), "pub fn somma(a: i32, b: i32) -> i32 {\n    a + b\n}\n", 5 * 3600)
+    write(os.path.join(demo, "docs/guida.md"), "# Guida\n\nUna guida breve.\n", DAY)
+    write(os.path.join(demo, "scripts/build.sh"), "#!/bin/sh\ncargo build --release\n", 9 * DAY)
+    write(os.path.join(demo, "assets/logo.svg"),
+          '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="28" fill="#7aa2f7"/></svg>\n',
+          3 * DAY)
+    write(os.path.join(demo, "tests/prova.rs"), "#[test]\nfn funziona() {}\n", 2 * DAY)
+
+    targz(os.path.join(demo, "archive.tar.gz"), 8 * DAY)
+    zipfile_(os.path.join(demo, "backup.zip"), 97 * DAY)
+    write(os.path.join(demo, "Cargo.toml"),
+          '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2024"\n', 3 * DAY)
+    write(os.path.join(demo, "data.json"), json.dumps({"nome": "demo", "valori": [1, 2, 3]}, indent=2) + "\n", 6 * DAY)
+    sparse(os.path.join(demo, "demo.mp4"), 96_000_000, 14 * DAY, b"\x00\x00\x00\x18ftypmp42")
+    write(os.path.join(demo, "main.rs"), 'fn main() {\n    println!("ciao, mondo");\n}\n', 55 * 60)
+    write(os.path.join(demo, "logo.svg"),
+          '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="14" fill="#bb9af7"/></svg>\n',
+          5 * DAY)
+    write(os.path.join(demo, "notes.txt"), "Cose da fare:\n- rivedere la relazione\n- spedire il backup\n", DAY + 7200)
+    photo = os.path.join(demo, "photo.jpg")
+    os.makedirs(demo, exist_ok=True)
+    landscape().save(photo, quality=82, optimize=True)
+    age(photo, 40 * 60)
+    write(os.path.join(demo, "README.md"), "# demo\n\nUna cartella di prova.\n", 41 * 60)
+    pdf(os.path.join(demo, "report.pdf"), 4 * DAY)
+    screenshot_png(os.path.join(demo, "screenshot.png"), DAY + 5000)
+    write(os.path.join(demo, "setup.sh"), "#!/bin/sh\necho preparo\n", 12 * DAY)
+    os.chmod(os.path.join(demo, "setup.sh"), 0o755)
+    sparse(os.path.join(demo, "song.mp3"), 7_800_000, 72 * DAY, b"ID3\x04\x00\x00\x00\x00\x00\x00")
+
+    # Some tags, in the colours the images show.
+    tag(os.path.join(demo, "archive.tar.gz"), "Rosso", "Blu")
+    tag(os.path.join(demo, "backup.zip"), "Giallo")
+    tag(os.path.join(demo, "Cargo.toml"), "Viola")
+    tag(os.path.join(demo, "src"), "Verde")
+    tag(os.path.join(demo, "demo.mp4"), "Arancione")
+    tag(os.path.join(demo, "notes.txt"), "Giallo")
+    tag(os.path.join(demo, "photo.jpg"), "Rosso", "Blu", "Viola")
+    tag(os.path.join(demo, "report.pdf"), "Blu")
+
+    # A few things in the other folders, so that they are not empty.
+    write(os.path.join(home, "Documenti/relazione.txt"), "Relazione di prova.\n", 2 * DAY)
+    write(os.path.join(home, "Download/istruzioni.txt"), "Istruzioni.\n", 3 * DAY)
+    shutil.copyfile(photo, os.path.join(home, "Immagini/paesaggio.jpg"))
+    age(os.path.join(home, "Immagini/paesaggio.jpg"), 5 * DAY)
+    print(home)
+
+
+if __name__ == "__main__":
+    main()

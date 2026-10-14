@@ -24,6 +24,8 @@ mod tagdots;
 mod updates;
 pub mod widgets;
 
+pub use list::{Columns as ListColumns, ListOpts, columns as list_columns};
+
 use std::path::Path;
 
 use rada_core::display;
@@ -257,7 +259,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // The folder's own card.
     let main_outer = main;
     let main = if carded {
-        soft::card(f, main, &th, !app.side_focus)
+        soft::card(f, main, &th, false)
     } else {
         main
     };
@@ -295,8 +297,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if hints_h > 0 {
         bottom::draw_hints(f, app, hints_row);
     }
-    // Notifications sit at the bottom right of the body.
-    notice::draw_notice(f, app, body);
+    // Notifications sit at the bottom right of the body; a window in front hides them.
+    if app.modal.is_none() {
+        notice::draw_notice(f, app, body);
+    }
     if app.address.is_some() && address_h > 0 {
         address::draw_suggestions(f, app, address_row, area);
     }

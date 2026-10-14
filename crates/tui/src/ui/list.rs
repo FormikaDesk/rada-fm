@@ -492,6 +492,42 @@ mod tests {
     }
 
     #[test]
+    fn the_tag_column_comes_last_and_goes_first() {
+        let rel = DateStyle::Relative;
+        let with = |w: usize| columns(w, ListOpts::for_terminal(170, true), 2, rel);
+        let without = |w: usize| columns(w, ListOpts::for_terminal(170, false), 2, rel);
+        // Plenty of room: the column is there, and the name still has what it had, less the
+        // column and its gap.
+        let wide = with(120);
+        assert_eq!(wide.tags, TAG_W);
+        assert_eq!(wide.name + TAG_W + wide.gap, without(120).name);
+        // The column is never what squeezes the name: it goes as soon as the name would get
+        // too little.
+        for w in 40..=140 {
+            let c = with(w);
+            if c.tags > 0 {
+                assert!(c.name >= NAME_MIN_WITH_TAGS, "{w}: {}", c.name);
+            }
+        }
+        assert_eq!(with(60).tags, 0);
+        // Off, it is never there.
+        assert_eq!(without(160).tags, 0);
+        // The columns still add up to the width with it.
+        for w in [170usize, 120, 100, 90] {
+            let c = with(w);
+            let n = [c.date, c.kind, c.size, c.tags]
+                .iter()
+                .filter(|x| **x > 0)
+                .count();
+            assert_eq!(
+                CHECK + c.icon + c.name + c.date + c.kind + c.size + c.tags + c.gap * n + 1,
+                w,
+                "{w}"
+            );
+        }
+    }
+
+    #[test]
     fn the_columns_always_add_up_to_the_width() {
         for term in [170usize, 120, 99, 80, 59, 40] {
             let area = term.saturating_sub(30).max(24);

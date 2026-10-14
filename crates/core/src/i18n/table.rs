@@ -304,7 +304,7 @@ strings! {
     LToggleDetails => "Show / hide the details pane", "Mostra / nascondi il pannello dei dettagli";
     LViewDetails => "View as details", "Vista a dettagli";
     LViewIcons => "View as icons", "Vista a icone";
-    LToggleView => "Switch between Details and Icons", "Passa tra Dettagli e Icone";
+    LToggleView => "Switch the view: Details, Icons, Columns", "Cambia vista: Dettagli, Icone, Colonne";
     LProperties => "Properties", "Proprietà";
     LOpenWith => "Open with…", "Apri con…";
     LCopyPath => "Copy the path", "Copia il percorso";
@@ -520,7 +520,7 @@ strings! {
     HelpMouse5 => "Shift+drag selects text in the terminal (the mouse belongs to rada while it runs).", "Maiusc+trascina seleziona il testo nel terminale (il mouse è di rada finché è in esecuzione).";
     HelpMouseOff => "The mouse is off (mouse = false in the configuration).", "Il mouse è disattivato (mouse = false nella configurazione).";
     HelpAlso1 => "Alt+1 … Alt+9 jump to a tab · Alt+P shows or hides the details pane.", "Alt+1 … Alt+9 vanno a una scheda · Alt+P mostra o nasconde il pannello dei dettagli.";
-    HelpAlso2 => "Ctrl+1 / Ctrl+2 (or v) switch between Details and Icons; in Icons the arrows and h j k l move across the grid.", "Ctrl+1 / Ctrl+2 (o v) passano da Dettagli a Icone; nelle Icone le frecce e h j k l si muovono nella griglia.";
+    HelpAlso2 => "Ctrl+1 / Ctrl+2 / Ctrl+3 (or v) switch between Details, Icons and Columns; in Icons the arrows and h j k l move across the grid; in Columns Left goes to the folder above and Right into the folder.", "Ctrl+1 / Ctrl+2 / Ctrl+3 (o v) passano da Dettagli a Icone e Colonne; nelle Icone le frecce e h j k l si muovono nella griglia; nelle Colonne ← va alla cartella superiore e → dentro la cartella.";
     HelpAlso3 => "Backspace goes to the parent folder with the vim keys on, and back with the classic keys alone.", "Backspace va alla cartella superiore con i tasti vim attivi, e indietro con i soli tasti classici.";
     HelpAlso4 => "Shift+Del deletes for good: the plan says so, and it cannot be undone.", "Maiusc+Canc elimina per sempre: il piano lo dice, e non si può annullare.";
     HelpEnd1 => "Enter on an archive opens it like a folder, read-only: copy items out (Ctrl+C), paste in a folder.", "Invio su un archivio lo apre come una cartella, in sola lettura: copia fuori gli elementi (Ctrl+C), incolla in una cartella.";
@@ -869,4 +869,8 @@ strings! {
     // ---- new actions
     LViewColumns => "View as columns", "Vista a colonne";
     LToggleTags => "Show / hide the Tag column", "Mostra / nascondi la colonna dei tag";
+
+    // ---- demo disks
+    DiskData => "Data", "Dati";
+    DiskUsb => "USB drive", "Chiavetta";
 }

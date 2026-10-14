@@ -41,11 +41,12 @@ impl ViewMode {
         }
     }
 
-    /// The other of the two views the key that switches between them knows.
+    /// The next view, for the key that goes through them: Details, Icons, Columns.
     pub fn other(self) -> ViewMode {
         match self {
-            ViewMode::Details | ViewMode::Columns => ViewMode::Icons,
-            ViewMode::Icons => ViewMode::Details,
+            ViewMode::Details => ViewMode::Icons,
+            ViewMode::Icons => ViewMode::Columns,
+            ViewMode::Columns => ViewMode::Details,
         }
     }
 }

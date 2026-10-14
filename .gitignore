@@ -19,3 +19,4 @@ Thumbs.db
 # review leftovers of snapshot tests
 *.snap.new
 *.pending-snap
+docs/media/.scarto/

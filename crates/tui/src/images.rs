@@ -198,7 +198,14 @@ impl ImageUi {
     /// its four corners are rounded first (see [`round_corners`]).
     pub fn show(&mut self, mut img: DynamicImage, bg: Option<[u8; 3]>) {
         if let Some(bg) = bg {
-            round_corners(&mut img, bg);
+            // Half blocks have a few pixels across the picture: their corner needs a larger
+            // share of it to show at all.
+            let share = if self.picker.protocol_type() == ProtocolType::Halfblocks {
+                CORNER_SHARE_BLOCKS
+            } else {
+                CORNER_SHARE
+            };
+            round_corners(&mut img, bg, share);
         }
         let p = self.picker.new_resize_protocol(img);
         self.proto.replace_protocol(p);
@@ -219,16 +226,18 @@ impl ImageUi {
 }
 
 /// The radius of the rounded corners, as a share of the shorter side of the picture: the
-/// same look at any size (and at any scale it is drawn at later).
-const CORNER_SHARE: f32 = 0.06;
+/// same look at any size (and at any scale it is drawn at later). A little more for half
+/// blocks, which draw the picture a few dozen pixels wide.
+pub const CORNER_SHARE: f32 = 0.04;
+pub const CORNER_SHARE_BLOCKS: f32 = 0.12;
 
 /// Round the four corners of a picture, in place: the pixels outside a quarter circle in each
 /// corner are given the colour of the background `bg`, blended along the edge so that it
 /// stays smooth when the picture is scaled down. This is done on the pixels, before they are
 /// sent to the terminal, so that every graphics protocol (and the half blocks) shows it.
-pub fn round_corners(img: &mut DynamicImage, bg: [u8; 3]) {
+pub fn round_corners(img: &mut DynamicImage, bg: [u8; 3], share: f32) {
     let (w, h) = (img.width(), img.height());
-    let radius = ((w.min(h) as f32 * CORNER_SHARE).round() as u32).max(3);
+    let radius = ((w.min(h) as f32 * share).round() as u32).max(3);
     if w < radius * 2 + 2 || h < radius * 2 + 2 {
         return;
     }
@@ -292,7 +301,7 @@ mod tests {
     fn the_corners_of_a_picture_take_the_background_and_the_middle_is_untouched() {
         let mut img =
             DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 80, Rgb::from([200u8, 100, 50])));
-        round_corners(&mut img, BG);
+        round_corners(&mut img, BG, CORNER_SHARE);
         let p = img.to_rgb8();
         for (x, y) in [(0, 0), (99, 0), (0, 79), (99, 79)] {
             assert_eq!(p.get_pixel(x, y).0, BG, "corner {x},{y}");
@@ -307,7 +316,7 @@ mod tests {
     fn the_edge_of_the_curve_is_blended_not_cut() {
         let mut img =
             DynamicImage::ImageRgb8(RgbImage::from_pixel(200, 200, Rgb::from([255u8, 255, 255])));
-        round_corners(&mut img, [0, 0, 0]);
+        round_corners(&mut img, [0, 0, 0], CORNER_SHARE);
         let p = img.to_rgb8();
         let radius = (200.0 * CORNER_SHARE).round() as u32;
         // Somewhere along the diagonal of the corner there is a pixel that is neither.
@@ -324,7 +333,7 @@ mod tests {
     fn a_picture_with_transparency_becomes_opaque_in_its_corners() {
         let mut img =
             DynamicImage::ImageRgba8(RgbaImage::from_pixel(60, 60, Rgba([10, 20, 30, 0])));
-        round_corners(&mut img, BG);
+        round_corners(&mut img, BG, CORNER_SHARE);
         let p = img.to_rgba8();
         assert_eq!(p.get_pixel(0, 0).0, [BG[0], BG[1], BG[2], 255]);
         assert_eq!(p.get_pixel(30, 30).0, [10, 20, 30, 0]);
@@ -334,11 +343,11 @@ mod tests {
     fn other_pixel_formats_are_converted_and_tiny_pictures_left_alone() {
         let mut grey =
             DynamicImage::ImageLuma8(image::GrayImage::from_pixel(80, 80, image::Luma([128])));
-        round_corners(&mut grey, BG);
+        round_corners(&mut grey, BG, CORNER_SHARE);
         assert!(matches!(grey, DynamicImage::ImageRgba8(_)));
         assert_eq!(grey.to_rgb8().get_pixel(0, 0).0, BG);
         let mut tiny = DynamicImage::ImageRgb8(RgbImage::from_pixel(6, 6, Rgb::from([9u8, 9, 9])));
-        round_corners(&mut tiny, BG);
+        round_corners(&mut tiny, BG, CORNER_SHARE);
         assert_eq!(
             tiny.to_rgb8().get_pixel(0, 0).0,
             [9, 9, 9],

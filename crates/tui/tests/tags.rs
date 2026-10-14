@@ -421,3 +421,102 @@ fn the_colours_are_called_what_the_system_calls_them() {
         h.press("esc");
     }
 }
+
+/// The line of the column titles of the list.
+fn titles(h: &mut H) -> String {
+    h.screen()
+        .lines()
+        .find(|l| l.contains("Name") && l.contains("Size"))
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[test]
+fn the_tag_column_can_be_hidden_from_the_view_menu_and_the_choice_is_remembered() {
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red", "Blue"])]) else {
+        return;
+    };
+    let mut h = H::new(sb, dir, 170, 30);
+    assert!(titles(&mut h).contains("Tags"), "{}", titles(&mut h));
+    // View ▾ has the switch, ticked.
+    h.click(&Target::Menu(rada_tui::app::MenuKind::View));
+    let s = h.screen();
+    assert!(s.contains("✓ Tags column"), "{s}");
+    let mut guard = 0;
+    while !menu_selected(&mut h).contains("Tags column") && guard < 20 {
+        h.key(KeyCode::Down);
+        guard += 1;
+    }
+    h.key(KeyCode::Enter);
+    assert!(!h.app.show_tags);
+    assert!(!titles(&mut h).contains("Tags"), "{}", titles(&mut h));
+    // The dots are gone from the list too (the details pane still has them).
+    let a_row = h
+        .screen()
+        .lines()
+        .find(|l| l.contains("a.txt"))
+        .unwrap()
+        .to_string();
+    assert!(!a_row.contains("● ●"), "{a_row}");
+    // Brought back by its key.
+    h.press("f8");
+    assert!(h.app.show_tags && titles(&mut h).contains("Tags"));
+}
+
+#[test]
+fn the_configuration_and_the_remembered_choice_decide_whether_the_column_shows() {
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
+        return;
+    };
+    // `tags_column = false` in the configuration.
+    let mut h = H::with_config(sb, dir, 170, 30, |c| c.tags_column = Some(false));
+    assert!(!h.app.show_tags);
+    assert!(!titles(&mut h).contains("Tags"));
+
+    // What was chosen last time, when the configuration says nothing.
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
+        return;
+    };
+    let h = H::with_config(sb, dir, 170, 30, |c| c.saved_ui.tags_column = Some(false));
+    assert!(!h.app.show_tags);
+    // And the file wins over what was remembered.
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
+        return;
+    };
+    let h = H::with_config(sb, dir, 170, 30, |c| {
+        c.tags_column = Some(true);
+        c.saved_ui.tags_column = Some(false);
+    });
+    assert!(h.app.show_tags);
+}
+
+#[test]
+fn up_to_three_dots_then_plus_n_and_a_tag_with_no_colour_is_a_dim_dot() {
+    let Some((sb, dir)) = scene(&[
+        ("a.txt", &["Red", "Blue", "Green", "Yellow", "Gray"]),
+        ("b.txt", &["Project X"]),
+    ]) else {
+        return;
+    };
+    let mut h = H::new(sb, dir, 170, 30);
+    let s = h.screen();
+    let a = s.lines().find(|l| l.contains("a.txt")).unwrap();
+    assert!(a.contains("● ● ● +2"), "{a}");
+    let th = h.app.th.clone();
+    let buf = h.term.backend().buffer().clone();
+    let y = (0..buf.area.height)
+        .find(|&y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                .contains("b.txt")
+        })
+        .unwrap();
+    let dot = (0..buf.area.width)
+        .rev()
+        .find(|&x| buf[(x, y)].symbol() == "●" && buf[(x, y)].fg == th.tag_color(None));
+    assert!(
+        dot.is_some(),
+        "a tag of its own, with no colour, is a dim dot"
+    );
+}

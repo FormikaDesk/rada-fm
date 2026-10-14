@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Draw the screenshots and the GIFs of the README from the tapes of docs/tapes (see the README
+# there). A fresh home folder of made-up files is made for each tape, so that what one tape
+# does (a copy, a tag) is not seen by the next.
+#
+#   scripts/docs-media               every tape
+#   scripts/docs-media principale    the tapes whose name starts with "principale"
+#
+# RADA_BIN is the program to draw (default: target/release/rada, built if it is missing).
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+filter=${1:-}
+
+for tool in vhs ttyd ffmpeg python3; do
+  command -v "$tool" > /dev/null || { echo "$tool is needed" >&2; exit 1; }
+done
+
+bin=${RADA_BIN:-target/release/rada}
+if [ ! -x "$bin" ]; then
+  cargo build --release -p rada
+fi
+bin=$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")
+
+work=$(mktemp -d -t rada-docs-XXXXXX)
+mkdir -p "$work/bin" docs/screenshots docs/media/.scarto
+ln -s "$bin" "$work/bin/rada"
+trap 'rm -r "$work"' EXIT
+
+for tape in docs/tapes/*.tape; do
+  name=$(basename "$tape" .tape)
+  case "$name" in ambiente*) continue ;; esac
+  case "$name" in "$filter"*) ;; *) continue ;; esac
+  echo "== $name"
+  home="$work/home-$name"
+  python3 scripts/demo-home "$home" > /dev/null
+  DEMO_HOME="$home" PATH="$work/bin:$PATH" vhs "$tape"
+done
+
+rm -r docs/media/.scarto

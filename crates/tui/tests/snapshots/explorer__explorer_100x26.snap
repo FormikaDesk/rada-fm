@@ -4,7 +4,7 @@ expression: shot(&mut h)
 ---
  rada  ▸ demo  ✕   +                                                                        ? Help
   ←   →   ↑   ⟳     ⌂ Home › projects › demo │ ⌕ Search file…                 Ctrl+P     ≣ Details
-  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                                     ⋯
+  New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo           ⋯
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
 │  ⌂ Home                  │ │ ☐   Name ↑        Date modified    Type                        Size │
 │                          │ │                                                                     │
@@ -27,4 +27,4 @@ expression: shot(&mut h)
 │ TAGS                     │ │ ☐ · screenshot.…  Yesterday        PNG image                5.34 KB │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯
  19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items read… v0.6.0 ⟳  183 GB free ■■■■■■□□□□  ≣  ▦  ▥
-   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all
+   Ctrl+C  copy   Ctrl+X  cut   Del  trash   Shift+Del  delete   R  rename all   Alt+z  compress

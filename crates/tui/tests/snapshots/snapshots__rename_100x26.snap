@@ -4,7 +4,7 @@ expression: shot(&mut h)
 ---
  rada  ▸ projects  ✕   +                                                                    ? Help
   ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search file…                 Ctrl+P     ≣ Details
-  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                                     ⋯
+  New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo           ⋯
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
 │  ⌂ Home                  │ │ ☐   Name ↑        Date modified    Type                        Size │
 │                          │ │                                                                     │

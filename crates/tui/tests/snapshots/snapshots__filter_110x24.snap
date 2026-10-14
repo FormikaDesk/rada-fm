@@ -4,7 +4,7 @@ expression: shot(&mut h)
 ---
  rada  ▸ projects  ✕   +                                                                              ? Help
   ←   →   ↑   ⟳     ⌕ txt▏                                                                 Esc     ≣ Details
-  +▾  │  ✂   ⧉   ⎘   Open the context menu  Shift+F10       command                                          ⋯
+  New ▾  │  Cut   Co Open the context menu  Shift+F10       command  ▾   Tags ▾  │  Undo                     ⋯
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
 │  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size │
 │                          │ │                                                                               │

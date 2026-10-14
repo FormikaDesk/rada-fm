@@ -25,4 +25,4 @@ expression: shot(&mut h)
 ╰───╯ ╰────────────────────────────────────────────────────────────────────────╯
  Enlarge the window for the full layout (now 80×24)  Esc: hide
  19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 i… v0.6.0 ⟳  183 GB free  ≣  ▦  ▥
-   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete
+   Ctrl+C  copy   Ctrl+X  cut   Del  trash   Shift+Del  delete   R  rename all

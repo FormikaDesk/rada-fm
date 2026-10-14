@@ -525,6 +525,11 @@ impl App {
         }
     }
 
+    /// [`folder_label`](Self::folder_label), for the demo scene of the README's pictures.
+    pub(super) fn folder_label_for_demo(&self, p: &Path) -> String {
+        self.folder_label(p)
+    }
+
     /// A folder as a message names it: "Documents", or "Home" for the home folder.
     fn folder_label(&self, p: &Path) -> String {
         if p == self.home() {

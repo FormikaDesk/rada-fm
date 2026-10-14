@@ -1,6 +1,6 @@
 # rada
 
-![rada: copy three big files with a plan first, watch the progress, then undo it](docs/media/demo.gif)
+![rada: look around, select three items, copy them with a plan first, see the card, take it back with Ctrl+Z](docs/media/demo.gif)
 
 **A safe harbor for your files.**
 
@@ -10,11 +10,32 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 2. **Undo always.** Every operation that finishes is recorded in a persistent journal and can be undone, even after a restart or a crash. If a file was modified after the operation, undo leaves it alone and tells you, instead of overwriting it.
 3. **Robust by construction.** Progress is counted in bytes. A failure on one file never stops the rest: you choose to skip, retry or abort, and the message always carries the full path. Symlinks stay symlinks (even broken or circular ones), nothing follows a link out of the tree, and a half-written file never appears under its final name.
 
-![rada: the folder list with an image preview](docs/screenshots/main.png)
+## The look
+
+![The main screen: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](docs/screenshots/principale-scuro.png)
+
+Three items are selected, two wait on the clipboard, the cursor is on a picture, and the card at the bottom right says the last copy went through, with **Annulla** and **Mostra** one click away. On a light terminal the same screen is "Carta", the paper theme:
+
+![The same screen on the light Carta theme](docs/screenshots/principale-carta.png)
+
+The interface speaks **Italian and English** (the screenshots are in Italian); it follows the system, or `language = "it"` / `"en"`. Everything is drawn with soft shapes — rounded cards, pills, a shade behind the cursor — where the terminal's font has the glyphs for them, and plainly where it has not (see [Terminals](#terminals)).
+
+| | |
+|---|---|
+| ![The Icons view](docs/screenshots/icone.png) | ![The Columns view](docs/screenshots/colonne.png) |
+| The **Icons** view: a big icon and the name. | The **Columns** view, as in the Finder: the folder above, the folder here, what is under the cursor; `←` and `→` move between the columns. |
+| ![The context menu](docs/screenshots/menu.png) | ![Open with…](docs/screenshots/apri-con.png) |
+| The menu of the right button, with each action's key. | **Apri con…** lists the programs that can open the file. |
+| ![The TAG section and the list of one tag](docs/screenshots/tag-blu.png) | ![The card after a copy](docs/screenshots/notifica.png) |
+| The **TAG** section of the sidebar and the list of what carries one (*Tag: Blu*). | After a copy, a move, the trash, a rename, a compression, an extraction or a change of tags, a card says what was done, with **Annulla** and **Mostra**. |
+| ![The plan window](docs/screenshots/piano.png) | ![Progress counted in bytes](docs/screenshots/avanzamento.png) |
+| Every operation shows a **plan** first. | Progress counted in bytes, with throughput and time left. |
+| ![The basic profile](docs/screenshots/basic.png) | ![A narrow terminal](docs/screenshots/stretta.png) |
+| The **basic profile** (`TERM=vt100`): ASCII, 16 colours, `[######----]` for a disk. | A narrow terminal: the sidebar is a column of icons. |
 
 ## Status
 
-Version 0.6.0-rc.4. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.5. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -22,7 +43,8 @@ rada is young and written by one person. The parts that touch your files — pla
 
 | | |
 |---|---|
-| **Looks like what you know** | Tabs on top, an address bar with clickable segments (type a path with `Ctrl+L`, with completion), a command bar (New, Cut, Copy, Paste, Rename, Compress, Delete, Sort, View and *Undo · copy of 3 items*), a navigation pane (Home, pinned folders, disks with how full they are, Trash), the folder as a table with checkboxes and plain-English types ("JPEG image", "Archive (tar.gz)") or as a grid of icons, a details pane with a big preview and the properties, a status bar and a row of key hints. Floating windows (plan, errors, prompts, jump palette) appear in the middle over a dimmed background; notifications come and go by themselves. It adapts to the terminal: below 140 columns the details pane steps aside, below 100 the buttons lose their words and the Type column goes, below 60 only name and size remain; on a short terminal the hints go first, then the command bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
+| **Looks like what you know, softer** | Tabs on top, **one bar** (the path as clickable crumbs and *Cerca file o digita un comando…* in a single pill; `Ctrl+P`, `Ctrl+L` or `Ctrl+F` start typing: a path is completed, words filter the files and offer the commands that match), a command bar (New, Cut, Copy, Paste, Rename, Compress, Delete, Sort, Tags and *Undo · copy of 3 items*), a navigation pane (Home, pinned folders, disks as ten segments, tags, Trash), the folder as a table with a **Tag column**, as a grid of icons or as **columns** like the Finder's, a details pane with a big preview whose corners are rounded, a status bar and a row of key hints. The three panels are rounded cards; buttons, the tab in front, key chips and column titles are pills; the row under the cursor is shaded and has rounded ends. A **card** at the bottom right says what an operation did, with *Undo* and *Show*, and goes by itself. It adapts to the terminal: below 140 columns the details pane steps aside, below 100 the buttons lose their words and the Type column goes, below 60 only name and size remain; on a short terminal the hints go first, then the command bar. Names with CJK, emoji or very long text stay aligned and are cut with `…`. |
+| **In your language** | Every text of the interface, the plan window and its warnings, the journal, the Type column ("Immagine JPEG"), dates ("3 giorni fa", "Oggi 15:21"), sizes (`70,7 KB`) and the key names are in Italian or English, from one table; the system decides, or `language = "it" \| "en"`. |
 | **Keyboard *and* mouse** | Vim keys and the usual desktop shortcuts work together by default (`y` or `Ctrl+C`, `d` or `Del`, `u` or `Ctrl+Z`…). The mouse selects, opens, scrolls, sorts by column, goes back and forward, picks places in the sidebar, and a right click opens a context menu that shows each shortcut. Every key can be rebound. |
 | **Plan window** | Copy, move, rename, bulk rename, new folder, trash, delete: all show a plan with totals and warnings first. Permanent deletion states clearly that it cannot be undone and asks you to type `yes`. |
 | **Journal + undo** | `u` undoes the last operation (with its own plan, so you see what undo will do). `U` shows the history. Undo of a copy removes exactly what the copy created; undo of a move moves back; undo of trash restores from the trash; undo of an overwrite brings the old file back. |
@@ -40,15 +62,7 @@ rada is young and written by one person. The parts that touch your files — pla
 | **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
 | **Hostile names are harmless** | Newlines, escape sequences, bidi controls and invalid UTF-8 in file names are shown as visible escapes. Paths are `Path`/`OsString` everywhere, never text. |
 
-![The plan window: totals, warnings, how clashes are settled, what will happen to each item](docs/screenshots/plan.png)
-
-![The jump palette](docs/screenshots/palette.png)
-
-![The context menu opened with the right mouse button, with each action's shortcut](docs/screenshots/menu.png)
-
-![The help: every action with its vim and classic keys side by side](docs/screenshots/help.png)
-
-![Progress counted in bytes, with throughput and time left](docs/screenshots/progress.png)
+![The help: every action with its vim and classic keys side by side](docs/screenshots/aiuto.png)
 
 ## Download
 
@@ -131,9 +145,11 @@ pdf_timeout_seconds = 8   # a PDF that takes longer to draw is given up on
 mouse = true          # false: rada never captures the mouse
 sidebar = true        # the navigation pane; Ctrl+B toggles it and remembers
 show_hints = true     # false: no row of key hints at the bottom (`hints` is the older name)
-layout = "explorer"   # explorer | compact (no address bar, command bar or hints: the most room)
+layout = "explorer"   # explorer | compact (no bar, command bar or hints: the most room)
 show_details_pane = true  # false: never show the details pane by itself (Alt+P still does)
-view = "details"      # details | icons: how a new tab shows a folder
+view = "details"      # details | icons | columns: how a new tab shows a folder
+tags_column = true    # the coloured dots of the tags in their own column of the Details view
+language = "auto"     # auto (from the system) | it | en
 remember_tabs = true  # reopen the tabs of the last session
 dates = "relative"    # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm, in the order of your locale)
 folder_sizes = "auto" # auto: count the size of the folders you can see, in the background | items: only how many items each holds | off
@@ -206,11 +222,11 @@ What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no ow
 
 ## Updates
 
-rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.4`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
+rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.5`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
 
 When one exists you see it twice: a pill in the accent colour in the tab bar, **↑ Update to X**, and the status bar, **New version X available — press Alt+U to update** (click either). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later.
 
-The status bar always shows the version that is running, **v0.6.0-rc.4 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
+The status bar always shows the version that is running, **v0.6.0-rc.5 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
 
 ```sh
 rada update --check     # only say whether a newer version exists, and what is in it
@@ -264,29 +280,41 @@ The Finder's tags on macOS (the extended attribute `com.apple.metadata:_kMDItemU
 - **Change them**: the right-click menu has *Tags ▸* with the seven colours, the other tags the selected items already carry, *New tag…* and *Remove all tags*. A tag is ticked when every selected item has it, and choosing it takes it off from all; otherwise it is given to all. It works on a selection.
 - **Like everything else rada does to files**, a change of tags shows a **plan** first (what each item had and will have), is written to the **journal** and can be **undone** — and undo leaves tags alone that someone changed after the operation. In the JSON requests it is `set_tags`.
 - **Copies and moves keep them** (on macOS only the tags are carried over: the rest of the extended attributes is not done yet, and the plan still says so).
-- **Find them**: type `tag:red` (or any part of a tag's name, or `tag:` alone for "anything tagged") in the search field; other words still match names.
+- **Find them**: type `tag:red` (or any part of a tag's name, or `tag:` alone for "anything tagged") in the bar; other words still match names.
 
 ## The screen
 
-From the top: a row of **tabs**, the **address bar**, the **command bar**, then the body — the **navigation pane**, the folder, the **details pane** — a **status bar** and a row of **key hints**. Everything drawn as a button does what its key does, through the same path: a plan first, then your confirmation, then the operation.
+From the top: a row of **tabs**, the **bar**, the **command bar**, then the body — three rounded cards: the **navigation pane**, the folder, the **details pane** — a **status bar** and a row of **key hints**. Everything drawn as a button does what its key does, through the same path: a plan first, then your confirmation, then the operation.
 
 ### Tabs
 
 `Ctrl+T` opens a tab in the current folder, `Ctrl+W` closes it (the last one is not closed: it goes back to Home), `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Ctrl+PgDn` / `Ctrl+PgUp` switch, `Alt+1` … `Alt+9` jump, a click on a tab switches and a middle click (or its ✕) closes it. Each tab has its own folder, history, cursor, selection, sort order and view; the clipboard, the journal and undo are shared. The open tabs are remembered between sessions (`remember_tabs = false` turns that off); a folder given on the command line opens in a tab of its own beside them. On a narrow terminal the tabs fold into `‹ 2/3 ›`.
 
-### Address bar and search
+### The bar
 
-Back `←`, forward `→`, up `↑` and refresh `⟳` sit at the left (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys). The path is clickable segment by segment, with `…` folding a long one (click it to pick a hidden folder). Click the path outside its words, or press `Ctrl+L` / `Alt+D` / `F4`, to **type an address**: `~` is your home, relative paths start at the current folder, `Tab` completes with the subfolders (listed by a background worker, never while you type), `↑` `↓` choose among the suggestions, `Enter` goes, `Esc` leaves. On the right is the **search** field (`Ctrl+F` or `/`): it filters the current folder as you type.
+One pill holds the path and the search. At rest it shows the path as clickable crumbs (`…` folds a long one; click it to pick a hidden folder) and *Cerca file o digita un comando…* with a **Ctrl+P** chip; under it a thin line fades from one accent to the other. At the left sit back `‹`, forward `›`, up `↑` and refresh `⟳` (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys), at the right the pill of the view (*Colonne*, *Dettagli*, *Icone*).
+
+`Ctrl+P` (`m` in the vim keys), `Ctrl+L`, `Alt+D`, `F4`, `Ctrl+F`, `/` or a click on the pill start typing, and what you type decides what happens:
+
+- a **path** (`~/Documenti`, `/etc`, `../x`): `~` is your home, relative paths start at the current folder, `Tab` completes with the subfolders (listed by a background worker, never while you type), `Enter` goes. `Ctrl+L` selects the old path, so typing replaces it;
+- **words**: the files of this folder are filtered as you type (`tag:red` finds by tag), and under the bar the **commands** that match (*Copia*, *Nuova cartella*, *Vista a colonne*…) and the places (folders, recents, pinned, disks) are offered. `↑` `↓` choose, `Enter` runs the one chosen; with none chosen it keeps the filter if files match, otherwise it runs the best command;
+- `Esc` goes back to the path and clears the filter; `Backspace` on an empty bar closes it.
 
 ### Command bar
 
-**+ New ▾** (a folder or an empty file), **Cut, Copy, Paste, Rename, Compress, Delete**, **Sort ▾**, **View ▾** and **Undo · copy of 3 items**, which says what the next undo would undo (taken from the journal). A button that cannot be used right now is faint and does nothing. Below 100 columns only the icons stay; the **⋯** at the right has the rest.
+**+ New ▾** (a folder or an empty file), **Cut, Copy, Paste, Rename, Compress, Delete**, **Sort ▾**, **Tags ▾** (where the system has tags) and **Undo · copy of 3 items**, which says what the next undo would undo (taken from the journal). A button that cannot be used right now is faint and does nothing. Below 100 columns only the icons stay; the **⋯** at the right has the rest.
 
 ### The folder
 
-**Details** shows a checkbox, the icon and name (folders in the accent colour and bold), the date, the type in words and the size; the column titles sort (click again to reverse, an arrow marks the sorted one). A click on a name moves the cursor; the box on the left, or `Space`, selects; double-click or `Enter` opens. The row under the cursor is solid with white text and a bar at its left; selected rows have a quiet background, a ticked box and a bold name. Dates are relative ("Today 14:03", "Yesterday", "3 days ago", "2 weeks ago", then the full date in the order your locale uses; `dates = "absolute"` always writes it in full). The size of a **folder** is counted in the background, only for the folders on screen (`···` while it counts, `> 3.2 GB` when it had to stop early): links, other disks, `/proc`, `/sys`, `/dev` and network shares are not entered, and `folder_sizes` (`auto`, `items`, `off`) with `folder_size_seconds` and `folder_size_entries` set how far it goes.
+**Details** shows a checkbox, the icon and name (folders in the accent colour and bold), the date, the type in words and the size; the column titles sort (click again to reverse, an arrow marks the sorted one). A click on a name moves the cursor; the box on the left, or `Space`, selects; double-click or `Enter` opens. The row under the cursor has a shade that goes from one accent to the other, white bold text and rounded ends (on a terminal without true colour or without a Nerd Font it is a solid colour); selected rows have a quiet background, a ticked box and a bold name. The **Tag** column shows the dots of the tags (three at most, then `+2`); *Vista ▾* or `F8` hides it, and it goes by itself when the name would get too little room. Dates are relative ("Today 14:03", "Yesterday", "3 days ago", "2 weeks ago", then the full date in the order your locale uses; `dates = "absolute"` always writes it in full). The size of a **folder** is counted in the background, only for the folders on screen (`···` while it counts, `> 3.2 GB` when it had to stop early): links, other disks, `/proc`, `/sys`, `/dev` and network shares are not entered, and `folder_sizes` (`auto`, `items`, `off`) with `folder_size_seconds` and `folder_size_entries` set how far it goes.
 
-**Icons** shows tiles with a big icon and the name under it, cut with `…`. The arrows and `h` `j` `k` `l` move in two dimensions; selection and every action are the same. Switch with **View ▾**, the two buttons at the right of the status bar, `Ctrl+1` / `Ctrl+2` (if your terminal tells them apart) or `v`.
+**Icons** shows tiles with a big icon and the name under it, cut with `…`. The arrows and `h` `j` `k` `l` move in two dimensions; selection and every action are the same. Switch with the pill of the view, the buttons at the right of the status bar, `Ctrl+1` / `Ctrl+2` / `Ctrl+3` (if your terminal tells them apart) or `v`.
+
+**Columns** is the Finder's view: the folder above on the left, this folder in the middle, and on the right what is under the cursor (a folder's contents, or the preview of a file). `→` or `l` goes into a folder, `←` or `h` to the folder above. Under 54 columns of width it falls back to the table.
+
+### Notifications
+
+When a copy, a move, the trash, a rename, a compression, an extraction or a change of tags is done, a soft card appears at the bottom right: *✓ 3 elementi copiati in Documenti*, then *Annulla Ctrl+Z · Mostra*, both clickable (*Mostra* goes to the folder). It never takes the focus: the first key you press goes to the list, and the card goes with it, or by itself after about six seconds. Cards that come one after the other wait their turn. An **error** stays, in the error colours, until you close it with `Esc` or a click.
 
 ### Details pane
 
@@ -294,11 +322,11 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 
 ### Navigation pane
 
-**Home**, then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of how full it is and what is free) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
+**Home**, then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of ten segments, `■■■■■■□□□□`, of how full it is, and what is free; `[######----]` in the basic profile), **TAGS** (the colours and your own tags) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
 
 ### Status bar and hints
 
-`19 items │ ☑ 3 selected · 56.7 MB │ ⎘ 2 items ready to paste` on the left; on the right the free space of the current disk and the Details / Icons buttons. Under it the **hints**: the keys that make sense now, drawn as pills and generated from your real keymap, so they follow `keymap = "vim"` and whatever you rebound. `show_hints = false` hides them; on a short terminal they go first, then the command bar.
+`19 elementi │ ☑ 3 selezionati · 56,7 MB │ ⎘ 2 elementi da incollare` on the left (the screenshots are in Italian; in English, `19 items │ ☑ 3 selected · 56.7 MB │ ⎘ 2 items ready to paste`); on the right the free space of the current disk as a bar of segments and the buttons of the three views. Under it the **hints**: the keys that make sense now, drawn as pills and generated from your real keymap, so they follow `keymap = "vim"` and whatever you rebound. `show_hints = false` hides them; on a short terminal they go first, then the command bar.
 
 ### Open with…
 
@@ -312,10 +340,6 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 ### Context menu
 
 Right click (or `Shift+F10`, or the Menu key). On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.
-
-![The explorer look](docs/screenshots/bars.png)
-
-![The navigation pane as a column of icons on a narrow terminal](docs/screenshots/sidebar-narrow.png)
 
 ## Themes
 
@@ -332,9 +356,9 @@ Three looks, each with a dark and a light variant:
 
 `rada-light` is "paper": a warm off-white background instead of pure white, which is easier on the eyes. `nebbia-light` ("mist") is the same idea with a cool grey-blue paper. Both paint their own background; on a 16-colour terminal the terminal's background is kept.
 
-![Catppuccin](docs/screenshots/theme-catppuccin.png)
-![Tokyo Night](docs/screenshots/theme-tokyo-night.png)
-![rada on a light terminal](docs/screenshots/theme-rada-light.png)
+![Catppuccin](docs/screenshots/tema-catppuccin.png)
+![Tokyo Night](docs/screenshots/tema-tokyo-night.png)
+![rada on a light terminal](docs/screenshots/principale-carta.png)
 
 The light variants use the same tokens, chosen so they read on a pale background: automatic tests check the contrast of every token against the colour it is meant to sit on (7:1 for the main text, 4.5:1 for secondary text, accents, file types and statuses). Catppuccin Latte and Tokyo Night Day are deepened where the original colours are too pale to read as text.
 
@@ -409,12 +433,12 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | undo · redo | `u` · `Ctrl+R` | `Ctrl+Z` · `Ctrl+Y` (or `Ctrl+Shift+Z`) |
 | back · forward in the folder history | `Alt+←` · `Alt+→`, or `Ctrl+O` · `Ctrl+G` (both schemes) | |
 | history of operations | `U` | `F3` |
-| filter this folder | `/` | `Ctrl+F` |
-| jump palette (folders, recents, pinned, disks) | `m` | `Ctrl+P` |
+| filter this folder (in the bar) | `/` | `Ctrl+F` |
+| the bar: commands, files, folders, recents, pinned, disks | `m` | `Ctrl+P` |
 | edit the address · refresh | `Ctrl+L` `Alt+D` `F4` · `F5` (both schemes) | |
 | properties · open with… · copy path · terminal here | `i` · `O` · `Y` · `t` | `Alt+Enter` · `Alt+O` · `Ctrl+Shift+C` · `Ctrl+Alt+T` |
 | tabs: new · close · next · previous · jump | `Ctrl+T` `Ctrl+W` `Ctrl+Tab` `Ctrl+Shift+Tab` `Alt+1…9` (both schemes) | |
-| details pane · Details / Icons · context menu | `Alt+P` or `F6` · `Ctrl+1` `Ctrl+2` or `v` · `Shift+F10` or `Menu` | |
+| details pane · Details / Icons / Columns · context menu · Tag column | `Alt+P` or `F6` · `Ctrl+1` `Ctrl+2` `Ctrl+3` or `v` · `Shift+F10` or `Menu` · `F8` | |
 | sort key · reverse · hidden files | `s` `S` `.` | |
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
 | pin this folder (or the item in the navigation pane) · home | `B` · `~` | |
@@ -430,7 +454,7 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 ### Mouse
 
-Click a name to put the cursor there; the box on its left (or `Space`) selects; double-click opens; the wheel scrolls (a turn is three rows, or one row of tiles); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: the tabs (middle click closes), **← → ↑ ⟳**, the path segments, the search field, every button of the command bar, a column title to sort, an item of the navigation pane (right-click for *Open* and *Pin / Unpin*), the buttons of the details pane, the Details / Icons switch, every key of the hints, a row of the palette, and the buttons of any window. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop is planned for a later release.
+Click a name to put the cursor there; the box on its left (or `Space`) selects; double-click opens; the wheel scrolls (a turn is three rows, or one row of tiles); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: the tabs (middle click closes), **← → ↑ ⟳**, the path segments, the bar, every button of the command bar, a column title to sort, an item of the navigation pane (right-click for *Open* and *Pin / Unpin*), the buttons of the details pane, the Details / Icons switch, every key of the hints, a command or place offered by the bar, and the buttons of any window. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop is planned for a later release.
 
 ### Keys that terminals take for themselves
 

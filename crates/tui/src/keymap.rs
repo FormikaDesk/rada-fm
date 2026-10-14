@@ -1341,6 +1341,44 @@ mod tests {
     }
 
     #[test]
+    fn keys_are_written_on_their_caps_in_the_language_in_use() {
+        use rada_core::i18n::{Lang, with_lang};
+        let shown = |spec: &str| Chord::parse(spec).unwrap().to_string();
+        assert_eq!(shown("enter"), "Enter");
+        assert_eq!(shown("space"), "Space");
+        assert_eq!(shown("delete"), "Del");
+        with_lang(Lang::It, || {
+            assert_eq!(shown("enter"), "Invio");
+            assert_eq!(shown("space"), "Spazio");
+            assert_eq!(shown("delete"), "Canc");
+            assert_eq!(shown("shift+delete"), "Shift+Canc");
+            // Names that need no translation stay, and ctrl chords are the same.
+            assert_eq!(shown("ctrl+c"), "Ctrl+C");
+            assert_eq!(shown("f2"), "F2");
+            assert_eq!(shown("esc"), "Esc");
+        });
+        // The configuration may use either language for the same key.
+        for (a, b) in [("invio", "enter"), ("spazio", "space"), ("canc", "delete")] {
+            assert_eq!(Chord::parse(a), Chord::parse(b));
+        }
+    }
+
+    #[test]
+    fn every_action_is_called_something_in_both_languages() {
+        use rada_core::i18n::Lang;
+        for a in Action::ALL {
+            let (en, it) = (
+                a.label_key().in_lang(Lang::En),
+                a.label_key().in_lang(Lang::It),
+            );
+            assert!(!en.is_empty() && !it.is_empty(), "{a:?}");
+        }
+        for g in Group::ALL {
+            assert!(!g.title().is_empty());
+        }
+    }
+
+    #[test]
     fn ids_round_trip() {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));

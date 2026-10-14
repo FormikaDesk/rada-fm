@@ -9,18 +9,18 @@ s success, w warn, e error, k file kind, + a tint, . none
 text colour
 AAAAAAddtttttddttttttddd.......AAAAAAAA.
 .ttt.ttt....ddddddmmmtmmmttttYYYYYYYY...
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-Ammm..AAAAAAAAAAAAAAAAAAAA..dddddddddd.A
-A......................................A
-AAA.kktttttttttt............dddddddddd.A
-AAA.kktttttttttt............dddddddddd.A
-AAm.kkttttttttt.............dddddddddd.A
-AAm.kktttttttt..............dddddddddd.A
-AAm.kktttttttt..............dddddddddd.A
-AAm.kkttttttt...............dddddddddd.A
-AAm.kkttttttttt.............dddddddddd.A
-AAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+rmmm..AAAAAAAAAAAAAAAAAAAA..dddddddddd.r
+r......................................r
+rAA.kktttttttttt............dddddddddd.r
+rAA.kktttttttttt............dddddddddd.r
+rAm.kkttttttttt.............dddddddddd.r
+rAm.kktttttttt..............dddddddddd.r
+rAm.kktttttttt..............dddddddddd.r
+rAm.kkttttttt...............dddddddddd.r
+rAm.kkttttttttt.............dddddddddd.r
+rAWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWr
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 .ttttttttmmmmmAAA.ddddddddddddooodddddd.
 

@@ -140,8 +140,9 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
         .iter()
         .position(|l| l.contains("  file ") && l.contains("in total"))
         .unwrap_or_else(|| panic!("no 'file' label: {s}"));
-    let at = lines[i].find("file").unwrap();
-    assert!(lines[i - 1][at..].starts_with('1'), "{s}");
+    // Columns of the screen, not bytes: the pane behind the window has multi-byte marks.
+    let at = lines[i][..lines[i].find("file").unwrap()].chars().count();
+    assert_eq!(lines[i - 1].chars().nth(at), Some('1'), "{s}");
     assert!(s.contains("What will happen"), "{s}");
     assert!(
         !dest.join("a.txt").exists(),
@@ -152,8 +153,8 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     assert_eq!(std::fs::read_to_string(dest.join("a.txt")).unwrap(), "ay");
     h.wait("toast", |a| a.current_notice().is_some());
     let toast = h.app.current_notice().unwrap().text.clone();
-    assert_eq!(toast, "Copied 1 file — press u to undo");
-    assert!(h.screen().contains("Copied 1 file"));
+    assert_eq!(toast, "1 item copied to elsewhere.d");
+    assert!(h.screen().contains("1 item copied to elsewhere.d"));
 
     h.keys("u");
     plan_modal(&mut h);
@@ -472,6 +473,75 @@ fn the_image_facts_follow_the_picture_directly() {
         facts_row,
         last_picture_row + 1,
         "no empty row between the picture and its facts:\n{s}"
+    );
+}
+
+#[test]
+fn the_picture_has_rounded_corners_blended_into_the_background() {
+    use ratatui::style::Color;
+    let sb = Sandbox::new();
+    sb.write("pics/a_first.txt", "x");
+    sb.write("pics/photo.png", png_bytes(1600, 1066));
+    let dir = sb.path("pics");
+    let mut h = H::new(sb, dir, 170, 40);
+    let _ = show_photo(&mut h);
+    let th = h.app.th.clone();
+    let canvas = rada_tui::theme::rgb_of(th.canvas).unwrap();
+    let buf = h.term.backend().buffer().clone();
+    // The cells of the picture: half blocks in colours that are no theme token.
+    let tokens = th.all_colors();
+    let is_pixel = |c: Color| matches!(c, Color::Rgb(..)) && !tokens.contains(&c);
+    let mut cells = Vec::new();
+    for y in 0..buf.area.height {
+        for x in 0..buf.area.width {
+            let c = &buf[(x, y)];
+            if matches!(c.symbol(), "▀" | "▄") && is_pixel(c.fg) && is_pixel(c.bg) {
+                cells.push((x, y));
+            }
+        }
+    }
+    assert!(cells.len() > 100, "the picture is on the screen");
+    let (x0, y0) = (
+        cells.iter().map(|c| c.0).min().unwrap(),
+        cells.iter().map(|c| c.1).min().unwrap(),
+    );
+    let (x1, y1) = (
+        cells.iter().map(|c| c.0).max().unwrap(),
+        cells.iter().map(|c| c.1).max().unwrap(),
+    );
+    // How far a colour is from the background, summed over the channels.
+    let away = |c: Color| -> i32 {
+        let Color::Rgb(r, g, b) = c else { return 999 };
+        [r, g, b]
+            .iter()
+            .zip(canvas)
+            .map(|(a, b)| (*a as i32 - b as i32).abs())
+            .sum()
+    };
+    // A cell is two pixels, one above the other: the upper one is the background of a lower
+    // half block and the foreground of an upper one.
+    let upper = |x: u16, y: u16| {
+        let c = &buf[(x, y)];
+        if c.symbol() == "▄" { c.bg } else { c.fg }
+    };
+    let lower = |x: u16, y: u16| {
+        let c = &buf[(x, y)];
+        if c.symbol() == "▄" { c.fg } else { c.bg }
+    };
+    // The outermost pixel of each corner is the background, to within the blur of scaling.
+    let corners = [
+        (x0, y0, upper(x0, y0)),
+        (x1, y0, upper(x1, y0)),
+        (x0, y1, lower(x0, y1)),
+        (x1, y1, lower(x1, y1)),
+    ];
+    for (x, y, px) in corners {
+        assert!(away(px) <= 100, "corner ({x},{y}): {px:?} vs {canvas:?}");
+    }
+    let mid = &buf[((x0 + x1) / 2, (y0 + y1) / 2)];
+    assert!(
+        away(mid.fg) > 150 && away(mid.bg) > 150,
+        "the middle of the picture is its own"
     );
 }
 

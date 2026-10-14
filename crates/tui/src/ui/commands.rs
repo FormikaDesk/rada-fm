@@ -31,6 +31,8 @@ enum Level {
     Roomy,
     /// The same, tighter.
     Words,
+    /// Words only, the icons given up (Italian words are longer).
+    Text,
     /// Icons only.
     Icons,
 }
@@ -39,7 +41,7 @@ impl Level {
     fn between(self) -> &'static str {
         match self {
             Level::Roomy => "  ",
-            Level::Words | Level::Icons => " ",
+            Level::Words | Level::Text | Level::Icons => " ",
         }
     }
 
@@ -67,6 +69,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     let new_icon = icons::ui(set, Glyph::New);
     let new_text = match level {
         Level::Icons => format!("{new_icon}▾"),
+        Level::Text => format!("{} ▾", Key::MenuNew.tr()),
         _ => format!("{new_icon} {} ▾", Key::MenuNew.tr()),
     };
     if nowhere {
@@ -101,7 +104,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         let icon = icons::ui(set, glyph);
         let text = match (level, icon.is_empty()) {
             (Level::Icons, false) => icon.to_string(),
-            (_, true) => word.to_string(),
+            (_, true) | (Level::Text, _) => word.to_string(),
             _ => format!("{icon} {word}"),
         };
         if enabled {
@@ -246,6 +249,7 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
         (Level::Roomy, false),
         (Level::Words, true),
         (Level::Words, false),
+        (Level::Text, false),
         (Level::Icons, false),
     ];
     let mut chosen = None;

@@ -6,6 +6,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 
+## [0.6.0-rc.5] - 2026-10-14
+
+A restyling release: a softer look, the interface in Italian, one bar at the top, a Tag column, notifications and a third view. Still a **pre-release**.
+
+### Added
+- **The interface speaks Italian.** Every text of the interface — the plan window and its warnings, the journal, the Type column ("Immagine JPEG", "Archivio (tar.gz)"), dates ("3 giorni fa", "Ieri", "Oggi 15:21"), sizes (`70,7 KB`), the help, the menus, the hints, the key names (`Invio`, `Spazio`, `Canc`) and the notifications — comes from one table of English and Italian texts. The language is the system's (`LC_ALL`, `LC_MESSAGES` and `LANG` on Linux, the language preferences on macOS, the interface language on Windows) or the one the configuration asks for: `language = "auto" | "it" | "en"`. A key without both languages does not compile, and tests check the placeholders and that the layout holds the longest Italian words at 170, 140, 120 and 80 columns. The configuration accepts the Italian names of keys (`invio`, `spazio`, `canc`).
+- **One bar at the top.** The path as crumbs and *Search files or type a command…* are one field, a pill with the key that starts it (`Ctrl+P`) and a thin shaded line under it. `Ctrl+P`, `Ctrl+L` and `Ctrl+F` all start it: a path is completed and gone to, words filter the files as you type and offer the commands (and the places) that match, `Enter` runs the one picked with the arrows (or keeps the filter), `Esc` goes back to the path. `Ctrl+L` shows the path selected: the first key typed replaces it. The buttons *back*, *forward*, *up* and *refresh* are little pills on the left, the view in use is a pill on the right.
+- **Soft shapes.** The three panels are cards with rounded corners; the buttons, the tab in front, the key chips and the column titles are pills; the row under the cursor, the selected rows and the current place of the sidebar have rounded ends. Where the font has no half-circle glyphs, a pill is a flat rectangle of the same size.
+- **A shade behind the cursor.** The row under the cursor is shaded cell by cell from `grad_row_start` to `grad_row_end` with bold white text, and the line under the bar from `grad_line_start` to `grad_line_end`: four new theme tokens in every theme (dark `#3d59a1 → #6a4c9c` and `#7aa2f7 → #bb9af7`, Carta `#476fa8 → #7d58a6` and `#3d68a3 → #8a57a8`). The white text reads at 4.5:1 or better at both ends and everywhere between, in every theme (a test). On a 256-colour terminal the shades are solid colours; in the basic profile and without Nerd Font glyphs there are neither shades nor special glyphs.
+- **A Tag column** in the list: a dot in the colour of each tag, three at most, then `+N`. *View ▾* shows or hides it (`F8`, remembered), and so does `tags_column = true | false` in the configuration. It comes last and goes first when the name would get too little room.
+- **Disks as ten segments**, `■■■■■■□□□□`, in the sidebar and the status bar (`[######----]` in the basic profile).
+- **Notifications** at the bottom right, a soft card: after a copy, move, trash, rename, compression, extraction or tag change, *3 elementi copiati in Documenti* with **Annulla** (`Ctrl+Z`) and **Mostra**, both clickable. They go by themselves after about six seconds or at the first key (which still does its job), never take the keyboard, and queue one at a time; an error stays until it is closed (a click, or `Esc`). Tests run them on a fake clock.
+- **The Columns view**, as in the Finder: the folder above (the one you are in picked out), the folder you are in, and what the item under the cursor holds or its preview. `←` goes to the folder above, `→` into the folder under the cursor; `Ctrl+3`, *View ▾* and `view = "columns"` choose it.
+- **Pictures with rounded corners**, a mask applied to the pixels before they are sent to the terminal and blended into the background colour, so every graphics protocol (and the half blocks) shows it.
+- `scripts/demo-home` makes a home folder of made-up files, and `docs/tapes/` has the [VHS](https://github.com/charmbracelet/vhs) tapes that draw the screenshots and the GIFs of the README (`scripts/docs-media`).
+
+### Changed
+- The Palette is no longer a window: it is the bar at the top.
+- Notifications are no longer a one-line pill that replaces the last one.
+- The command bar has *Tag ▾* in place of *View ▾* (the view is the pill on the right), and gives up its icons before its words on a narrower terminal.
+- The key hints close up their gaps before dropping one.
+- The list leaves a blank row under the column titles.
+
 ## [0.6.0-rc.4] - 2026-10-13
 
 A release in which tags have a place of their own, updates can be seen, "Open with…" knows what is installed, and the terminal profiles and icon sets of @chrias (pull request #1) join the line: thank you. Still a **pre-release**.

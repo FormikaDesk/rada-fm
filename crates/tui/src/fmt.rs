@@ -424,6 +424,37 @@ mod tests {
     }
 
     #[test]
+    fn dates_and_sizes_are_written_the_italian_way() {
+        use rada_core::i18n::{Lang, with_lang};
+        let utc = jiff::tz::TimeZone::UTC;
+        let now = day(2026, 10, 10, 16, 0);
+        let rel =
+            |t| explorer_date_in(Some(t), now, DateStyle::Relative, DateFormat::DEFAULT, &utc);
+        with_lang(Lang::It, || {
+            assert_eq!(rel(day(2026, 10, 10, 14, 3)), "Oggi 14:03");
+            assert_eq!(rel(day(2026, 10, 9, 23, 59)), "Ieri");
+            assert_eq!(rel(day(2026, 10, 7, 12, 0)), "3 giorni fa");
+            assert_eq!(rel(day(2026, 9, 26, 12, 0)), "2 settimane fa");
+            assert_eq!(rel(day(2026, 7, 5, 9, 0)), "05/07/2026");
+            let f = |t| date_with_day(Some(t), now, DateFormat::DEFAULT, &utc);
+            assert_eq!(f(day(2026, 10, 10, 15, 21)), "Oggi, 15:21");
+            assert_eq!(f(day(2026, 10, 9, 9, 12)), "Ieri, 09:12");
+            assert_eq!(size(72_397), "70,7 KB");
+            assert_eq!(size(2_400_000), "2,29 MB");
+            assert_eq!(size(512), "512 B");
+            assert_eq!(thousands(1_234_567), "1.234.567");
+            assert_eq!(month_name(7), "lug");
+            assert_eq!(count(3, Key::ItemOne, Key::ItemMany), "3 elementi");
+            assert_eq!(selected_items(1), "1 elemento selezionato");
+            assert_eq!(selected_items(3), "3 elementi selezionati");
+        });
+        // English is what it was.
+        assert_eq!(rel(day(2026, 10, 9, 23, 59)), "Yesterday");
+        assert_eq!(size(72_397), "70.7 KB");
+        assert_eq!(month_name(7), "Jul");
+    }
+
+    #[test]
     fn thousands_separators() {
         assert_eq!(thousands(0), "0");
         assert_eq!(thousands(999), "999");
