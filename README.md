@@ -326,6 +326,8 @@ One pill holds the path and the search. At rest it shows the path as clickable c
 
 When a copy, a move, the trash, a rename, a compression, an extraction or a change of tags is done, a card appears at the bottom right of the list: *✓ 3 elementi copiati in Documenti*, then *Annulla  Ctrl+Z · Mostra*, both clickable (*Mostra* goes to the folder). Up to three are piled, each with its own six seconds and a bottom edge that shortens as they pass; the list is made shorter while they are there, so they never cover its text. The first key you press goes to the list, and the cards go with it. An operation that is running is a card too, with its progress bar, *42% · 12 MB/s · 3 s* and *Interrompi*. An **error** stays, with a red side, until you close it with `Esc` or a click.
 
+![An error over a card that is done, on the light Carta theme](docs/screenshots/notifiche-carta.png)
+
 ### Details pane
 
 The name with its icon, the type and size, a big preview (pictures, a PDF's first page, text, an archive's contents), then **Open** (full width), **Open with…** and **Preview** (the preview over the whole screen), then the properties: *Dimensions* for pictures, *Size* with the exact bytes, *Modified*, *Created* where the file system keeps it, *Location* and *Permissions*. It is a column from 140 columns; below that `Alt+P` shows it over the right of the list. `Alt+P` toggles it and the choice is remembered.
