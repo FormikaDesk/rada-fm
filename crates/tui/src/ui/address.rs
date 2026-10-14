@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use rada_core::display;
-use rada_core::i18n::{Key, tf};
+use rada_core::i18n::Key;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -41,8 +41,8 @@ fn home_label(app: &App) -> String {
 fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
     // A tag's items are not on a path: one segment, which is the list itself.
-    if let Some(tag) = app.tag_view() {
-        return vec![(tf(Key::TagViewTitle, &[&tag]), app.cwd.clone())];
+    if let Some(title) = app.view_title() {
+        return vec![(title, app.cwd.clone())];
     }
     let home = app.home();
     let (first, rest) = match app.cwd.strip_prefix(home) {

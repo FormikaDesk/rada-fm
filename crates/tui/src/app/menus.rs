@@ -169,6 +169,9 @@ impl App {
             let cur = self.current();
             // Opening.
             items.push(MenuItem::act(Open, true, false));
+            if self.tag_view().is_some() {
+                items.push(MenuItem::act(ShowInFolder, true, false));
+            }
             if cur.is_some_and(|e| e.package) {
                 items.push(MenuItem::act(ShowPackage, true, false));
             }

@@ -26,6 +26,9 @@ pub struct Entry {
     /// ordering by size reads it.
     pub dir_size: Option<u64>,
     pub mtime: Option<SystemTime>,
+    /// When it was last used, where a list says so (the list of recent files); the ordering
+    /// and the date column by date read it before `mtime`.
+    pub used: Option<SystemTime>,
     /// When it was created, where the filesystem records that.
     pub created: Option<SystemTime>,
     pub mode: Option<u32>,
@@ -121,6 +124,7 @@ impl Entry {
             size: meta.size,
             dir_size: None,
             mtime: meta.mtime,
+            used: None,
             created: meta.btime,
             type_label,
             mode: meta.mode,
@@ -148,6 +152,7 @@ impl Entry {
             size: 0,
             dir_size: None,
             mtime: None,
+            used: None,
             created: None,
             type_label: Cow::Borrowed("Unreadable"),
             mode: None,
@@ -373,7 +378,7 @@ pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
     let primary = match spec.key {
         SortKey::Name => by_name(),
         SortKey::Size => size_key(a).cmp(&size_key(b)),
-        SortKey::Modified => a.mtime.cmp(&b.mtime),
+        SortKey::Modified => a.used.or(a.mtime).cmp(&b.used.or(b.mtime)),
         SortKey::Type => a
             .type_label
             .to_lowercase()

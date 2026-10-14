@@ -24,6 +24,11 @@ pub struct LinuxPlatform {
 }
 
 impl LinuxPlatform {
+    /// The list the desktop's programs keep of the files they opened.
+    fn recent_file(&self) -> std::path::PathBuf {
+        self.dirs.data.join("recently-used.xbel")
+    }
+
     pub fn new(dirs: Dirs) -> Self {
         let trash = FreedesktopTrash::new(dirs.home_trash(), Arc::new(LocalFs));
         Self::with_trash(dirs, trash)
@@ -77,6 +82,16 @@ impl Platform for LinuxPlatform {
     }
     fn tags(&self) -> Option<&dyn super::TagStore> {
         Some(&self.tags)
+    }
+    fn recent_available(&self) -> bool {
+        self.recent_file().is_file()
+    }
+    fn recent_files(
+        &self,
+        _cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(std::path::PathBuf, std::time::SystemTime)>> {
+        let text = std::fs::read_to_string(self.recent_file()).ok()?;
+        Some(crate::recents::parse_xbel(&text))
     }
     fn user_dirs(&self) -> UserDirs {
         // xdg-user-dirs: `$XDG_CONFIG_HOME/user-dirs.dirs`. Without it the system has

@@ -91,6 +91,8 @@ pub enum Action {
     // rc.5
     ViewColumns,
     ToggleTags,
+    // rc.8
+    ShowInFolder,
 }
 
 /// Where an action appears in the help, in this order.
@@ -127,7 +129,7 @@ impl Group {
 }
 
 impl Action {
-    pub const ALL: [Action; 68] = [
+    pub const ALL: [Action; 69] = [
         Action::Up,
         Action::Down,
         Action::Parent,
@@ -196,6 +198,7 @@ impl Action {
         Action::ShowPackage,
         Action::ViewColumns,
         Action::ToggleTags,
+        Action::ShowInFolder,
     ];
 
     /// The name used in the configuration file.
@@ -267,6 +270,7 @@ impl Action {
             Action::Update => "update",
             Action::QuickLook => "quick_look",
             Action::ShowPackage => "show_package",
+            Action::ShowInFolder => "show_in_folder",
             Action::ViewColumns => "view_columns",
             Action::ToggleTags => "toggle_tags",
         }
@@ -345,6 +349,7 @@ impl Action {
             Action::Update => Key::LUpdate,
             Action::QuickLook => Key::LQuickLook,
             Action::ShowPackage => Key::LShowPackage,
+            Action::ShowInFolder => Key::LShowInFolder,
             Action::ViewColumns => Key::LViewColumns,
             Action::ToggleTags => Key::LToggleTags,
         }
@@ -364,7 +369,9 @@ impl Action {
             | ClearSelection => Group::Select,
             Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | NewFolder
             | NewFile | ExtractHere | ExtractToFolder | Compress | Undo | Redo | History
-            | Properties | OpenWith | CopyPath | QuickLook | ShowPackage => Group::Files,
+            | Properties | OpenWith | CopyPath | QuickLook | ShowPackage | ShowInFolder => {
+                Group::Files
+            }
             Filter | Palette | Sort | SortReverse | ToggleHidden | ToggleHex | PreviewDown
             | PreviewUp | Bookmark | SwitchPane | ToggleSidebar | Refresh | FocusAddress
             | ToggleDetails | ViewDetails | ViewIcons | ViewColumns | ToggleTags | ToggleView
@@ -713,6 +720,7 @@ const ALWAYS: &[(Action, &[&str])] = &[
     (Action::Update, &["alt+u"]),
     (Action::QuickLook, &["alt+y"]),
     (Action::ShowPackage, &["alt+down"]),
+    (Action::ShowInFolder, &["alt+f"]),
 ];
 
 #[derive(Clone, Debug)]
@@ -1399,7 +1407,7 @@ mod tests {
         for a in Action::ALL {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
-        assert_eq!(Action::ALL.len(), 68);
+        assert_eq!(Action::ALL.len(), 69);
         let mut ids: Vec<_> = Action::ALL.iter().map(|a| a.id()).collect();
         ids.sort();
         ids.dedup();
@@ -1478,7 +1486,12 @@ mod tests {
         // Three later actions have only an Alt key (and Cmd on a Mac) by design; they are
         // also in the menus and the palette. Listed here so that the list does not grow
         // unnoticed.
-        let alt_only = [Action::Update, Action::QuickLook, Action::ShowPackage];
+        let alt_only = [
+            Action::Update,
+            Action::QuickLook,
+            Action::ShowPackage,
+            Action::ShowInFolder,
+        ];
         let missing: Vec<&str> = Action::ALL
             .into_iter()
             .filter(|a| !alt_only.contains(a))

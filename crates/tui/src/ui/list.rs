@@ -81,7 +81,7 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
     // A title with the arrow of the sort must fit its column ("Dimensione ↑").
     let fit = |base: usize, label: Key| base.max(label.tr().width() + 2);
     let (mut date, mut kind, mut size) = (
-        fit(date_w, Key::ColModified),
+        fit(date_w, Key::ColModified).max(fit(date_w, Key::ColUsed)),
         fit(20, Key::ColType),
         fit(10, Key::ColSize),
     );
@@ -167,7 +167,13 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     head.push(Span::styled(pad(&t, cols.name), st));
     if cols.date > 0 {
         head.push(gap());
-        let (t, st) = label(Key::ColModified.tr(), SortKey::Modified);
+        // In the list of recent files the date is the one of the last use.
+        let title = if app.recents_view() {
+            Key::ColUsed
+        } else {
+            Key::ColModified
+        };
+        let (t, st) = label(title.tr(), SortKey::Modified);
         head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
         head.push(Span::styled(pad(&t, cols.date), st));
     }
@@ -380,7 +386,8 @@ fn row<'a>(
     let name_txt = display::truncate(&shown, cols.name);
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
-    // In the list of a tag's items, the folder each one is in, dim after the name.
+    // In the list of a tag's items, or of recent files, the folder each one is in, dim after
+    // the name.
     if app.tag_view().is_some() {
         let room = cols.name.saturating_sub(used);
         if room > 8

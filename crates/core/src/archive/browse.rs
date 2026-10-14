@@ -94,6 +94,7 @@ pub fn read_dir(
             let type_label =
                 crate::filetype::label(&shown, meta.kind, c.kind == EntryKind::Dir, executable);
             Entry {
+                used: None,
                 sort_name: shown.to_lowercase(),
                 display: shown,
                 name: c.name.clone(),

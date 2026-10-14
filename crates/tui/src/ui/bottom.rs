@@ -230,8 +230,8 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     }
     if app.layout == LayoutKind::Compact {
         b.push(Span::styled(
-            match app.tag_view() {
-                Some(tag) => tf(Key::TagViewTitle, &[&tag]),
+            match app.view_title() {
+                Some(title) => title,
                 None => fmt::short_path(&app.cwd, app.home()),
             },
             th.accent_style().add_modifier(Modifier::BOLD).patch(band),

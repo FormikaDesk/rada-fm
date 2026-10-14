@@ -25,6 +25,8 @@ pub struct MacLikeSpec {
     /// A folder standing in for the system's tables of folder names: with it, the standard
     /// folders of the home folder are named in the language of the interface, as on a Mac.
     pub folder_tables: Option<PathBuf>,
+    /// The files "Spotlight" says were used lately; `None`: the stand-in has no such list.
+    pub recents: Option<Vec<(PathBuf, std::time::SystemTime)>>,
     pub extra_places: Vec<(PlaceKind, PathBuf)>,
     /// Folders the system refuses until the person allows it, with the explanation.
     pub denied: Vec<AccessDenied>,
@@ -225,6 +227,15 @@ impl Platform for MacLike {
     fn extra_places(&self) -> Vec<(PlaceKind, PathBuf)> {
         self.spec.extra_places.clone()
     }
+    fn recent_available(&self) -> bool {
+        self.spec.recents.is_some()
+    }
+    fn recent_files(
+        &self,
+        _cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(PathBuf, std::time::SystemTime)>> {
+        self.spec.recents.clone()
+    }
     fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
         if err.raw_os_error() != Some(1) {
             return None;
@@ -340,6 +351,15 @@ impl Platform for Recording {
     }
     fn tags(&self) -> Option<&dyn TagStore> {
         self.inner.tags()
+    }
+    fn recent_available(&self) -> bool {
+        self.inner.recent_available()
+    }
+    fn recent_files(
+        &self,
+        cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(PathBuf, std::time::SystemTime)>> {
+        self.inner.recent_files(cancel)
     }
     fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
         self.inner.explain_denied(path, err)

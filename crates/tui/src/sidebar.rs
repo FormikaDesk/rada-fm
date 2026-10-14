@@ -85,6 +85,8 @@ pub enum Origin {
     Device(VolumeKind),
     /// A tag, in its colour if it has one.
     Tag(Option<Hue>),
+    /// The files used lately, under Home, where the system has such a list.
+    Recent,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -118,6 +120,7 @@ impl Item {
             Origin::Place(PlaceKind::Videos) => ("\u{f03d}", "▶"),
             Origin::Place(PlaceKind::Trash) => ("\u{f1f8}", "⌫"),
             Origin::Place(PlaceKind::ICloud) => ("\u{f0c2}", "☁"),
+            Origin::Recent => ("\u{f017}", "○"),
             Origin::Bookmark { .. } => ("\u{f02e}", "★"),
             Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
@@ -173,6 +176,17 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         .filter(|p| p.kind == PlaceKind::Home)
     {
         out.push(place(p, Section::Home));
+    }
+    // The files used lately, right under Home, when the system has a list of them.
+    if app.paths.recent_files {
+        out.push(Item {
+            section: Section::Home,
+            origin: Origin::Recent,
+            name: rada_core::i18n::Key::PlaceRecent.tr().to_string(),
+            path: rada_core::recents::view_path(),
+            usage: None,
+            locked: false,
+        });
     }
     for p in app
         .paths

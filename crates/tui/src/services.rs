@@ -95,10 +95,16 @@ impl Services {
                 );
                 let candidates: Vec<PathBuf> = standard.iter().map(|p| p.path.clone()).collect();
                 let for_names = platform.clone();
+                let for_recent = platform.clone();
                 PlacesStore::spawn_with_names(
                     platform.dirs().rada_state(),
                     standard,
-                    Box::new(move || for_names.display_names(&candidates)),
+                    Box::new(move || {
+                        (
+                            for_names.display_names(&candidates),
+                            for_recent.recent_available(),
+                        )
+                    }),
                     tx.clone(),
                 )
             },

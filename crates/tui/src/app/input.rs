@@ -495,6 +495,7 @@ impl App {
             Update => self.start_update_action(),
             QuickLook => self.quick_look(),
             ShowPackage => self.show_package(),
+            ShowInFolder => self.show_in_folder(),
             Help => {
                 self.help_scroll = 0;
                 self.modal = Some(Modal::Help);

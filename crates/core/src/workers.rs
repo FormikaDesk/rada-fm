@@ -138,13 +138,17 @@ fn dir_loop(
                     .name("rada-tag-view".into())
                     .spawn(move || {
                         let stale = || latest.load(Ordering::SeqCst) != generation;
-                        let query = crate::tagsearch::TagQuery::new(&name);
-                        let result = crate::tagsearch::entries(
-                            fs.as_ref(),
-                            platform.as_ref(),
-                            &query,
-                            &stale,
-                        );
+                        let result = if crate::recents::is_view(&path) {
+                            crate::recents::entries(fs.as_ref(), platform.as_ref(), &stale)
+                        } else {
+                            let query = crate::tagsearch::TagQuery::new(&name);
+                            crate::tagsearch::entries(
+                                fs.as_ref(),
+                                platform.as_ref(),
+                                &query,
+                                &stale,
+                            )
+                        };
                         if stale() {
                             return;
                         }

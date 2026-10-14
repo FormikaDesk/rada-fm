@@ -323,6 +323,7 @@ strings! {
     LUpdate => "Update rada", "Aggiorna rada";
     LQuickLook => "Quick Look", "Anteprima rapida";
     LShowPackage => "Show package contents", "Mostra il contenuto del pacchetto";
+    LShowInFolder => "Show in folder", "Mostra nella cartella";
     ResultOne => "result", "risultato";
     ResultMany => "results", "risultati";
 
@@ -595,6 +596,7 @@ strings! {
     // ---- menus
     ColName => "Name", "Nome";
     ColModified => "Date modified", "Modificato";
+    ColUsed => "Last used", "Usato";
     ColType => "Type", "Tipo";
     ColSize => "Size", "Dimensione";
     ColTags => "Tags", "Tag";
@@ -620,6 +622,7 @@ strings! {
 
     // ---- places and sections of the sidebar
     PlaceTrash => "Trash", "Cestino";
+    PlaceRecent => "Recent", "Recenti";
     SecPinned => "PINNED", "PREFERITI";
     SecDevices => "DEVICES", "DISPOSITIVI";
     SecTags => "TAGS", "TAG";
@@ -794,6 +797,8 @@ strings! {
     // ---- notices
     TJournalDown => "journal unavailable: operations cannot be undone this session", "registro non disponibile: in questa sessione le operazioni non si possono annullare";
     TTagViewRefuse => "this list is the items tagged \"{0}\", not a folder — cannot {1} here", "questo elenco contiene gli elementi con il tag \"{0}\", non è una cartella — qui non si può {1}";
+    TRecentRefuse => "this list is the files used lately, not a folder — cannot {0} here", "questo elenco contiene i file usati di recente, non è una cartella — qui non si può {0}";
+    TShowInFolderHere => "this is already a folder: nothing to show", "questa è già una cartella: non c'è altro da mostrare";
     TAtTop => "already at the top", "sei già in cima";
     TInArchive => "inside an archive: copy ({0}) it to a folder, or extract with {1}", "dentro un archivio: copialo ({0}) in una cartella, oppure estrai con {1}";
     TOpening => "opening {0}", "apro {0}";

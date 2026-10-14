@@ -40,6 +40,10 @@ impl Place {
     }
 }
 
+/// What the places worker asks of the system once: the names it shows for folders and
+/// drives, and whether it has a list of recent files.
+pub type AskSystem = dyn FnOnce() -> (Vec<(PathBuf, String)>, bool) + Send;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PathLists {
     /// Most recent first.
@@ -50,6 +54,9 @@ pub struct PathLists {
     /// The names the system's file manager shows for some folders and drives, where they are
     /// not the names on disk ("Scrivania" for `Desktop`). Arrives a moment after the places.
     pub names: HashMap<PathBuf, String>,
+    /// The system has a list of the files used lately that can be read: the sidebar shows
+    /// "Recent". Arrives with the names, a moment after the places.
+    pub recent_files: bool,
 }
 
 impl PathLists {
@@ -150,15 +157,16 @@ impl PlacesStore {
     /// `state_dir` is `$XDG_STATE_HOME/rada`; `standard` are the candidate standard places
     /// (see [`standard_places`]), of which the ones that exist are reported.
     pub fn spawn(state_dir: PathBuf, standard: Vec<Place>, out: Sender<CoreEvent>) -> PlacesStore {
-        PlacesStore::spawn_with_names(state_dir, standard, Box::new(Vec::new), out)
+        PlacesStore::spawn_with_names(state_dir, standard, Box::new(|| (Vec::new(), false)), out)
     }
 
     /// [`spawn`](Self::spawn), and `names` is asked once, after the first report, for the
-    /// names the system shows for folders and drives; they follow in a second report.
+    /// names the system shows for folders and drives and for whether it has a list of recent
+    /// files; they follow in a second report.
     pub fn spawn_with_names(
         state_dir: PathBuf,
         standard: Vec<Place>,
-        names: Box<dyn FnOnce() -> Vec<(PathBuf, String)> + Send>,
+        names: Box<AskSystem>,
         out: Sender<CoreEvent>,
     ) -> PlacesStore {
         let (tx, rx) = mpsc::channel::<Req>();
@@ -171,7 +179,11 @@ impl PlacesStore {
                 let mut bookmarks = read(&mark_file);
                 let mut names = Some(names);
                 let mut known: HashMap<PathBuf, String> = HashMap::new();
-                let send = |r: &Vec<PathBuf>, b: &Vec<PathBuf>, n: &HashMap<PathBuf, String>| {
+                let mut has_recents = false;
+                let send = |r: &Vec<PathBuf>,
+                            b: &Vec<PathBuf>,
+                            n: &HashMap<PathBuf, String>,
+                            recent: bool| {
                     // Checked on every report, here on the worker: a folder created or
                     // removed since the last one comes and goes.
                     let places = standard
@@ -184,6 +196,7 @@ impl PlacesStore {
                         bookmarks: b.clone(),
                         places,
                         names: n.clone(),
+                        recent_files: recent,
                     }))
                     .is_ok()
                 };
@@ -205,13 +218,17 @@ impl PlacesStore {
                             write(&state_dir, &mark_file, &bookmarks);
                         }
                     }
-                    if !send(&recents, &bookmarks, &known) {
+                    if !send(&recents, &bookmarks, &known, has_recents) {
                         return;
                     }
                     // The names come second: asking the system may take a moment.
                     if let Some(ask) = names.take() {
-                        known = ask().into_iter().collect();
-                        if !known.is_empty() && !send(&recents, &bookmarks, &known) {
+                        let (found, recent) = ask();
+                        known = found.into_iter().collect();
+                        has_recents = recent;
+                        if (!known.is_empty() || has_recents)
+                            && !send(&recents, &bookmarks, &known, has_recents)
+                        {
                             return;
                         }
                     }

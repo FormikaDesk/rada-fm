@@ -550,6 +550,9 @@ pub struct MacPlatform {
     sandbox_user_dirs: bool,
     /// Where the system's tables of folder names are (tests: a folder of their own).
     system_tables: std::path::PathBuf,
+    /// The program that asks Spotlight (tests: a stand-in of their own). `None`: `mdfind`,
+    /// except in the sandbox, where nothing is asked of the real system.
+    mdfind: Option<std::path::PathBuf>,
 }
 
 impl MacPlatform {
@@ -582,6 +585,22 @@ impl MacPlatform {
             tags: super::tags::XattrTags::finder(),
             sandbox_user_dirs: false,
             system_tables: super::foldernames::SYSTEM_TABLES.into(),
+            mdfind: None,
+        }
+    }
+
+    /// Spotlight is asked through `program` instead of `mdfind`: for tests.
+    pub fn with_mdfind(mut self, program: &Path) -> Self {
+        self.mdfind = Some(program.to_path_buf());
+        self
+    }
+
+    /// The program to ask Spotlight with, if it may be asked.
+    fn mdfind_program(&self) -> Option<std::path::PathBuf> {
+        match &self.mdfind {
+            Some(p) => Some(p.clone()),
+            None if self.sandbox_user_dirs => None,
+            None => Some("mdfind".into()),
         }
     }
 
@@ -665,6 +684,40 @@ impl Platform for MacPlatform {
                 native::display_name(&p).and_then(|n| only_different(&p, n))
             })
             .collect()
+    }
+    fn recent_available(&self) -> bool {
+        let Some(program) = self.mdfind_program() else {
+            return false;
+        };
+        crate::tagsearch::run_tool(
+            &program,
+            &crate::recents::mdfind_probe_args(&self.dirs.home),
+            std::time::Duration::from_secs(5),
+            &|| false,
+        )
+        .is_some_and(|out| crate::recents::probe_answer_is_a_count(&out))
+    }
+    fn recent_files(
+        &self,
+        cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(std::path::PathBuf, std::time::SystemTime)>> {
+        let program = self.mdfind_program()?;
+        let out = crate::tagsearch::run_tool(
+            &program,
+            &crate::recents::mdfind_args(&self.dirs.home),
+            std::time::Duration::from_secs(15),
+            cancel,
+        )?;
+        Some(
+            crate::recents::parse_mdfind_attr(&out)
+                .into_iter()
+                .filter_map(|(path, date)| {
+                    // A date Spotlight did not give: the file's own last change.
+                    let at = date.or_else(|| std::fs::metadata(&path).ok()?.modified().ok())?;
+                    Some((path, at))
+                })
+                .collect(),
+        )
     }
     fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
         let cloud = icloud_drive(&self.dirs.home);
@@ -778,6 +831,69 @@ mod tests {
         assert_eq!(get(&it, "Movies"), None, "no marker, no new name");
         let en = with_lang(Lang::En, || p.display_names(&places));
         assert!(en.is_empty(), "English keeps the names on disk: {en:?}");
+    }
+
+    /// Spotlight answers through a stand-in program: the list is what it prints, and the
+    /// entry is offered only when it answers.
+    #[cfg(unix)]
+    #[test]
+    fn recent_files_come_from_what_spotlight_prints_and_only_when_it_answers() {
+        use std::os::unix::fs::PermissionsExt;
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("home");
+        std::fs::create_dir_all(home.join("docs")).unwrap();
+        let (a, b) = (home.join("docs/a.txt"), home.join("docs/b b.txt"));
+        std::fs::write(&a, "a").unwrap();
+        std::fs::write(&b, "b").unwrap();
+        let dirs = Dirs {
+            home: home.clone(),
+            config: t.path().join("c"),
+            data: t.path().join("d"),
+            state: t.path().join("s"),
+            cache: t.path().join("k"),
+        };
+        let script = |body: &str| {
+            let p = t.path().join(format!("mdfind-{}", body.len()));
+            std::fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap();
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+            p
+        };
+        let ok = script(&format!(
+            "case \"$*\" in *-count*) echo 2;; *) echo '{}   kMDItemLastUsedDate = 2026-10-10 10:00:00 +0000'; echo '{} kMDItemLastUsedDate = 2026-10-12 10:00:00 +0000';; esac",
+            a.display(),
+            b.display()
+        ));
+        let p = MacPlatform::new(dirs.clone())
+            .with_sandbox_user_dirs()
+            .with_mdfind(&ok);
+        assert!(p.recent_available());
+        let mut got = p.recent_files(&|| false).unwrap();
+        got.sort();
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].0, a);
+        // It fails, or says something that is no count: no entry, no list.
+        let broken = script("exit 1");
+        let p = MacPlatform::new(dirs.clone())
+            .with_sandbox_user_dirs()
+            .with_mdfind(&broken);
+        assert!(!p.recent_available());
+        assert!(p.recent_files(&|| false).is_none());
+        let chatty = script("echo 'Spotlight is off'");
+        let p = MacPlatform::new(dirs.clone())
+            .with_sandbox_user_dirs()
+            .with_mdfind(&chatty);
+        assert!(!p.recent_available());
+        // A program that is not there.
+        let p = MacPlatform::new(dirs.clone())
+            .with_sandbox_user_dirs()
+            .with_mdfind(&t.path().join("nothing"));
+        assert!(!p.recent_available());
+        // The sandbox never asks the real system.
+        assert!(
+            !MacPlatform::new(dirs)
+                .with_sandbox_user_dirs()
+                .recent_available()
+        );
     }
 
     #[test]

@@ -518,6 +518,8 @@ pub struct App {
     pub marked: BTreeSet<OsString>,
     pub show_hidden: bool,
     pub sort: SortSpec,
+    /// The order of the folders, put away while the list of recent files has its own.
+    sort_outside_recents: Option<SortSpec>,
     remembered: HashMap<PathBuf, OsString>,
     /// Folders visited, for back and forward.
     pub nav: crate::nav::NavHistory,
@@ -702,6 +704,7 @@ impl App {
             marked: BTreeSet::new(),
             show_hidden: cfg.show_hidden,
             sort,
+            sort_outside_recents: None,
             remembered: HashMap::new(),
             nav: crate::nav::NavHistory::new(start_dir.clone()),
             nav_move: None,
@@ -1113,6 +1116,28 @@ impl App {
         rada_core::tagsearch::view_name(&self.cwd)
     }
 
+    /// Whether the list shows the files used lately (the "Recent" entry of the sidebar).
+    pub fn recents_view(&self) -> bool {
+        rada_core::recents::is_view(&self.cwd)
+    }
+
+    /// What the list is when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
+    pub fn view_title(&self) -> Option<String> {
+        if self.recents_view() {
+            return Some(Key::PlaceRecent.tr().to_string());
+        }
+        self.tag_view().map(|tag| tf(Key::TagViewTitle, &[&tag]))
+    }
+
+    /// The order of the list of recent files: the last used first, whatever the order of the
+    /// folders is. It lasts as long as the list is open.
+    const RECENT_SORT: SortSpec = SortSpec {
+        key: SortKey::Modified,
+        reverse: true,
+        dirs_first: false,
+        natural: false,
+    };
+
     /// This system keeps tags (everywhere but Windows).
     pub fn tags_supported(&self) -> bool {
         self.svc.platform.tags().is_some()
@@ -1137,11 +1162,33 @@ impl App {
 
     /// Say why nothing can be made here when the list is a tag's items, not a folder.
     pub(super) fn refuse_in_tag_view(&mut self, what: &str) -> bool {
+        if self.recents_view() {
+            self.toast(ToastKind::Warn, tf(Key::TRecentRefuse, &[&what]), 5);
+            return true;
+        }
         let Some(tag) = self.tag_view() else {
             return false;
         };
         self.toast(ToastKind::Warn, tf(Key::TTagViewRefuse, &[&tag, &what]), 5);
         true
+    }
+
+    /// From a list of tagged or recent items: open the folder the item under the cursor is in,
+    /// with the cursor on it.
+    pub(super) fn show_in_folder(&mut self) {
+        if self.tag_view().is_none() {
+            self.toast(ToastKind::Info, Key::TShowInFolderHere.tr(), 2);
+            return;
+        }
+        let Some(path) = self.current().map(|e| e.path.clone()) else {
+            return;
+        };
+        let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+            return;
+        };
+        self.remembered
+            .insert(dir.to_path_buf(), name.to_os_string());
+        self.open_dir(dir.to_path_buf());
     }
 
     /// The folder to use for something made next to the items: the one the first of them is
@@ -1372,6 +1419,17 @@ impl App {
                         } else {
                             self.remembered.get(&path).cloned()
                         };
+                        // The list of recent files has an order of its own while it is open;
+                        // the folders get theirs back when it is left.
+                        let into_recents = rada_core::recents::is_view(&path);
+                        if into_recents != self.recents_view() {
+                            if into_recents {
+                                self.sort_outside_recents = Some(self.sort);
+                                self.sort = Self::RECENT_SORT;
+                            } else if let Some(before) = self.sort_outside_recents.take() {
+                                self.sort = before;
+                            }
+                        }
                         self.listing = DirListing::new(path.clone(), entries, self.sort);
                         let virtual_dir =
                             archive.is_some() || rada_core::tagsearch::view_name(&path).is_some();
@@ -2949,7 +3007,7 @@ impl App {
                 && let Some(e) = self.listing.all().get(i)
             {
                 *slot = Some(fmt::explorer_date_in(
-                    e.mtime,
+                    e.used.or(e.mtime),
                     now,
                     self.dates,
                     self.date_format,

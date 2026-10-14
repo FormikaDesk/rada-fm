@@ -150,6 +150,9 @@ impl App {
         if p == self.home() {
             return Key::HomeLabel.tr().to_string();
         }
+        if rada_core::recents::is_view(p) {
+            return Key::PlaceRecent.tr().to_string();
+        }
         if let Some(tag) = rada_core::tagsearch::view_name(p) {
             return tf(Key::TagViewTitle, &[&tag]);
         }

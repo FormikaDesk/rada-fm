@@ -1001,6 +1001,16 @@ pub struct WindowsPlatform {
 }
 
 impl WindowsPlatform {
+    /// The user's Recent folder, where Windows keeps a shortcut to everything opened. Not in
+    /// the sandbox: tests do not read the real one.
+    fn recent_dir(&self) -> Option<std::path::PathBuf> {
+        if self.sandbox_user_dirs {
+            return None;
+        }
+        let appdata = std::env::var_os("APPDATA")?;
+        Some(std::path::PathBuf::from(appdata).join(r"Microsoft\Windows\Recent"))
+    }
+
     pub fn new(dirs: Dirs) -> Self {
         Self::with_trash(dirs, Box::new(WindowsTrash))
     }
@@ -1071,6 +1081,39 @@ impl Platform for WindowsPlatform {
         }
         #[cfg(not(windows))]
         UserDirs::conventional(&self.dirs.home, "Videos")
+    }
+    fn recent_available(&self) -> bool {
+        self.recent_dir().is_some_and(|d| d.is_dir())
+    }
+    fn recent_files(
+        &self,
+        _cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(std::path::PathBuf, std::time::SystemTime)>> {
+        let mut out = Vec::new();
+        for e in std::fs::read_dir(self.recent_dir()?).ok()?.flatten() {
+            let path = e.path();
+            if !path
+                .extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case("lnk"))
+            {
+                continue;
+            }
+            // The shortcut was last touched when the item was last opened.
+            let Some(at) = e.metadata().ok().and_then(|m| m.modified().ok()) else {
+                continue;
+            };
+            // A shortcut is a few hundred bytes; a huge one is not one.
+            if e.metadata().is_ok_and(|m| m.len() > 64 * 1024) {
+                continue;
+            }
+            if let Some(target) = std::fs::read(&path)
+                .ok()
+                .and_then(|b| crate::recents::lnk_target(&b))
+            {
+                out.push((target, at));
+            }
+        }
+        Some(out)
     }
     fn display_names(&self, places: &[std::path::PathBuf]) -> Vec<(std::path::PathBuf, String)> {
         if self.sandbox_user_dirs {

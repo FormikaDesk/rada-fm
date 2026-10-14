@@ -17,6 +17,7 @@ pub mod pathcodec;
 pub mod places;
 pub mod platform;
 pub mod preview;
+pub mod recents;
 pub mod schema;
 pub mod tagsearch;
 pub mod uistate;

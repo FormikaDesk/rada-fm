@@ -53,8 +53,8 @@ impl App {
             ),
             (
                 Key::PropLocation.tr().to_string(),
-                match self.tag_view() {
-                    Some(tag) => tf(Key::TagViewTitle, &[&tag]),
+                match self.view_title() {
+                    Some(title) => title,
                     None => fmt::short_path(&self.cwd, self.home()),
                 },
             ),

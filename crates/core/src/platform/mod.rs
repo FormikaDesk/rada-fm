@@ -186,6 +186,20 @@ pub trait Platform: Send + Sync {
     fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
         Vec::new()
     }
+    /// Whether this system has a list of the files used lately that can be read (a Spotlight
+    /// that answers, a `recently-used.xbel`, the Recent folder). Asked once, from a worker;
+    /// when it is `false` the sidebar has no "Recent".
+    fn recent_available(&self) -> bool {
+        false
+    }
+    /// The files used lately and when, newest first or not (the caller sorts and tidies):
+    /// `None` when the source is missing or fails. May take a while: call it from a worker.
+    fn recent_files(
+        &self,
+        _cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(std::path::PathBuf, std::time::SystemTime)>> {
+        None
+    }
     /// Where tags are kept on this system; `None` where they are not supported (Windows).
     fn tags(&self) -> Option<&dyn TagStore> {
         None
