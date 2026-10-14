@@ -2,35 +2,35 @@
 source: crates/tui/tests/snapshots.rs
 expression: out
 ---
-[rada-light] canvas #f6f3ee
-  text          #3a3632
-  text_dim      #6a6359
-  muted         #a39a8d
-  accent        #3b659f
+[rada-light] canvas #ecdfc6
+  text          #3b2f22
+  text_dim      #625340
+  muted         #a39478
+  accent        #405c84
   on_accent     #ffffff
-  selection     #f6f3ee
-  cursor        #476fa8
-  mark          #ebe6de
-  track         #d9d2c6
-  success       #4b7438
-  warn          #8c5f16
-  error         #a8454c
-  kind.code     #9e5826
-  kind.markup   #77559e
-  kind.text     #6a6359
-  kind.doc      #a8454c
-  kind.image    #77559e
-  kind.vector   #77559e
-  kind.audio    #a8454c
-  kind.video    #a8454c
-  kind.archive  #8c5f16
-  kind.data     #8c5f16
-  kind.config   #6a6359
-  kind.binary   #4b7438
-  kind.other    #6a6359
-  kind.folder   #3b659f
-  kind.link     #2c6e7d
-  tint(accent)  #dbdfe2
+  selection     #e2d3b7
+  cursor        #6d87ad
+  mark          #e5d7bc
+  track         #cfbb96
+  success       #416433
+  warn          #765513
+  error         #8f443f
+  kind.code     #8f5628
+  kind.markup   #6f5296
+  kind.text     #625340
+  kind.doc      #8f443f
+  kind.image    #6f5296
+  kind.vector   #6f5296
+  kind.audio    #8f443f
+  kind.video    #8f443f
+  kind.archive  #765513
+  kind.data     #765513
+  kind.config   #625340
+  kind.binary   #416433
+  kind.other    #625340
+  kind.folder   #405c84
+  kind.link     #2f6573
+  tint(accent)  #d3ccbc
 [catppuccin-latte] canvas #eff1f5
   text          #3e4058
   text_dim      #5f6379
@@ -38,12 +38,12 @@ expression: out
   accent        #1b5de0
   on_accent     #ffffff
   selection     #d4dbee
-  cursor        #becae8
+  cursor        #2f5fd0
   mark          #e0e5f2
   track         #d6dae5
-  success       #2f7620
-  warn          #925d13
-  error         #d20f39
+  success       #2e731f
+  warn          #8d5a12
+  error         #c50e35
   kind.code     #895f0c
   kind.markup   #814dc6
   kind.text     #5e6781
@@ -67,12 +67,12 @@ expression: out
   accent        #225cac
   on_accent     #ffffff
   selection     #c8d0ec
-  cursor        #b0bee6
+  cursor        #3a5ba9
   mark          #d4d9ee
   track         #d0d3de
-  success       #4e6832
-  warn          #755a34
-  error         #b51f4a
+  success       #4a6330
+  warn          #725832
+  error         #af1e47
   kind.code     #7d570b
   kind.markup   #7647b4
   kind.text     #565e76

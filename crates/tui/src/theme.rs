@@ -124,9 +124,9 @@ pub struct Theme {
     pub sel: Color,
     /// Text on the row under the cursor (and on the cursor tile).
     pub cursor_text: Color,
-    /// Background of the command bar.
+    /// Background of the command bar and of the strip of key hints: the canvas, like every
+    /// other zone (the interface has one background; panels are told apart by thin lines).
     pub cmdbar: Color,
-    /// Background of the strip of key hints.
     pub panel: Color,
     /// The pill behind a key in the hints, and the text on it.
     pub key_bg: Color,
@@ -271,8 +271,8 @@ impl Theme {
             track: rgb(36, 42, 62),
             sel: rgb(34, 42, 68),
             cursor_text: rgb(255, 255, 255),
-            cmdbar: rgb(30, 32, 48),
-            panel: rgb(21, 22, 32),
+            cmdbar: rgb(26, 27, 38),
+            panel: rgb(26, 27, 38),
             key_bg: rgb(59, 66, 97),
             key_text: rgb(192, 202, 245),
             field: rgb(30, 32, 46),
@@ -312,11 +312,29 @@ impl Theme {
 
     /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
     pub fn rada() -> Theme {
-        let mut t = Theme::rada_base("rada", rgb(122, 162, 247), rgb(40, 52, 87), rgb(30, 36, 58));
-        t.cursor = rgb(61, 89, 161);
-        t.field = rgb(31, 34, 51);
-        t.button = rgb(41, 46, 66);
-        t.kinds.folder = rgb(122, 162, 247);
+        let accent = rgb(0x86, 0xa0, 0xd4);
+        let mut t = Theme::rada_base("rada", accent, rgb(0x28, 0x2c, 0x3a), rgb(0x20, 0x23, 0x30));
+        // One night blue for every zone, painted (the interface is the same on any terminal),
+        // thin lines between the panels, and pills and keys a step lighter than the canvas.
+        t.canvas = rgb(0x1b, 0x1d, 0x27);
+        t.bg = Some(t.canvas);
+        t.popup = t.canvas;
+        t.cmdbar = t.canvas;
+        t.panel = t.canvas;
+        t.track = rgb(0x2c, 0x30, 0x40);
+        t.text = rgb(0xc8, 0xcd, 0xe0);
+        t.text_dim = rgb(0x8a, 0x91, 0xab);
+        t.muted = rgb(0x4f, 0x55, 0x70);
+        t.on_accent = rgb(0x14, 0x16, 0x1e);
+        t.cursor = rgb(0x3e, 0x54, 0x87);
+        t.grad_row_start = rgb(0x3e, 0x54, 0x87);
+        t.grad_row_end = rgb(0x5f, 0x4f, 0x88);
+        t.sel = rgb(0x25, 0x2a, 0x3a);
+        t.field = rgb(0x22, 0x25, 0x2f);
+        t.button = rgb(0x27, 0x2b, 0x38);
+        t.key_bg = rgb(0x2e, 0x33, 0x43);
+        t.key_text = t.text;
+        t.kinds.folder = accent;
         t
     }
 
@@ -422,9 +440,9 @@ impl Theme {
         t.field = mark;
         t.button = selection;
         t.sel = mark;
-        t.cursor_text = text;
-        t.cmdbar = mark;
-        t.panel = mark;
+        t.cursor_text = rgb(255, 255, 255);
+        t.cmdbar = canvas;
+        t.panel = canvas;
         t.key_bg = selection;
         t.key_text = text;
         t.check = accent;
@@ -433,16 +451,16 @@ impl Theme {
     }
 
     /// A light theme painted on a tinted paper instead of white, from the hex values of its
-    /// tokens: `[bg, panel, bar, field, border, text, dim, muted, accent, sel, cursor, key,
-    /// button, tab (the active tab and the other chips), check]` and the colours of the file
-    /// types `[yellow, green, red, purple, cyan, orange]`. Pure white tires the eyes; the
-    /// paper keeps the text sharp and the bars a step apart.
-    fn paper(name: &'static str, tokens: [u32; 15], types: [u32; 6], gradients: [u32; 2]) -> Theme {
+    /// tokens: `[bg, hover (a row under the mouse), field, border, text, dim, muted, accent,
+    /// sel, cursor, key, button, tab (the active tab and the other chips), check]` and the
+    /// colours of the file types `[yellow, green, red, purple, cyan, orange]`. Pure white tires
+    /// the eyes. The paper is the one background of every zone, bars and menus included; the
+    /// panels are told apart by thin lines.
+    fn paper(name: &'static str, tokens: [u32; 14], types: [u32; 6], gradients: [u32; 2]) -> Theme {
         let c = |v: u32| rgb((v >> 16) as u8, (v >> 8) as u8, v as u8);
         let [
             bg,
-            panel,
-            bar,
+            hover,
             field,
             border,
             text,
@@ -458,15 +476,15 @@ impl Theme {
         ] = tokens.map(c);
         let [yellow, green, red, purple, cyan, orange] = types.map(c);
         let [row_start, row_end] = gradients.map(c);
-        let mut t = Theme::light_base(name, bg, text, dim, muted, accent, tab, cursor, bar, border);
+        let mut t = Theme::light_base(
+            name, bg, text, dim, muted, accent, tab, cursor, hover, border,
+        );
         t.bg = Some(bg);
         t.popup = bg;
         t.field = field;
         t.button = button;
         t.sel = sel;
         t.cursor_text = rgb(255, 255, 255);
-        t.cmdbar = bar;
-        t.panel = panel;
         t.key_bg = key;
         t.key_text = text;
         t.check = check;
@@ -500,13 +518,15 @@ impl Theme {
         let mut t = Theme::paper(
             "rada-light",
             [
-                0xf6f3ee, 0xeeeae3, 0xebe6de, 0xe5e0d7, 0xd9d2c6, 0x3a3632, 0x6a6359, 0xa39a8d,
-                0x3b659f, 0xe2e7ee, 0x476fa8, 0xe3ddd3, 0xe5e0d7, 0xf6f3ee, 0x476fa8,
+                0xecdfc6, 0xe5d7bc, 0xe2d3b7, 0xcfbb96, 0x3b2f22, 0x625340, 0xa39478, 0x405c84,
+                0xe0d2b8, 0x6d87ad, 0xdbcaab, 0xe2d3b7, 0xe2d3b7, 0x405c84,
             ],
-            [0x8c5f16, 0x4b7438, 0xa8454c, 0x77559e, 0x2c6e7d, 0x9e5826],
-            [0x476fa8, 0x7d58a6],
+            [0x765513, 0x416433, 0x8f443f, 0x6f5296, 0x2f6573, 0x8f5628],
+            [0x6d87ad, 0x8a78a8],
         );
-        t.popup_border = rgb(0x88, 0x85, 0x80);
+        // The row under the cursor is a light shade: its text is the darkest brown.
+        t.cursor_text = rgb(0x1a, 0x13, 0x0c);
+        t.popup_border = rgb(0x8e, 0x7b, 0x5a);
         t
     }
 
@@ -515,10 +535,10 @@ impl Theme {
         let mut t = Theme::paper(
             "nebbia-light",
             [
-                0xeef0f3, 0xe6e9ee, 0xe3e6eb, 0xdde1e7, 0xd0d5dd, 0x343a46, 0x5d6474, 0x9aa3b2,
-                0x3e63a8, 0xdfe6f2, 0x4a6fb3, 0xd9dee6, 0xdde1e7, 0xeef0f3, 0x4469b0,
+                0xeef0f3, 0xe3e6eb, 0xdde1e7, 0xd0d5dd, 0x343a46, 0x5d6474, 0x9aa3b2, 0x3e63a8,
+                0xdfe6f2, 0x4a6fb3, 0xd9dee6, 0xdde1e7, 0xe1e5ea, 0x4469b0,
             ],
-            [0x86621c, 0x3c7346, 0xa2485a, 0x6f5499, 0x2a6a80, 0x975a2a],
+            [0x815f1b, 0x3a7044, 0xa04759, 0x6f5499, 0x2a6a80, 0x975a2a],
             [0x4a6fb3, 0x7a5aa8],
         );
         t.popup_border = rgb(0x7e, 0x82, 0x8b);
@@ -543,9 +563,11 @@ impl Theme {
         t.popup_border = rgb(0x81, 0x83, 0x93);
         t.grad_row_start = rgb(0x2f, 0x5f, 0xd0);
         t.grad_row_end = rgb(0x88, 0x39, 0xef);
-        t.success = rgb(47, 118, 32);
-        t.warn = rgb(146, 93, 19);
-        t.error = rgb(210, 15, 57);
+        // The solid colour of the cursor row is where the shade starts (white text).
+        t.cursor = t.grad_row_start;
+        t.success = rgb(46, 115, 31);
+        t.warn = rgb(141, 90, 18);
+        t.error = rgb(197, 14, 53);
         t.kinds = KindColors {
             code: rgb(137, 95, 12),
             markup: rgb(129, 77, 198),
@@ -583,9 +605,11 @@ impl Theme {
         t.popup_border = rgb(0x74, 0x78, 0x8c);
         t.grad_row_start = rgb(0x3a, 0x5b, 0xa9);
         t.grad_row_end = rgb(0x78, 0x47, 0xa6);
-        t.success = rgb(78, 104, 50);
-        t.warn = rgb(117, 90, 52);
-        t.error = rgb(181, 31, 74);
+        // The solid colour of the cursor row is where the shade starts (white text).
+        t.cursor = t.grad_row_start;
+        t.success = rgb(74, 99, 48);
+        t.warn = rgb(114, 88, 50);
+        t.error = rgb(175, 30, 71);
         t.kinds = KindColors {
             code: rgb(125, 87, 11),
             markup: rgb(118, 71, 180),
@@ -745,6 +769,23 @@ impl Theme {
                 TagColor::Purple => Color::Magenta,
                 TagColor::Gray => Color::DarkGray,
             },
+            depth if self.light => {
+                // On paper the dots are a little quieter than on a dark screen.
+                let rgb = match c {
+                    TagColor::Red => Color::Rgb(0xb9, 0x53, 0x4c),
+                    TagColor::Orange => Color::Rgb(0xbd, 0x7a, 0x3a),
+                    TagColor::Yellow => Color::Rgb(0xb8, 0x9a, 0x30),
+                    TagColor::Green => Color::Rgb(0x5c, 0x8a, 0x4e),
+                    TagColor::Blue => Color::Rgb(0x4f, 0x78, 0xad),
+                    TagColor::Purple => Color::Rgb(0x84, 0x67, 0xa8),
+                    TagColor::Gray => Color::Rgb(0x8a, 0x82, 0x74),
+                };
+                if depth == ColorDepth::Ansi256 {
+                    to_256(rgb)
+                } else {
+                    rgb
+                }
+            }
             depth => {
                 let rgb = match c {
                     TagColor::Red => Color::Rgb(0xff, 0x5f, 0x57),
@@ -843,13 +884,13 @@ impl Theme {
         }
     }
 
-    /// The strip behind the top and bottom bars: a tone apart from the content. On a
-    /// 16-colour terminal there is no such tone, and the chips carry the structure.
+    /// The strip behind the top and bottom bars: the canvas, like the content (a bar is told
+    /// apart by its pills and keys). On a 16-colour terminal there is no paint at all.
     pub fn band(&self) -> Style {
         if self.depth == ColorDepth::Ansi16 {
             self.on(Style::default())
         } else {
-            Style::default().bg(self.mark)
+            Style::default().bg(self.canvas)
         }
     }
 
@@ -997,40 +1038,34 @@ impl Theme {
     }
 
     /// What a window is filled with: the screen behind it is dimmed (see
-    /// [`dimmed`](Self::dimmed)) and the window is that tone a little lighter, so that its border and
-    /// its inside are one colour. Only true colour can be mixed; elsewhere it is the popup's.
+    /// [`dimmed`](Self::dimmed)) and the window is that tone a little lighter, so that its
+    /// border and its inside are one colour. On a light theme that is the paper itself. Only
+    /// true colour can be mixed; elsewhere it is the popup's.
     pub fn modal_surface(&self) -> Color {
         match (self.depth, self.canvas) {
             (ColorDepth::True, Color::Rgb(..)) => {
-                let behind = self.dimmed(self.canvas);
                 if self.light {
-                    // Paler again: halfway to white.
-                    self.tint_share(behind, rgb(255, 255, 255), 0.5)
+                    self.canvas
                 } else {
-                    // A shade of the text colour over it.
-                    self.tint_share(behind, self.text, 0.07)
+                    // A shade of the text colour over the dimmed canvas.
+                    self.tint_share(self.dimmed(self.canvas), self.text, 0.07)
                 }
             }
             _ => self.popup,
         }
     }
 
-    /// `c` as it lies under a window: darker on a dark theme, on a light one paler (colours
-    /// move towards white instead of black). Only true colour is changed; a colour the
-    /// terminal owns (`Reset`) is taken as the theme's canvas.
+    /// `c` as it lies under a window: darker (a light theme's paper goes a little darker too,
+    /// not white). Only true colour is changed; a colour the terminal owns (`Reset`) is taken
+    /// as the theme's canvas.
     pub fn dimmed(&self, c: Color) -> Color {
         let c = match c {
             Color::Reset if self.depth == ColorDepth::True => self.canvas,
             other => other,
         };
         let Color::Rgb(r, g, b) = c else { return c };
-        let ch = |v: u8| -> u8 {
-            if self.light {
-                (v as f32 + (255.0 - v as f32) * 0.4) as u8
-            } else {
-                (v as f32 * 0.6) as u8
-            }
-        };
+        let f = if self.light { 0.86 } else { 0.6 };
+        let ch = |v: u8| (v as f32 * f) as u8;
         rgb(ch(r), ch(g), ch(b))
     }
 }
@@ -1336,12 +1371,14 @@ mod tests {
             need("accent on canvas", contrast(t.accent, c), 4.5);
             need("on_accent on accent", contrast(t.on_accent, t.accent), 4.5);
             // The chips sit on the bars; the active tab of a paper theme is the canvas itself.
+            // Bars are the canvas: the chips on them, and the row under the mouse, are a step
+            // away from it.
             need(
                 "selection against its bar",
-                contrast(t.selection, t.mark),
+                contrast(t.selection, t.canvas),
                 1.05,
             );
-            need("mark against canvas", contrast(t.mark, c), 1.05);
+            need("mark against canvas", contrast(t.mark, c), 1.03);
             need("track against canvas", contrast(t.track, c), 1.1);
             need("cursor against canvas", contrast(t.cursor, c), 1.4);
             need(
@@ -1391,11 +1428,6 @@ mod tests {
                     3.0,
                 );
             }
-            need(
-                "popup_border against the dimmed screen",
-                contrast(t.popup_border, t.dimmed(c)),
-                3.0,
-            );
             need(
                 "window against the dimmed screen",
                 contrast(t.modal_surface(), t.dimmed(c)),
@@ -1448,9 +1480,10 @@ mod tests {
             let t = Theme::named(n, ColorDepth::True).unwrap();
             // The theme's own background, or the terminal's where the theme leaves it alone.
             assert_eq!(t.popup, t.bg.unwrap_or(Color::Reset), "{n}");
-            // Dimmed screen and window: darker on a dark theme, paler on a light one.
+            // The screen under a window goes darker, on a light theme too, and the window is
+            // a little lighter than it.
             let (behind, window) = (luminance(t.dimmed(t.canvas)), luminance(t.modal_surface()));
-            assert_eq!(behind < luminance(t.canvas), !t.light, "{n}");
+            assert!(behind < luminance(t.canvas), "{n}");
             assert!(
                 window > behind,
                 "{n}: the window is lighter than the screen under it"
@@ -1459,12 +1492,13 @@ mod tests {
     }
 
     #[test]
-    fn the_white_text_of_the_cursor_row_reads_on_both_ends_of_its_gradient() {
-        // Bold white on the shade: 4.5:1 at the left end, at the right end and in between.
-        let white = rgb(255, 255, 255);
+    fn the_text_of_the_cursor_row_reads_on_both_ends_of_its_gradient() {
+        // The text of the row (white; the darkest brown on the pale shade of Carta) in bold:
+        // 4.5:1 at the left end, at the right end and in between.
         let mut failures = Vec::new();
         for n in Theme::NAMES {
             let t = Theme::named(n, ColorDepth::True).unwrap();
+            let white = t.cursor_text;
             for (what, col) in [("start", t.grad_row_start), ("end", t.grad_row_end)] {
                 let r = contrast(white, col);
                 if r < 4.5 {
@@ -1488,11 +1522,11 @@ mod tests {
             format!("#{r:02x}{g:02x}{b:02x}")
         };
         let dark = Theme::named("rada", ColorDepth::True).unwrap();
-        assert_eq!(hex(dark.grad_row_start), "#3d59a1");
-        assert_eq!(hex(dark.grad_row_end), "#6a4c9c");
+        assert_eq!(hex(dark.grad_row_start), "#3e5487");
+        assert_eq!(hex(dark.grad_row_end), "#5f4f88");
         let paper = Theme::named("rada-light", ColorDepth::True).unwrap();
-        assert_eq!(hex(paper.grad_row_start), "#476fa8");
-        assert_eq!(hex(paper.grad_row_end), "#7d58a6");
+        assert_eq!(hex(paper.grad_row_start), "#6d87ad");
+        assert_eq!(hex(paper.grad_row_end), "#8a78a8");
         // The solid cursor colour is where the shade starts.
         assert_eq!(dark.cursor, dark.grad_row_start);
         assert_eq!(paper.cursor, paper.grad_row_start);
@@ -1553,6 +1587,56 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn every_zone_of_the_interface_is_the_canvas_and_panels_differ_by_their_lines() {
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            // The command bar, the key hints, the strips above and below the content, the
+            // menus: the same background as the list. Pills, fields and keys a step away.
+            assert_eq!(t.cmdbar, t.canvas, "{n}");
+            assert_eq!(t.panel, t.canvas, "{n}");
+            assert_eq!(t.band().bg, Some(t.canvas), "{n}");
+            for (what, c) in [
+                ("field", t.field),
+                ("button", t.button),
+                ("key_bg", t.key_bg),
+                ("selection", t.selection),
+            ] {
+                assert_ne!(c, t.canvas, "{n}: {what} is a step away from the canvas");
+            }
+            // The thin line between panels.
+            assert!(contrast(t.track, t.canvas) >= 1.1, "{n}");
+        }
+        // The two reference themes: one background, in the hex of the design.
+        let hex = |c: Color| {
+            let (r, g, b) = channels(c);
+            format!("#{r:02x}{g:02x}{b:02x}")
+        };
+        let carta = Theme::named("rada-light", ColorDepth::True).unwrap();
+        assert_eq!(hex(carta.canvas), "#ecdfc6");
+        assert_eq!(carta.bg, Some(carta.canvas));
+        assert_eq!(hex(carta.track), "#cfbb96");
+        assert_eq!(hex(carta.text), "#3b2f22");
+        let dark = Theme::named("rada", ColorDepth::True).unwrap();
+        assert_eq!(hex(dark.canvas), "#1b1d27");
+        assert_eq!(
+            dark.bg,
+            Some(dark.canvas),
+            "painted: one blue-night everywhere"
+        );
+        assert_eq!(hex(dark.track), "#2c3040");
+        assert_eq!(hex(dark.text), "#c8cde0");
+        // Nothing white on paper: no token of Carta is a pure white or pale cream.
+        for (what, c) in [("canvas", carta.canvas), ("popup", carta.popup)] {
+            let (r, g, b) = channels(c);
+            assert!(
+                r < 0xf0 && g < 0xe8 && b < 0xd0,
+                "{what} of Carta is warm paper: {}",
+                hex(c)
+            );
+        }
     }
 
     #[test]

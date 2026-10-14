@@ -362,6 +362,9 @@ fn every_colour_on_screen_is_a_theme_token_in_every_theme() {
         let allowed = tokens_of(&th);
         let mut h = scene(120, 30);
         h.app.th = th.clone();
+        // The scene was drawn with the first theme: the second cell of a wide glyph keeps what
+        // it had unless the terminal is cleared.
+        h.term.clear().unwrap();
         on(&mut h, "README.md");
         let _ = h.screen();
         let buf = h.term.backend().buffer().clone();
