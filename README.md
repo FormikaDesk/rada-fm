@@ -96,6 +96,8 @@ cargo install --path crates/rada
 
 Or just build it: `cargo build --release` and use `target/release/rada`.
 
+<!-- TODO(aur): when the package `rada` is published on the AUR (see packaging/aur/README.md), add the line `yay -S rada` here, under "From source". Not before: nobody can install it yet. -->
+
 A [Nerd Font](https://www.nerdfonts.com/) in your terminal is recommended: rada then shows file-type icons. It looks for the font in the configuration of Ghostty, kitty, WezTerm, Alacritty, foot, Windows Terminal and Konsole; otherwise it uses Unicode markers, chosen for what the fonts of the system can draw (`--icons nerd|unicode-icons|unicode-std|none` overrides; see [Terminals](#terminals)).
 
 Optional: make your shell follow rada's last folder (`v` instead of `rada`):

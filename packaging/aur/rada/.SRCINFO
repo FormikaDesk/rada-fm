@@ -1,0 +1,22 @@
+pkgbase = rada
+	pkgdesc = A terminal file manager where every destructive action is planned first and can be undone
+	pkgver = 0.6.0rc7
+	pkgrel = 1
+	url = https://github.com/FormikaDesk/rada-fm
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = cargo
+	depends = glibc
+	depends = gcc-libs
+	optdepends = xdg-utils: open files and folders with the default program
+	optdepends = poppler: previews of PDF files
+	optdepends = udisks2: eject removable disks
+	optdepends = 7zip: read RAR archives (unrar does it too)
+	optdepends = ttf-jetbrains-mono-nerd: the icons of the file types
+	options = !lto
+	options = !debug
+	source = rada-0.6.0rc7.tar.gz::https://github.com/FormikaDesk/rada-fm/archive/refs/tags/v0.6.0-rc.7.tar.gz
+	sha256sums = da5f5f80a2fc2773182d63a7b7ba4b8c6761964f9c88d4d588d5ca668c415ea4
+
+pkgname = rada
