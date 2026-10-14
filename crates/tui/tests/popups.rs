@@ -234,3 +234,14 @@ fn the_help_says_what_ctrl_l_does() {
         "{s}"
     );
 }
+
+#[test]
+fn the_help_window_does_not_mention_the_launch_helper() {
+    let (mut h, _dest) = files(150, 60);
+    h.key(KeyCode::F(1));
+    for scroll in [0, 40, 100] {
+        h.app.help_scroll = scroll;
+        let s = h.screen();
+        assert!(!s.contains("launch-helper"), "{s}");
+    }
+}
