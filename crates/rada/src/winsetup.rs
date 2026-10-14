@@ -9,6 +9,7 @@
 //!   its size.
 //! * Without it: the shortcut starts `rada.exe` directly, whose icon is built into the program.
 
+use rada_core::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -97,15 +98,10 @@ impl WinSetup {
                 &frag,
                 fragment_json(&self.exe, &self.icon_path(), self.font_installed).as_bytes(),
             )?;
-            say.push(format!(
-                "added the Windows Terminal profile \"rada\": {}",
-                frag.display()
-            ));
+            say.push(tf(Key::SayWinProfile, &[&frag.display()]));
             written.push(frag);
         } else {
-            say.push(
-                "Windows Terminal is not installed: the shortcut starts rada.exe directly".into(),
-            );
+            say.push(Key::SayWinNoTerminal.tr().to_string());
         }
 
         let plan = self.shortcut_plan();
@@ -116,13 +112,11 @@ impl WinSetup {
         for dir in dirs {
             let lnk = self.shortcut_in(&dir);
             make_shortcut(&lnk, &plan, &self.exe)?;
-            say.push(format!("made the shortcut {}", lnk.display()));
+            say.push(tf(Key::SayWinShortcut, &[&lnk.display()]));
             written.push(lnk);
         }
         if self.windows_terminal.is_some() && !self.font_installed {
-            say.push(format!(
-                "for the icons, run `rada setup font` and then `rada setup desktop` again: the profile then asks for {FONT_FACE}"
-            ));
+            say.push(tf(Key::SayWinFont, &[&FONT_FACE]));
         }
         let mut manifest = self.read_manifest();
         for p in written {
@@ -149,9 +143,9 @@ impl WinSetup {
         }
         for p in paths {
             match std::fs::remove_file(&p) {
-                Ok(()) => say.push(format!("removed {}", p.display())),
+                Ok(()) => say.push(tf(Key::SayRemoved, &[&p.display()])),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => say.push(format!("could not remove {}: {e}", p.display())),
+                Err(e) => say.push(tf(Key::SayCouldNotRemove, &[&p.display(), &e])),
             }
         }
         // The folders rada made, if nothing else is in them.
@@ -166,7 +160,7 @@ impl WinSetup {
         }
         let _ = std::fs::remove_file(self.manifest_path());
         if say.is_empty() {
-            say.push("nothing to remove".into());
+            say.push(Key::SayNothingToRemove.tr().to_string());
         }
         Ok(say)
     }
@@ -197,9 +191,9 @@ pub struct ShortcutPlan {
 
 fn write(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| tf(Key::MCannotCreate, &[&dir.display()]))?;
     }
-    std::fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))
+    std::fs::write(path, bytes).with_context(|| tf(Key::MCannotWrite, &[&path.display()]))
 }
 
 /// The fragment that adds the profile.
@@ -234,7 +228,7 @@ fn make_shortcut(lnk: &Path, plan: &ShortcutPlan, exe: &Path) -> Result<()> {
     use windows::core::{HSTRING, Interface, PCWSTR};
 
     if let Some(dir) = lnk.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| tf(Key::MCannotCreate, &[&dir.display()]))?;
     }
     let wide = |p: &Path| -> Vec<u16> { p.as_os_str().encode_wide().chain(Some(0)).collect() };
     // SAFETY: COM is initialised for this thread and released at the end; every string
@@ -263,7 +257,7 @@ fn make_shortcut(lnk: &Path, plan: &ShortcutPlan, exe: &Path) -> Result<()> {
 
 #[cfg(not(windows))]
 fn make_shortcut(lnk: &Path, _plan: &ShortcutPlan, _exe: &Path) -> Result<()> {
-    anyhow::bail!("shortcuts are made on Windows only ({})", lnk.display())
+    anyhow::bail!("{}", tf(Key::MWinOnly, &[&lnk.display()]))
 }
 
 /// Read a shortcut back: what it starts, with what arguments (tests).

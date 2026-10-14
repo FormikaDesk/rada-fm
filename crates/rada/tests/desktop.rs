@@ -84,6 +84,7 @@ esac"#,
         let mut c = Command::new(env!("CARGO_BIN_EXE_rada"));
         c.args(args)
             .env_clear()
+            .env("LC_ALL", "en_US.UTF-8")
             .env("HOME", self.p("home"))
             .env("XDG_DATA_HOME", self.p("data"))
             .env("XDG_CONFIG_HOME", self.p("config"))

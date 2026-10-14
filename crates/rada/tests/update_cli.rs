@@ -65,6 +65,7 @@ impl World {
     fn run(&self, args: &[&str]) -> Output {
         let mut cmd = Command::new(&self.exe);
         cmd.args(args)
+            .env("LC_ALL", "en_US.UTF-8")
             .env("HOME", self.p("home"))
             .env("USERPROFILE", self.p("home"))
             .env("XDG_CONFIG_HOME", self.p("xdg/config"))
@@ -199,6 +200,7 @@ fn an_unreachable_server_is_an_error_not_a_crash() {
     let out = run_patiently(
         Command::new(&w.exe)
             .args(["update", "--check"])
+            .env("LC_ALL", "en_US.UTF-8")
             .env("HOME", w.p("home"))
             .env("USERPROFILE", w.p("home"))
             .env("XDG_CONFIG_HOME", w.p("xdg/config"))

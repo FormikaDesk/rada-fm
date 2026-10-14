@@ -1,5 +1,6 @@
 //! How this copy of rada got where it is, and so how it may be updated.
 
+use crate::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
 
 use super::Method;
@@ -22,24 +23,22 @@ fn package_hint(exe: &Path, os_id: Option<&str>) -> Option<String> {
     let p = p.as_str();
     let has = |s: &str| p.contains(s);
     if has("/Cellar/") || has("/homebrew/") || has("/linuxbrew/") {
-        return Some("Homebrew installed it: run `brew upgrade rada`.".into());
+        return Some(Key::UpHintBrew.tr().to_string());
     }
     if has("/scoop/apps/") || has("/scoop/shims/") {
-        return Some("Scoop installed it: run `scoop update rada`.".into());
+        return Some(Key::UpHintScoop.tr().to_string());
     }
     if has("/WindowsApps/") {
-        return Some(
-            "It was installed from the Microsoft Store or winget: update it there.".into(),
-        );
+        return Some(Key::UpHintStore.tr().to_string());
     }
     if has("/chocolatey/") {
-        return Some("Chocolatey installed it: run `choco upgrade rada`.".into());
+        return Some(Key::UpHintChoco.tr().to_string());
     }
     if has("/nix/store/") {
-        return Some("Nix installed it: update your profile or flake.".into());
+        return Some(Key::UpHintNix.tr().to_string());
     }
     if has("/snap/") || has("/flatpak/") {
-        return Some("It was installed as a snap or flatpak: update it with that tool.".into());
+        return Some(Key::UpHintSnap.tr().to_string());
     }
     let system = p.starts_with("/usr/bin/")
         || p.starts_with("/bin/")
@@ -52,22 +51,23 @@ fn package_hint(exe: &Path, os_id: Option<&str>) -> Option<String> {
         return None;
     }
     let tool = match os_id {
-        Some("arch" | "manjaro" | "endeavouros" | "cachyos") => {
-            "an AUR helper (for example `yay -Syu`) or `sudo pacman -Syu`"
-        }
+        Some("arch" | "manjaro" | "endeavouros" | "cachyos") => Key::UpToolArch.tr(),
         Some("debian" | "ubuntu" | "linuxmint" | "pop" | "raspbian") => {
             "`sudo apt update && sudo apt upgrade`"
         }
         Some("fedora" | "rhel" | "centos" | "rocky" | "almalinux") => "`sudo dnf upgrade`",
         Some("opensuse-tumbleweed" | "opensuse-leap" | "sles") => "`sudo zypper update`",
         Some("alpine") => "`sudo apk upgrade`",
-        _ => "your package manager",
+        _ => Key::UpToolPackageManager.tr(),
     };
-    Some(format!(
-        "It is in {}, which a package manager looks after: update it with {tool}.",
-        exe.parent()
-            .map(|d| d.display().to_string())
-            .unwrap_or_default()
+    Some(tf(
+        Key::UpHintSystem,
+        &[
+            &exe.parent()
+                .map(|d| d.display().to_string())
+                .unwrap_or_default(),
+            &tool,
+        ],
     ))
 }
 
@@ -109,8 +109,7 @@ pub fn detect(
         Method::Binary => Ok(Mode::Binary),
         Method::Source => source(),
         Method::Package => Ok(Mode::Package {
-            hint: package_hint(exe, os_id)
-                .unwrap_or_else(|| "Update it with the tool that installed it.".into()),
+            hint: package_hint(exe, os_id).unwrap_or_else(|| Key::UpHintDefault.tr().to_string()),
         }),
         Method::Auto => {
             if let Some(hint) = package_hint(exe, os_id) {

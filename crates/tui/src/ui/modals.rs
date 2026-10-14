@@ -176,8 +176,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                     tf(
                         Key::ScanTotals,
                         &[
-                            &fmt::thousands(*files),
-                            &fmt::thousands(*dirs),
+                            &fmt::count(*files, Key::FileOne, Key::FileMany),
+                            &fmt::count(*dirs, Key::FolderOne, Key::FolderMany),
                             &fmt::size(*bytes),
                         ],
                     ),

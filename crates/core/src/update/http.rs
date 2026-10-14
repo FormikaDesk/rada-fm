@@ -1,6 +1,7 @@
 //! The little HTTP client updates use. Nothing is sent but the request itself and a
 //! `User-Agent` of `rada/<version>`.
 
+use crate::i18n::{Key, tf};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -37,12 +38,10 @@ fn agent(
 
 fn describe(e: ureq::Error, url: &str) -> String {
     match e {
-        ureq::Error::StatusCode(404) => format!("{url} was not found (404)"),
-        ureq::Error::StatusCode(c @ (403 | 429)) => format!(
-            "{url} refused the request ({c}); GitHub limits how often releases are read, try again later"
-        ),
-        ureq::Error::StatusCode(c) => format!("{url} answered with status {c}"),
-        other => format!("cannot reach {url}: {other}"),
+        ureq::Error::StatusCode(404) => tf(Key::UpHttpNotFound, &[&url]),
+        ureq::Error::StatusCode(c @ (403 | 429)) => tf(Key::UpHttpRefused, &[&url, &c]),
+        ureq::Error::StatusCode(c) => tf(Key::UpHttpStatus, &[&url, &c]),
+        other => tf(Key::UpHttpUnreachable, &[&url, &other]),
     }
 }
 
@@ -71,7 +70,7 @@ impl Http {
             .with_config()
             .limit(max_bytes)
             .read_to_string()
-            .map_err(|e| format!("cannot read the answer of {url}: {e}"))
+            .map_err(|e| tf(Key::UpHttpAnswer, &[&url, &e]))
     }
 
     /// Download `url` into the new file `dest`. `progress(done, total)` is called as bytes
@@ -96,37 +95,33 @@ impl Http {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<u64>().ok());
         if total.is_some_and(|t| t > max_bytes) {
-            return Err(format!(
-                "{url} is larger than the {max_bytes} bytes allowed"
-            ));
+            return Err(tf(Key::UpHttpLarge, &[&url, &max_bytes]));
         }
         let mut reader = resp.body_mut().with_config().limit(max_bytes).reader();
         let mut out =
-            File::create(dest).map_err(|e| format!("cannot create {}: {e}", dest.display()))?;
+            File::create(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
         let mut buf = vec![0u8; 64 * 1024];
         let mut done = 0u64;
         loop {
             let n = reader
                 .read(&mut buf)
-                .map_err(|e| format!("the download of {url} broke off: {e}"))?;
+                .map_err(|e| tf(Key::UpHttpBroke, &[&url, &e]))?;
             if n == 0 {
                 break;
             }
             out.write_all(&buf[..n])
-                .map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
+                .map_err(|e| tf(Key::UpCannotWrite, &[&dest.display(), &e]))?;
             done += n as u64;
             if !progress(done, total) {
                 return Err("stopped".into());
             }
         }
         out.flush()
-            .map_err(|e| format!("cannot write {}: {e}", dest.display()))?;
+            .map_err(|e| tf(Key::UpCannotWrite, &[&dest.display(), &e]))?;
         if let Some(t) = total
             && done != t
         {
-            return Err(format!(
-                "the download of {url} ended early ({done} of {t} bytes)"
-            ));
+            return Err(tf(Key::UpHttpEarly, &[&url, &done, &t]));
         }
         Ok(())
     }

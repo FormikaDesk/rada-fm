@@ -31,6 +31,7 @@ impl Sandbox {
     fn rada(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_rada"))
             .args(args)
+            .env("LC_ALL", "en_US.UTF-8")
             .env("HOME", self.p("home"))
             .env("USERPROFILE", self.p("home"))
             .env("XDG_CONFIG_HOME", self.p("config"))

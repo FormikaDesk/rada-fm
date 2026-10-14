@@ -409,6 +409,51 @@ mod tests {
     }
 
     #[test]
+    fn a_sentence_that_starts_with_a_count_and_a_plural_has_a_form_for_one() {
+        // "3 elementi selezionati" is not "1 elementi selezionati": a text that puts a count in
+        // front of a word that agrees with it is one of a pair, `…One` and `…Many`, and the
+        // code picks between them. The plural words that are asked for in a sentence like that:
+        const PLURALS: &[&str] = &[
+            "selezionati",
+            "copiati",
+            "tagliati",
+            "spostati",
+            "mostrati",
+            "saltati",
+            "eliminati",
+            "rinominati",
+            "estratti",
+            "compressi",
+            "elementi",
+            "cartelle",
+            "passaggi",
+            "pagine",
+            "collegamenti",
+        ];
+        let mut problems = Vec::new();
+        for &k in Key::ALL {
+            let name = format!("{k:?}");
+            let it = k.it();
+            let Some(rest) = it.strip_prefix("{0} ") else {
+                continue;
+            };
+            let first = rest.split_whitespace().next().unwrap_or("");
+            if PLURALS.contains(&first) && !name.ends_with("Many") {
+                problems.push(format!(
+                    "{name}: {it:?} puts a count before a plural; make it …Many and add …One"
+                ));
+            }
+            if name.ends_with("Many") {
+                let one = format!("{}One", name.trim_end_matches("Many"));
+                if !Key::ALL.iter().any(|o| format!("{o:?}") == one) {
+                    problems.push(format!("{name} has no {one}"));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    #[test]
     fn counts_use_the_right_form_of_the_word() {
         assert_eq!(count(1, Key::ItemOne, Key::ItemMany), "1 item");
         assert_eq!(count(3, Key::ItemOne, Key::ItemMany), "3 items");

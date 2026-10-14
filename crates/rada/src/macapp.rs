@@ -17,6 +17,7 @@
 //! command twice. The command is its `initial-command` instead, in the settings file. The Dock shows the
 //! terminal's icon while rada runs, not rada's: a window belongs to the program that draws it.
 
+use rada_core::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -69,7 +70,7 @@ impl MacSetup {
         // A fresh bundle each time: nothing of an older version is left inside.
         if app.exists() {
             std::fs::remove_dir_all(&app)
-                .with_context(|| format!("cannot replace {}", app.display()))?;
+                .with_context(|| tf(Key::MCannotReplace, &[&app.display()]))?;
         }
         write(
             &contents.join("Info.plist"),
@@ -92,16 +93,13 @@ impl MacSetup {
             command_script(&self.exe).as_bytes(),
             true,
         )?;
-        say.push(format!("made {}", app.display()));
+        say.push(tf(Key::SayMade, &[&app.display()]));
         refresh_launch_services(&app);
 
         if desktop {
             let alias = self.alias();
             make_alias(&app, &alias)?;
-            say.push(format!(
-                "made a link to it on the Desktop: {}",
-                alias.display()
-            ));
+            say.push(tf(Key::SayMacLink, &[&alias.display()]));
             written.push(alias);
         }
         let mut manifest = self.read_manifest();
@@ -111,14 +109,8 @@ impl MacSetup {
             }
         }
         self.save_manifest(&manifest)?;
-        say.push(
-            "Rada.app opens rada in Ghostty (in iTerm2 or Terminal if that is not installed). \
-             While it runs the Dock shows the terminal's icon: a window belongs to the program that draws it."
-                .into(),
-        );
-        say.push(format!(
-            "In Ghostty the window is {WINDOW_COLUMNS}×{WINDOW_ROWS} and Cmd+C, Cmd+V, Cmd+Backspace and the other Mac shortcuts go to rada."
-        ));
+        say.push(Key::SayMacGhostty.tr().to_string());
+        say.push(tf(Key::SayMacWindow, &[&WINDOW_COLUMNS, &WINDOW_ROWS]));
         Ok(say)
     }
 
@@ -140,21 +132,21 @@ impl MacSetup {
                 Ok(m) if m.file_type().is_symlink() => {
                     if std::fs::read_link(&p).is_ok_and(|t| t == self.app()) {
                         std::fs::remove_file(&p)
-                            .with_context(|| format!("cannot remove {}", p.display()))?;
-                        say.push(format!("removed {}", p.display()));
+                            .with_context(|| tf(Key::MCannotRemove, &[&p.display()]))?;
+                        say.push(tf(Key::SayRemoved, &[&p.display()]));
                     }
                 }
                 Ok(m) if m.is_dir() && p == self.app() => {
                     std::fs::remove_dir_all(&p)
-                        .with_context(|| format!("cannot remove {}", p.display()))?;
-                    say.push(format!("removed {}", p.display()));
+                        .with_context(|| tf(Key::MCannotRemove, &[&p.display()]))?;
+                    say.push(tf(Key::SayRemoved, &[&p.display()]));
                 }
                 _ => {}
             }
         }
         let _ = std::fs::remove_file(self.manifest_path());
         if say.is_empty() {
-            say.push("nothing to remove".into());
+            say.push(Key::SayNothingToRemove.tr().to_string());
         }
         Ok(say)
     }
@@ -177,14 +169,14 @@ impl MacSetup {
 
 fn write(path: &Path, bytes: &[u8], executable: bool) -> Result<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| tf(Key::MCannotCreate, &[&dir.display()]))?;
     }
-    std::fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))?;
+    std::fs::write(path, bytes).with_context(|| tf(Key::MCannotWrite, &[&path.display()]))?;
     #[cfg(unix)]
     if executable {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
-            .with_context(|| format!("cannot make {} runnable", path.display()))?;
+            .with_context(|| tf(Key::MCannotRunnable, &[&path.display()]))?;
     }
     #[cfg(not(unix))]
     let _ = executable;
@@ -195,28 +187,25 @@ fn write(path: &Path, bytes: &[u8], executable: bool) -> Result<()> {
 /// opens the application when it is double-clicked.
 fn make_alias(app: &Path, alias: &Path) -> Result<()> {
     if let Some(dir) = alias.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| tf(Key::MCannotCreate, &[&dir.display()]))?;
     }
     if let Ok(m) = std::fs::symlink_metadata(alias) {
         if m.file_type().is_symlink() {
             std::fs::remove_file(alias)
-                .with_context(|| format!("cannot replace {}", alias.display()))?;
+                .with_context(|| tf(Key::MCannotReplace, &[&alias.display()]))?;
         } else {
-            anyhow::bail!(
-                "{} exists and is not a link made by rada: left alone",
-                alias.display()
-            );
+            anyhow::bail!("{}", tf(Key::MMacNotLink, &[&alias.display()]));
         }
     }
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(app, alias)
-            .with_context(|| format!("cannot make {}", alias.display()))
+            .with_context(|| tf(Key::MCannotCreate, &[&alias.display()]))
     }
     #[cfg(not(unix))]
     {
         let _ = app;
-        anyhow::bail!("a link on the Desktop is made on macOS only")
+        anyhow::bail!("{}", Key::MMacLinkOnly.tr())
     }
 }
 

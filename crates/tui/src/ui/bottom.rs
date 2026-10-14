@@ -224,7 +224,14 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             format!(
                 "{tick} {}",
-                tf(Key::SelectedSize, &[&app.marked.len(), &fmt::size(size)])
+                if app.marked.len() == 1 {
+                    tf(Key::SelectedSizeOne, &[&fmt::size(size)])
+                } else {
+                    tf(
+                        Key::SelectedSizeMany,
+                        &[&app.marked.len(), &fmt::size(size)],
+                    )
+                }
             ),
             th.fg(th.check).add_modifier(Modifier::BOLD).patch(band),
         ));

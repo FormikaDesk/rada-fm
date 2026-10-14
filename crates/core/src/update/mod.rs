@@ -18,6 +18,7 @@ pub mod release;
 pub mod source;
 pub mod version;
 
+use crate::i18n::{Key, tf};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -142,9 +143,8 @@ impl Ctx {
         state_dir: PathBuf,
         home: PathBuf,
     ) -> Result<Ctx, String> {
-        let current = Version::parse(version)
-            .ok_or_else(|| format!("{version:?} is not a version number"))?;
-        let exe = std::env::current_exe().map_err(|e| format!("cannot find the program: {e}"))?;
+        let current = Version::parse(version).ok_or_else(|| tf(Key::UpNotVersion, &[&version]))?;
+        let exe = std::env::current_exe().map_err(|e| tf(Key::UpNoProgram, &[&e]))?;
         let exe = {
             let s = exe.to_string_lossy();
             // Linux appends this to the path of a program whose file has been replaced.
@@ -358,13 +358,13 @@ pub struct Applied {
 
 pub fn sha256_of(path: &Path) -> Result<String, String> {
     use std::io::Read;
-    let mut f = fs::File::open(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    let mut f = fs::File::open(path).map_err(|e| tf(Key::UpCannotRead, &[&path.display(), &e]))?;
     let mut h = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
     loop {
         let n = f
             .read(&mut buf)
-            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+            .map_err(|e| tf(Key::UpCannotRead, &[&path.display(), &e]))?;
         if n == 0 {
             break;
         }
@@ -439,12 +439,12 @@ fn apply_binary(
         .update_dir()
         .join(format!("work-{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);
-    fs::create_dir_all(&work).map_err(|e| format!("cannot create {}: {e}", work.display()))?;
+    fs::create_dir_all(&work).map_err(|e| tf(Key::UpCannotCreate, &[&work.display(), &e]))?;
     let result = (|| {
-        report("reading the checksums".into());
+        report(Key::UpReadingSums.tr().to_string());
         let sums_text = http.get_text(&sums.url, MAX_SUMS_BYTES)?;
         let want = release::checksum_for(&sums_text, &archive_name)
-            .ok_or_else(|| format!("SHA256SUMS does not list {archive_name}"))?;
+            .ok_or_else(|| tf(Key::UpSumsMissing, &[&archive_name]))?;
         log.line(&format!("{archive_name} should be {want}"));
 
         let file = work.join(&archive_name);
@@ -457,41 +457,42 @@ fn apply_binary(
                 let step = done / (256 * 1024);
                 if step != last {
                     last = step;
-                    report(format!(
-                        "downloading {archive_name}: {}",
-                        percent(done, total)
+                    report(tf(
+                        Key::UpDownloading,
+                        &[&archive_name, &percent(done, total)],
                     ));
                 }
                 true
             },
         )?;
-        report("checking the download".into());
+        report(Key::UpChecking.tr().to_string());
         let got = sha256_of(&file)?;
         log.line(&format!("downloaded file is {got}"));
         if got != want {
-            return Err(format!(
-                "the downloaded file does not match its checksum (expected {want}, got {got}); nothing was installed"
-            ));
+            return Err(tf(Key::UpChecksumBad, &[&want, &got]));
         }
 
-        report("unpacking".into());
+        report(Key::UpUnpacking.tr().to_string());
         let stage = install::stage_path(&ctx.exe);
         let inner = release::inner_path(&release.version, target);
         install::extract_binary(&file, &inner, &stage).map_err(|e| {
             if e.contains("Permission denied") || e.contains("denied") {
-                format!(
-                    "rada cannot write in {}: {e}",
-                    ctx.exe
-                        .parent()
-                        .map(|d| d.display().to_string())
-                        .unwrap_or_default()
+                tf(
+                    Key::UpCannotWriteDir,
+                    &[
+                        &ctx.exe
+                            .parent()
+                            .map(|d| d.display().to_string())
+                            .unwrap_or_default(),
+                        &e,
+                    ],
                 )
             } else {
                 e
             }
         })?;
         if ctx.run_check {
-            report("checking the new program".into());
+            report(Key::UpCheckingNew.tr().to_string());
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -507,10 +508,7 @@ fn apply_binary(
             log.line(&format!("new program: {out}"));
             if out != format!("rada {}", release.version) {
                 let _ = fs::remove_file(&stage);
-                return Err(format!(
-                    "the new program says {out:?}, not rada {}; nothing was installed",
-                    release.version
-                ));
+                return Err(tf(Key::UpNewSays, &[&out, &release.version]));
             }
         }
         if let Err(e) = install::save_backup(
@@ -521,7 +519,7 @@ fn apply_binary(
             // Not fatal: the update itself is safe, only going back would not be possible.
             log.line(&format!("no copy of the old program kept: {e}"));
         }
-        report("installing".into());
+        report(Key::UpInstalling.tr().to_string());
         install::replace_exe(&stage, &ctx.exe)?;
         if install::has_quarantine(&ctx.exe) {
             install::clear_quarantine(&ctx.exe);
@@ -529,11 +527,7 @@ fn apply_binary(
         }
         Ok(Applied {
             version: release.version.to_string(),
-            note: format!(
-                "rada {} is installed at {}.",
-                release.version,
-                ctx.exe.display()
-            ),
+            note: tf(Key::UpInstalledAt, &[&release.version, &ctx.exe.display()]),
             restart: true,
         })
     })();
@@ -680,7 +674,7 @@ fn worker(ctx: std::sync::Arc<Ctx>, rx: Receiver<Req>, out: Sender<CoreEvent>) {
                 match rollback(&ctx) {
                     Ok(v) => send(UpdateEvent::Done(Applied {
                         version: v.clone(),
-                        note: format!("Went back to rada {v}."),
+                        note: tf(Key::UpWentBack, &[&v]),
                         restart: true,
                     })),
                     Err(message) => send(UpdateEvent::Failed {

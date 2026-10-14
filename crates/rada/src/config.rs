@@ -138,8 +138,9 @@ impl FileConfig {
         let d = SizeLimits::default();
         let mode = match self.folder_sizes.as_deref() {
             None => SizeMode::Auto,
-            Some(n) => SizeMode::parse(n)
-                .with_context(|| format!("unknown folder_sizes {n:?} (use auto, items or off)"))?,
+            Some(n) => SizeMode::parse(n).with_context(|| {
+                rada_core::i18n::tf(rada_core::i18n::Key::MBadFolderSizes, &[&n])
+            })?,
         };
         Ok(SizeSettings {
             mode,
@@ -249,6 +250,14 @@ struct Raw {
     keymap: Option<String>,
     cmd_keys: Option<bool>,
     keys: Option<HashMap<String, Keys>>,
+}
+
+/// The `language` the config file asks for, read before anything else so that even `--help`
+/// can speak it. Nothing is reported here: `load` does that.
+pub fn chosen_language(dirs: &Dirs) -> Option<String> {
+    let text = std::fs::read_to_string(dirs.rada_config().join("config.toml")).ok()?;
+    let value: toml::Value = toml::from_str(&text).ok()?;
+    value.get("language")?.as_str().map(str::to_string)
 }
 
 pub fn load(dirs: &Dirs) -> FileConfig {

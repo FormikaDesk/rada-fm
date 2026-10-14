@@ -2,6 +2,7 @@
 //! entry uses. Everything is installed for the current user only, and the exact list of
 //! files written is remembered so that `--remove` takes away precisely those.
 
+use rada_core::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -44,7 +45,7 @@ impl Setup {
             data_home: dirs.data.clone(),
             config_home: dirs.config.clone(),
             state_dir: dirs.rada_state(),
-            exe: std::env::current_exe().context("cannot find the rada executable")?,
+            exe: std::env::current_exe().context(Key::MNoExe.tr())?,
             xdg_mime: "xdg-mime".into(),
             update_db: "update-desktop-database".into(),
         })
@@ -83,11 +84,11 @@ impl Setup {
             &desktop,
             launcher_entry(DESKTOP_ENTRY, &self.exe, claims_folders).as_bytes(),
         )?;
-        say.push(format!("installed {}", desktop.display()));
+        say.push(tf(Key::SayInstalled, &[&desktop.display()]));
         written.push(desktop);
         for (path, bytes) in self.icon_files() {
             write_file(&path, bytes)?;
-            say.push(format!("installed {}", path.display()));
+            say.push(tf(Key::SayInstalled, &[&path.display()]));
             written.push(path);
         }
         for f in written {
@@ -96,11 +97,12 @@ impl Setup {
             }
         }
 
-        match run(&self.update_db, &[self.data_home.join("applications").as_os_str()]) {
-            Ok(_) => say.push("updated the desktop database".into()),
-            Err(e) => say.push(format!(
-                "note: could not update the desktop database ({e}); the entry appears after the next login"
-            )),
+        match run(
+            &self.update_db,
+            &[self.data_home.join("applications").as_os_str()],
+        ) {
+            Ok(_) => say.push(Key::SayDbUpdated.tr().to_string()),
+            Err(e) => say.push(tf(Key::SayDbNote, &[&e])),
         }
 
         if default_file_manager {
@@ -111,7 +113,7 @@ impl Setup {
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
             if current == DESKTOP_FILE {
-                say.push("rada is already the default file manager".into());
+                say.push(Key::SayAlreadyDefault.tr().to_string());
             } else {
                 // Keep the first previous handler if setup is run twice.
                 if manifest.previous_default.is_none() {
@@ -122,12 +124,10 @@ impl Setup {
                     &self.xdg_mime,
                     &["default".as_ref(), DESKTOP_FILE.as_ref(), DIR_MIME.as_ref()],
                 )
-                .context("xdg-mime could not set the default file manager")?;
+                .context(Key::MXdgSet.tr())?;
                 say.push(match current.as_str() {
-                    "" => {
-                        "rada is now the default file manager (there was none before)".to_string()
-                    }
-                    prev => format!("rada is now the default file manager (it was {prev})"),
+                    "" => Key::SayNowDefaultNone.tr().to_string(),
+                    prev => tf(Key::SayNowDefaultWas, &[&prev]),
                 });
             }
         }
@@ -150,9 +150,9 @@ impl Setup {
         }
         for f in &files {
             match std::fs::remove_file(f) {
-                Ok(()) => say.push(format!("removed {}", f.display())),
+                Ok(()) => say.push(tf(Key::SayRemoved, &[&f.display()])),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => say.push(format!("could not remove {}: {e}", f.display())),
+                Err(e) => say.push(tf(Key::SayCouldNotRemove, &[&f.display(), &e])),
             }
         }
         if let Some(prev) = &manifest.previous_default {
@@ -170,11 +170,11 @@ impl Setup {
                         &self.xdg_mime,
                         &["default".as_ref(), prev.as_ref(), DIR_MIME.as_ref()],
                     )
-                    .context("xdg-mime could not restore the previous file manager")?;
-                    say.push(format!("restored {prev} as the default file manager"));
+                    .context(Key::MXdgRestore.tr())?;
+                    say.push(tf(Key::SayRestored, &[&prev]));
                 }
             } else {
-                say.push("the default file manager was changed since; left as it is".into());
+                say.push(Key::SayDefaultChanged.tr().to_string());
             }
         }
         let _ = std::fs::remove_file(self.manifest_path());
@@ -201,11 +201,8 @@ impl Setup {
         let kept: Vec<&str> = text.lines().filter(|l| l.trim() != wanted).collect();
         if kept.len() != text.lines().count() {
             std::fs::write(&path, kept.join("\n") + "\n")
-                .with_context(|| format!("cannot update {}", path.display()))?;
-            say.push(format!(
-                "removed rada as the default file manager from {}",
-                path.display()
-            ));
+                .with_context(|| tf(Key::MCannotUpdate, &[&path.display()]))?;
+            say.push(tf(Key::SayForgotDefault, &[&path.display()]));
         }
         Ok(())
     }
@@ -227,9 +224,9 @@ impl Setup {
 
 fn write_file(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| tf(Key::MCannotCreate, &[&dir.display()]))?;
     }
-    std::fs::write(path, bytes).with_context(|| format!("cannot write {}", path.display()))
+    std::fs::write(path, bytes).with_context(|| tf(Key::MCannotWrite, &[&path.display()]))
 }
 
 fn run(program: &str, args: &[&std::ffi::OsStr]) -> Result<String> {
@@ -237,11 +234,14 @@ fn run(program: &str, args: &[&std::ffi::OsStr]) -> Result<String> {
         .args(args)
         .stdin(Stdio::null())
         .output()
-        .with_context(|| format!("{program} is not available"))?;
+        .with_context(|| tf(Key::MNotAvailable, &[&program]))?;
     if !out.status.success() {
         bail!(
-            "{program} failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+            "{}",
+            tf(
+                Key::MProgramFailed,
+                &[&program, &String::from_utf8_lossy(&out.stderr).trim()]
+            )
         );
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
@@ -410,19 +410,18 @@ pub fn terminal_command(
 
 /// Open rada in a new terminal window and return at once.
 pub fn spawn_terminal(path: Option<&Path>) -> Result<()> {
-    let exe = std::env::current_exe().context("cannot find the rada executable")?;
+    let exe = std::env::current_exe().context(Key::MNoExe.tr())?;
     let path = match path {
         Some(p) => Some(
             rada_core::fs::canonical_path(p)
-                .with_context(|| format!("cannot open {}", p.display()))?,
+                .with_context(|| tf(Key::MCannotOpen, &[&p.display()]))?,
         ),
         None => None,
     };
     let var = std::env::var("TERMINAL").ok();
     let installed = |name: &str| which(name).is_some();
-    let cmd = terminal_command(&exe, path.as_deref(), var.as_deref(), &installed).context(
-        "no terminal emulator found: install one, or set $TERMINAL (for example TERMINAL=kitty)",
-    )?;
+    let cmd = terminal_command(&exe, path.as_deref(), var.as_deref(), &installed)
+        .context(Key::MNoTerminal.tr())?;
     let mut c = Command::new(&cmd[0]);
     c.args(&cmd[1..])
         .stdin(Stdio::null())
@@ -435,7 +434,7 @@ pub fn spawn_terminal(path: Option<&Path>) -> Result<()> {
         c.process_group(0);
     }
     c.spawn()
-        .with_context(|| format!("cannot start {}", cmd[0]))?;
+        .with_context(|| tf(Key::MCannotStart, &[&cmd[0]]))?;
     Ok(())
 }
 

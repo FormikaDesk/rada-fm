@@ -7,6 +7,7 @@
 //! cannot be overwritten, it is renamed out of the way first (a running program can be
 //! renamed) and put back if the second rename fails.
 
+use crate::i18n::{Key, tf};
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -58,59 +59,58 @@ pub fn extract_binary(archive: &Path, inner: &str, dest: &Path) -> Result<(), St
 
 fn copy_limited(mut from: impl Read, dest: &Path) -> Result<(), String> {
     let mut out =
-        fs::File::create(dest).map_err(|e| format!("cannot create {}: {e}", dest.display()))?;
+        fs::File::create(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
     let n = io::copy(&mut (&mut from).take(MAX_BINARY_BYTES + 1), &mut out)
-        .map_err(|e| format!("the archive is damaged: {e}"))?;
+        .map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
     if n > MAX_BINARY_BYTES {
-        return Err("the program in the archive is implausibly large".into());
+        return Err(Key::UpArchiveHuge.tr().to_string());
     }
     if n == 0 {
-        return Err("the program in the archive is empty".into());
+        return Err(Key::UpArchiveEmpty.tr().to_string());
     }
     Ok(())
 }
 
 fn extract_from_tar_gz(archive: &Path, inner: &str, dest: &Path) -> Result<(), String> {
     let file =
-        fs::File::open(archive).map_err(|e| format!("cannot open {}: {e}", archive.display()))?;
+        fs::File::open(archive).map_err(|e| tf(Key::UpCannotOpen, &[&archive.display(), &e]))?;
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(file));
     let entries = tar
         .entries()
-        .map_err(|e| format!("the archive is damaged: {e}"))?;
+        .map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
     for entry in entries {
-        let entry = entry.map_err(|e| format!("the archive is damaged: {e}"))?;
+        let entry = entry.map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
         let path = entry
             .path()
-            .map_err(|e| format!("the archive is damaged: {e}"))?
+            .map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?
             .to_string_lossy()
             .replace('\\', "/");
         if path == inner && entry.header().entry_type().is_file() {
             return copy_limited(entry, dest);
         }
     }
-    Err(format!("the archive does not contain {inner}"))
+    Err(tf(Key::UpArchiveLacks, &[&inner]))
 }
 
 fn extract_from_zip(archive: &Path, inner: &str, dest: &Path) -> Result<(), String> {
     let file =
-        fs::File::open(archive).map_err(|e| format!("cannot open {}: {e}", archive.display()))?;
-    let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("the archive is damaged: {e}"))?;
+        fs::File::open(archive).map_err(|e| tf(Key::UpCannotOpen, &[&archive.display(), &e]))?;
+    let mut zip = zip::ZipArchive::new(file).map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
     for i in 0..zip.len() {
         let entry = zip
             .by_index(i)
-            .map_err(|e| format!("the archive is damaged: {e}"))?;
+            .map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
         let name = entry.name().map(|n| n.replace('\\', "/"));
         if name.as_deref().ok() == Some(inner) && entry.is_file() {
             return copy_limited(entry, dest);
         }
     }
-    Err(format!("the archive does not contain {inner}"))
+    Err(tf(Key::UpArchiveLacks, &[&inner]))
 }
 
 /// Start `program --version` and return what it printed, giving up after `limit`.
 pub fn run_version(program: &Path, limit: Duration) -> Result<String, String> {
-    let mut child =
-        spawn_version(program).map_err(|e| format!("the new program does not start: {e}"))?;
+    let mut child = spawn_version(program).map_err(|e| tf(Key::UpNewNoStart, &[&e]))?;
     let started = Instant::now();
     loop {
         match child.try_wait() {
@@ -120,17 +120,17 @@ pub fn run_version(program: &Path, limit: Duration) -> Result<String, String> {
                     let _ = so.read_to_string(&mut out);
                 }
                 if !status.success() {
-                    return Err(format!("the new program exited with {status}"));
+                    return Err(tf(Key::UpNewExit, &[&status]));
                 }
                 return Ok(out.trim().to_string());
             }
             Ok(None) if started.elapsed() > limit => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err("the new program did not answer `--version` in time".into());
+                return Err(Key::UpNewSlow.tr().to_string());
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(20)),
-            Err(e) => return Err(format!("cannot wait for the new program: {e}")),
+            Err(e) => return Err(tf(Key::UpNewWait, &[&e])),
         }
     }
 }
@@ -254,29 +254,26 @@ pub fn replace_exe(stage: &Path, exe: &Path) -> Result<(), String> {
 }
 
 fn replace_inner(stage: &Path, exe: &Path) -> Result<(), String> {
-    make_executable(stage).map_err(|e| format!("cannot make the new program runnable: {e}"))?;
+    make_executable(stage).map_err(|e| tf(Key::UpCannotRunnable, &[&e]))?;
     clear_quarantine(stage);
     #[cfg(not(windows))]
     {
         // A rename gives the new program a file of its own: the running one keeps its old file
         // until it exits, and nothing ever sees a half-written program.
-        fs::rename(stage, exe)
-            .map_err(|e| format!("cannot put the new program at {}: {e}", exe.display()))
+        fs::rename(stage, exe).map_err(|e| tf(Key::UpCannotPut, &[&exe.display(), &e]))
     }
     #[cfg(windows)]
     {
         let away = sibling(exe, "old");
         let _ = fs::remove_file(&away);
-        fs::rename(exe, &away)
-            .map_err(|e| format!("cannot move {} out of the way: {e}", exe.display()))?;
+        fs::rename(exe, &away).map_err(|e| tf(Key::UpCannotMove, &[&exe.display(), &e]))?;
         if let Err(e) = fs::rename(stage, exe) {
             let back = fs::rename(&away, exe);
             return Err(match back {
-                Ok(()) => format!("cannot put the new program at {}: {e}", exe.display()),
-                Err(b) => format!(
-                    "cannot put the new program at {}: {e}; the old one is at {} ({b})",
-                    exe.display(),
-                    away.display()
+                Ok(()) => tf(Key::UpCannotPut, &[&exe.display(), &e]),
+                Err(b) => tf(
+                    Key::UpCannotPutKept,
+                    &[&exe.display(), &e, &away.display(), &b],
                 ),
             });
         }
@@ -335,16 +332,16 @@ pub fn read_backup(dir: &Path) -> Option<(PathBuf, BackupInfo)> {
 
 /// Keep a copy of `exe` (which is `version`) to go back to.
 pub fn save_backup(exe: &Path, version: &str, dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    fs::create_dir_all(dir).map_err(|e| tf(Key::UpCannotCreate, &[&dir.display(), &e]))?;
     let tmp = dir.join("incoming");
-    fs::copy(exe, &tmp).map_err(|e| format!("cannot keep a copy of {}: {e}", exe.display()))?;
+    fs::copy(exe, &tmp).map_err(|e| tf(Key::UpCannotKeepCopy, &[&exe.display(), &e]))?;
     commit_backup(&tmp, exe, version, dir)
 }
 
 fn commit_backup(tmp: &Path, exe: &Path, version: &str, dir: &Path) -> Result<(), String> {
     let bin = backup_binary(dir);
     let _ = fs::remove_file(&bin);
-    fs::rename(tmp, &bin).map_err(|e| format!("cannot keep the old program: {e}"))?;
+    fs::rename(tmp, &bin).map_err(|e| tf(Key::UpCannotKeepOld, &[&e]))?;
     let info = BackupInfo {
         version: version.to_string(),
         exe: exe.to_path_buf(),
@@ -353,7 +350,7 @@ fn commit_backup(tmp: &Path, exe: &Path, version: &str, dir: &Path) -> Result<()
         backup_meta(dir),
         serde_json::to_vec_pretty(&info).map_err(|e| e.to_string())?,
     )
-    .map_err(|e| format!("cannot write {}: {e}", backup_meta(dir).display()))
+    .map_err(|e| tf(Key::UpCannotWrite, &[&backup_meta(dir).display(), &e]))
 }
 
 /// Go back to the saved program. The program being replaced becomes the saved one, so that
@@ -365,17 +362,17 @@ pub fn rollback(
     run_check: bool,
 ) -> Result<String, String> {
     let Some((bin, info)) = read_backup(dir) else {
-        return Err("there is no earlier version saved to go back to".into());
+        return Err(Key::UpNoEarlier.tr().to_string());
     };
     let stage = stage_path(exe);
-    fs::copy(&bin, &stage).map_err(|e| format!("cannot write {}: {e}", stage.display()))?;
+    fs::copy(&bin, &stage).map_err(|e| tf(Key::UpCannotWrite, &[&stage.display(), &e]))?;
     if run_check {
         make_executable(&stage).map_err(|e| e.to_string())?;
         match run_version(&stage, Duration::from_secs(10)) {
             Ok(out) if out.starts_with("rada ") => {}
             Ok(out) => {
                 let _ = fs::remove_file(&stage);
-                return Err(format!("the saved program says {out:?}, not its version"));
+                return Err(tf(Key::UpSavedSays, &[&out]));
             }
             Err(e) => {
                 let _ = fs::remove_file(&stage);
@@ -384,10 +381,10 @@ pub fn rollback(
         }
     }
     let outgoing = dir.join("incoming");
-    fs::create_dir_all(dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    fs::create_dir_all(dir).map_err(|e| tf(Key::UpCannotCreate, &[&dir.display(), &e]))?;
     if let Err(e) = fs::copy(exe, &outgoing) {
         let _ = fs::remove_file(&stage);
-        return Err(format!("cannot keep a copy of {}: {e}", exe.display()));
+        return Err(tf(Key::UpCannotKeepCopy, &[&exe.display(), &e]));
     }
     replace_exe(&stage, exe)?;
     commit_backup(&outgoing, exe, current_version, dir)?;

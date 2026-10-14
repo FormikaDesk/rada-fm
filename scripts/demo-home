@@ -219,7 +219,7 @@ def main():
     write(os.path.join(demo, "docs/guida.md"), "# Guida\n\nUna guida breve.\n", DAY)
     write(os.path.join(demo, "scripts/build.sh"), "#!/bin/sh\ncargo build --release\n", 9 * DAY)
     write(os.path.join(demo, "assets/logo.svg"),
-          '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="28" fill="#7aa2f7"/></svg>\n',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7aa2f7"/><stop offset="1" stop-color="#bb9af7"/></linearGradient></defs><rect width="128" height="128" rx="28" fill="url(#g)"/><path d="M40 94V36h26a19 19 0 0 1 0 38H40m26 0 24 20" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>\n',
           3 * DAY)
     write(os.path.join(demo, "tests/prova.rs"), "#[test]\nfn funziona() {}\n", 2 * DAY)
 
@@ -231,7 +231,7 @@ def main():
     sparse(os.path.join(demo, "demo.mp4"), 96_000_000, 14 * DAY, b"\x00\x00\x00\x18ftypmp42")
     write(os.path.join(demo, "main.rs"), 'fn main() {\n    println!("ciao, mondo");\n}\n', 55 * 60)
     write(os.path.join(demo, "logo.svg"),
-          '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="14" fill="#bb9af7"/></svg>\n',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7aa2f7"/><stop offset="1" stop-color="#bb9af7"/></linearGradient></defs><rect width="128" height="128" rx="28" fill="url(#g)"/><path d="M40 94V36h26a19 19 0 0 1 0 38H40m26 0 24 20" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>\n',
           5 * DAY)
     write(os.path.join(demo, "notes.txt"), "Cose da fare:\n- rivedere la relazione\n- spedire il backup\n", DAY + 7200)
     photo = os.path.join(demo, "photo.jpg")

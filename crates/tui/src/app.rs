@@ -1642,7 +1642,11 @@ impl App {
         if report.skipped_dependent > 0 {
             lines.push((
                 ToastKind::Warn,
-                tf(Key::NSkippedFolder, &[&report.skipped_dependent]),
+                if report.skipped_dependent == 1 {
+                    Key::NSkippedFolderOne.tr().to_string()
+                } else {
+                    tf(Key::NSkippedFolderMany, &[&report.skipped_dependent])
+                },
             ));
         }
         for (_, note) in &report.kept {
@@ -1668,7 +1672,14 @@ impl App {
             ));
         }
         if journal_errors > 0 {
-            lines.push((ToastKind::Warn, tf(Key::NJournalErrors, &[&journal_errors])));
+            lines.push((
+                ToastKind::Warn,
+                if journal_errors == 1 {
+                    Key::NJournalErrorsOne.tr().to_string()
+                } else {
+                    tf(Key::NJournalErrorsMany, &[&journal_errors])
+                },
+            ));
         }
         let (kind, headline) = match report.status() {
             Completed if report.kept.is_empty() && report.not_preserved.is_empty() => {
@@ -2103,10 +2114,11 @@ impl App {
         let n = paths.len();
         self.clipboard = Some(Clip { mode, paths });
         self.clear_marks();
-        let verb = if mode == TransferMode::Copy {
-            Key::TYankCopied
-        } else {
-            Key::TYankCut
+        let verb = match (mode == TransferMode::Copy, n == 1) {
+            (true, true) => Key::TYankCopiedOne,
+            (true, false) => Key::TYankCopiedMany,
+            (false, true) => Key::TYankCutOne,
+            (false, false) => Key::TYankCutMany,
         };
         self.toast(
             ToastKind::Info,

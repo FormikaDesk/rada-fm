@@ -14,6 +14,7 @@
 //! The decision is made from the environment alone, so it is the same every time and can
 //! be tested; `profile = "modern" | "basic"` (`--profile`, `RADA_PROFILE`) overrides it.
 
+use rada_core::i18n::{Key, tf};
 use ratatui_image::picker::ProtocolType;
 
 use crate::compat::{Glyphs, Rendering};
@@ -69,7 +70,7 @@ impl TerminalKind {
     pub fn name(self) -> &'static str {
         match self {
             TerminalKind::WindowsTerminal => "Windows Terminal",
-            TerminalKind::WindowsConsole => "the Windows console",
+            TerminalKind::WindowsConsole => Key::TermWindowsConsole.tr(),
             TerminalKind::AppleTerminal => "Terminal.app",
             TerminalKind::Vte => "GNOME Terminal (VTE)",
             TerminalKind::Konsole => "Konsole",
@@ -78,7 +79,7 @@ impl TerminalKind {
             TerminalKind::WezTerm => "WezTerm",
             TerminalKind::Iterm2 => "iTerm2",
             TerminalKind::Foot => "foot",
-            TerminalKind::LinuxConsole => "the Linux console",
+            TerminalKind::LinuxConsole => Key::TermLinuxConsole.tr(),
             TerminalKind::Plain => "a plain terminal",
             TerminalKind::Other => "an xterm-compatible terminal",
         }
@@ -199,22 +200,18 @@ impl TermCaps {
         let no_color = has("NO_COLOR");
 
         let (profile, why) = match forced {
-            Some(p) => (p, "set by you (profile / RADA_PROFILE)".to_string()),
+            Some(p) => (p, Key::WhyForced.tr().to_string()),
             None => match terminal {
                 TerminalKind::Plain if term.is_empty() => {
-                    (Profile::Basic, "TERM is not set".to_string())
+                    (Profile::Basic, Key::WhyNoTerm.tr().to_string())
                 }
-                TerminalKind::Plain => (Profile::Basic, format!("TERM={term} is a plain terminal")),
-                TerminalKind::LinuxConsole => (
-                    Profile::Basic,
-                    "the Linux console has a small font and 16 colours".to_string(),
-                ),
+                TerminalKind::Plain => (Profile::Basic, tf(Key::WhyPlain, &[&term])),
+                TerminalKind::LinuxConsole => {
+                    (Profile::Basic, Key::WhyLinuxConsole.tr().to_string())
+                }
                 _ => match non_utf8_locale(env.var).filter(|_| !env.windows) {
-                    Some(locale) => (Profile::Basic, format!("the locale {locale} is not UTF-8")),
-                    None => (
-                        Profile::Modern,
-                        format!("{} is a modern terminal", terminal.name()),
-                    ),
+                    Some(locale) => (Profile::Basic, tf(Key::WhyLocale, &[&locale])),
+                    None => (Profile::Modern, tf(Key::WhyModern, &[&terminal.name()])),
                 },
             },
         };
@@ -316,7 +313,7 @@ impl TermCaps {
     pub fn modern() -> TermCaps {
         TermCaps {
             profile: Profile::Modern,
-            why: "assumed".to_string(),
+            why: Key::WhyAssumed.tr().to_string(),
             terminal: TerminalKind::Other,
             multiplexer: false,
             depth: ColorDepth::True,
@@ -344,50 +341,51 @@ impl TermCaps {
 
     /// One line per capability, for `rada doctor` and the log.
     pub fn describe(&self) -> Vec<String> {
-        let yes_no = |b: bool| if b { "yes" } else { "no" };
+        let yes_no = |b: bool| if b { Key::DocYes.tr() } else { Key::DocNo.tr() };
+        let colours = match (self.no_color, self.depth) {
+            (true, _) => Key::DocColoursNone.tr(),
+            (false, ColorDepth::True) => Key::DocColours24.tr(),
+            (false, ColorDepth::Ansi256) => "256",
+            (false, ColorDepth::Ansi16) => "16",
+        };
+        let pictures = match self.images {
+            ImagePlan::Off => Key::DocPicturesOff.tr(),
+            ImagePlan::Halfblocks => Key::DocPicturesBlocks.tr(),
+            ImagePlan::Protocol(ProtocolType::Kitty) => Key::DocPicturesKitty.tr(),
+            ImagePlan::Protocol(ProtocolType::Sixel) => "Sixel",
+            ImagePlan::Protocol(ProtocolType::Iterm2) => Key::DocPicturesIterm.tr(),
+            ImagePlan::Protocol(ProtocolType::Halfblocks) => Key::DocPicturesBlocks.tr(),
+            ImagePlan::Ask => Key::DocPicturesAsk.tr(),
+        };
         vec![
-            format!("profile: {} ({})", self.profile.name(), self.why),
-            format!(
-                "terminal: {}{}",
-                self.terminal.name(),
-                if self.multiplexer {
-                    ", inside tmux or screen"
+            tf(Key::DocProfile, &[&self.profile.name(), &self.why]),
+            tf(
+                Key::DocTerminal,
+                &[
+                    &self.terminal.name(),
+                    &if self.multiplexer {
+                        Key::DocInsideMux.tr()
+                    } else {
+                        ""
+                    },
+                ],
+            ),
+            tf(Key::DocColours, &[&colours]),
+            tf(
+                Key::DocGlyphs,
+                &[&if self.unicode { "Unicode" } else { "ASCII" }],
+            ),
+            tf(Key::DocPictures, &[&pictures]),
+            tf(Key::DocMouse, &[&yes_no(self.mouse)]),
+            tf(
+                Key::DocClipboard,
+                &[&if self.osc52 {
+                    Key::DocClipboardOsc.tr()
                 } else {
-                    ""
-                }
+                    Key::DocClipboardSystem.tr()
+                }],
             ),
-            format!(
-                "colours: {}",
-                match (self.no_color, self.depth) {
-                    (true, _) => "none (NO_COLOR)",
-                    (false, ColorDepth::True) => "24-bit",
-                    (false, ColorDepth::Ansi256) => "256",
-                    (false, ColorDepth::Ansi16) => "16",
-                }
-            ),
-            format!("glyphs: {}", if self.unicode { "Unicode" } else { "ASCII" }),
-            format!(
-                "pictures: {}",
-                match self.images {
-                    ImagePlan::Off => "off",
-                    ImagePlan::Halfblocks => "half blocks",
-                    ImagePlan::Protocol(ProtocolType::Kitty) => "kitty graphics",
-                    ImagePlan::Protocol(ProtocolType::Sixel) => "Sixel",
-                    ImagePlan::Protocol(ProtocolType::Iterm2) => "iTerm2 images",
-                    ImagePlan::Protocol(ProtocolType::Halfblocks) => "half blocks",
-                    ImagePlan::Ask => "the terminal is asked",
-                }
-            ),
-            format!("mouse: {}", yes_no(self.mouse)),
-            format!(
-                "clipboard: {}",
-                if self.osc52 {
-                    "through the terminal (OSC 52)"
-                } else {
-                    "the system's own"
-                }
-            ),
-            format!("terminal queries: {}", yes_no(self.may_query)),
+            tf(Key::DocQueries, &[&yes_no(self.may_query)]),
         ]
     }
 }

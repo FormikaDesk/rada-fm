@@ -13,6 +13,7 @@
 //!
 //! The font is licensed under the SIL Open Font License 1.1; the licence is installed with it.
 
+use rada_core::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -207,23 +208,27 @@ impl FontSetup {
     /// Download, check and install. `say` is told what is going on.
     pub fn install(&self, say: &mut dyn FnMut(String)) -> Result<()> {
         if self.is_installed() {
-            say(format!(
-                "{FAMILY} is already installed in {}",
-                self.fonts_dir.display()
+            say(tf(
+                Key::SayFontAlready,
+                &[&FAMILY, &self.fonts_dir.display()],
             ));
             return Ok(());
         }
         let total: u64 = self.faces.iter().map(|f| f.size).sum::<u64>() + self.license.size;
-        say(format!(
-            "downloading {FAMILY} {RELEASE} ({:.1} MB) from the Nerd Fonts repository…",
-            total as f64 / 1_000_000.0
+        say(tf(
+            Key::SayFontDownloading,
+            &[
+                &FAMILY,
+                &RELEASE,
+                &rada_core::i18n::decimal(&format!("{:.1}", total as f64 / 1_000_000.0)),
+            ],
         ));
         let work = self
             .state_dir
             .join(format!("font-work-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&work);
         std::fs::create_dir_all(&work)
-            .with_context(|| format!("cannot create {}", work.display()))?;
+            .with_context(|| tf(Key::MCannotCreate, &[&work.display()]))?;
         let result = self
             .fetch_all(&work, say)
             .and_then(|()| self.place(&work, say));
@@ -247,13 +252,12 @@ impl FontSetup {
             let got = rada_core::update::sha256_of(&dest).map_err(anyhow::Error::msg)?;
             if got != face.sha256 {
                 bail!(
-                    "{} does not match its checksum (expected {}, got {got}); nothing was installed",
-                    face.file,
-                    face.sha256
+                    "{}",
+                    tf(Key::MFontChecksum, &[&face.file, &face.sha256, &got])
                 );
             }
             if face.file.ends_with(".ttf") && !looks_like_a_font(&dest)? {
-                bail!("{} is not a font file; nothing was installed", face.file);
+                bail!("{}", tf(Key::MFontNotAFont, &[&face.file]));
             }
         }
         Ok(())
@@ -261,7 +265,7 @@ impl FontSetup {
 
     fn place(&self, work: &Path, say: &mut dyn FnMut(String)) -> Result<()> {
         std::fs::create_dir_all(&self.fonts_dir)
-            .with_context(|| format!("cannot create {}", self.fonts_dir.display()))?;
+            .with_context(|| tf(Key::MCannotCreate, &[&self.fonts_dir.display()]))?;
         let mut manifest = self.read_manifest();
         for face in self.faces.iter().chain(std::iter::once(&self.license)) {
             let to = self.fonts_dir.join(&face.file);
@@ -274,7 +278,7 @@ impl FontSetup {
             {
                 let name = registry_name(&face.file);
                 reg.set(&name, &to)
-                    .with_context(|| format!("cannot register {name} for your account"))?;
+                    .with_context(|| tf(Key::MCannotRegisterFont, &[&name]))?;
                 if !manifest.registry.contains(&name) {
                     manifest.registry.push(name);
                 }
@@ -284,26 +288,22 @@ impl FontSetup {
             self.manifest_path(),
             serde_json::to_string_pretty(&manifest)?,
         )
-        .with_context(|| format!("cannot write {}", self.manifest_path().display()))?;
+        .with_context(|| tf(Key::MCannotWrite, &[&self.manifest_path().display()]))?;
         if let Some(fc) = &self.fc_cache {
             match run(fc, &["-f", &self.fonts_dir.to_string_lossy()]) {
-                Ok(_) => say("refreshed the font cache".into()),
-                Err(e) => say(format!(
-                    "note: could not refresh the font cache ({e}); the font appears after the next login"
-                )),
+                Ok(_) => say(Key::SayFontCache.tr().to_string()),
+                Err(e) => say(tf(Key::SayFontCacheNote, &[&e])),
             }
         }
-        say(format!(
-            "installed {FAMILY} in {}",
-            self.fonts_dir.display()
+        say(tf(
+            Key::SayFontInstalled,
+            &[&FAMILY, &self.fonts_dir.display()],
         ));
-        say(format!(
-            "the licence (SIL Open Font License 1.1) is beside it: {}",
-            self.fonts_dir.join(&self.license.file).display()
+        say(tf(
+            Key::SayFontLicence,
+            &[&self.fonts_dir.join(&self.license.file).display()],
         ));
-        say(format!(
-            "now choose “{FAMILY}” as the font of your terminal, and start rada again: the icons will draw"
-        ));
+        say(tf(Key::SayFontChoose, &[&FAMILY]));
         Ok(())
     }
 
@@ -314,18 +314,18 @@ impl FontSetup {
         for f in &manifest.files {
             match std::fs::remove_file(f) {
                 Ok(()) => {
-                    say(format!("removed {}", f.display()));
+                    say(tf(Key::SayRemoved, &[&f.display()]));
                     any = true;
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => say(format!("could not remove {}: {e}", f.display())),
+                Err(e) => say(tf(Key::SayCouldNotRemove, &[&f.display(), &e])),
             }
         }
         if let Some(reg) = &self.registry {
             for name in &manifest.registry {
                 match reg.remove(name) {
                     Ok(()) => any = true,
-                    Err(e) => say(format!("could not unregister {name}: {e}")),
+                    Err(e) => say(tf(Key::SayFontUnregister, &[&name, &e])),
                 }
             }
         }
@@ -338,7 +338,7 @@ impl FontSetup {
         }
         let _ = std::fs::remove_file(self.manifest_path());
         if !any {
-            say("nothing to remove".into());
+            say(Key::SayNothingToRemove.tr().to_string());
         }
         Ok(())
     }
@@ -359,7 +359,7 @@ fn looks_like_a_font(path: &Path) -> Result<bool> {
     let mut head = [0u8; 4];
     std::fs::File::open(path)
         .and_then(|mut f| f.read_exact(&mut head))
-        .with_context(|| format!("cannot read {}", path.display()))?;
+        .with_context(|| tf(Key::MCannotRead, &[&path.display()]))?;
     // TrueType, OpenType with PostScript outlines, a TrueType collection, old Mac TrueType.
     Ok(matches!(&head, [0, 1, 0, 0] | b"OTTO" | b"ttcf" | b"true"))
 }
@@ -369,7 +369,7 @@ fn move_file(from: &Path, to: &Path) -> Result<()> {
         return Ok(());
     }
     // Another filesystem: copy, then remove.
-    std::fs::copy(from, to).with_context(|| format!("cannot write {}", to.display()))?;
+    std::fs::copy(from, to).with_context(|| tf(Key::MCannotWrite, &[&to.display()]))?;
     let _ = std::fs::remove_file(from);
     Ok(())
 }
@@ -379,11 +379,14 @@ fn run(program: &str, args: &[&str]) -> Result<String> {
         .args(args)
         .stdin(Stdio::null())
         .output()
-        .with_context(|| format!("{program} is not available"))?;
+        .with_context(|| tf(Key::MNotAvailable, &[&program]))?;
     if !out.status.success() {
         bail!(
-            "{program} failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+            "{}",
+            tf(
+                Key::MProgramFailed,
+                &[&program, &String::from_utf8_lossy(&out.stderr).trim()]
+            )
         );
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())

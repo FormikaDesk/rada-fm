@@ -1,6 +1,7 @@
 //! What GitHub says about the releases, which one is wanted, and which file of it is for
 //! this system.
 
+use crate::i18n::{Key, tf};
 use serde::Deserialize;
 
 use super::Channel;
@@ -53,7 +54,7 @@ struct RawRelease {
 /// are left out.
 pub fn parse_releases(json: &str) -> Result<Vec<Release>, String> {
     let raw: Vec<RawRelease> =
-        serde_json::from_str(json).map_err(|e| format!("not a list of releases: {e}"))?;
+        serde_json::from_str(json).map_err(|e| tf(Key::UpNotReleases, &[&e]))?;
     Ok(raw
         .into_iter()
         .filter(|r| !r.draft)

@@ -1,5 +1,6 @@
 //! rada: a terminal file manager you can trust.
 
+mod cli_text;
 mod config;
 mod demo;
 mod desktop;
@@ -16,8 +17,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{FromArgMatches, Parser, Subcommand};
 use rada_core::fs::LocalFs;
+use rada_core::i18n::{Key, tf};
 use rada_core::journal::Journal;
 use rada_core::platform::{self, Dirs};
 use rada_tui::{Config, Services, Theme};
@@ -149,10 +151,26 @@ struct Cli {
     init: Option<String>,
 }
 
+/// The language the process speaks before anything is parsed, so that even `--help` has it:
+/// the one the config file asks for, or the system's.
+fn early_language() {
+    use rada_core::i18n::{Lang, set_chosen_lang, set_lang};
+    let chosen = Dirs::from_env()
+        .ok()
+        .and_then(|d| config::chosen_language(&d))
+        .and_then(|l| Lang::parse(&l));
+    match chosen {
+        Some(l) => set_chosen_lang(l),
+        None => set_lang(Lang::system()),
+    }
+}
+
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    early_language();
+    let matches = cli_text::command::<Cli>().get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     if let Some(Command::Setup { what }) = &cli.command {
-        let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
+        let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
         let lines = match what {
             SetupWhat::Desktop {
                 remove,
@@ -179,7 +197,7 @@ fn main() -> Result<()> {
         yes,
     }) = &cli.command
     {
-        let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
+        let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
         let cfg_file = config::load(&dirs);
         cfg_file.apply_language();
         let settings = cfg_file.update_settings(&dirs.home)?;
@@ -208,19 +226,18 @@ fn main() -> Result<()> {
     let request = match &cli.request {
         Some(src) => {
             let text = if src == "-" {
-                std::io::read_to_string(std::io::stdin())
-                    .context("cannot read the request from stdin")?
+                std::io::read_to_string(std::io::stdin()).context(Key::MRequestStdin.tr())?
             } else {
-                std::fs::read_to_string(src).with_context(|| format!("cannot read {src}"))?
+                std::fs::read_to_string(src).with_context(|| tf(Key::MCannotRead, &[&src]))?
             };
-            let req: rada_core::ops::OpRequest = serde_json::from_str(&text)
-                .context("the request is not valid (see `rada --schema request`)")?;
+            let req: rada_core::ops::OpRequest =
+                serde_json::from_str(&text).context(Key::MRequestBad.tr())?;
             req.validate().map_err(|e| anyhow::anyhow!("{e}"))?;
             Some(req)
         }
         None => None,
     };
-    let dirs = Dirs::from_env().context("cannot locate your home and data folders")?;
+    let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
     cfg_file.apply_language();
@@ -232,8 +249,7 @@ fn main() -> Result<()> {
         .or_else(|| std::env::var("RADA_PROFILE").ok())
         .or(cfg_file.profile.clone());
     let forced_profile = match profile_name {
-        Some(n) => rada_tui::Profile::parse(&n)
-            .with_context(|| format!("unknown profile {n:?} (use auto, modern or basic)"))?,
+        Some(n) => rada_tui::Profile::parse(&n).with_context(|| tf(Key::MBadProfile, &[&n]))?,
         None => None,
     };
     let caps = rada_tui::TermCaps::detect_here(forced_profile);
@@ -242,10 +258,10 @@ fn main() -> Result<()> {
 
     let start = match cli.path.first() {
         Some(p) => p.clone(),
-        None => std::env::current_dir().context("cannot read the current folder")?,
+        None => std::env::current_dir().context(Key::MNoCwd.tr())?,
     };
     let start = rada_core::fs::canonical_path(&start)
-        .with_context(|| format!("cannot open {}", start.display()))?;
+        .with_context(|| tf(Key::MCannotOpen, &[&start.display()]))?;
     // Given a file, open its folder with the cursor on it.
     let (start, select) = if start.is_dir() {
         (start, None)
@@ -280,12 +296,8 @@ fn main() -> Result<()> {
                 rada_tui::IconSet::UnicodeStd
             }
         }
-        Some(n) => rada_tui::IconSet::parse(n).with_context(|| {
-            format!(
-                "unknown icon set {n:?} (use auto, {})",
-                rada_tui::IconSet::NAMES.join(", ")
-            )
-        })?,
+        Some(n) => rada_tui::IconSet::parse(n)
+            .with_context(|| tf(Key::MBadIcons, &[&n, &rada_tui::IconSet::NAMES.join(", ")]))?,
     };
     if let Some(Command::Doctor) = &cli.command {
         for line in caps.describe() {
@@ -294,16 +306,9 @@ fn main() -> Result<()> {
         // Why this set: the font the terminal is set to draw with, when it could be read.
         let chosen = !matches!(icons_name.as_deref(), None | Some("auto"));
         match fonts::terminal_nerd_font(&dirs.home, windows_terminal) {
-            _ if chosen => println!("icons: {} (set by you: icons / RADA_ICONS)", icons.name()),
-            Some(font) => println!(
-                "icons: {} (the terminal's font is a Nerd Font: {})",
-                icons.name(),
-                font.trim()
-            ),
-            None => println!(
-                "icons: {} (no Nerd Font found in the terminal's configuration)",
-                icons.name()
-            ),
+            _ if chosen => println!("{}", tf(Key::DocIconsChosen, &[&icons.name()])),
+            Some(font) => println!("{}", tf(Key::DocIconsNerd, &[&icons.name(), &font.trim()])),
+            None => println!("{}", tf(Key::DocIconsNone, &[&icons.name()])),
         }
         return Ok(());
     }
@@ -328,12 +333,8 @@ fn main() -> Result<()> {
         .or_else(|| std::env::var("RADA_THEME").ok())
         .or(cfg_file.theme.clone())
         .unwrap_or_else(|| "auto".into());
-    let follows = Theme::follows_background(&theme_name).with_context(|| {
-        format!(
-            "unknown theme {theme_name:?} (use auto, rada, catppuccin, tokyo-night, or one of {})",
-            Theme::NAMES.join(", ")
-        )
-    })?;
+    let follows = Theme::follows_background(&theme_name)
+        .with_context(|| tf(Key::MBadTheme, &[&theme_name, &Theme::NAMES.join(", ")]))?;
     let appearance_name = cli
         .appearance
         .clone()
@@ -341,7 +342,7 @@ fn main() -> Result<()> {
         .or(cfg_file.appearance.clone());
     let forced = match appearance_name {
         Some(n) => rada_tui::termtheme::Appearance::parse(&n)
-            .with_context(|| format!("unknown appearance {n:?} (use auto, light or dark)"))?,
+            .with_context(|| tf(Key::MBadAppearance, &[&n]))?,
         None => None,
     };
     // A name that follows the background is resolved once the terminal is up (it may have
@@ -375,9 +376,7 @@ fn main() -> Result<()> {
         .or_else(|| std::env::var("RADA_IMAGES").ok())
         .or(cfg_file.images.clone());
     let image_mode = match images_name {
-        Some(n) => rada_tui::ImageMode::parse(&n).with_context(|| {
-            format!("unknown image mode {n:?} (use auto, halfblocks, kitty, sixel, iterm2 or off)")
-        })?,
+        Some(n) => rada_tui::ImageMode::parse(&n).with_context(|| tf(Key::MBadImages, &[&n]))?,
         None if caps.images == rada_tui::caps::ImagePlan::Off => rada_tui::ImageMode::Off,
         None => rada_tui::ImageMode::Auto,
     };
@@ -389,9 +388,9 @@ fn main() -> Result<()> {
         .or(cfg_file.keymap.clone());
     let preset = match preset_name {
         Some(n) => rada_tui::keymap::Preset::parse(&n).with_context(|| {
-            format!(
-                "unknown keymap {n:?} (use {})",
-                rada_tui::keymap::Preset::NAMES.join(", ")
+            tf(
+                Key::MBadKeymap,
+                &[&n, &rada_tui::keymap::Preset::NAMES.join(", ")],
             )
         })?,
         None => rada_tui::keymap::Preset::VimClassic,
@@ -434,18 +433,15 @@ fn main() -> Result<()> {
     };
     let layout = match cfg_file.layout.as_deref() {
         None => rada_tui::LayoutKind::Explorer,
-        Some(n) => rada_tui::LayoutKind::parse(n)
-            .with_context(|| format!("unknown layout {n:?} (use explorer or compact)"))?,
+        Some(n) => rada_tui::LayoutKind::parse(n).with_context(|| tf(Key::MBadLayout, &[&n]))?,
     };
     let view = match cfg_file.view.as_deref() {
         None => rada_tui::ViewMode::Details,
-        Some(n) => rada_tui::ViewMode::parse(n)
-            .with_context(|| format!("unknown view {n:?} (use details or icons)"))?,
+        Some(n) => rada_tui::ViewMode::parse(n).with_context(|| tf(Key::MBadView, &[&n]))?,
     };
     let dates = match cfg_file.dates.as_deref() {
         None => rada_tui::fmt::DateStyle::Relative,
-        Some(n) => rada_tui::fmt::DateStyle::parse(n)
-            .with_context(|| format!("unknown dates {n:?} (use relative or absolute)"))?,
+        Some(n) => rada_tui::fmt::DateStyle::parse(n).with_context(|| tf(Key::MBadDates, &[&n]))?,
     };
     let saved_ui = rada_core::uistate::load(&dirs.rada_state());
     // Only folders that are still there come back.
@@ -502,9 +498,9 @@ fn main() -> Result<()> {
         },
     };
 
-    let outcome = rada_tui::run::run(cfg, services, caps).context("terminal error")?;
+    let outcome = rada_tui::run::run(cfg, services, caps).context(Key::MTerminalError.tr())?;
     if let Some(f) = &cli.cwd_file {
-        write_cwd(f, &outcome.last_dir).with_context(|| format!("cannot write {}", f.display()))?;
+        write_cwd(f, &outcome.last_dir).with_context(|| tf(Key::MCannotWrite, &[&f.display()]))?;
     }
     Ok(())
 }
@@ -529,10 +525,7 @@ fn make_font_offer(dirs: &Dirs) -> rada_tui::FontOffer {
         install: Arc::new(move || {
             let setup = fontsetup::FontSetup::for_this_system(&install_dirs);
             setup.install(&mut |_| {}).map_err(|e| e.to_string())?;
-            Ok(format!(
-                "{} is installed: choose it as the font of your terminal, then start rada again",
-                fontsetup::FAMILY
-            ))
+            Ok(tf(Key::MFontInstalled, &[&fontsetup::FAMILY]))
         }),
         shown: Arc::new(move || {
             let file = font_offered_file(&note_dirs);

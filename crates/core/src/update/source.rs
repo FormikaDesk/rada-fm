@@ -3,6 +3,7 @@
 //! the build folder. If any step fails the program that was running is still there, and the
 //! log of what happened is kept.
 
+use crate::i18n::{Key, tf};
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -91,7 +92,12 @@ fn run_logged(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("cannot start {}: {e}", cmd.get_program().to_string_lossy()))?;
+        .map_err(|e| {
+            tf(
+                Key::UpCannotStart,
+                &[&cmd.get_program().to_string_lossy(), &e],
+            )
+        })?;
     let (tx, rx) = crossbeam_channel::unbounded::<String>();
     let mut readers = Vec::new();
     if let Some(out) = child.stdout.take() {
@@ -119,9 +125,9 @@ fn run_logged(
         let _ = r.join();
     }
     child.wait().map_err(|e| {
-        format!(
-            "cannot wait for {}: {e}",
-            cmd.get_program().to_string_lossy()
+        tf(
+            Key::UpCannotWaitFor,
+            &[&cmd.get_program().to_string_lossy(), &e],
         )
     })
 }
@@ -129,10 +135,12 @@ fn run_logged(
 /// Run a command and return what it printed, or its error output when it fails.
 fn capture(cmd: &mut Command, log: &mut Log) -> Result<String, String> {
     log.line(&format!("$ {:?}", cmd).replace('"', ""));
-    let out = cmd
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("cannot start {}: {e}", cmd.get_program().to_string_lossy()))?;
+    let out = cmd.stdin(Stdio::null()).output().map_err(|e| {
+        tf(
+            Key::UpCannotStart,
+            &[&cmd.get_program().to_string_lossy(), &e],
+        )
+    })?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
     log.line(&text);
@@ -185,33 +193,27 @@ pub fn run(
     };
 
     if !dir.is_dir() {
-        return Err(format!(
-            "the source folder {} does not exist (see `source_dir` in the [update] section of config.toml)",
-            dir.display()
-        ));
+        return Err(tf(Key::UpNoSourceDir, &[&dir.display()]));
     }
 
-    report("checking the checkout".into());
+    report(Key::UpCheckingCheckout.tr().to_string());
     capture(git_cmd().args(["rev-parse", "--is-inside-work-tree"]), log)
-        .map_err(|e| format!("{} is not a git checkout ({e})", dir.display()))?;
+        .map_err(|e| tf(Key::UpNotCheckout, &[&dir.display(), &e]))?;
     let changes = capture(
         git_cmd().args(["status", "--porcelain", "--untracked-files=no"]),
         log,
     )?;
     if !changes.is_empty() {
         let n = changes.lines().count();
-        return Err(format!(
-            "the checkout in {} has {n} changed file{} that are not committed: commit or stash them, then update again. Nothing was changed.",
-            dir.display(),
-            if n == 1 { "" } else { "s" }
-        ));
+        return Err(if n == 1 {
+            tf(Key::UpDirtyOne, &[&dir.display()])
+        } else {
+            tf(Key::UpDirtyMany, &[&dir.display(), &n])
+        });
     }
     let branch = capture(git_cmd().args(["rev-parse", "--abbrev-ref", "HEAD"]), log)?;
     if branch != "main" {
-        return Err(format!(
-            "the checkout in {} is on the branch `{branch}`, not `main`: switch it to main (`git switch main`), then update again. Nothing was changed.",
-            dir.display()
-        ));
+        return Err(tf(Key::UpWrongBranch, &[&dir.display(), &branch]));
     }
 
     // The program that runs now is kept before anything can replace it.
@@ -225,20 +227,17 @@ pub fn run(
     }
 
     let before = capture(git_cmd().args(["rev-parse", "HEAD"]), log)?;
-    report("pulling the latest changes".into());
+    report(Key::UpPulling.tr().to_string());
     let status = run_logged(git_cmd().args(["pull", "--ff-only"]), log, &mut |_| {})?;
     if !status.success() {
-        return Err(format!(
-            "`git pull --ff-only` did not work (the checkout may have diverged from its upstream); the log has the details: {}",
-            log.path.display()
-        ));
+        return Err(tf(Key::UpPullFailed, &[&log.path.display()]));
     }
     let after = capture(git_cmd().args(["rev-parse", "HEAD"]), log)?;
     let new_version = checkout_version(dir).unwrap_or_else(|| ctx.current.to_string());
     if before == after && new_version == ctx.current.to_string() {
         return Ok(Applied {
             version: new_version,
-            note: "The checkout is already at the latest commit and the program was built from it; nothing to build.".into(),
+            note: Key::UpAlreadyLatest.tr().to_string(),
             restart: false,
         });
     }
@@ -249,7 +248,7 @@ pub fn run(
     let in_target = ctx.exe.starts_with(dir.join("target"));
     let own_target = (in_target && cfg!(windows)).then(|| run_dir.join("build"));
     let target_dir = own_target.clone().unwrap_or_else(|| dir.join("target"));
-    report("building (this takes a few minutes)".into());
+    report(Key::UpBuilding.tr().to_string());
     let mut crates = 0usize;
     let mut build = Command::new(&cargo);
     build
@@ -269,53 +268,42 @@ pub fn run(
             if last_report.elapsed() >= Duration::from_millis(400) {
                 last_report = std::time::Instant::now();
                 let what = t.split_whitespace().nth(1).unwrap_or("");
-                report(format!("building: {what} ({crates} compiled)"));
+                report(tf(Key::UpBuildingWhat, &[&what, &crates]));
             }
         }
     })?;
     if !status.success() {
-        return Err(format!(
-            "the build failed; the program that was running is untouched. The log has the details: {}",
-            log.path.display()
-        ));
+        return Err(tf(Key::UpBuildFailed, &[&log.path.display()]));
     }
 
     let built = target_dir.join("release").join(exe_name());
     if !built.is_file() {
-        return Err(format!("the build left no program at {}", built.display()));
+        return Err(tf(Key::UpBuildLeftNone, &[&built.display()]));
     }
-    report("checking the new program".into());
+    report(Key::UpCheckingNew.tr().to_string());
     if ctx.run_check {
         let out = install::run_version(&built, Duration::from_secs(15))?;
         log.line(&format!("new program: {out}"));
         if !out.starts_with("rada ") {
-            return Err(format!("the new program says {out:?}, not its version"));
+            return Err(tf(Key::UpSourceNewSays, &[&out]));
         }
     }
 
     // The program that was running may be the very file the build has just written.
     let same_file = fs::canonicalize(&built).ok() == fs::canonicalize(&ctx.exe).ok();
     if !same_file {
-        report("putting the new program in place".into());
+        report(Key::UpPutting.tr().to_string());
         let stage = install::stage_path(&ctx.exe);
-        fs::copy(&built, &stage).map_err(|e| {
-            format!(
-                "cannot write the new program next to {}: {e}",
-                ctx.exe.display()
-            )
-        })?;
+        fs::copy(&built, &stage)
+            .map_err(|e| tf(Key::UpCannotWriteNext, &[&ctx.exe.display(), &e]))?;
         install::replace_exe(&stage, &ctx.exe)?;
     }
 
-    let mut note = format!(
-        "Built from {} and installed at {}.",
-        dir.display(),
-        ctx.exe.display()
-    );
+    let mut note = tf(Key::UpBuiltFrom, &[&dir.display(), &ctx.exe.display()]);
     if in_target && !cfg!(windows) {
-        note.push_str(" The build folder was kept because rada runs from it.");
+        note.push_str(Key::UpBuildKept.tr());
     } else {
-        report("cleaning up the build folder".into());
+        report(Key::UpCleaning.tr().to_string());
         let mut clean = Command::new(&cargo);
         clean
             .current_dir(dir)

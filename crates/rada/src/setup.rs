@@ -1,6 +1,7 @@
 //! `rada setup desktop`: the right integration for the system rada runs on.
 
 use anyhow::{Context, Result, bail};
+use rada_core::i18n::Key;
 use rada_core::platform::Dirs;
 
 pub struct DesktopOptions {
@@ -12,14 +13,12 @@ pub struct DesktopOptions {
 
 pub fn desktop(dirs: &Dirs, o: &DesktopOptions) -> Result<Vec<String>> {
     if o.remove && o.default_file_manager {
-        bail!("--remove and --default-file-manager cannot be used together");
+        bail!("{}", Key::MRemoveAndDefault.tr());
     }
-    let exe = std::env::current_exe().context("cannot find the rada executable")?;
+    let exe = std::env::current_exe().context(Key::MNoExe.tr())?;
     if cfg!(target_os = "macos") {
         if o.default_file_manager {
-            bail!(
-                "--default-file-manager is for Linux desktops: macOS has no setting for it that a program may change"
-            );
+            bail!("{}", Key::MDefaultFmMac.tr());
         }
         let setup = crate::macapp::MacSetup {
             apps_dir: dirs.home.join("Applications"),
@@ -36,9 +35,7 @@ pub fn desktop(dirs: &Dirs, o: &DesktopOptions) -> Result<Vec<String>> {
     }
     if cfg!(windows) {
         if o.default_file_manager {
-            bail!(
-                "--default-file-manager is for Linux desktops: Windows keeps Explorer as the folder handler"
-            );
+            bail!("{}", Key::MDefaultFmWin.tr());
         }
         // Windows' own folders for a person's application data, not the XDG variables a
         // developer may have set: that is where Windows Terminal and the Start menu look.
@@ -78,10 +75,7 @@ pub fn desktop(dirs: &Dirs, o: &DesktopOptions) -> Result<Vec<String>> {
         setup.install(o.default_file_manager)?
     };
     if o.desktop {
-        lines.push(
-            "--desktop is for macOS and Windows: on Linux the entry is in the application menu"
-                .into(),
-        );
+        lines.push(Key::SayDesktopFlag.tr().to_string());
     }
     Ok(lines)
 }

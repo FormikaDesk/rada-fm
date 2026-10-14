@@ -66,7 +66,11 @@ impl App {
             ));
         }
         PropsView {
-            title: tf(Key::PropsSelected, &[&chosen.len()]),
+            title: if chosen.len() == 1 {
+                Key::PropsSelectedOne.tr().to_string()
+            } else {
+                tf(Key::PropsSelectedMany, &[&chosen.len()])
+            },
             rows,
             scroll: 0,
         }

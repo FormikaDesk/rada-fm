@@ -10,6 +10,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use unicode_width::UnicodeWidthStr;
 
 use super::widgets::SPIN;
 use crate::app::{App, ImageStatus};
@@ -253,15 +254,18 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                     &format!("{lower}{}", archive_counts(a.files, a.dirs, a.symlinks)),
                     th.base(),
                 );
-                kv(
-                    &mut lines,
-                    Key::PvPacked.tr(),
-                    &tf(
-                        Key::PvSizeBytes,
-                        &[&fmt::size(a.packed), &fmt::thousands(a.packed)],
-                    ),
-                    th.base(),
+                // The exact number of bytes only where it fits on the line with its label:
+                // the pane is narrow, and a value that wraps is hard to read.
+                let packed = tf(
+                    Key::PvSizeBytes,
+                    &[&fmt::size(a.packed), &fmt::thousands(a.packed)],
                 );
+                let packed = if Key::PvPacked.tr().width() + 2 + packed.width() <= w {
+                    packed
+                } else {
+                    fmt::size(a.packed)
+                };
+                kv(&mut lines, Key::PvPacked.tr(), &packed, th.base());
                 kv(
                     &mut lines,
                     Key::PvUnpacked.tr(),
@@ -301,12 +305,31 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                 let extract_key = app
                     .key_for(crate::keymap::Action::ExtractHere)
                     .unwrap_or_else(|| "e".into());
-                lines.push(Line::from(vec![
-                    Span::styled(super::widgets::key_name("Enter"), th.key()),
-                    Span::styled(format!("  {}   ", Key::PvOpenLikeFolder.tr()), th.dim()),
-                    Span::styled(extract_key, th.key()),
-                    Span::styled(format!("  {}", Key::PvExtract.tr()), th.dim()),
-                ]));
+                // The two keys on one line where they fit, on two where the pane is narrow.
+                let open = (
+                    super::widgets::key_name("Enter"),
+                    format!("  {}", Key::PvOpenLikeFolder.tr()),
+                );
+                let extract = (extract_key.clone(), format!("  {}", Key::PvExtract.tr()));
+                let one_line =
+                    open.0.width() + open.1.width() + 3 + extract.0.width() + extract.1.width();
+                if one_line <= w {
+                    lines.push(Line::from(vec![
+                        Span::styled(open.0, th.key()),
+                        Span::styled(format!("{}   ", open.1), th.dim()),
+                        Span::styled(extract.0, th.key()),
+                        Span::styled(extract.1, th.dim()),
+                    ]));
+                } else {
+                    lines.push(Line::from(vec![
+                        Span::styled(open.0, th.key()),
+                        Span::styled(open.1, th.dim()),
+                    ]));
+                    lines.push(Line::from(vec![
+                        Span::styled(extract.0, th.key()),
+                        Span::styled(extract.1, th.dim()),
+                    ]));
+                }
                 lines.push(Line::raw(""));
                 let room = h.saturating_sub(lines.len());
                 app.preview.scroll = app.preview.scroll.min(a.first.len().saturating_sub(1));
@@ -417,7 +440,11 @@ fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
                 Key::PvEmptyFolder.tr().into()
             } else {
                 tf(
-                    Key::PvShown,
+                    if d.entries.len() == 1 {
+                        Key::PvShownOne
+                    } else {
+                        Key::PvShownMany
+                    },
                     &[
                         &fmt::count(d.entries.len() as u64, Key::ItemOne, Key::ItemMany),
                         &if d.truncated {
