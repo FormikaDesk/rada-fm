@@ -607,7 +607,7 @@ pub fn draw(
     let want = body.len() as u16 + foot_h + 4;
     let h = want.clamp(12, area.height.saturating_sub(2));
     let r = super::widgets::centered(area, w, h);
-    let inner_card = popup::card(f.buffer_mut(), r, th);
+    let inner_card = popup::card(f.buffer_mut(), r, th, popup::Edge::Own);
     let inner = Rect {
         x: inner_card.x + 2,
         y: inner_card.y + 1,

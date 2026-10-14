@@ -22,11 +22,11 @@ use crate::palette::{PaletteKind, PaletteView};
 use crate::theme::Theme;
 use crossterm::event::KeyCode;
 
-/// The card of a window: surface, rounded border and shadow (see [`super::popup`]); returns
+/// The card of a window: its own tone and a rounded border (see [`super::popup`]); returns
 /// the usable area inside it, with air of two cells at the sides and one above and below. The
 /// colour a window used to give its border now says itself in the mark at its head.
 pub(super) fn frame(f: &mut Frame, th: &Theme, r: Rect, _tone: Color) -> Rect {
-    let inner = super::popup::card(f.buffer_mut(), r, th);
+    let inner = super::popup::card(f.buffer_mut(), r, th, super::popup::Edge::Own);
     Rect {
         x: inner.x + 2,
         y: inner.y + 1,
@@ -152,12 +152,38 @@ fn draw_properties(f: &mut Frame, ctx: &Ctx, p: &PropsView, area: Rect, hits: &m
     );
 }
 
+/// Whether the window in front dims what is behind it: a menu does not, nor the list of
+/// programs that sits beside one, nor the preview that takes the whole screen.
+pub(super) fn dims_backdrop(app: &App) -> bool {
+    let beside_menu = matches!(&app.modal, Some(Modal::OpenWith(v)) if v.under.is_some());
+    app.modal.is_some()
+        && !beside_menu
+        && !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview))
+}
+
+/// Where a menu may be: the screen without the status bar and the key hints, which it stays
+/// above (a menu opened near the bottom moves up instead), and without the row over the status
+/// bar, so that the line of the menu is never against the colour of the bar.
+pub(super) fn popup_room(app: &App, area: Rect) -> Rect {
+    let explorer = app.layout == crate::view::LayoutKind::Explorer;
+    let hints = super::hints_height(explorer && app.show_hints, area.height);
+    Rect {
+        height: area.height.saturating_sub(2 + hints),
+        ..area
+    }
+}
+
 pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
     if matches!(app.modal, Some(Modal::FullPreview)) {
         draw_full_preview(f, app, area);
         return;
     }
-    let th = app.th.clone();
+    let mut th = app.th.clone();
+    if dims_backdrop(app) {
+        // A window over the dimmed screen is a tone of its own, and so is everything in it.
+        th.popup = th.modal_surface();
+    }
+    let room = popup_room(app, area);
     let ctx = super::popup::Ctx {
         th: &th,
         look: super::soft::Look::of(app),
@@ -212,10 +238,11 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         Modal::OpenWith(v) => {
             // Opened from the context menu: the menu stays in view and the list sits beside it.
             let anchor = v.under.as_deref().map(|m| {
-                super::menu::draw_behind(f, &ctx, &app.keymap, m, area);
-                super::menu::beside(&ctx, &app.keymap, m, area)
+                super::menu::draw_behind(f, &ctx, &app.keymap, m, room);
+                super::menu::beside(&ctx, &app.keymap, m, room)
             });
-            super::openwith::draw(f, &ctx, &app.keymap, v, area, anchor, &mut app.hits);
+            let at = if anchor.is_some() { room } else { area };
+            super::openwith::draw(f, &ctx, &app.keymap, v, at, anchor, &mut app.hits);
         }
         Modal::Failure { info, .. } => {
             let w = 88.min(area.width.saturating_sub(4));
@@ -353,7 +380,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::Help => draw_help(f, &ctx, area, &app.keymap, app.mouse, app.help_scroll),
-        Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, area, &mut app.hits),
+        Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, room, &mut app.hits),
         Modal::Properties(p) => draw_properties(f, &ctx, p, area, &mut app.hits),
         Modal::Update(u) => super::updates::draw_update(f, &ctx, u, area, &mut app.hits),
         Modal::Access(d) => super::dialogs::draw_access(f, &ctx, d, area, &mut app.hits),

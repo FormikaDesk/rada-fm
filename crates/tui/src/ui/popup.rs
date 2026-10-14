@@ -1,12 +1,13 @@
-//! Popups: the surface, the rounded border and the shadow that every menu, window and
-//! notification card shares, and the small parts they are made of — pills, buttons, badges,
-//! strips of a status colour, rules.
+//! Popups: the rounded border and the surface that every menu, window and notification card
+//! share, and the small parts they are made of — pills, buttons, badges, strips of a status
+//! colour, rules.
 //!
-//! A card is a surface a little lighter than the window behind it (`popup`), a thin rounded
-//! border one step lighter again (`popup_border`), and a shadow of one cell on the right and
-//! at the bottom: the colours underneath, darkened (true colour only). The four corner cells
-//! take the colour of what is behind them, so that the corners read as round. The basic
-//! profile draws the same, and its backend turns the border into `+-|`.
+//! A card has no shadow and no surface of its own: the inside of a menu or a notification is
+//! the colour of what lies behind it (the theme's background), and so are the cells of its
+//! border, whose line is `popup_border`; a cell of the border is never another colour than the
+//! cells just outside and just inside it. A window dims the screen behind it and is the dimmed
+//! tone a little lighter (`modal_surface`), border and inside alike. The basic profile draws
+//! the same, and its backend turns the border into `+-|`.
 //!
 //! Nothing here picks a colour: every one comes from the theme.
 
@@ -86,51 +87,52 @@ impl Tone {
 
 // ------------------------------------------------------------------------------- the card
 
-/// Darken what lies right of and below `r` (one cell): the shadow. True colour only; a cell
-/// with no colour of its own (the terminal's) is taken as the theme's canvas.
-pub fn shadow(buf: &mut Buffer, r: Rect, th: &Theme) {
-    if th.depth != ColorDepth::True || r.width == 0 || r.height == 0 {
-        return;
-    }
-    let area = buf.area;
-    let mut dim = |x: u16, y: u16| {
-        if x >= area.right() || y >= area.bottom() {
-            return;
-        }
-        let cell = &mut buf[(x, y)];
-        let bg = if cell.bg == Color::Reset {
-            th.canvas
-        } else {
-            cell.bg
-        };
-        cell.set_bg(th.shadow(bg));
-        if cell.fg != Color::Reset {
-            cell.set_fg(th.shadow(cell.fg));
-        }
-    };
-    for y in r.y + 1..=r.bottom() {
-        dim(r.right(), y);
-    }
-    for x in r.x + 1..r.right() {
-        dim(x, r.bottom());
-    }
+/// What the cells of the border of a card are filled with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Edge {
+    /// What is just outside each cell: a menu or a notification is the colour of what lies
+    /// behind it, and the line does not stand out of it with a band of another colour.
+    Behind,
+    /// The colour of the card itself: a window, whose inside is a tone of its own.
+    Own,
 }
 
-/// Paint a card over `r`: shadow, surface, rounded border. Returns what is inside the border.
-pub fn card(buf: &mut Buffer, r: Rect, th: &Theme) -> Rect {
+/// Paint a card over `r`: the inside in the popup colour, the rounded border around it.
+/// Returns what is inside the border.
+pub fn card(buf: &mut Buffer, r: Rect, th: &Theme, edge: Edge) -> Rect {
     let r = r.intersection(buf.area);
     if r.width < 2 || r.height < 2 {
         return Rect::default();
     }
-    // What the four corners sit on: they take it, so that they read as round.
-    let corner_bg = [
-        (r.x, r.y),
-        (r.right() - 1, r.y),
-        (r.x, r.bottom() - 1),
-        (r.right() - 1, r.bottom() - 1),
-    ]
-    .map(|(x, y)| buf[(x, y)].bg);
-    shadow(buf, r, th);
+    let area = buf.area;
+    // What lies just outside each cell of the border (straight out; a corner, along the
+    // diagonal), before anything is drawn: a cell with no colour of its own is the theme's
+    // plain background. A cell at the edge of the screen has no outside: its own colour stands.
+    let outside = |buf: &Buffer, x: u16, y: u16| -> Color {
+        let dx = i32::from(x == r.right() - 1) - i32::from(x == r.x);
+        let dy = i32::from(y == r.bottom() - 1) - i32::from(y == r.y);
+        let (ox, oy) = (x as i32 + dx, y as i32 + dy);
+        let inside_screen = ox >= area.x as i32
+            && oy >= area.y as i32
+            && ox < area.right() as i32
+            && oy < area.bottom() as i32;
+        let at = if inside_screen {
+            (ox as u16, oy as u16)
+        } else {
+            (x, y)
+        };
+        match buf[at].bg {
+            Color::Reset => th.popup,
+            c => c,
+        }
+    };
+    let on_border =
+        |x: u16, y: u16| x == r.x || x == r.right() - 1 || y == r.y || y == r.bottom() - 1;
+    let colours: Vec<Color> = (r.y..r.bottom())
+        .flat_map(|y| (r.x..r.right()).map(move |x| (x, y)))
+        .filter(|&(x, y)| on_border(x, y))
+        .map(|(x, y)| outside(buf, x, y))
+        .collect();
     for y in r.y..r.bottom() {
         for x in r.x..r.right() {
             let c = &mut buf[(x, y)];
@@ -138,27 +140,28 @@ pub fn card(buf: &mut Buffer, r: Rect, th: &Theme) -> Rect {
             c.set_bg(th.popup);
         }
     }
-    let edge = Style::default().fg(th.popup_border).bg(th.popup);
-    for x in r.x + 1..r.right() - 1 {
-        buf[(x, r.y)].set_symbol("─").set_style(edge);
-        buf[(x, r.bottom() - 1)].set_symbol("─").set_style(edge);
-    }
-    for y in r.y + 1..r.bottom() - 1 {
-        buf[(r.x, y)].set_symbol("│").set_style(edge);
-        buf[(r.right() - 1, y)].set_symbol("│").set_style(edge);
-    }
-    for (i, (x, y, glyph)) in [
-        (r.x, r.y, "╭"),
-        (r.right() - 1, r.y, "╮"),
-        (r.x, r.bottom() - 1, "╰"),
-        (r.right() - 1, r.bottom() - 1, "╯"),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let c = &mut buf[(x, y)];
-        c.set_symbol(glyph).set_style(edge);
-        c.set_bg(corner_bg[i]);
+    let line = Style::default().fg(th.popup_border);
+    let mut colours = colours.into_iter();
+    for y in r.y..r.bottom() {
+        for x in r.x..r.right() {
+            if !on_border(x, y) {
+                continue;
+            }
+            let outside = colours.next().unwrap_or(th.popup);
+            let bg = match edge {
+                Edge::Behind => outside,
+                Edge::Own => th.popup,
+            };
+            let glyph = match (x == r.x, x == r.right() - 1, y == r.y, y == r.bottom() - 1) {
+                (true, _, true, _) => "╭",
+                (_, true, true, _) => "╮",
+                (true, _, _, true) => "╰",
+                (_, true, _, true) => "╯",
+                (_, _, true, _) | (_, _, _, true) => "─",
+                _ => "│",
+            };
+            buf[(x, y)].set_symbol(glyph).set_style(line.bg(bg));
+        }
     }
     Rect {
         x: r.x + 1,
@@ -166,6 +169,12 @@ pub fn card(buf: &mut Buffer, r: Rect, th: &Theme) -> Rect {
         width: r.width - 2,
         height: r.height - 2,
     }
+}
+
+/// Draw `symbol` in `fg` over a cell of the border, keeping the colour behind it: the strip
+/// of a status colour on the side of a card.
+pub fn mark(buf: &mut Buffer, x: u16, y: u16, symbol: &str, fg: Color) {
+    buf[(x, y)].set_symbol(symbol).set_fg(fg);
 }
 
 /// Write `line` over the cells of `row` (one row of the card), left aligned.
@@ -442,64 +451,168 @@ mod tests {
         }
     }
 
+    /// A screen of text on the plain background (what a menu is filled with).
     fn painted(th: &Theme) -> Buffer {
+        painted_on(th, th.popup)
+    }
+
+    fn painted_on(th: &Theme, bg: Color) -> Buffer {
         let mut b = Buffer::empty(Rect::new(0, 0, 40, 12));
         for y in 0..12 {
             for x in 0..40 {
                 let c = &mut b[(x, y)];
                 c.set_symbol("x");
-                c.set_bg(th.canvas);
+                c.set_bg(bg);
                 c.set_fg(th.text);
             }
         }
         b
     }
 
+    /// The cells of the border of the card at `r` with the cells just outside and just inside
+    /// each of them.
+    fn edge_triples(b: &Buffer, r: Rect) -> Vec<((u16, u16), Option<(u16, u16)>, (u16, u16))> {
+        let mut out = Vec::new();
+        for y in r.y..r.bottom() {
+            for x in r.x..r.right() {
+                let (left, right, top, bottom) =
+                    (x == r.x, x == r.right() - 1, y == r.y, y == r.bottom() - 1);
+                if !(left || right || top || bottom) {
+                    continue;
+                }
+                // Straight out of the card and straight into it (a corner: along the diagonal).
+                let dx: i32 = if left {
+                    -1
+                } else if right {
+                    1
+                } else {
+                    0
+                };
+                let dy: i32 = if top {
+                    -1
+                } else if bottom {
+                    1
+                } else {
+                    0
+                };
+                let outside = (x as i32 + dx, y as i32 + dy);
+                let inside = ((x as i32 - dx) as u16, (y as i32 - dy) as u16);
+                let area = b.area;
+                let outside = (outside.0 >= 0
+                    && outside.1 >= 0
+                    && (outside.0 as u16) < area.right()
+                    && (outside.1 as u16) < area.bottom())
+                .then_some((outside.0 as u16, outside.1 as u16));
+                out.push(((x, y), outside, inside));
+            }
+        }
+        out
+    }
+
     #[test]
-    fn a_card_has_a_surface_a_rounded_border_and_a_shadow() {
+    fn a_card_has_a_rounded_border_and_no_shadow() {
         let th = Theme::named("rada", ColorDepth::True).unwrap();
         let mut b = painted(&th);
         let r = Rect::new(4, 2, 20, 6);
-        let inner = card(&mut b, r, &th);
+        let inner = card(&mut b, r, &th, Edge::Behind);
         assert_eq!(inner, Rect::new(5, 3, 18, 4));
-        // Surface and border come from the tokens.
-        assert_eq!(b[(10, 4)].bg, th.popup);
         assert_eq!(b[(4, 4)].symbol(), "│");
         assert_eq!(b[(4, 4)].fg, th.popup_border);
-        // Round corners take the colour of what is behind them.
         assert_eq!(b[(4, 2)].symbol(), "╭");
-        assert_eq!(b[(4, 2)].bg, th.canvas);
+        assert_eq!(b[(23, 2)].symbol(), "╮");
+        assert_eq!(b[(4, 7)].symbol(), "╰");
         assert_eq!(b[(23, 7)].symbol(), "╯");
-        // The shadow: one cell right and below, the colours underneath darkened.
-        assert_eq!(b[(24, 5)].bg, th.shadow(th.canvas));
-        assert_eq!(b[(10, 8)].bg, th.shadow(th.canvas));
-        assert_eq!(b[(24, 8)].bg, th.shadow(th.canvas), "the corner");
-        // Nothing beyond that.
-        assert_eq!(b[(25, 5)].bg, th.canvas);
-        assert_eq!(b[(10, 9)].bg, th.canvas);
-        // The shadow is darker than what it covers, on a light theme as on a dark one.
-        for name in ["rada", "rada-light"] {
-            let t = Theme::named(name, ColorDepth::True).unwrap();
-            assert_ne!(t.shadow(t.canvas), t.canvas, "{name}");
+        // Nothing beyond the border: not a cell on the right, nor one below.
+        for y in 2..9 {
+            assert_eq!(b[(24, y)].bg, th.popup, "right of the card, row {y}");
+        }
+        for x in 4..25 {
+            assert_eq!(b[(x, 8)].bg, th.popup, "under the card, column {x}");
         }
     }
 
     #[test]
-    fn below_true_colour_there_is_no_shadow() {
-        let th = Theme::named("rada", ColorDepth::Ansi256).unwrap();
+    fn a_cell_of_the_border_is_never_another_colour_than_the_cells_beside_it() {
+        // Over a plain screen, in a dark theme and in Carta: the cell of the border, the cell
+        // just outside it and the cell just inside it are one colour, corners included.
+        for name in ["rada", "rada-light"] {
+            let th = Theme::named(name, ColorDepth::True).unwrap();
+            let mut b = painted(&th);
+            let r = Rect::new(4, 2, 20, 6);
+            card(&mut b, r, &th, Edge::Behind);
+            for (cell, outside, inside) in edge_triples(&b, r) {
+                let bg = b[cell].bg;
+                assert_eq!(bg, th.popup, "{name}: {cell:?}");
+                if let Some(o) = outside {
+                    assert_eq!(b[o].bg, bg, "{name}: outside {cell:?}");
+                }
+                assert_eq!(b[inside].bg, bg, "{name}: inside {cell:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn over_a_coloured_row_the_line_takes_the_colour_of_what_is_outside_it() {
+        let th = Theme::named("rada", ColorDepth::True).unwrap();
         let mut b = painted(&th);
-        card(&mut b, Rect::new(4, 2, 20, 6), &th);
-        assert_eq!(b[(24, 5)].bg, th.canvas);
-        assert_eq!(b[(10, 8)].bg, th.canvas);
+        for x in 0..40 {
+            b[(x, 4)].set_bg(th.sel);
+        }
+        let r = Rect::new(10, 2, 20, 6);
+        card(&mut b, r, &th, Edge::Behind);
+        // On the sides the row goes on outside the line, and so does its colour under it.
+        assert_eq!(b[(10, 4)].bg, th.sel);
+        assert_eq!(b[(29, 4)].bg, th.sel);
+        // Over the top the colour outside is the plain one: the row's colour is not carried
+        // into the line (nor, then, a strip of it under the line).
+        let mut b = painted(&th);
+        for x in 0..40 {
+            b[(x, 2)].set_bg(th.sel);
+        }
+        card(&mut b, r, &th, Edge::Behind);
+        assert_eq!(b[(15, 2)].bg, th.popup);
+        // The inside is the plain colour.
+        assert_eq!(b[(11, 4)].bg, th.popup);
+    }
+
+    #[test]
+    fn a_window_has_one_tone_for_its_border_and_its_inside() {
+        for name in ["rada", "rada-light"] {
+            let mut th = Theme::named(name, ColorDepth::True).unwrap();
+            let behind = th.dimmed(th.canvas);
+            th.popup = th.modal_surface();
+            let mut b = painted_on(&th, behind);
+            let r = Rect::new(4, 2, 20, 6);
+            card(&mut b, r, &th, Edge::Own);
+            for (cell, _, inside) in edge_triples(&b, r) {
+                assert_eq!(b[cell].bg, th.popup, "{name}: {cell:?}");
+                assert_eq!(b[inside].bg, th.popup, "{name}: inside {cell:?}");
+            }
+            // The screen around it stays the dimmed tone: the window is a little lighter.
+            assert_eq!(b[(30, 5)].bg, behind, "{name}");
+            assert_ne!(behind, th.popup, "{name}");
+        }
+    }
+
+    #[test]
+    fn the_side_of_a_card_in_a_colour_keeps_the_colour_behind_it() {
+        let th = Theme::named("rada", ColorDepth::True).unwrap();
+        let mut b = painted(&th);
+        let r = Rect::new(4, 2, 20, 6);
+        card(&mut b, r, &th, Edge::Behind);
+        mark(&mut b, 4, 4, "┃", th.success);
+        assert_eq!(b[(4, 4)].symbol(), "┃");
+        assert_eq!(b[(4, 4)].fg, th.success);
+        assert_eq!(b[(4, 4)].bg, th.popup);
     }
 
     #[test]
     fn a_card_at_the_edge_of_the_screen_is_cut_not_broken() {
         let th = Theme::named("rada", ColorDepth::True).unwrap();
         let mut b = painted(&th);
-        let inner = card(&mut b, Rect::new(30, 8, 20, 10), &th);
+        let inner = card(&mut b, Rect::new(30, 8, 20, 10), &th, Edge::Behind);
         assert!(inner.right() <= 40 && inner.bottom() <= 12);
-        let inner = card(&mut b, Rect::new(0, 0, 1, 1), &th);
+        let inner = card(&mut b, Rect::new(0, 0, 1, 1), &th, Edge::Behind);
         assert_eq!(inner, Rect::default());
     }
 

@@ -330,29 +330,30 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         app.hits.clear();
         // A window dims what is behind it; a menu does not, nor the list of programs that sits
         // beside one.
-        let beside_menu = matches!(&app.modal, Some(Modal::OpenWith(v)) if v.under.is_some());
-        if !beside_menu && !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview)) {
-            dim_backdrop(f.buffer_mut(), area, th.light);
+        if modals::dims_backdrop(app) {
+            dim_backdrop(f.buffer_mut(), area, &th);
         }
         modals::draw_modal(f, app, area);
     }
 }
 
-/// The places popups are drawn at, shadows included, for what lies over cells and cannot be
-/// drawn under them (a picture of the terminal). A window dims the whole screen: all of it.
+/// The places popups are drawn at, for what lies over cells and cannot be drawn under them (a
+/// picture of the terminal). A window dims the whole screen: all of it.
 fn popup_rects(app: &App, area: Rect) -> Vec<Rect> {
     let ctx = popup::Ctx::of(app);
+    let room = modals::popup_room(app, area);
     match &app.modal {
         None | Some(Modal::FullPreview) => Vec::new(),
-        Some(Modal::Menu(m)) => menu::rects(&ctx, &app.keymap, m, area),
+        Some(Modal::Menu(m)) => menu::rects(&ctx, &app.keymap, m, room),
         Some(Modal::OpenWith(v)) => {
             let mut rects = Vec::new();
             let mut anchor = None;
             if let Some(m) = v.under.as_deref() {
-                rects.extend(menu::rects(&ctx, &app.keymap, m, area));
-                anchor = Some(menu::beside(&ctx, &app.keymap, m, area));
+                rects.extend(menu::rects(&ctx, &app.keymap, m, room));
+                anchor = Some(menu::beside(&ctx, &app.keymap, m, room));
             }
-            rects.push(openwith::rect(&ctx, v, area, anchor));
+            let at = if anchor.is_some() { room } else { area };
+            rects.push(openwith::rect(&ctx, v, at, anchor));
             rects
         }
         Some(_) => vec![area],

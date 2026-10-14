@@ -99,7 +99,7 @@ fn place(
     });
     // Two cells of air on each side of the pills, and never wider than the screen allows.
     let inner = content.max(title_w).max(18) + 2;
-    let width = ((inner + 2) as u16).min(area.width.saturating_sub(2));
+    let width = ((inner + 2) as u16).min(area.width);
 
     let mut rows = Vec::new();
     if m.title.is_some() {
@@ -112,14 +112,14 @@ fn place(
         }
         rows.push(Row::Item(i));
     }
-    let height = ((rows.len() + 2) as u16).min(area.height.saturating_sub(2));
+    let height = ((rows.len() + 2) as u16).min(area.height);
 
     // The first row of the menu's items, for a submenu to sit beside the entry that opened it.
     let (mut x, mut y) = match parent {
         None => m.at,
         Some((p, opener_y)) => {
             let right = p.rect.right();
-            let x = if right + width < area.right() {
+            let x = if right + width <= area.right() {
                 right
             } else {
                 p.rect.x.saturating_sub(width)
@@ -128,9 +128,9 @@ fn place(
             (x, opener_y.saturating_sub(head))
         }
     };
-    // Inside the screen, with a cell for the shadow.
-    x = x.min(area.right().saturating_sub(width + 1)).max(area.x);
-    y = y.min(area.bottom().saturating_sub(height + 1)).max(area.y);
+    // Inside the room it has: a menu near the bottom moves up, over the bars it stays above.
+    x = x.min(area.right().saturating_sub(width)).max(area.x);
+    y = y.min(area.bottom().saturating_sub(height)).max(area.y);
     Placed {
         rect: Rect {
             x,
@@ -171,16 +171,12 @@ fn row_y(p: &Placed, item: usize) -> u16 {
     top + at
 }
 
-/// The rectangles a menu (and the menus it was opened from) covers, shadows included.
+/// The rectangles a menu (and the menus it was opened from) covers.
 pub fn rects(ctx: &Ctx, km: &Keymap, m: &MenuView, area: Rect) -> Vec<Rect> {
     let chain = m.chain();
     layout(ctx, km, &chain, area)
         .into_iter()
-        .map(|p| Rect {
-            width: p.rect.width + 1,
-            height: p.rect.height + 1,
-            ..p.rect
-        })
+        .map(|p| p.rect)
         .collect()
 }
 
@@ -231,7 +227,7 @@ fn draw_one(
 ) {
     let th = ctx.th;
     let buf = f.buffer_mut();
-    let inner = popup::card(buf, p.rect, th);
+    let inner = popup::card(buf, p.rect, th, popup::Edge::Behind);
     if inner.width < 4 || inner.height == 0 {
         return;
     }
@@ -433,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn a_menu_stays_inside_the_screen_with_room_for_its_shadow() {
+    fn a_menu_stays_inside_the_room_it_has_and_moves_up_to_fit() {
         let th = Theme::named("rada", ColorDepth::True).unwrap();
         let c = ctx(&th, true);
         let km = Keymap::new(Preset::VimClassic, &std::collections::HashMap::new());
@@ -449,6 +445,16 @@ mod tests {
                 r[0]
             );
         }
+        // Near the bottom it moves up until its last row is the last row of the room: no row
+        // is left empty under it, and none of it is over the bars below.
+        let mut m = sample();
+        m.at = (30, 18);
+        let r = rects(&c, &km, &m, area);
+        assert_eq!(r[0].bottom(), area.bottom(), "{:?}", r[0]);
+        let mut m = sample();
+        m.at = (59, 5);
+        let r = rects(&c, &km, &m, area);
+        assert_eq!(r[0].right(), area.right(), "{:?}", r[0]);
     }
 
     #[test]
@@ -502,5 +508,12 @@ mod tests {
         let narrow = Rect::new(0, 0, r[0].right() + 4, 30);
         let r = rects(&c, &km, &child, narrow);
         assert!(r[1].right() <= r[0].x + 1, "{r:?}");
+        // On the left of its parent, at the bottom of the room: flush with it, nothing under.
+        let low = Rect::new(0, 0, r[0].right() + 4, r[0].bottom() + 1);
+        let r = rects(&c, &km, &child, low);
+        assert!(
+            r[1].bottom() <= low.bottom() && r[1].right() <= r[0].x + 1,
+            "{r:?}"
+        );
     }
 }

@@ -89,22 +89,11 @@ pub fn centered(area: Rect, w: u16, h: u16) -> Rect {
     }
 }
 
-/// Dim everything already drawn, so that a window in front is the only thing in focus.
-/// On a light theme "dimmer" means paler: colours move towards white instead of black.
-pub fn dim_backdrop(buf: &mut Buffer, area: Rect, light: bool) {
-    fn shade(c: Color, f: f32, light: bool) -> Color {
-        let ch = |v: u8| -> u8 {
-            if light {
-                (v as f32 + (255.0 - v as f32) * (1.0 - f)) as u8
-            } else {
-                (v as f32 * f) as u8
-            }
-        };
-        match c {
-            Color::Rgb(r, g, b) => Color::Rgb(ch(r), ch(g), ch(b)),
-            other => other,
-        }
-    }
+/// Dim everything already drawn, so that a window in front is the only thing in focus
+/// (see [`Theme::dimmed`]: on a light theme "dimmer" means paler). The cells the terminal fills
+/// with its own background are dimmed too, as the theme's canvas, so that the whole screen
+/// goes down together and the window stands on one tone.
+pub fn dim_backdrop(buf: &mut Buffer, area: Rect, th: &Theme) {
     for y in area.top()..area.bottom() {
         for x in area.left()..area.right() {
             let cell = &mut buf[(x, y)];
@@ -113,8 +102,10 @@ pub fn dim_backdrop(buf: &mut Buffer, area: Rect, light: bool) {
             if cell.symbol().contains('\u{10EEEE}') {
                 continue;
             }
-            cell.fg = shade(cell.fg, 0.62, light);
-            cell.bg = shade(cell.bg, 0.6, light);
+            if cell.fg != Color::Reset {
+                cell.fg = th.dimmed(cell.fg);
+            }
+            cell.bg = th.dimmed(cell.bg);
         }
     }
 }

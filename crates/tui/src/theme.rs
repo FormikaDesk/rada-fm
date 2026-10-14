@@ -140,10 +140,11 @@ pub struct Theme {
     /// The text on it is white, so both ends read at 4.5:1 or better.
     pub grad_row_start: Color,
     pub grad_row_end: Color,
-    /// The surface of a popup (a menu, a window, a notification card): a little lighter than
-    /// the canvas on a dark theme, a little paler on a light one. Every text token reads on it.
+    /// What a menu and a notification card are filled with: the same as what lies behind them,
+    /// the theme's own background (the terminal's own, `Reset`, where the theme leaves it
+    /// alone). A window is filled with [`modal_surface`](Self::modal_surface) instead.
     pub popup: Color,
-    /// The thin rounded border of a popup: a step away from its surface.
+    /// The line of the rounded border of a popup. It reads against the canvas at 3:1 or better.
     pub popup_border: Color,
     /// A ticked checkbox.
     pub check: Color,
@@ -278,8 +279,8 @@ impl Theme {
             button: rgb(36, 40, 59),
             grad_row_start: rgb(0x3d, 0x59, 0xa1),
             grad_row_end: rgb(0x6a, 0x4c, 0x9c),
-            popup: rgb(0x26, 0x2b, 0x40),
-            popup_border: rgb(0x41, 0x48, 0x68),
+            popup: Color::Reset,
+            popup_border: rgb(0x6a, 0x6d, 0x7c),
             check: accent,
             disk: accent,
             success: rgb(120, 220, 160),
@@ -328,8 +329,7 @@ impl Theme {
             rgb(40, 42, 58),
         );
         t.cursor = rgb(66, 72, 108);
-        t.popup = rgb(0x2a, 0x2e, 0x45);
-        t.popup_border = rgb(0x45, 0x48, 0x6a);
+        t.popup_border = rgb(0x68, 0x6d, 0x80);
         t.grad_row_start = rgb(0x45, 0x5e, 0xa8);
         t.grad_row_end = rgb(0x7b, 0x4f, 0xa6);
         t.text = rgb(205, 214, 244);
@@ -367,8 +367,7 @@ impl Theme {
             rgb(34, 38, 56),
         );
         t.cursor = rgb(56, 66, 108);
-        t.popup = rgb(0x25, 0x2a, 0x3e);
-        t.popup_border = rgb(0x41, 0x48, 0x68);
+        t.popup_border = rgb(0x68, 0x6d, 0x87);
         t.text = rgb(192, 202, 245);
         t.text_dim = rgb(135, 144, 187);
         t.muted = rgb(68, 75, 106);
@@ -461,6 +460,7 @@ impl Theme {
         let [row_start, row_end] = gradients.map(c);
         let mut t = Theme::light_base(name, bg, text, dim, muted, accent, tab, cursor, bar, border);
         t.bg = Some(bg);
+        t.popup = bg;
         t.field = field;
         t.button = button;
         t.sel = sel;
@@ -506,8 +506,7 @@ impl Theme {
             [0x8c5f16, 0x4b7438, 0xa8454c, 0x77559e, 0x2c6e7d, 0x9e5826],
             [0x476fa8, 0x7d58a6],
         );
-        t.popup = rgb(0xfd, 0xfc, 0xf9);
-        t.popup_border = rgb(0xd5, 0xcd, 0xbf);
+        t.popup_border = rgb(0x88, 0x85, 0x80);
         t
     }
 
@@ -522,8 +521,7 @@ impl Theme {
             [0x86621c, 0x3c7346, 0xa2485a, 0x6f5499, 0x2a6a80, 0x975a2a],
             [0x4a6fb3, 0x7a5aa8],
         );
-        t.popup = rgb(0xfa, 0xfb, 0xfc);
-        t.popup_border = rgb(0xcd, 0xd3, 0xdc);
+        t.popup_border = rgb(0x7e, 0x82, 0x8b);
         t
     }
 
@@ -542,8 +540,7 @@ impl Theme {
             rgb(224, 229, 242),
             rgb(214, 218, 229),
         );
-        t.popup = rgb(0xfb, 0xfc, 0xfe);
-        t.popup_border = rgb(0xc9, 0xcf, 0xdf);
+        t.popup_border = rgb(0x81, 0x83, 0x93);
         t.grad_row_start = rgb(0x2f, 0x5f, 0xd0);
         t.grad_row_end = rgb(0x88, 0x39, 0xef);
         t.success = rgb(47, 118, 32);
@@ -583,8 +580,7 @@ impl Theme {
             rgb(212, 217, 238),
             rgb(208, 211, 222),
         );
-        t.popup = rgb(0xef, 0xf0, 0xf5);
-        t.popup_border = rgb(0xbd, 0xc3, 0xd8);
+        t.popup_border = rgb(0x74, 0x78, 0x8c);
         t.grad_row_start = rgb(0x3a, 0x5b, 0xa9);
         t.grad_row_end = rgb(0x78, 0x47, 0xa6);
         t.success = rgb(78, 104, 50);
@@ -985,6 +981,11 @@ impl Theme {
     /// [`tint_on`](Self::tint_on) with the share chosen: a light touch (a pill) or a stronger
     /// one (a strip).
     pub fn tint_share(&self, surface: Color, c: Color, share: f32) -> Color {
+        // The terminal's own background is not a colour to mix with: the canvas stands for it.
+        let surface = match surface {
+            Color::Reset if self.depth == ColorDepth::True => self.canvas,
+            other => other,
+        };
         match (self.depth, surface, c) {
             (ColorDepth::True, Color::Rgb(sr, sg, sb), Color::Rgb(r, g, b)) => {
                 let mix = |v: u8, base: u8| (v as f32 * share + base as f32 * (1.0 - share)) as u8;
@@ -995,21 +996,42 @@ impl Theme {
         }
     }
 
-    /// What lies under the shadow of a popup: the colour darkened (a light theme loses 6% at
-    /// most: a dark block on paper is heavy, the edge only has to be felt).
-    /// Only true colour can be shaded; every other colour is kept as it is.
-    pub fn shadow(&self, c: Color) -> Color {
-        match (self.depth, c) {
-            (ColorDepth::True, Color::Rgb(r, g, b)) => {
-                let f = if self.light { 0.94 } else { 0.62 };
-                rgb(
-                    (r as f32 * f) as u8,
-                    (g as f32 * f) as u8,
-                    (b as f32 * f) as u8,
-                )
+    /// What a window is filled with: the screen behind it is dimmed (see
+    /// [`dimmed`](Self::dimmed)) and the window is that tone a little lighter, so that its border and
+    /// its inside are one colour. Only true colour can be mixed; elsewhere it is the popup's.
+    pub fn modal_surface(&self) -> Color {
+        match (self.depth, self.canvas) {
+            (ColorDepth::True, Color::Rgb(..)) => {
+                let behind = self.dimmed(self.canvas);
+                if self.light {
+                    // Paler again: halfway to white.
+                    self.tint_share(behind, rgb(255, 255, 255), 0.5)
+                } else {
+                    // A shade of the text colour over it.
+                    self.tint_share(behind, self.text, 0.07)
+                }
             }
-            _ => c,
+            _ => self.popup,
         }
+    }
+
+    /// `c` as it lies under a window: darker on a dark theme, on a light one paler (colours
+    /// move towards white instead of black). Only true colour is changed; a colour the
+    /// terminal owns (`Reset`) is taken as the theme's canvas.
+    pub fn dimmed(&self, c: Color) -> Color {
+        let c = match c {
+            Color::Reset if self.depth == ColorDepth::True => self.canvas,
+            other => other,
+        };
+        let Color::Rgb(r, g, b) = c else { return c };
+        let ch = |v: u8| -> u8 {
+            if self.light {
+                (v as f32 + (255.0 - v as f32) * 0.4) as u8
+            } else {
+                (v as f32 * 0.6) as u8
+            }
+        };
+        rgb(ch(r), ch(g), ch(b))
     }
 }
 
@@ -1351,18 +1373,35 @@ mod tests {
             for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
                 need(&format!("{what} on canvas"), contrast(col, c), 4.5);
             }
-            // The surface of a popup: everything read there reads as well as on the canvas.
-            let p = t.popup;
-            need("text on popup", contrast(t.text, p), 7.0);
-            need("text_dim on popup", contrast(t.text_dim, p), 4.5);
-            need("muted on popup", contrast(t.muted, p), 1.5);
-            need("accent on popup", contrast(t.accent, p), 4.5);
-            need("popup against canvas", contrast(p, c), 1.05);
+            // A menu is filled with what lies behind it, a window with the dimmed canvas made a
+            // little lighter: everything read there reads as well as on the canvas, and the
+            // line of the border can be seen against both.
+            for (which, p) in [("menu", c), ("window", t.modal_surface())] {
+                need(&format!("text on {which}"), contrast(t.text, p), 7.0);
+                need(
+                    &format!("text_dim on {which}"),
+                    contrast(t.text_dim, p),
+                    4.5,
+                );
+                need(&format!("muted on {which}"), contrast(t.muted, p), 1.5);
+                need(&format!("accent on {which}"), contrast(t.accent, p), 4.5);
+                need(
+                    &format!("popup_border against the {which}"),
+                    contrast(t.popup_border, p),
+                    3.0,
+                );
+            }
             need(
-                "popup_border against popup",
-                contrast(t.popup_border, p),
-                1.3,
+                "popup_border against the dimmed screen",
+                contrast(t.popup_border, t.dimmed(c)),
+                3.0,
             );
+            need(
+                "window against the dimmed screen",
+                contrast(t.modal_surface(), t.dimmed(c)),
+                1.03,
+            );
+            let p = t.modal_surface();
             need("on_accent on error", contrast(t.on_accent, t.error), 4.5);
             for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
                 need(&format!("{what} on popup"), contrast(col, p), 4.5);
@@ -1404,18 +1443,18 @@ mod tests {
     }
 
     #[test]
-    fn the_shadow_of_a_popup_is_felt_on_paper_and_deep_on_dark() {
+    fn a_menu_is_filled_with_what_is_behind_it_and_a_window_with_a_lighter_dimmed_tone() {
         for n in Theme::NAMES {
             let t = Theme::named(n, ColorDepth::True).unwrap();
-            let (r0, g0, b0) = channels(t.canvas);
-            let (r1, g1, b1) = channels(t.shadow(t.canvas));
-            let kept = (r1 as f32 + g1 as f32 + b1 as f32) / (r0 as f32 + g0 as f32 + b0 as f32);
-            if t.light {
-                // At most ~8% darker than the paper: a hint, not a block.
-                assert!((0.92..1.0).contains(&kept), "{n}: keeps {kept:.3}");
-            } else {
-                assert!(kept < 0.7, "{n}: keeps {kept:.3}");
-            }
+            // The theme's own background, or the terminal's where the theme leaves it alone.
+            assert_eq!(t.popup, t.bg.unwrap_or(Color::Reset), "{n}");
+            // Dimmed screen and window: darker on a dark theme, paler on a light one.
+            let (behind, window) = (luminance(t.dimmed(t.canvas)), luminance(t.modal_surface()));
+            assert_eq!(behind < luminance(t.canvas), !t.light, "{n}");
+            assert!(
+                window > behind,
+                "{n}: the window is lighter than the screen under it"
+            );
         }
     }
 

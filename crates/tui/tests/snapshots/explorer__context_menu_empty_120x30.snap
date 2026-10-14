@@ -20,20 +20,20 @@ expression: shot(&mut h)
 │  ▶ Videos              ⚲ │ │ ☐ · backup.zip              05/07/2026       Archive (ZIP)            39.0 MB           │
 │                          │ │ ☐ · Cargo.toml              3 days ago       Settings file               82 B           │
 │ DEVICES                  │ │ ☐ · data.json               6 days ago       JSON data                   49 B           │
-│  ▥ System                │ │ ☐ · demo.mp4                2 weeks ago      MP4 video                91.0 MB           │
-│    ■■■■■■□□□□     183 GB │ │ ☐ · logo.svg                5 days ago       SVG image                  197 B           │
-│  ▥ Data                  │ │ ☐ · main.rs                 Today 14:10      Rust source                 80 B           │
-│    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt               Yesterday        Text document               28 B           │
-│  ⏏ USB drive             │ │▌☐ · photo.jpg               Today 13:30    ╭───────────────────────────────────────╮    │
-│    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md               Today 13:28    │  + New                             ›  │    │
-│                          │ │ ☐ · report.pdf              4 days ago     │  ⎘ Paste                      Ctrl+V  │    │
-│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│  ● Red                   │ │ ☐ · setup.sh                12 days ago    │  ⇅ Sort by                         ›  │    │
-│  ● Orange                │ │ ☐ · song.mp3                30/07/2026     │  ≣ View                            ›  │    │
-│  ● Yellow                │ │                                            │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│  ● Green                 │ │                                            │  ⟳ Refresh the folder             F5  │    │
-╰──────────────────────────╯ ╰────────────────────────────────────────────│  ☑ Select all                 Ctrl+A  │────╯
- 19 items                                                                 │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │  ▥
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│  › Open a terminal here   Ctrl+Alt+T  │▄▄▄▄▄
-   ↑↓  choose     →  open     Enter  confirm     Esc  close               ╰───────────────────────────────────────╯
+│  ▥ System                │ │ ☐ · demo.mp4                2 weeks ago    ╭───────────────────────────────────────╮    │
+│    ■■■■■■□□□□     183 GB │ │ ☐ · logo.svg                5 days ago     │  + New                             ›  │    │
+│  ▥ Data                  │ │ ☐ · main.rs                 Today 14:10    │  ⎘ Paste                      Ctrl+V  │    │
+│    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt               Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│  ⏏ USB drive             │ │▌☐ · photo.jpg               Today 13:30    │  ⇅ Sort by                         ›  │    │
+│    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md               Today 13:28    │  ≣ View                            ›  │    │
+│                          │ │ ☐ · report.pdf              4 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │  ⟳ Refresh the folder             F5  │    │
+│  ● Red                   │ │ ☐ · setup.sh                12 days ago    │  ☑ Select all                 Ctrl+A  │    │
+│  ● Orange                │ │ ☐ · song.mp3                30/07/2026     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│  ● Yellow                │ │                                            │  › Open a terminal here   Ctrl+Alt+T  │    │
+│  ● Green                 │ │                                            ╰───────────────────────────────────────╯    │
+╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+ 19 items                                                                    v0.6.0 ⟳  183 GB free ■■■■■■□□□□  ≣  ▦  ▥
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   ↑↓  choose     →  open     Enter  confirm     Esc  close
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

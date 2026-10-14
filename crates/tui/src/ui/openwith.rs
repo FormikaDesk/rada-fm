@@ -59,7 +59,7 @@ fn geometry(ctx: &Ctx, v: &OpenWithView, area: Rect, anchor: Option<(Rect, u16)>
             area.y + area.height.saturating_sub(height) / 2,
         ),
         Some((menu, oy)) => {
-            let x = if menu.right() + width < area.right() {
+            let x = if menu.right() + width <= area.right() {
                 menu.right()
             } else {
                 menu.x.saturating_sub(width)
@@ -67,8 +67,8 @@ fn geometry(ctx: &Ctx, v: &OpenWithView, area: Rect, anchor: Option<(Rect, u16)>
             (x, oy.saturating_sub(3))
         }
     };
-    x = x.min(area.right().saturating_sub(width + 1)).max(area.x);
-    y = y.min(area.bottom().saturating_sub(height + 1)).max(area.y);
+    x = x.min(area.right().saturating_sub(width)).max(area.x);
+    y = y.min(area.bottom().saturating_sub(height)).max(area.y);
     let _ = ctx;
     Geom {
         rect: Rect {
@@ -96,14 +96,9 @@ fn badge_text(v: &OpenWithView, a: &rada_core::platform::OpenApp) -> &'static st
     }
 }
 
-/// Where the card is, shadow included (for what must not be drawn under it).
+/// Where the card is (for what must not be drawn under it).
 pub fn rect(ctx: &Ctx, v: &OpenWithView, area: Rect, anchor: Option<(Rect, u16)>) -> Rect {
-    let g = geometry(ctx, v, area, anchor).rect;
-    Rect {
-        width: g.width + 1,
-        height: g.height + 1,
-        ..g
-    }
+    geometry(ctx, v, area, anchor).rect
 }
 
 pub fn draw(
@@ -119,7 +114,13 @@ pub fn draw(
     let th = ctx.th;
     let g = geometry(ctx, v, area, anchor);
     let buf = f.buffer_mut();
-    let inner = popup::card(buf, g.rect, th);
+    // Beside a menu the card is a menu too; on its own it is a window over a dimmed screen.
+    let edge = if v.under.is_some() {
+        popup::Edge::Behind
+    } else {
+        popup::Edge::Own
+    };
+    let inner = popup::card(buf, g.rect, th, edge);
     if inner.width < 10 || inner.height < 6 {
         return;
     }

@@ -249,15 +249,13 @@ fn draw_card(f: &mut Frame, ctx: &Ctx, c: &Card, rect: Rect, targets: &mut Vec<(
     let th = ctx.th;
     let tone = c.tone.color(th);
     let buf = f.buffer_mut();
-    let inner = popup::card(buf, rect, th);
+    let inner = popup::card(buf, rect, th, popup::Edge::Behind);
     if inner.width < 12 || inner.height < 2 {
         return;
     }
     // The left side of the border in the colour of the state.
     for y in rect.y + 1..rect.bottom() - 1 {
-        buf[(rect.x, y)]
-            .set_symbol("┃")
-            .set_style(Style::default().fg(tone).bg(th.popup));
+        popup::mark(buf, rect.x, y, "┃", tone);
     }
     let w = inner.width as usize;
     let lines = title_lines(c, rect.width as usize);
@@ -334,9 +332,7 @@ fn draw_card(f: &mut Frame, ctx: &Ctx, c: &Card, rect: Rect, targets: &mut Vec<(
     if let Some(left) = c.left {
         let cells = ((rect.width as usize).saturating_sub(2) as f64 * left).round() as u16;
         for i in 0..cells {
-            buf[(rect.x + 1 + i, rect.bottom() - 1)]
-                .set_symbol("━")
-                .set_style(Style::default().fg(tone).bg(th.popup));
+            popup::mark(buf, rect.x + 1 + i, rect.bottom() - 1, "━", tone);
         }
     }
     // The card itself behind its parts: a click on it closes it (a running one has no such).
