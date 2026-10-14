@@ -376,3 +376,56 @@ fn a_notification_is_still_a_card_with_its_colour_at_the_side() {
     assert_eq!(b[(r.x, r.y + 1)].fg, th.success);
     assert_eq!(b[(r.right() - 1, r.y + 1)].fg, th.popup_border);
 }
+
+/// A submenu is right against its menu, on the right of it and on the left of it, and nothing
+/// of the list shows between the two lines: not the cursor row, which is in another colour and
+/// passes behind them.
+#[test]
+fn a_submenu_is_right_against_its_menu_and_nothing_of_the_list_shows_between() {
+    for name in THEMES {
+        for (side, click_x) in [("right", 31u16), ("left", 98u16)] {
+            let mut h = scene(name, 100, 30, 12);
+            let th = h.app.th.clone();
+            // The last row: the menu has to move up, so that the cursor row is behind it.
+            h.app.cursor = 11;
+            let before = buffer(&mut h);
+            let (_, y) = h.where_is(&Target::Row(11));
+            h.mouse(
+                MouseEventKind::Down(MouseButton::Right),
+                click_x,
+                y,
+                KeyModifiers::NONE,
+            );
+            assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+            open_tag_submenu(&mut h);
+            let after = buffer(&mut h);
+            let rs = cards(&after, &th);
+            assert_eq!(rs.len(), 2, "{name} {side}: {rs:?}");
+            let (parent, child) = (rs[0], rs[1]);
+            let (left, right) = if side == "right" {
+                assert_eq!(child.x, parent.right(), "{name}: {parent:?} {child:?}");
+                (parent, child)
+            } else {
+                assert_eq!(child.right(), parent.x, "{name}: {parent:?} {child:?}");
+                (child, parent)
+            };
+            // The two lines, over the rows both cards have: on the plain background. The
+            // cursor row (another colour) is among them.
+            let top = parent.y.max(child.y);
+            let bottom = parent.bottom().min(child.bottom());
+            let mut coloured_behind = false;
+            for y in top..bottom {
+                for x in [left.right() - 1, right.x] {
+                    assert_eq!(after[(x, y)].bg, th.popup, "{name} {side}: ({x}, {y})");
+                    coloured_behind |=
+                        before[(x, y)].bg != th.popup && before[(x, y)].bg != Color::Reset;
+                }
+            }
+            // The test means something: a row of another colour really was behind them.
+            assert!(
+                coloured_behind,
+                "{name} {side}: nothing coloured behind the seam"
+            );
+        }
+    }
+}

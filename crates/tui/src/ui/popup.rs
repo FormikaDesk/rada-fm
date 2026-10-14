@@ -171,6 +171,29 @@ pub fn card(buf: &mut Buffer, r: Rect, th: &Theme, edge: Edge) -> Rect {
     }
 }
 
+/// Two cards side by side (a menu and its submenu, on either side of it), the border of one
+/// right against the border of the other: the two cells that face each other, over the rows
+/// both cards have, are the plain background. What lies behind them (the cursor row, a
+/// selected row) must not show in the seam between the lines.
+pub fn seam(buf: &mut Buffer, a: Rect, b: Rect, th: &Theme) {
+    let (left, right) = if a.right() == b.x {
+        (a, b)
+    } else if b.right() == a.x {
+        (b, a)
+    } else {
+        return;
+    };
+    let top = a.y.max(b.y);
+    let bottom = a.bottom().min(b.bottom());
+    for y in top..bottom {
+        for x in [left.right() - 1, right.x] {
+            if x < buf.area.right() && y < buf.area.bottom() {
+                buf[(x, y)].set_bg(th.popup);
+            }
+        }
+    }
+}
+
 /// Draw `symbol` in `fg` over a cell of the border, keeping the colour behind it: the strip
 /// of a status colour on the side of a card.
 pub fn mark(buf: &mut Buffer, x: u16, y: u16, symbol: &str, fg: Color) {

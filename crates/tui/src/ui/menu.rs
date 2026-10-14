@@ -118,6 +118,7 @@ fn place(
     let (mut x, mut y) = match parent {
         None => m.at,
         Some((p, opener_y)) => {
+            // Right against its parent, on the right or on the left (see `popup::seam`).
             let right = p.rect.right();
             let x = if right + width <= area.right() {
                 right
@@ -213,6 +214,9 @@ fn draw_chain(
     let top = chain.len() - 1;
     for (depth, (menu, p)) in chain.iter().zip(&placed).enumerate() {
         draw_one(f, ctx, km, menu, p, active && depth == top, hits);
+        if depth > 0 {
+            popup::seam(f.buffer_mut(), placed[depth - 1].rect, p.rect, ctx.th);
+        }
     }
 }
 

@@ -121,6 +121,9 @@ pub fn draw(
         popup::Edge::Own
     };
     let inner = popup::card(buf, g.rect, th, edge);
+    if let Some((menu, _)) = anchor {
+        popup::seam(buf, menu, g.rect, th);
+    }
     if inner.width < 10 || inner.height < 6 {
         return;
     }
