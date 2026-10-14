@@ -166,6 +166,13 @@ fn early_language() {
 }
 
 fn main() -> Result<()> {
+    // Started by rada itself to call the shell from a process with no console (see
+    // `rada_core::platform::launch`): it does that one thing and ends, before anything of the
+    // interface or of the command line is touched.
+    let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if let Some(task) = rada_core::platform::launch::parse_helper_args(&raw) {
+        std::process::exit(rada_core::platform::windows::run_launch_helper(&task));
+    }
     early_language();
     let matches = cli_text::command::<Cli>().get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());

@@ -222,6 +222,12 @@ fn event_loop(
     loop {
         // Draw as soon as something changed: no artificial frame limit, the batching
         // below already folds a burst of events into a single frame.
+        // From nothing: the screen is cleared and every cell is sent again, so that what
+        // another program wrote on the terminal does not stay.
+        if app.take_full_redraw() {
+            terminal.clear()?;
+            app.dirty = true;
+        }
         if app.dirty {
             terminal.draw(|f| ui::draw(f, &mut app))?;
             app.dirty = false;

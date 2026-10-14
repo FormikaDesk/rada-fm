@@ -190,3 +190,47 @@ fn notification_titles_start_with_a_capital() {
     let s = h.screen();
     assert!(s.contains("Cannot show this picture"), "{s}");
 }
+
+#[test]
+fn ctrl_l_asks_for_the_whole_screen_to_be_drawn_again_wherever_it_is_pressed() {
+    let (mut h, _dest) = files(150, 40);
+    assert!(!h.app.take_full_redraw());
+    h.press("ctrl+l");
+    assert!(h.app.take_full_redraw(), "Ctrl+L asks for a redraw");
+    assert!(!h.app.take_full_redraw(), "asking once resets it");
+    // While the bar is being edited, and inside a window, too.
+    assert!(h.app.address.is_some());
+    h.press("ctrl+l");
+    assert!(h.app.take_full_redraw());
+    h.key(KeyCode::Esc);
+    h.key(KeyCode::F(1));
+    h.press("ctrl+l");
+    assert!(h.app.take_full_redraw());
+}
+
+#[test]
+fn starting_a_program_has_the_screen_drawn_again_now_and_a_few_times_after() {
+    let (mut h, _dest) = files(150, 40);
+    h.app.after_launch();
+    assert!(h.app.take_full_redraw(), "at once");
+    // Nothing is due yet; the ticks that follow draw again when their times come.
+    h.app.tick();
+    assert!(!h.app.take_full_redraw());
+    std::thread::sleep(std::time::Duration::from_millis(350));
+    h.app.tick();
+    assert!(h.app.take_full_redraw(), "after 0.3 s");
+    h.app.tick();
+    assert!(!h.app.take_full_redraw());
+}
+
+#[test]
+fn the_help_says_what_ctrl_l_does() {
+    let (mut h, _dest) = files(150, 60);
+    h.key(KeyCode::F(1));
+    h.app.help_scroll = 100;
+    let s = h.screen();
+    assert!(
+        s.contains("Ctrl+L") && s.contains("draws the whole screen again"),
+        "{s}"
+    );
+}

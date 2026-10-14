@@ -14,7 +14,7 @@ Down 14
 Sleep 1s
 Ctrl+K
 Sleep 1s
-Down 7
+Down 6
 Sleep 500ms
 Enter
 Sleep 1500ms

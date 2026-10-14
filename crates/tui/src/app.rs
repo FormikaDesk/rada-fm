@@ -553,6 +553,11 @@ pub struct App {
     pub viewport: Viewport,
     pub should_quit: bool,
     pub dirty: bool,
+    /// The whole screen is drawn again from nothing at the next frame (Ctrl+L, and after a
+    /// program was started): whatever something else wrote on the terminal is put right.
+    pub full_redraw: bool,
+    /// When to do that again after a program was started: they say things a while after.
+    redraw_at: Vec<Instant>,
     pub spinner: usize,
     plan_job: Option<JobId>,
 
@@ -732,6 +737,8 @@ impl App {
             viewport: Viewport::default(),
             should_quit: false,
             dirty: true,
+            full_redraw: false,
+            redraw_at: Vec::new(),
             spinner: 0,
             plan_job: None,
             keymap: cfg.keymap,
@@ -898,8 +905,35 @@ impl App {
             .collect()
     }
 
+    /// A program was started from here. Some of them write on the terminal they were started
+    /// from (Electron editors print their logs), which spoils the screen: it is drawn again from
+    /// nothing now and a few times in the seconds after.
+    pub fn after_launch(&mut self) {
+        let now = Instant::now();
+        self.full_redraw = true;
+        self.dirty = true;
+        self.redraw_at.extend(
+            [300u64, 1500, 4000]
+                .into_iter()
+                .map(|ms| now + Duration::from_millis(ms)),
+        );
+    }
+
+    /// Whether the screen is to be cleared and drawn again; asking resets it.
+    pub fn take_full_redraw(&mut self) -> bool {
+        std::mem::take(&mut self.full_redraw)
+    }
+
     pub fn tick(&mut self) {
         self.spinner = self.spinner.wrapping_add(1);
+        if !self.redraw_at.is_empty() {
+            let now = Instant::now();
+            if self.redraw_at.iter().any(|t| *t <= now) {
+                self.redraw_at.retain(|t| *t > now);
+                self.full_redraw = true;
+                self.dirty = true;
+            }
+        }
         self.tick_notices();
         if self.running.is_some()
             || self.notices.has_clock()
@@ -1181,6 +1215,7 @@ impl App {
             let notes = self.svc.notes.clone();
             let state = platform.dirs().rada_state();
             // Spawning a process is I/O: keep it off the UI thread.
+            self.after_launch();
             std::thread::spawn(move || {
                 // A program chosen in "Open with…" to be used always for this kind of file
                 // takes the place of the system's default.
@@ -1239,6 +1274,7 @@ impl App {
         }
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
+        self.after_launch();
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().quick_look(&path) {
                 let _ = notes.send(CoreEvent::Note {
@@ -2039,6 +2075,7 @@ impl App {
                     self.svc.platform.clone(),
                     self.svc.notes.clone(),
                 );
+                self.after_launch();
                 std::thread::spawn(move || {
                     if let Err(e) = platform.opener().open_with(&path, &program) {
                         let _ = notes.send(CoreEvent::Note {

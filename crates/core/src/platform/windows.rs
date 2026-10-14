@@ -575,26 +575,111 @@ struct WindowsOpener;
 
 #[cfg(windows)]
 mod native_open {
+    use std::io::Read;
     use std::os::windows::ffi::OsStrExt;
     use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
 
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     use super::*;
+    use crate::platform::launch::{self, Spawn, Stream, Task};
     use crate::platform::split_command;
-
-    const DETACHED_PROCESS: u32 = 0x0000_0008;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
     fn wide(s: &std::ffi::OsStr) -> Vec<u16> {
         s.encode_wide().chain(Some(0)).collect()
     }
 
+    fn stdio(s: Stream) -> Stdio {
+        match s {
+            Stream::Null => Stdio::null(),
+            Stream::Piped => Stdio::piped(),
+        }
+    }
+
+    /// The process a [`Spawn`] describes, not yet started.
+    fn command_of(spawn: &Spawn) -> Command {
+        let mut cmd = Command::new(&spawn.program);
+        cmd.args(&spawn.args)
+            .stdin(stdio(spawn.stdin))
+            .stdout(stdio(spawn.stdout))
+            .stderr(stdio(spawn.stderr))
+            .creation_flags(spawn.creation_flags);
+        cmd
+    }
+
+    /// Start a program and leave it: nobody waits for it but a thread that collects it.
+    fn detach(cmd: Command, op: &'static str, subject: &Path, flags: u32) -> Result<()> {
+        let mut cmd = cmd;
+        let mut child = cmd
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(flags)
+            .spawn()
+            .map_err(|e| Error::io(op, subject, e))?;
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+        Ok(())
+    }
+
+    /// The task, done by a helper process that has no console (see [`launch`]): the shell is
+    /// called from there, so that what it starts has no console of rada's to attach to. The
+    /// helper is waited for (it ends as soon as the shell has answered), and its standard
+    /// output, which holds the reason when it failed, becomes the error.
+    pub fn via_helper(task: &Task, op: &'static str, subject: &Path) -> Result<()> {
+        let exe = std::env::current_exe().map_err(|e| Error::io(op, subject, e))?;
+        let spawn = launch::helper_spawn(&exe, task);
+        let mut child = command_of(&spawn)
+            .spawn()
+            .map_err(|e| Error::io(op, subject, e))?;
+        let mut out = child.stdout.take();
+        let end = Instant::now() + Duration::from_secs(30);
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(st)) => break st,
+                Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(15)),
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(Error::io(
+                        op,
+                        subject,
+                        std::io::Error::other("Windows did not answer"),
+                    ));
+                }
+                Err(e) => return Err(Error::io(op, subject, e)),
+            }
+        };
+        if status.success() {
+            return Ok(());
+        }
+        let mut why = String::new();
+        if let Some(o) = out.as_mut() {
+            let _ = o.read_to_string(&mut why);
+        }
+        let why = why.trim();
+        Err(Error::io(
+            op,
+            subject,
+            std::io::Error::other(if why.is_empty() {
+                "Windows could not open it".to_string()
+            } else {
+                why.to_string()
+            }),
+        ))
+    }
+
     /// The default program of Windows for this item (what a double click in Explorer does).
     pub fn open(path: &Path) -> Result<()> {
+        via_helper(&Task::Open(path.to_path_buf()), "open", path)
+    }
+
+    /// What the helper does for [`open`]: the call to the shell itself. `Err` is the reason.
+    pub fn shell_open(path: &Path) -> std::result::Result<(), String> {
         let verb = wide(std::ffi::OsStr::new("open"));
         let file = wide(path.as_os_str());
         // SAFETY: NUL-terminated wide strings that live through the call; no window, no
@@ -620,25 +705,7 @@ mod native_open {
             31 => "no program is set to open this kind of file (try Open with…)",
             _ => "Windows could not open it",
         };
-        Err(Error::io(
-            "open",
-            path,
-            std::io::Error::other(format!("{why} (code {code})")),
-        ))
-    }
-
-    fn detach(mut cmd: Command, op: &'static str, subject: &Path, flags: u32) -> Result<()> {
-        let mut child = cmd
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .creation_flags(flags)
-            .spawn()
-            .map_err(|e| Error::io(op, subject, e))?;
-        std::thread::spawn(move || {
-            let _ = child.wait();
-        });
-        Ok(())
+        Err(format!("{why} (code {code})"))
     }
 
     pub fn open_with(path: &Path, program: &str) -> Result<()> {
@@ -647,7 +714,12 @@ mod native_open {
             // argument, so quotes and blanks in it are no problem.
             let mut cmd = Command::new("rundll32.exe");
             cmd.arg("shell32.dll,OpenAs_RunDLL").arg(path);
-            return detach(cmd, "show the Open with window for", path, DETACHED_PROCESS);
+            return detach(
+                cmd,
+                "show the Open with window for",
+                path,
+                launch::NO_CONSOLE,
+            );
         }
         let words = split_command(program);
         let Some((exe, args)) = words.split_first() else {
@@ -659,7 +731,7 @@ mod native_open {
             cmd,
             "start the program for",
             path,
-            DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+            launch::NO_CONSOLE | launch::CREATE_NEW_PROCESS_GROUP,
         )
     }
 
@@ -667,19 +739,19 @@ mod native_open {
         // Explorer parses its own command line: `/select,"path"` as one raw argument.
         let mut cmd = Command::new("explorer.exe");
         cmd.raw_arg(format!("/select,\"{}\"", path.display()));
-        detach(cmd, "show in Explorer", path, 0)
+        detach(cmd, "show in Explorer", path, launch::NO_CONSOLE)
     }
 
     pub fn open_terminal(dir: &Path) -> Result<()> {
         // Windows Terminal when there is one, else PowerShell in a console of its own.
         let mut wt = Command::new("wt.exe");
         wt.arg("-d").arg(dir);
-        if detach(wt, "start Windows Terminal in", dir, 0).is_ok() {
+        if detach(wt, "start Windows Terminal in", dir, launch::NO_CONSOLE).is_ok() {
             return Ok(());
         }
         let mut ps = Command::new("powershell.exe");
         ps.arg("-NoExit").current_dir(dir);
-        detach(ps, "start PowerShell in", dir, CREATE_NEW_CONSOLE)
+        detach(ps, "start PowerShell in", dir, launch::CREATE_NEW_CONSOLE)
     }
 }
 
@@ -815,21 +887,30 @@ mod native_apps {
     }
 
     pub fn open_with_app(path: &Path, app: &OpenApp) -> Result<()> {
+        super::native_open::via_helper(
+            &crate::platform::launch::Task::OpenWith {
+                path: path.to_path_buf(),
+                app_id: app.id.clone(),
+            },
+            "open",
+            path,
+        )
+    }
+
+    /// What the helper does for [`open_with_app`]: asks the handler of the shell to open the
+    /// item. `Err` is the reason.
+    pub fn handler_open(path: &Path, app_id: &str) -> std::result::Result<(), String> {
         let ext = path
             .extension()
             .map(|e| format!(".{}", e.to_string_lossy()))
             .unwrap_or_default();
-        let failed = |why: String| Error::io("open", path, std::io::Error::other(why));
         with_com(|| {
             let handler = handlers(&ext, ASSOC_FILTER_NONE)
                 .into_iter()
                 // SAFETY: the handler is alive; the string is taken and freed.
-                .find(|h| unsafe { take(h.GetName().unwrap_or_default()) } == app.id)
+                .find(|h| unsafe { take(h.GetName().unwrap_or_default()) } == app_id)
                 .ok_or_else(|| {
-                    failed(format!(
-                        "{} is not associated with this kind of file any more",
-                        app.name
-                    ))
+                    format!("{app_id} is not associated with this kind of file any more")
                 })?;
             // SAFETY: the item and the data object are COM objects owned here.
             unsafe {
@@ -837,14 +918,12 @@ mod native_apps {
                     &HSTRING::from(path.as_os_str()),
                     None::<&IBindCtx>,
                 )
-                .map_err(|e| failed(e.message()))?;
+                .map_err(|e| e.message())?;
                 let data: IDataObject = item
                     .BindToHandler(None::<&IBindCtx>, &BHID_DataObject)
-                    .map_err(|e| failed(e.message()))?;
-                let invoker = handler
-                    .CreateInvoker(&data)
-                    .map_err(|e| failed(e.message()))?;
-                invoker.Invoke().map_err(|e| failed(e.message()))
+                    .map_err(|e| e.message())?;
+                let invoker = handler.CreateInvoker(&data).map_err(|e| e.message())?;
+                invoker.Invoke().map_err(|e| e.message())
             }
         })
     }
@@ -883,6 +962,31 @@ impl Opener for WindowsOpener {
     fn open_terminal(&self, dir: &Path) -> Result<()> {
         native_open::open_terminal(dir)
     }
+}
+
+/// What rada does when it was started as the launch helper (see [`crate::platform::launch`]):
+/// the one call to the shell, from a process that has no console. The reason of a failure is
+/// written to standard output, which the parent reads. The exit code is 0 or 1.
+#[cfg(windows)]
+pub fn run_launch_helper(task: &crate::platform::launch::Task) -> i32 {
+    use crate::platform::launch::Task;
+    let result = match task {
+        Task::Open(path) => native_open::shell_open(path),
+        Task::OpenWith { path, app_id } => native_apps::handler_open(path, app_id),
+    };
+    match result {
+        Ok(()) => 0,
+        Err(why) => {
+            use std::io::Write;
+            let _ = write!(std::io::stdout(), "{why}");
+            1
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn run_launch_helper(_: &crate::platform::launch::Task) -> i32 {
+    2
 }
 
 pub struct WindowsPlatform {

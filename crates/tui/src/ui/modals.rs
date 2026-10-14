@@ -836,6 +836,7 @@ fn draw_help(f: &mut Frame, ctx: &Ctx, area: Rect, km: &Keymap, mouse: bool, scr
         Key::HelpAlso2.tr(),
         Key::HelpAlso3.tr(),
         Key::HelpAlso4.tr(),
+        Key::HelpAlso5.tr(),
     ] {
         lines.push(Line::from(Span::styled(l, th.base())));
     }

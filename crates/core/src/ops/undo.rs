@@ -328,9 +328,16 @@ impl Engine {
         }
         plan.totals.items = plan.steps.len() as u64;
         plan.items = undo_items(&plan.steps);
+        // As many items as the list shows: what the undo really touches, which is less than
+        // the operation asked for when something was left alone.
+        let touched = plan.items.len() as u64;
         plan.undoes = Some(UndoOf {
             kind: entry.kind,
-            items: entry.totals.items.max(1),
+            items: if touched > 0 {
+                touched
+            } else {
+                entry.totals.items.max(1)
+            },
         });
         plan.warnings = ws.finish();
         Ok(UndoPlan {

@@ -256,6 +256,11 @@ impl App {
         if key.kind == KeyEventKind::Release {
             return;
         }
+        // Ctrl+L, wherever it is pressed: the screen is drawn again from nothing (the key still
+        // does what it does: it starts the editing of the address).
+        if key.code == KeyCode::Char('l') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            self.full_redraw = true;
+        }
         // The card at the bottom right goes at the first key (the key still does its job); an
         // error stays until Esc, which it takes when nothing else is open.
         let now = self.notice_now();
@@ -607,6 +612,7 @@ impl App {
         let Some(dir) = dir else { return };
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
+        self.after_launch();
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().open_terminal(&dir) {
                 let _ = notes.send(CoreEvent::Note {

@@ -276,6 +276,7 @@ impl App {
         let notes = self.svc.notes.clone();
         let state = platform.dirs().rada_state();
         let name = app.name.clone();
+        self.after_launch();
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().open_with_app(&path, &app) {
                 let _ = notes.send(CoreEvent::Note {

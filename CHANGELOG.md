@@ -5,6 +5,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.6] - 2026-10-14
+
+The windows that sit in front of the interface — menus, "Open with…", the plan, the undo, the notifications — are redone in one style, and the command line speaks the language too. Still a **pre-release**.
+
+### Added
+- **One look for every popup.** A surface a little lighter than the window behind it, a thin rounded border one step lighter again, a shadow of a cell on the right and below (true colour only: on a light theme it is at most about 6% darker than the paper), and corners that take the colour behind them. Two new theme tokens, `popup` and `popup_border`, in all seven themes, with contrast tests. In the basic profile the border is `+-|`. Windows dim the whole screen behind them; menus do not.
+- **Menus** with the name and the type of what they are about on top, an icon on each entry, the key at the right (a `›` for what opens another menu, a tick for a choice that is on), groups set apart by a short dashed line, the entry under the cursor a pill with the shade of the list's cursor row, and what takes files away (*Sposta nel cestino*, *Elimina definitivamente*) in red and last. A submenu opens beside its parent, which stays in view with its entry marked; `→` opens it, `←` and `Esc` give the parent back; entries that are greyed out are skipped by the cursor. The menu moves to stay in the window.
+- **"Open with…"** titled *Apri photo.jpg con*, each program with a mark and a colour of its own (Firefox, Chromium, LibreOffice Writer, Calc and Impress, GIMP, Krita, Inkscape, VLC, mpv, Okular, Evince, Zathura, VS Code, Kate, gedit, Nautilus, Dolphin, Thunar, Ghostty, kitty, Loupe, Preview, TextEdit, Notepad, Paint, Photos and more; the kind of file when the program is not known), the system's choice with a *predefinito* label, *Altro programma…* and the box *Usa sempre per i file .jpg*. It is a glyph, not the program's own icon: drawing that needs the icon theme and a picture protocol.
+- **Plan and confirmation windows** with a round mark, a title that asks (*Eliminare definitivamente 3 elementi?*, *Copia 3 elementi in Documenti*), a quiet line with the size and where from and to, a list of the items with their icon, name and size (six, then *… e altri N*), a label on each (*nuovo*, *esiste già*), warnings as strips in their own colour, the choice for name clashes as a group of pills changed with `←` `→`, and buttons with their keys inside (*Chiudi  Esc*, *Elimina  Invio*). Permanent deletion still asks for the typed word.
+- **Undo and redo windows** that say what they take back: *Annullare la copia di 3 elementi?*, *Ripetere lo spostamento…?*, a line per item with *verrà tolto* or *torna al suo posto*, a strip for what was changed since and will be left alone, and buttons *Chiudi* and *Annulla la copia* (*Ripeti la copia*).
+- **Notifications** piled at the bottom right of the list, up to three, each with its own six seconds and a bottom edge that shortens; a coloured left side for the state (green, red for an error, yellow, the accent for what is running), the title in bold, quiet details at the right (*42% · 12 MB/s · 3 s*) and the actions as links. A running operation is a card with a shaded progress bar; the bar at the bottom of the screen is gone. The list gets shorter while the cards are there instead of being covered.
+- **The key bar with a menu open** names only the keys that work there: `↑↓` choose, `→` open, `←` back, `Invio` confirm, `Esc` close.
+- **The command line speaks the language.** `rada --help` and the help of each command, `rada doctor`, `rada update`, `rada setup` and the errors of a wrong choice come from the same table as the interface, in the language of the system or of `language` in the configuration (read before the arguments are). What clap says on its own about a wrongly typed line stays in English.
+- A picture the terminal draws itself (Kitty, Sixel, iTerm2) is left out where a popup is drawn.
+- `scripts/docs-media` takes several tape prefixes and `DOCS_OUT`, a folder to draw into instead of the repository.
+
+### Fixed on Windows
+- A program opened from rada (an Electron editor such as VS Code is the case that showed it) no longer writes its logs on rada's console, which scrolled the screen and spoiled the panels. Such programs call `AttachConsole(ATTACH_PARENT_PROCESS)` and so attach to the console of whoever started them, which was rada. Now rada starts a helper of its own (its executable, with a hidden first argument) with no console and no window (`DETACHED_PROCESS | CREATE_NO_WINDOW`) and with standard input and error closed; the helper makes the call to the shell (`ShellExecute`, or the handler chosen in *Open with…*) and ends, so what it started has no console to attach to. The reason of a failure comes back through the helper's standard output. Explorer, Windows Terminal and the program typed in *Other program…* are started with the same flags and no standard streams.
+
+### Changed
+- `Ctrl+L` draws the whole screen again from nothing (clear and a full redraw), wherever it is pressed, besides starting the editing of the address; the same is done right after a program is started and a few times in the seconds after, on every system, so that anything that spoils the terminal is put right. The help says so.
+- In Italian *Annulla* only takes an operation back; closing a window is *Chiudi*, and stopping one that runs is *Interrompi*.
+- The thin shaded line under the bar of the path and search is gone, in every theme.
+- The sentences that put a count before a word that agrees with it have a form for one (*1 selezionato*, *1 elemento copiato*), and a test keeps it so.
+- Letters with Alt are shown in capitals (`Alt+Z`); times have a space before their units (`7 s`, `1 min 20 s`); notification titles start with a capital.
+- The GitHub actions of the workflows move to the versions that run on Node 24.
+
+### Fixed
+- The archive card of the details pane no longer breaks a size over two lines or cuts its keys.
+- The logo of the demo folder is a recognisable one, not a purple square.
+- In the basic profile the half-row of air under the tabs, which came out as `#`, is gone.
+
 
 ## [0.6.0-rc.5] - 2026-10-14
 

@@ -143,7 +143,11 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             title: super::plan::shorten_title(&r.title, app.home()),
             data: data.join(" · "),
             links: vec![
-                link(Key::BtnCancel.tr(), false, NoticeHit::CancelRun),
+                link(
+                    fmt::capitalised(Key::ProgCancel.tr()),
+                    false,
+                    NoticeHit::CancelRun,
+                ),
                 link("  Esc", true, NoticeHit::CancelRun),
             ],
             progress: Some(frac),

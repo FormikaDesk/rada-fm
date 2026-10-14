@@ -14,6 +14,7 @@ pub mod eject;
 pub mod fidelity;
 #[cfg(unix)]
 pub mod freedesktop;
+pub mod launch;
 pub mod macos;
 pub mod openwith;
 pub mod tags;

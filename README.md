@@ -14,7 +14,7 @@ rada is a fast file manager for the terminal, written in Rust, driven by keyboar
 
 ![The main screen: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](docs/screenshots/principale-scuro.png)
 
-Three items are selected, two wait on the clipboard, the cursor is on a picture, and the card at the bottom right says the last copy went through, with **Annulla** and **Mostra** one click away. On a light terminal the same screen is "Carta", the paper theme:
+One item is selected, two wait on the clipboard, the cursor is on a picture, and the card at the bottom right says the last copy went through, with **Annulla** and **Mostra** one click away. On a light terminal the same screen is "Carta", the paper theme:
 
 ![The same screen on the light Carta theme](docs/screenshots/principale-carta.png)
 
@@ -30,16 +30,20 @@ The names of the folders in the sidebar are the ones the system gives them (Ital
 | The **Icons** view: a big icon and the name. | The **Columns** view, as in the Finder: the folder above, the folder here, what is under the cursor; `←` and `→` move between the columns. |
 | ![The context menu](docs/screenshots/menu.png) | ![Open with…](docs/screenshots/apri-con.png) |
 | The menu of the right button, with each action's key. | **Apri con…** lists the programs that can open the file. |
-| ![The TAG section and the list of one tag](docs/screenshots/tag-blu.png) | ![The card after a copy](docs/screenshots/notifica.png) |
-| The **TAG** section of the sidebar and the list of what carries one (*Tag: Blu*). | After a copy, a move, the trash, a rename, a compression, an extraction or a change of tags, a card says what was done, with **Annulla** and **Mostra**. |
+| ![The TAG section and the list of one tag](docs/screenshots/tag-blu.png) | ![Two cards piled: a copy that runs and one that is done](docs/screenshots/notifiche.png) |
+| The **TAG** section of the sidebar and the list of what carries one (*Tag: Blu*). | After a copy, a move, the trash, a rename, a compression, an extraction or a change of tags, a card says what was done, with **Annulla** and **Mostra**; up to three are piled, each with its own six seconds, and a running operation is a card with a progress bar. |
 | ![The plan window](docs/screenshots/piano.png) | ![Progress counted in bytes](docs/screenshots/avanzamento.png) |
 | Every operation shows a **plan** first. | Progress counted in bytes, with throughput and time left. |
+| ![Permanent deletion asks before it happens](docs/screenshots/elimina.png) | ![The window of an undo](docs/screenshots/annulla.png) |
+| **Eliminare definitivamente** says that nothing goes to the trash and still asks for the typed word. | **Annullare la copia** says what comes back or goes away, line by line. |
+| ![The menu of the right button with the Tag submenu, dark](docs/screenshots/tag-menu.png) | ![The same on the light Carta theme](docs/screenshots/tag-menu-carta.png) |
+| The **Tag** submenu opens beside the menu, which stays in view. | The same on **Carta**, the paper theme. |
 | ![The basic profile](docs/screenshots/basic.png) | ![A narrow terminal](docs/screenshots/stretta.png) |
 | The **basic profile** (`TERM=vt100`): ASCII, 16 colours, `[######----]` for a disk. | A narrow terminal: the sidebar is a column of icons. |
 
 ## Status
 
-Version 0.6.0-rc.5. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.6. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -226,11 +230,11 @@ What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no ow
 
 ## Updates
 
-rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.5`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
+rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.6`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
 
 When one exists you see it twice: a pill in the accent colour in the tab bar, **↑ Update to X**, and the status bar, **New version X available — press Alt+U to update** (click either). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later.
 
-The status bar always shows the version that is running, **v0.6.0-rc.5 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
+The status bar always shows the version that is running, **v0.6.0-rc.6 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
 
 ```sh
 rada update --check     # only say whether a newer version exists, and what is in it
@@ -298,7 +302,7 @@ From the top: a row of **tabs**, the **bar**, the **command bar**, then the body
 
 ### The bar
 
-One pill holds the path and the search. At rest it shows the path as clickable crumbs (`…` folds a long one; click it to pick a hidden folder) and *Cerca file o digita un comando…* with a **Ctrl+P** chip; under it a thin line fades from one accent to the other. At the left sit back `‹`, forward `›`, up `↑` and refresh `⟳` (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys), at the right the pill of the view (*Colonne*, *Dettagli*, *Icone*).
+One pill holds the path and the search. At rest it shows the path as clickable crumbs (`…` folds a long one; click it to pick a hidden folder) and *Cerca file o digita un comando…* with a **Ctrl+P** chip  At the left sit back `‹`, forward `›`, up `↑` and refresh `⟳` (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys), at the right the pill of the view (*Colonne*, *Dettagli*, *Icone*).
 
 `Ctrl+P` (`m` in the vim keys), `Ctrl+L`, `Alt+D`, `F4`, `Ctrl+F`, `/` or a click on the pill start typing, and what you type decides what happens:
 
@@ -320,7 +324,7 @@ One pill holds the path and the search. At rest it shows the path as clickable c
 
 ### Notifications
 
-When a copy, a move, the trash, a rename, a compression, an extraction or a change of tags is done, a soft card appears at the bottom right: *✓ 3 elementi copiati in Documenti*, then *Annulla Ctrl+Z · Mostra*, both clickable (*Mostra* goes to the folder). It never takes the focus: the first key you press goes to the list, and the card goes with it, or by itself after about six seconds. Cards that come one after the other wait their turn. An **error** stays, in the error colours, until you close it with `Esc` or a click.
+When a copy, a move, the trash, a rename, a compression, an extraction or a change of tags is done, a card appears at the bottom right of the list: *✓ 3 elementi copiati in Documenti*, then *Annulla  Ctrl+Z · Mostra*, both clickable (*Mostra* goes to the folder). Up to three are piled, each with its own six seconds and a bottom edge that shortens as they pass; the list is made shorter while they are there, so they never cover its text. The first key you press goes to the list, and the cards go with it. An operation that is running is a card too, with its progress bar, *42% · 12 MB/s · 3 s* and *Interrompi*. An **error** stays, with a red side, until you close it with `Esc` or a click.
 
 ### Details pane
 
@@ -345,7 +349,7 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 
 ### Context menu
 
-Right click (or `Shift+F10`, or the Menu key). On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.
+Right click (or `Shift+F10`, or the Menu key). The menu has the name and the type of the item on top, an icon on each entry, its key at the right, groups set apart by a dashed line, and what takes files away in red at the bottom; *Apri con*, *Tag*, *Ordina* and *Nuovo* open a submenu beside it (`→` or `Enter` opens, `←` or `Esc` goes back; entries that are greyed out are skipped). The key bar says which keys work. On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.
 
 ## Themes
 
