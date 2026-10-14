@@ -344,8 +344,9 @@ fn redo_replans_the_undone_operation_and_asks_for_confirmation_again() {
     // Nothing left to redo.
     h.press("ctrl+y");
     h.wait("toast", |a| {
-        a.current_notice()
-            .is_some_and(|t| t.text.contains("nothing to redo"))
+        a.shown_notices()
+            .iter()
+            .any(|t| t.text.contains("nothing to redo"))
     });
 }
 
@@ -502,8 +503,13 @@ fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
     }
     // Paste is greyed out until something is copied (it must not do anything).
     h.click(&Target::MenuItem(4));
-    assert!(h.app.modal.is_none(), "the menu closes after a click");
+    assert!(
+        matches!(h.app.modal, Some(Modal::Menu(_))),
+        "a click on what is greyed out does nothing, and the menu stays"
+    );
     assert!(h.app.clipboard.is_none());
+    h.press("esc");
+    assert!(h.app.modal.is_none());
 
     h.right_click(&Target::Row(2));
     h.click(&Target::MenuItem(3)); // Copy
@@ -545,7 +551,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     h.press("ctrl+v");
     plan_modal(&mut h);
     let s = h.screen();
-    assert!(s.contains("keep both"), "{s}");
+    assert!(s.contains("Keep both"), "{s}");
     // Pick "keep both" with the mouse: the plan is recomputed.
     h.click(&Target::Policy(rada_core::ops::ConflictPolicy::KeepBoth));
     h.wait("replanned", |a| match &a.modal {
@@ -555,7 +561,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
         _ => false,
     });
     // Cancel with the mouse.
-    h.click(&Target::Key(crossterm::event::KeyCode::Esc));
+    h.click(&Target::PlanCancel);
     assert!(h.app.modal.is_none());
     assert!(!dest.join("a (2).txt").exists() && !dest.join("a copy.txt").exists());
 
@@ -569,7 +575,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
         }
         _ => false,
     });
-    h.click(&Target::Key(crossterm::event::KeyCode::Enter));
+    h.click(&Target::PlanRun);
     h.wait("done", |a| {
         a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });

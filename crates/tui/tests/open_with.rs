@@ -142,8 +142,7 @@ fn the_window_lists_the_programs_the_default_first_and_other_program_last() {
         ["Vim", "Kate", "Text Editor", "Other program…"]
     );
     let s = w.h.screen();
-    assert!(s.contains("Open with"), "{s}");
-    assert!(s.contains("a.txt"), "{s}");
+    assert!(s.contains("Open a.txt with"), "{s}");
     let vim = s.lines().find(|l| l.contains("Vim")).unwrap();
     assert!(
         vim.contains("default"),
@@ -154,7 +153,7 @@ fn the_window_lists_the_programs_the_default_first_and_other_program_last() {
         "{vim}"
     );
     assert!(s.contains("Other program…"), "{s}");
-    assert!(s.contains("Always use Vim for text/plain"), "{s}");
+    assert!(s.contains("Always use for .txt files"), "{s}");
     // Another kind of file: its own programs.
     w.h.key(KeyCode::Esc);
     std::fs::write(w.dir.join("pic.png"), "\u{89}PNG").unwrap();
@@ -227,7 +226,7 @@ fn always_use_this_is_kept_in_rada_and_replaces_the_default_for_enter() {
     w.h.keys("kate");
     w.h.key(KeyCode::Tab);
     assert!(
-        w.h.screen().contains("☑ Always use Kate"),
+        w.h.screen().contains("☑ Always use for .txt files"),
         "{}",
         w.h.screen()
     );
@@ -265,7 +264,7 @@ fn always_use_this_is_kept_in_rada_and_replaces_the_default_for_enter() {
     );
     assert!(s.contains("☑"), "the box reflects it: {s}");
     w.h.key(KeyCode::Tab);
-    assert!(w.h.screen().contains("☐ Always use Kate"));
+    assert!(w.h.screen().contains("☐ Always use for .txt files"));
     w.h.key(KeyCode::Enter);
     prefs_when(&w.state, "always removed", |p| p.always.is_empty());
     let n = w.h.opened().len();

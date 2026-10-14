@@ -15,25 +15,25 @@ expression: shot(&mut h)
 │  ▭ Desktop             ⚲ │ │ ☐ ▸ docs                    Yesterday        Folder                                     │
 │  ▤ Documents           ⚲ │ │ ☐ ▸ scripts                 9 days ago       Folder                                     │
 │  ↓ Downloads           ⚲ │ │ ☐ ▸ src                     Today 09:30      Folder                                     │
-│  ▣ Pictures            ⚲ │ │ ☐ ▸ tests                   2 days ago       Folder                                     │
-│  ♪ Music               ⚲ │ │ ☐ · archive.tar.gz          8 days ago       Archive (tar.gz)         17.6 MB           │
-│  ▶ Videos              ⚲ │ │ ☐ · backup.zip              05/07/2026       Archive (ZIP)            39.0 MB           │
-│                          │ │ ☐ · Cargo.toml              3 days ago     ╭──────────────────────────────╮ B           │
-│ DEVICES                  │ │ ☐ · data.json               6 days ago     │ Open                    Enter│ B           │
-│  ▥ System                │ │ ☐ · demo.mp4                2 weeks ago    │ Open with…              Alt+o│MB           │
-│    ■■■■■■□□□□     183 GB │ │ ☐ · logo.svg                5 days ago     │──────────────────────────────│ B           │
-│  ▥ Data                  │ │ ☐ · main.rs                 Today 14:10    │ Cut                    Ctrl+X│ B           │
-│    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt               Yesterday      │ Copy                   Ctrl+C│ B           │
-│  ⏏ USB drive             │ │▌☐ · photo.jpg               Today 13:30    │ Paste                  Ctrl+V│KB           │
-│    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md               Today 13:28    │──────────────────────────────│ B           │
-│                          │ │ ☐ · report.pdf              4 days ago     │ Rename                     F2│MB           │
-│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │ Compress…               Alt+z│KB           │
-│  ● Red                   │ │ ☐ · setup.sh                12 days ago    │──────────────────────────────│ B           │
-│  ● Orange                │ │ ☐ · song.mp3                30/07/2026     │ Tags                        ▸│MB           │
-│  ● Yellow                │ │                                            │──────────────────────────────│             │
-│  ● Green                 │ │                                            │ Copy the path    Ctrl+Shift+C│             │
-╰──────────────────────────╯ ╰────────────────────────────────────────────│──────────────────────────────│─────────────╯
- 19 items                                                                 │ Move to trash             Del│□□□  ≣  ▦  ▥
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-   Esc  close                                                             │ Properties          Alt+Enter│
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╰──────────────────────────────╯▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+│  ▣ Pictures            ⚲ │ │ ☐ ▸ tests                   2 days ago     ╭───────────────────────────────────────╮    │
+│  ♪ Music               ⚲ │ │ ☐ · archive.tar.gz          8 days ago     │  · photo.jpg  ·  JPEG image           │    │
+│  ▶ Videos              ⚲ │ │ ☐ · backup.zip              05/07/2026     │ ───────────────────────────────────── │    │
+│                          │ │ ☐ · Cargo.toml              3 days ago     │  ▸ Open                        Enter  │    │
+│ DEVICES                  │ │ ☐ · data.json               6 days ago     │  ▦ Open with…                      ›  │    │
+│  ▥ System                │ │ ☐ · demo.mp4                2 weeks ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│    ■■■■■■□□□□     183 GB │ │ ☐ · logo.svg                5 days ago     │  ✂ Cut                        Ctrl+X  │    │
+│  ▥ Data                  │ │ ☐ · main.rs                 Today 14:10    │  ⧉ Copy                       Ctrl+C  │    │
+│    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt               Yesterday      │  ⎘ Paste                      Ctrl+V  │    │
+│  ⏏ USB drive             │ │▌☐ · photo.jpg               Today 13:30    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md               Today 13:28    │  ✎ Rename                         F2  │    │
+│                          │ │ ☐ · report.pdf              4 days ago     │  ▣ Compress…                   Alt+z  │    │
+│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│  ● Red                   │ │ ☐ · setup.sh                12 days ago    │  ◆ Tags                            ›  │    │
+│  ● Orange                │ │ ☐ · song.mp3                30/07/2026     │  ⚲ Copy the path        Ctrl+Shift+C  │    │
+│  ● Yellow                │ │                                            │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│  ● Green                 │ │                                            │  ≣ Properties              Alt+Enter  │    │
+╰──────────────────────────╯ ╰────────────────────────────────────────────│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │────╯
+ 19 items                                                                 │  ✗ Move to trash                 Del  │  ▥
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│  ✗ Delete permanently      Shift+Del  │▄▄▄▄▄
+   Esc  close                                                             ╰───────────────────────────────────────╯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

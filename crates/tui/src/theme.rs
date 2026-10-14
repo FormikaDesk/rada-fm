@@ -140,9 +140,11 @@ pub struct Theme {
     /// The text on it is white, so both ends read at 4.5:1 or better.
     pub grad_row_start: Color,
     pub grad_row_end: Color,
-    /// The thin line under the bar of the path and search: the same kind of shade.
-    pub grad_line_start: Color,
-    pub grad_line_end: Color,
+    /// The surface of a popup (a menu, a window, a notification card): a little lighter than
+    /// the canvas on a dark theme, a little paler on a light one. Every text token reads on it.
+    pub popup: Color,
+    /// The thin rounded border of a popup: a step away from its surface.
+    pub popup_border: Color,
     /// A ticked checkbox.
     pub check: Color,
     /// The filled part of a disk bar.
@@ -276,8 +278,8 @@ impl Theme {
             button: rgb(36, 40, 59),
             grad_row_start: rgb(0x3d, 0x59, 0xa1),
             grad_row_end: rgb(0x6a, 0x4c, 0x9c),
-            grad_line_start: rgb(0x7a, 0xa2, 0xf7),
-            grad_line_end: rgb(0xbb, 0x9a, 0xf7),
+            popup: rgb(0x26, 0x2b, 0x40),
+            popup_border: rgb(0x41, 0x48, 0x68),
             check: accent,
             disk: accent,
             success: rgb(120, 220, 160),
@@ -326,10 +328,10 @@ impl Theme {
             rgb(40, 42, 58),
         );
         t.cursor = rgb(66, 72, 108);
+        t.popup = rgb(0x2a, 0x2e, 0x45);
+        t.popup_border = rgb(0x45, 0x48, 0x6a);
         t.grad_row_start = rgb(0x45, 0x5e, 0xa8);
         t.grad_row_end = rgb(0x7b, 0x4f, 0xa6);
-        t.grad_line_start = rgb(0x89, 0xb4, 0xfa);
-        t.grad_line_end = rgb(0xcb, 0xa6, 0xf7);
         t.text = rgb(205, 214, 244);
         t.text_dim = rgb(147, 153, 178);
         t.muted = rgb(88, 91, 112);
@@ -365,6 +367,8 @@ impl Theme {
             rgb(34, 38, 56),
         );
         t.cursor = rgb(56, 66, 108);
+        t.popup = rgb(0x25, 0x2a, 0x3e);
+        t.popup_border = rgb(0x41, 0x48, 0x68);
         t.text = rgb(192, 202, 245);
         t.text_dim = rgb(135, 144, 187);
         t.muted = rgb(68, 75, 106);
@@ -434,7 +438,7 @@ impl Theme {
     /// button, tab (the active tab and the other chips), check]` and the colours of the file
     /// types `[yellow, green, red, purple, cyan, orange]`. Pure white tires the eyes; the
     /// paper keeps the text sharp and the bars a step apart.
-    fn paper(name: &'static str, tokens: [u32; 15], types: [u32; 6], gradients: [u32; 4]) -> Theme {
+    fn paper(name: &'static str, tokens: [u32; 15], types: [u32; 6], gradients: [u32; 2]) -> Theme {
         let c = |v: u32| rgb((v >> 16) as u8, (v >> 8) as u8, v as u8);
         let [
             bg,
@@ -454,7 +458,7 @@ impl Theme {
             check,
         ] = tokens.map(c);
         let [yellow, green, red, purple, cyan, orange] = types.map(c);
-        let [row_start, row_end, line_start, line_end] = gradients.map(c);
+        let [row_start, row_end] = gradients.map(c);
         let mut t = Theme::light_base(name, bg, text, dim, muted, accent, tab, cursor, bar, border);
         t.bg = Some(bg);
         t.field = field;
@@ -468,8 +472,6 @@ impl Theme {
         t.check = check;
         t.grad_row_start = row_start;
         t.grad_row_end = row_end;
-        t.grad_line_start = line_start;
-        t.grad_line_end = line_end;
         t.success = green;
         t.warn = yellow;
         t.error = red;
@@ -495,28 +497,34 @@ impl Theme {
 
     /// The default theme for a light terminal, "paper": warm off-white, a muted blue accent.
     pub fn rada_light() -> Theme {
-        Theme::paper(
+        let mut t = Theme::paper(
             "rada-light",
             [
                 0xf6f3ee, 0xeeeae3, 0xebe6de, 0xe5e0d7, 0xd9d2c6, 0x3a3632, 0x6a6359, 0xa39a8d,
                 0x3b659f, 0xe2e7ee, 0x476fa8, 0xe3ddd3, 0xe5e0d7, 0xf6f3ee, 0x476fa8,
             ],
             [0x8c5f16, 0x4b7438, 0xa8454c, 0x77559e, 0x2c6e7d, 0x9e5826],
-            [0x476fa8, 0x7d58a6, 0x3d68a3, 0x8a57a8],
-        )
+            [0x476fa8, 0x7d58a6],
+        );
+        t.popup = rgb(0xfd, 0xfc, 0xf9);
+        t.popup_border = rgb(0xd5, 0xcd, 0xbf);
+        t
     }
 
     /// "Mist": the same idea with cool grey-blue paper.
     pub fn nebbia_light() -> Theme {
-        Theme::paper(
+        let mut t = Theme::paper(
             "nebbia-light",
             [
                 0xeef0f3, 0xe6e9ee, 0xe3e6eb, 0xdde1e7, 0xd0d5dd, 0x343a46, 0x5d6474, 0x9aa3b2,
                 0x3e63a8, 0xdfe6f2, 0x4a6fb3, 0xd9dee6, 0xdde1e7, 0xeef0f3, 0x4469b0,
             ],
             [0x86621c, 0x3c7346, 0xa2485a, 0x6f5499, 0x2a6a80, 0x975a2a],
-            [0x4a6fb3, 0x7a5aa8, 0x3e63a8, 0x8657a6],
-        )
+            [0x4a6fb3, 0x7a5aa8],
+        );
+        t.popup = rgb(0xfa, 0xfb, 0xfc);
+        t.popup_border = rgb(0xcd, 0xd3, 0xdc);
+        t
     }
 
     /// Catppuccin Latte, with the bright accents deepened where the original is too pale
@@ -534,10 +542,10 @@ impl Theme {
             rgb(224, 229, 242),
             rgb(214, 218, 229),
         );
+        t.popup = rgb(0xfb, 0xfc, 0xfe);
+        t.popup_border = rgb(0xc9, 0xcf, 0xdf);
         t.grad_row_start = rgb(0x2f, 0x5f, 0xd0);
         t.grad_row_end = rgb(0x88, 0x39, 0xef);
-        t.grad_line_start = rgb(0x1e, 0x66, 0xf5);
-        t.grad_line_end = rgb(0x88, 0x39, 0xef);
         t.success = rgb(47, 118, 32);
         t.warn = rgb(146, 93, 19);
         t.error = rgb(210, 15, 57);
@@ -575,10 +583,10 @@ impl Theme {
             rgb(212, 217, 238),
             rgb(208, 211, 222),
         );
+        t.popup = rgb(0xef, 0xf0, 0xf5);
+        t.popup_border = rgb(0xbd, 0xc3, 0xd8);
         t.grad_row_start = rgb(0x3a, 0x5b, 0xa9);
         t.grad_row_end = rgb(0x78, 0x47, 0xa6);
-        t.grad_line_start = rgb(0x2e, 0x7d, 0xe9);
-        t.grad_line_end = rgb(0x98, 0x54, 0xf1);
         t.success = rgb(78, 104, 50);
         t.warn = rgb(117, 90, 52);
         t.error = rgb(181, 31, 74);
@@ -623,13 +631,14 @@ impl Theme {
         self.key_text = Color::Reset;
         self.field = Color::DarkGray;
         self.button = Color::DarkGray;
+        // A popup keeps the terminal's own background and a grey border.
+        self.popup = Color::Reset;
+        self.popup_border = Color::DarkGray;
         self.check = Color::Blue;
         self.disk = Color::Blue;
         // Sixteen colours have no shades: these are never drawn, the row is reversed.
         self.grad_row_start = Color::Blue;
         self.grad_row_end = Color::Blue;
-        self.grad_line_start = Color::Blue;
-        self.grad_line_end = Color::Magenta;
         self.success = Color::Green;
         self.warn = Color::Yellow;
         self.error = Color::Red;
@@ -687,12 +696,12 @@ impl Theme {
                 t.key_text = f(t.key_text);
                 t.field = f(t.field);
                 t.button = f(t.button);
+                t.popup = f(t.popup);
+                t.popup_border = f(t.popup_border);
                 t.check = f(t.check);
                 t.disk = f(t.disk);
                 t.grad_row_start = f(t.grad_row_start);
                 t.grad_row_end = f(t.grad_row_end);
-                t.grad_line_start = f(t.grad_line_start);
-                t.grad_line_end = f(t.grad_line_end);
                 t.success = f(t.success);
                 t.warn = f(t.warn);
                 t.error = f(t.error);
@@ -909,12 +918,12 @@ impl Theme {
             self.key_text,
             self.field,
             self.button,
+            self.popup,
+            self.popup_border,
             self.check,
             self.disk,
             self.grad_row_start,
             self.grad_row_end,
-            self.grad_line_start,
-            self.grad_line_end,
             self.success,
             self.warn,
             self.error,
@@ -966,6 +975,41 @@ impl Theme {
             _ => Color::Reset,
         }
     }
+
+    /// `c` laid over `surface` at `share` (0.0 to 1.0): a strip of a status colour on a popup.
+    /// Below true colour there is nothing to mix: the surface stands.
+    pub fn tint_on(&self, surface: Color, c: Color) -> Color {
+        self.tint_share(surface, c, if self.light { 0.08 } else { 0.11 })
+    }
+
+    /// [`tint_on`](Self::tint_on) with the share chosen: a light touch (a pill) or a stronger
+    /// one (a strip).
+    pub fn tint_share(&self, surface: Color, c: Color, share: f32) -> Color {
+        match (self.depth, surface, c) {
+            (ColorDepth::True, Color::Rgb(sr, sg, sb), Color::Rgb(r, g, b)) => {
+                let mix = |v: u8, base: u8| (v as f32 * share + base as f32 * (1.0 - share)) as u8;
+                rgb(mix(r, sr), mix(g, sg), mix(b, sb))
+            }
+            (ColorDepth::Ansi256, _, Color::Indexed(_)) => self.mark,
+            _ => surface,
+        }
+    }
+
+    /// What lies under the shadow of a popup: the colour darkened (a light theme loses less).
+    /// Only true colour can be shaded; every other colour is kept as it is.
+    pub fn shadow(&self, c: Color) -> Color {
+        match (self.depth, c) {
+            (ColorDepth::True, Color::Rgb(r, g, b)) => {
+                let f = if self.light { 0.9 } else { 0.62 };
+                rgb(
+                    (r as f32 * f) as u8,
+                    (g as f32 * f) as u8,
+                    (b as f32 * f) as u8,
+                )
+            }
+            _ => c,
+        }
+    }
 }
 
 impl Theme {
@@ -982,14 +1026,6 @@ impl Theme {
             return self.cursor;
         }
         mix(self.grad_row_start, self.grad_row_end, x, width)
-    }
-
-    /// The colour at `x` of the thin line under the bar: shaded, or the accent colour.
-    pub fn line_shade(&self, x: usize, width: usize) -> Color {
-        if !self.shades() {
-            return self.accent;
-        }
-        mix(self.grad_line_start, self.grad_line_end, x, width)
     }
 }
 
@@ -1314,6 +1350,28 @@ mod tests {
             for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
                 need(&format!("{what} on canvas"), contrast(col, c), 4.5);
             }
+            // The surface of a popup: everything read there reads as well as on the canvas.
+            let p = t.popup;
+            need("text on popup", contrast(t.text, p), 7.0);
+            need("text_dim on popup", contrast(t.text_dim, p), 4.5);
+            need("muted on popup", contrast(t.muted, p), 1.5);
+            need("accent on popup", contrast(t.accent, p), 4.5);
+            need("popup against canvas", contrast(p, c), 1.05);
+            need(
+                "popup_border against popup",
+                contrast(t.popup_border, p),
+                1.3,
+            );
+            need("on_accent on error", contrast(t.on_accent, t.error), 4.5);
+            for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
+                need(&format!("{what} on popup"), contrast(col, p), 4.5);
+                // The strip tinted with a status colour must keep its text readable.
+                need(
+                    &format!("{what} on its strip"),
+                    contrast(col, t.tint_on(p, col)),
+                    4.5,
+                );
+            }
             let k = &t.kinds;
             for (what, col) in [
                 ("code", k.code),
@@ -1376,13 +1434,9 @@ mod tests {
         let dark = Theme::named("rada", ColorDepth::True).unwrap();
         assert_eq!(hex(dark.grad_row_start), "#3d59a1");
         assert_eq!(hex(dark.grad_row_end), "#6a4c9c");
-        assert_eq!(hex(dark.grad_line_start), "#7aa2f7");
-        assert_eq!(hex(dark.grad_line_end), "#bb9af7");
         let paper = Theme::named("rada-light", ColorDepth::True).unwrap();
         assert_eq!(hex(paper.grad_row_start), "#476fa8");
         assert_eq!(hex(paper.grad_row_end), "#7d58a6");
-        assert_eq!(hex(paper.grad_line_start), "#3d68a3");
-        assert_eq!(hex(paper.grad_line_end), "#8a57a8");
         // The solid cursor colour is where the shade starts.
         assert_eq!(dark.cursor, dark.grad_row_start);
         assert_eq!(paper.cursor, paper.grad_row_start);
@@ -1403,7 +1457,6 @@ mod tests {
         assert!(!t256.shades());
         for x in [0, 10, 49] {
             assert_eq!(t256.row_shade(x, 50), t256.cursor, "solid in 256 colours");
-            assert_eq!(t256.line_shade(x, 50), t256.accent);
         }
         let t16 = Theme::named("rada", ColorDepth::Ansi16).unwrap();
         assert!(!t16.shades());

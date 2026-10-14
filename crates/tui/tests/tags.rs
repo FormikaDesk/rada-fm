@@ -167,13 +167,13 @@ fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
     plan_modal(&mut h);
     let s = h.screen();
     assert!(
-        s.contains("Tag Red on a.txt") && s.contains("retag"),
+        s.contains("Tag Red on a.txt"),
         "the plan says what changes: {s}"
     );
-    // The steps say how its tags change.
-    h.key(KeyCode::Tab);
+    // The steps say how its tags change (d switches to them and back).
+    h.keys("d");
     assert!(h.screen().contains("none → Red"), "{}", h.screen());
-    h.key(KeyCode::Tab);
+    h.keys("d");
     confirm(&mut h);
     assert_eq!(tags_of(&h, "a.txt"), ["Red"]);
     assert!(
@@ -274,12 +274,12 @@ fn the_menu_ticks_what_the_item_has_and_offers_to_take_it_all_off() {
         .iter()
         .map(|i| (i.label.clone(), i.checked, i.enabled))
         .collect();
-    assert_eq!(labels[0].0, "● Red");
+    assert_eq!(labels[0].0, "Red");
     assert_eq!(labels[0].1, Some(false));
-    let blue = labels.iter().find(|l| l.0 == "● Blue").unwrap();
+    let blue = labels.iter().find(|l| l.0 == "Blue").unwrap();
     assert_eq!(blue.1, Some(true), "{labels:?}");
     // A tag of the person's own is listed so that it can be taken off.
-    let client = labels.iter().find(|l| l.0 == "● Client").unwrap();
+    let client = labels.iter().find(|l| l.0 == "Client").unwrap();
     assert_eq!(client.1, Some(true));
     assert!(labels.iter().any(|l| l.0 == "New tag…" && l.2));
     assert!(labels.iter().any(|l| l.0 == "Remove all tags" && l.2));
@@ -387,17 +387,20 @@ fn the_colours_are_called_what_the_system_calls_them() {
     assert_eq!(
         names,
         [
-            "● Rosso",
-            "● Arancione",
-            "● Giallo",
-            "● Verde",
-            "● Blu",
-            "● Viola",
-            "● Grigio"
+            "Rosso",
+            "Arancione",
+            "Giallo",
+            "Verde",
+            "Blu",
+            "Viola",
+            "Grigio"
         ]
     );
     assert_eq!(labels[0].1, Some(true), "Rosso is ticked: {labels:?}");
+    // Esc gives back the menu the tags were opened from; a second one closes it.
     h.key(KeyCode::Esc);
+    h.key(KeyCode::Esc);
+    assert!(h.app.modal.is_none());
     // Choosing Blu puts a tag called Blu, blue, on the file.
     choose_tag(&mut h, "Blu");
     plan_modal(&mut h);
@@ -441,7 +444,11 @@ fn the_tag_column_can_be_hidden_from_the_view_menu_and_the_choice_is_remembered(
     // View ▾ has the switch, ticked.
     h.click(&Target::Menu(rada_tui::app::MenuKind::View));
     let s = h.screen();
-    assert!(s.contains("✓ Tags column"), "{s}");
+    assert!(
+        s.lines()
+            .any(|l| l.contains("Tags column") && l.contains('✓')),
+        "{s}"
+    );
     let mut guard = 0;
     while !menu_selected(&mut h).contains("Tags column") && guard < 20 {
         h.key(KeyCode::Down);

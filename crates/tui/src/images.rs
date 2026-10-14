@@ -214,6 +214,13 @@ impl ImageUi {
         self.proto.replace_protocol(p);
     }
 
+    /// Whether the picture is drawn by the terminal (Kitty, Sixel, iTerm2) and not out of
+    /// ordinary cells: such a picture lies over the cells, so it has to be left out where a
+    /// popup is drawn.
+    pub fn is_graphics(&self) -> bool {
+        self.picker.protocol_type() != ProtocolType::Halfblocks
+    }
+
     pub fn clear(&mut self) {
         self.proto.empty_protocol();
     }

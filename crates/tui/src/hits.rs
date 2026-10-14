@@ -26,6 +26,9 @@ pub enum Target {
     CrumbMore(Vec<PathBuf>),
     /// An item of the sidebar: the folder it leads to.
     Place(PathBuf),
+    /// The button of a plan window that runs it, and the one that cancels it.
+    PlanRun,
+    PlanCancel,
     /// An item of the hint bar or a header button: runs the action.
     Act(Action),
     Preview,
@@ -65,8 +68,8 @@ pub enum Target {
     OpenWithAlways,
     /// The version in the status bar: look for a newer one now.
     CheckUpdates,
-    /// Something on the notification card.
-    Notice(NoticeHit),
+    /// Something on a notification card (the id of the card, 0 for the running operation).
+    Notice(u64, NoticeHit),
     /// Inside a window but on nothing in particular.
     Window,
 }
@@ -84,6 +87,8 @@ pub enum NoticeHit {
     Close,
     /// Anywhere else on the card: it goes away.
     Card,
+    /// Stop the operation that is running.
+    CancelRun,
 }
 
 #[derive(Default, Clone)]

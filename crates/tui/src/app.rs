@@ -171,6 +171,8 @@ pub struct PlanView {
     pub replanning: Option<JobId>,
     /// Show every step instead of the per-item summary.
     pub details: bool,
+    /// The keyboard is on the Cancel button (Tab moves it between the two buttons).
+    pub cancel_focus: bool,
 }
 
 /// Whether what was typed is the word that confirms a dangerous operation: "yes", or "sì" /
@@ -469,9 +471,9 @@ mod update;
 pub use address::{AddressEdit, BarHit, BarItem, BarMode};
 pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
-pub use input::{FilterState, MenuCmd, MenuItem, MenuView, TagCmd};
+pub use input::{FilterState, MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, TagCmd};
 pub use menus::MenuKind;
-pub use notice::{Notice, NoticeAction, NoticeKind, NoticeQueue};
+pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
 pub use props::PropsView;
 pub use tabs::TabState;
@@ -570,6 +572,9 @@ pub struct App {
     /// Where the field of the bar at the top was drawn (what is offered under it lines up
     /// with it).
     pub bar_field: ratatui::layout::Rect,
+    /// Where popups are drawn this frame (menus, the list of programs, windows): a picture the
+    /// terminal draws is left out of these places.
+    pub popup_covers: Vec<ratatui::layout::Rect>,
     /// Screen rectangles of everything clickable, rebuilt every frame.
     pub hits: Hits,
     pub filter: Option<FilterState>,
@@ -739,6 +744,7 @@ impl App {
             hover: None,
             term_width: 0,
             bar_field: ratatui::layout::Rect::default(),
+            popup_covers: Vec::new(),
             hits: Hits::default(),
             filter: None,
             sel_anchor: None,
@@ -878,15 +884,25 @@ impl App {
         self.dirty = true;
     }
 
-    /// The notification on screen.
+    /// The oldest notification on screen.
     pub fn current_notice(&self) -> Option<&Notice> {
         self.notices.front()
+    }
+
+    /// Every notification on screen, the oldest first.
+    pub fn shown_notices(&self) -> Vec<&Notice> {
+        self.notices
+            .shown(self.notice_now())
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect()
     }
 
     pub fn tick(&mut self) {
         self.spinner = self.spinner.wrapping_add(1);
         self.tick_notices();
         if self.running.is_some()
+            || self.notices.has_clock()
             || matches!(self.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
         {
@@ -954,7 +970,7 @@ impl App {
         self.running.is_some()
     }
 
-    fn ensure_visible(&mut self) {
+    pub(crate) fn ensure_visible(&mut self) {
         if self.view == ViewMode::Icons {
             // `scroll` is the first tile shown, always the start of a row.
             let cols = self.viewport.grid_cols.max(1);
@@ -1741,6 +1757,7 @@ impl App {
                 typed: String::new(),
                 replanning: None,
                 details: false,
+                cancel_focus: false,
             });
             self.run_plan(pv);
             return;
@@ -1754,6 +1771,7 @@ impl App {
             typed: String::new(),
             replanning: None,
             details: false,
+            cancel_focus: false,
         })));
     }
 
@@ -2397,7 +2415,93 @@ impl App {
             }
             "main" => {}
             "help" => self.modal = Some(Modal::Help),
-            "menu" => self.modal = Some(Modal::Menu(self.context_menu(true, (30, 11)))),
+            // The menu of the right button on the picture, and the menus beside it.
+            "menu" | "openwith" | "tagmenu" => {
+                self.restore_cursor(Some(OsString::from("photo.jpg")));
+                self.ensure_visible();
+                self.request_preview();
+                let mut m = self.context_menu(true, (24, 12));
+                let want = match scene {
+                    "openwith" => Some(MenuCmd::OpenWithList),
+                    "tagmenu" => Some(MenuCmd::Sub(MenuKind::Tags)),
+                    _ => None,
+                };
+                if let Some(cmd) = want
+                    && let Some(i) = m.items.iter().position(|it| it.cmd == cmd)
+                {
+                    m.selected = i;
+                    self.menu_activate(m);
+                } else {
+                    self.modal = Some(Modal::Menu(m));
+                }
+            }
+            // Two cards piled: a copy that is running (slowly: RADA_DEMO_SLOW_MBPS) over one
+            // that is done, or an error over one that is done.
+            "toasts" | "toasts-error" => {
+                let long = Duration::from_secs(60);
+                let trash = self
+                    .paths
+                    .places
+                    .iter()
+                    .find(|p| p.kind == rada_core::platform::PlaceKind::Trash)
+                    .map(|p| p.path.clone());
+                let mut done = Notice::new(NoticeKind::Ok, tf(Key::NTrashMany, &[&3]))
+                    .with_action(NoticeAction::Undo)
+                    .lasting(long);
+                if let Some(t) = trash {
+                    done = done.showing(t, None);
+                }
+                if scene == "toasts-error" {
+                    self.notify(
+                        Notice::new(NoticeKind::Error, Key::PvCannotImage.tr()).lasting(long),
+                    );
+                    self.notify(done);
+                    return;
+                }
+                self.notify(done);
+                let names = ["archive.tar.gz", "backup.zip"];
+                self.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                let paths: Vec<PathBuf> = names
+                    .iter()
+                    .filter_map(|n| {
+                        self.listing
+                            .all()
+                            .iter()
+                            .find(|e| e.display == *n)
+                            .map(|e| e.path.clone())
+                    })
+                    .collect();
+                let Some(dest) = d.dest else { return };
+                self.demo_auto_run = true;
+                let opts = TransferOptions::copy(ConflictPolicy::KeepBoth);
+                let h = self.svc.jobs.plan_transfer(paths, dest, opts);
+                self.begin_plan(Key::PlanningCopy.tr(), h);
+            }
+            // The windows of a permanent deletion and of a copy that meets a file of the same
+            // name, on three marked items.
+            "delete" | "conflict" => {
+                let names = ["archive.tar.gz", "backup.zip", "Cargo.toml"];
+                self.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                self.restore_cursor(Some(OsString::from("photo.jpg")));
+                self.ensure_visible();
+                if scene == "delete" {
+                    self.dispatch(Action::DeletePermanently);
+                } else if let Some(dest) = d.dest {
+                    let paths: Vec<PathBuf> = names
+                        .iter()
+                        .filter_map(|n| {
+                            self.listing
+                                .all()
+                                .iter()
+                                .find(|e| e.display == *n)
+                                .map(|e| e.path.clone())
+                        })
+                        .collect();
+                    let opts = TransferOptions::copy(ConflictPolicy::KeepBoth);
+                    let h = self.svc.jobs.plan_transfer(paths, dest, opts);
+                    self.begin_plan(Key::PlanningCopy.tr(), h);
+                }
+            }
             _ => {}
         }
     }
@@ -2465,7 +2569,9 @@ impl App {
                 KeyCode::Esc => {}
                 KeyCode::Char('q') if !pv.needs_typed_confirmation() => {}
                 KeyCode::Enter => {
-                    if pv.can_run() {
+                    if pv.cancel_focus {
+                        // The keyboard is on Cancel: Enter cancels.
+                    } else if pv.can_run() {
                         self.run_plan(pv);
                     } else {
                         self.modal = Some(Modal::Plan(pv));
@@ -2478,7 +2584,24 @@ impl App {
                     self.replan_with(&mut pv, policy);
                     self.modal = Some(Modal::Plan(pv));
                 }
-                KeyCode::Tab => {
+                // ← → choose how name clashes are settled (the pills, in the order they are in).
+                KeyCode::Left | KeyCode::Right
+                    if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
+                {
+                    let dir = if key.code == KeyCode::Right { 1 } else { -1 };
+                    let policy = crate::ui::policy_step(pv.plan.policy, dir);
+                    if policy != pv.plan.policy {
+                        self.replan_with(&mut pv, policy);
+                    }
+                    self.modal = Some(Modal::Plan(pv));
+                }
+                // Tab moves the keyboard between the buttons.
+                KeyCode::Tab | KeyCode::BackTab => {
+                    pv.cancel_focus = !pv.cancel_focus;
+                    self.modal = Some(Modal::Plan(pv));
+                }
+                // d: every step, or the summary.
+                KeyCode::Char('d') if !pv.needs_typed_confirmation() => {
                     pv.details = !pv.details;
                     pv.scroll = 0;
                     self.modal = Some(Modal::Plan(pv));

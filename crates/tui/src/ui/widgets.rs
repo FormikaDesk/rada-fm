@@ -319,6 +319,38 @@ pub fn button<'a>(
     }
 }
 
+/// Register clickable groups of spans of one rendered line: each `(start, end, target)` is the
+/// spans `start..end`, together (a pill is several spans).
+pub fn hit_groups(
+    hits: &mut Hits,
+    x: u16,
+    y: u16,
+    spans: &[Span],
+    groups: &[(usize, usize, Target)],
+) {
+    for (start, end, target) in groups {
+        let before: usize = spans[..(*start).min(spans.len())]
+            .iter()
+            .map(|s| s.content.width())
+            .sum();
+        let width: usize = spans[(*start).min(spans.len())..(*end).min(spans.len())]
+            .iter()
+            .map(|s| s.content.width())
+            .sum();
+        if width > 0 {
+            hits.add(
+                Rect {
+                    x: x + before as u16,
+                    y,
+                    width: width as u16,
+                    height: 1,
+                },
+                target.clone(),
+            );
+        }
+    }
+}
+
 /// Register the clickable spans of one rendered line. `targets` pairs a span index with
 /// what a click on it does; the x positions come from the widths of the spans before it.
 pub fn hit_spans(hits: &mut Hits, x: u16, y: u16, spans: &[Span], targets: &[(usize, Target)]) {

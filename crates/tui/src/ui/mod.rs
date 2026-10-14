@@ -14,8 +14,12 @@ mod details;
 mod dialogs;
 mod grid;
 mod list;
+mod menu;
 mod modals;
 mod notice;
+mod openwith;
+mod plan;
+pub mod popup;
 mod preview;
 mod sidebar;
 pub mod soft;
@@ -25,23 +29,20 @@ mod updates;
 pub mod widgets;
 
 pub use list::{Columns as ListColumns, ListOpts, columns as list_columns};
-
-use std::path::Path;
+pub use plan::policy_step;
 
 use rada_core::display;
 use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
-use unicode_width::UnicodeWidthStr;
 
 use crate::app::*;
-use crate::fmt;
 use crate::sidebar::Mode;
 use crate::view::{LayoutKind, ViewMode};
-use widgets::{SPIN, dim_backdrop, pad, progress_spans};
+use widgets::dim_backdrop;
 
 /// How the details pane is shown right now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,6 +140,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     app.term_width = area.width;
     app.screen = (area.width, area.height);
+    app.popup_covers = popup_rects(app, area);
 
     // Top to bottom: tabs, address, commands, the body, the progress of a running operation,
     // the status bar and the key hints. The hints go first when the terminal is short, the
@@ -146,16 +148,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let explorer = app.layout == LayoutKind::Explorer;
     let tabs_h = 1;
     let gap_h = top_gap_height(explorer, area.height);
-    let look = soft::Look::of(app);
-    // The thin line under the bar of the path takes a row of its own where it can be drawn.
-    let address_h = if explorer {
-        1 + u16::from(look.caps && area.height >= 26)
-    } else {
-        0
-    };
+    let address_h = u16::from(explorer);
     let commands_h = commands_height(explorer, area.height);
     let hints_h = hints_height(explorer && app.show_hints, area.height);
-    let progress_h = if app.running.is_some() { 4 } else { 0 };
     let notice = size_notice_shown(app, area.width, area.height);
     app.size_notice_visible = notice;
     let [
@@ -165,7 +160,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         commands_row,
         body,
         notice_row,
-        progress,
         status,
         hints_row,
     ] = Layout::vertical([
@@ -175,7 +169,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Constraint::Length(commands_h),
         Constraint::Min(3),
         Constraint::Length(u16::from(notice)),
-        Constraint::Length(progress_h),
         Constraint::Length(1),
         Constraint::Length(hints_h),
     ])
@@ -264,6 +257,23 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         main
     };
     let _ = main_outer;
+    // The cards of the notifications sit in the bottom right of the list. They never cover
+    // its text: when the list is full it is made shorter for as long as they are there.
+    let now = app.notice_now();
+    let notice_h = if app.modal.is_none() {
+        notice::stack_height(app, now, main.width as usize)
+    } else {
+        0
+    };
+    let notice_area = main;
+    let main = if notice_h > 0 && list_needs_room(app, main, notice_h) {
+        Rect {
+            height: main.height.saturating_sub(notice_h),
+            ..main
+        }
+    } else {
+        main
+    };
     match app.view {
         ViewMode::Columns => columns::draw_columns(f, app, main),
         ViewMode::Details => list::draw_list(
@@ -276,6 +286,14 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             ),
         ),
         ViewMode::Icons => grid::draw_grid(f, app, main),
+    }
+    // A shorter list may have left the cursor below its last row: bring it back in view.
+    if notice_h > 0 {
+        let before = app.scroll;
+        app.ensure_visible();
+        if app.scroll != before {
+            app.dirty = true;
+        }
     }
     if dmode == DetailsMode::Overlay {
         details::draw_overlay(f, app, main);
@@ -290,16 +308,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             notice_row,
         );
     }
-    if app.running.is_some() {
-        draw_progress(f, app, progress);
-    }
     bottom::draw_status(f, app, status);
     if hints_h > 0 {
         bottom::draw_hints(f, app, hints_row);
     }
-    // Notifications sit at the bottom right of the body; a window in front hides them.
+    // Notifications sit at the bottom right of the list; a window in front hides them.
     if app.modal.is_none() {
-        notice::draw_notice(f, app, body);
+        notice::draw(f, app, notice_area, now);
     }
     if app.address.is_some() && address_h > 0 {
         address::draw_suggestions(f, app, address_row, area);
@@ -308,107 +323,48 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if app.modal.is_some() {
         // Only the window is clickable while it is open.
         app.hits.clear();
-        if !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview)) {
+        // A window dims what is behind it; a menu does not, nor the list of programs that sits
+        // beside one.
+        let beside_menu = matches!(&app.modal, Some(Modal::OpenWith(v)) if v.under.is_some());
+        if !beside_menu && !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview)) {
             dim_backdrop(f.buffer_mut(), area, th.light);
         }
         modals::draw_modal(f, app, area);
     }
 }
 
-// ----------------------------------------------------------------------------- progress
-
-/// The temporary bar at the bottom while an operation runs.
-fn draw_progress(f: &mut Frame, app: &App, area: Rect) {
-    let Some(r) = &app.running else { return };
-    let th = &app.th;
-    let p = &r.progress;
-    let frac = p.fraction();
-    let pct = (frac * 100.0) as u32;
-    let w = area.width as usize;
-    if area.height < 3 {
-        return;
-    }
-
-    let mut right = String::new();
-    if p.bytes_total > 0 {
-        right.push_str(&format!(
-            "{} / {}",
-            fmt::size(p.bytes_done),
-            fmt::size(p.bytes_total)
-        ));
-        if r.rate() > 1.0 {
-            right.push_str(&format!("  ·  {}", fmt::rate(r.rate())));
+/// The places popups are drawn at, shadows included, for what lies over cells and cannot be
+/// drawn under them (a picture of the terminal). A window dims the whole screen: all of it.
+fn popup_rects(app: &App, area: Rect) -> Vec<Rect> {
+    let ctx = popup::Ctx::of(app);
+    match &app.modal {
+        None | Some(Modal::FullPreview) => Vec::new(),
+        Some(Modal::Menu(m)) => menu::rects(&ctx, &app.keymap, m, area),
+        Some(Modal::OpenWith(v)) => {
+            let mut rects = Vec::new();
+            let mut anchor = None;
+            if let Some(m) = v.under.as_deref() {
+                rects.extend(menu::rects(&ctx, &app.keymap, m, area));
+                anchor = Some(menu::beside(&ctx, &app.keymap, m, area));
+            }
+            rects.push(openwith::rect(&ctx, v, area, anchor));
+            rects
         }
-        if let Some(eta) = r.eta() {
-            right.push_str(&format!(
-                "  ·  {}",
-                tf(Key::ProgLeft, &[&fmt::duration(eta)])
-            ));
-        }
-    } else {
-        right.push_str(&format!(
-            "{} / {}",
-            p.steps_done,
-            fmt::count(p.steps_total, Key::StepOne, Key::StepMany)
-        ));
+        Some(_) => vec![area],
     }
-    let head_right = format!("{pct:>3}%   {right}   Esc {}", Key::ProgCancel.tr());
-    // The title names a folder with its full path; show it the way the rest of the
-    // interface does.
-    let full_title = r.title.replace(&display::path(app.home()), "~");
-    let title = display::truncate(&full_title, w.saturating_sub(head_right.width() + 6));
-    let gap = w.saturating_sub(title.width() + head_right.width() + 3);
-    let line1 = Line::from(vec![
-        Span::styled(
-            format!("{} ", SPIN[app.spinner % SPIN.len()]),
-            th.accent_style(),
-        ),
-        Span::styled(title, th.base().add_modifier(Modifier::BOLD)),
-        Span::raw(" ".repeat(gap + 1)),
-        Span::styled(
-            format!("{pct:>3}%"),
-            th.accent_style().add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(format!("   {right}   "), th.dim()),
-        Span::styled("Esc", th.key()),
-        Span::styled(format!(" {}", Key::ProgCancel.tr()), th.dim()),
-    ]);
-    let y = area.y + 1;
-    f.render_widget(
-        Paragraph::new(line1),
-        Rect {
-            y,
-            height: 1,
-            ..area
-        },
-    );
+}
 
-    // The bar moves in eighths of a cell: smooth even on a slow copy.
-    let bar_w = w;
-    f.render_widget(
-        Paragraph::new(Line::from(progress_spans(th, frac, bar_w))),
-        Rect {
-            y: y + 1,
-            height: 1,
-            ..area
-        },
-    );
-
-    let current = if p.current.as_os_str().is_empty() {
-        String::new()
-    } else {
-        widgets::tail(&fmt::short_path(&p.current, app.home()), w)
-    };
-    f.render_widget(
-        Paragraph::new(Span::styled(pad(&current, w), th.faint())),
-        Rect {
-            y: y + 2,
-            height: 1,
-            ..area
-        },
-    );
-    let _ = Alignment::Left;
-    let _: &Path = app.home();
+/// Whether the list has no room to spare for the cards: its rows reach into them. The other
+/// views give them the room at once.
+fn list_needs_room(app: &App, main: Rect, cards_h: u16) -> bool {
+    match app.view {
+        ViewMode::Details => {
+            // The column titles, a row of air and the rows.
+            let rows = 2 + app.visible.len();
+            rows + cards_h as usize > main.height as usize
+        }
+        _ => true,
+    }
 }
 
 #[cfg(test)]

@@ -192,11 +192,11 @@ def main():
     apps = os.path.join(home, ".local/share/applications")
     os.makedirs(apps, exist_ok=True)
     for file, name, kinds in [
-        ("visualizzatore.desktop", "Visualizzatore di immagini", "image/jpeg;image/png;image/svg+xml;"),
-        ("ritocco.desktop", "Ritocco foto", "image/jpeg;image/png;"),
-        ("disegno.desktop", "Disegno vettoriale", "image/svg+xml;image/png;image/jpeg;"),
-        ("browser.desktop", "Browser web", "image/jpeg;image/png;text/html;"),
-        ("presentazioni.desktop", "Presentazioni", "image/jpeg;image/png;"),
+        ("org.gnome.Loupe.desktop", "Visualizzatore di immagini", "image/jpeg;image/png;image/svg+xml;"),
+        ("gimp.desktop", "GIMP", "image/jpeg;image/png;"),
+        ("org.kde.krita.desktop", "Krita", "image/jpeg;image/png;"),
+        ("org.inkscape.Inkscape.desktop", "Inkscape", "image/svg+xml;image/png;image/jpeg;"),
+        ("org.mozilla.firefox.desktop", "Firefox", "image/jpeg;image/png;text/html;"),
     ]:
         with open(os.path.join(apps, file), "w") as f:
             f.write(
@@ -204,7 +204,7 @@ def main():
                 f"MimeType={kinds}\nNoDisplay=false\n"
             )
     with open(os.path.join(home, ".config/mimeapps.list"), "w") as f:
-        f.write("[Default Applications]\nimage/jpeg=visualizzatore.desktop\n")
+        f.write("[Default Applications]\nimage/jpeg=org.gnome.Loupe.desktop\n")
     # The trash, so that the sidebar has its place at the bottom.
     os.makedirs(os.path.join(home, ".local/share/Trash/files"), exist_ok=True)
     os.makedirs(os.path.join(home, ".local/share/Trash/info"), exist_ok=True)
@@ -257,6 +257,8 @@ def main():
 
     # A few things in the other folders, so that they are not empty.
     write(os.path.join(home, "Documenti/relazione.txt"), "Relazione di prova.\n", 2 * DAY)
+    # A file with the name of one in the demo folder, so that a copy meets a clash.
+    write(os.path.join(home, "Documenti/Cargo.toml"), "[package]\nname = \"vecchio\"\n", 40 * DAY)
     write(os.path.join(home, "Download/istruzioni.txt"), "Istruzioni.\n", 3 * DAY)
     shutil.copyfile(photo, os.path.join(home, "Immagini/paesaggio.jpg"))
     age(os.path.join(home, "Immagini/paesaggio.jpg"), 5 * DAY)

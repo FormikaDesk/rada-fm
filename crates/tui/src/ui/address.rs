@@ -446,17 +446,6 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
         bar.push(Span::styled(" ".repeat(w - total), band));
     }
     bar.render(f, &mut app.hits, row);
-
-    // The thin line under the field.
-    if area.height >= 2 {
-        let line = Rect {
-            x: field_x,
-            y: area.y + 1,
-            width: field_w as u16,
-            height: 1,
-        };
-        soft::gradient_line(f.buffer_mut(), line, &th, look);
-    }
 }
 
 /// What is offered under the field: the subfolders of a path being typed, or the commands and

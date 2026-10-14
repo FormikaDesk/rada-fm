@@ -191,6 +191,7 @@ pub fn std_for(ch: char) -> Option<char> {
         // arrows
         '↪' => '→',
         '↶' => '←',
+        '↷' => '→',
         '↻' | '⟳' => '○',
         '⇄' => '↔',
         '⇅' => '↕',
@@ -224,6 +225,10 @@ pub fn std_for(ch: char) -> Option<char> {
         '▍' | '▎' | '▏' => '│',
         '▖' => '▄',
         '▔' => '▀',
+        // the heavy side of a card, the half of a bar's head and the dashes between groups
+        '┃' => '│',
+        '╺' => '╸',
+        '╌' => '─',
         // the spinner's ten braille frames turn as the classic four
         '⠋' | '⠼' | '⠇' => '|',
         '⠙' | '⠴' | '⠏' => '/',

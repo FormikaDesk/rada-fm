@@ -53,14 +53,14 @@ fn after_a_copy_the_card_says_what_was_done_and_where_with_undo_and_show() {
         s.contains("Undo") && s.contains("Ctrl+Z") && s.contains("Show"),
         "{s}"
     );
-    // The card has soft half-block edges (▄ above, ▀ below) and sits at the bottom right.
+    // The card is rounded (a corner above and below it) and sits at the bottom right.
     let lines: Vec<&str> = s.lines().collect();
     let at = lines
         .iter()
         .position(|l| l.contains("3 items copied"))
         .unwrap();
     assert!(
-        lines[at - 1].contains('▄') && lines[at + 2].contains('▀'),
+        lines[at - 1].contains('╭') && lines[at + 2].contains('╰'),
         "{s}"
     );
     let col = lines[at].find("3 items").unwrap();
@@ -107,7 +107,9 @@ fn show_on_the_card_goes_to_the_result() {
     h.app.open_dir(dir.clone());
     let d = dir.clone();
     h.wait("away", move |a| a.cwd == d && !a.is_loading());
-    h.click(&Target::Notice(NoticeHit::Show));
+    let id = h.app.current_notice().unwrap().id;
+    let _ = h.screen();
+    h.click(&Target::Notice(id, NoticeHit::Show));
     let d = dest.clone();
     h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
     assert!(h.app.current_notice().is_none(), "a click closes the card");
@@ -119,7 +121,8 @@ fn undo_on_the_card_takes_the_copy_back() {
     copy_all_to(&mut h, &dest);
     assert!(dest.join("a.txt").exists());
     let _ = h.screen();
-    h.click(&Target::Notice(NoticeHit::Undo));
+    let id = h.app.current_notice().unwrap().id;
+    h.click(&Target::Notice(id, NoticeHit::Undo));
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     assert!(!dest.join("a.txt").exists(), "the copy was taken back");
@@ -157,28 +160,49 @@ fn an_error_stays_until_it_is_closed_and_has_the_style_of_an_error() {
 }
 
 #[test]
-fn notifications_queue_one_at_a_time() {
-    let (mut h, dir, dest) = files();
-    copy_all_to(&mut h, &dest);
-    // A second operation while the first card is up.
-    h.app.open_dir(dir.clone());
-    let d = dir.clone();
-    h.wait("back", move |a| a.cwd == d && !a.is_loading());
-    h.keys("j");
-    h.press("f2");
-    h.keys("2");
-    h.key(KeyCode::Enter);
-    confirm(&mut h);
-    let first = h.app.current_notice().unwrap().text.clone();
-    assert!(
-        first.contains("copied"),
-        "the first card is still in front: {first}"
+fn notifications_pile_up_and_each_goes_when_its_time_is_up() {
+    use rada_tui::app::Notice;
+    let (mut h, _dir, _dest) = files();
+    h.app.notify(
+        Notice::new(NoticeKind::Ok, "3 items moved to the trash").with_action(NoticeAction::Undo),
     );
-    assert!(h.screen().contains("+1"), "and says one more is waiting");
+    h.app.advance_notices(Duration::from_secs(2));
+    h.app
+        .notify(Notice::new(NoticeKind::Error, "cannot rename setup.sh"));
+    let now = h.app.notice_now();
+    assert_eq!(h.app.notices.shown(now).len(), 2, "both are on screen");
+    let s = h.screen();
+    assert!(
+        s.contains("moved to the trash") && s.contains("cannot rename"),
+        "{s}"
+    );
+    // The first was there first and goes first; the other is an error and stays.
+    h.app.advance_notices(Duration::from_millis(4100));
+    let s = h.screen();
+    assert!(!s.contains("moved to the trash"), "{s}");
+    assert!(s.contains("cannot rename"));
+    h.app.advance_notices(Duration::from_secs(3600));
+    assert!(h.screen().contains("cannot rename"), "an error stays");
+}
+
+#[test]
+fn more_than_three_wait_for_room() {
+    use rada_tui::app::Notice;
+    let (mut h, _dir, _dest) = files();
+    for n in ["a", "b", "c", "d"] {
+        h.app.notify(
+            Notice::new(NoticeKind::Ok, format!("done {n}")).with_action(NoticeAction::Undo),
+        );
+    }
+    let now = h.app.notice_now();
+    assert_eq!(h.app.notices.shown(now).len(), 3);
+    assert_eq!(h.app.notices.waiting(), 1);
+    let s = h.screen();
+    assert!(s.contains("done a") && s.contains("done c"), "{s}");
+    assert!(!s.contains("done d"), "{s}");
     h.app.advance_notices(Duration::from_secs(7));
-    let second = h.app.current_notice().unwrap().text.clone();
-    assert!(second.starts_with("Renamed to"), "{second}");
-    assert_eq!(h.app.notices.waiting(), 0);
+    let s = h.screen();
+    assert!(s.contains("done d"), "{s}");
 }
 
 #[test]

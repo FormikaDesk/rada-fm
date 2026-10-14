@@ -294,6 +294,34 @@ pub fn icon(e: &Entry, set: IconSet, th: &Theme) -> (&'static str, Color) {
     (glyph, color)
 }
 
+/// Glyph and colour for something known only by its name and kind (a line of a plan, which
+/// is not in the listing).
+pub fn icon_for(name: &str, kind: FileKind, set: IconSet, th: &Theme) -> (&'static str, Color) {
+    let e = Entry {
+        name: name.into(),
+        path: std::path::PathBuf::from(name),
+        kind,
+        link: None,
+        size: 0,
+        dir_size: None,
+        mtime: None,
+        created: None,
+        mode: None,
+        hidden: false,
+        system: false,
+        readonly: false,
+        executable: false,
+        reparse: None,
+        package: false,
+        tags: Vec::new(),
+        error: None,
+        display: name.to_string(),
+        sort_name: name.to_lowercase(),
+        type_label: std::borrow::Cow::Borrowed(""),
+    };
+    icon(&e, set, th)
+}
+
 // ------------------------------------------------------------------------- interface icons
 
 /// The small pictures on buttons and bars (not the ones of files).
@@ -415,6 +443,46 @@ pub fn ui(set: IconSet, g: Glyph) -> &'static str {
     }
 }
 
+/// The mark in front of an entry of a menu, in the icon set in use. Nerd Font symbols; the
+/// Unicode sets get the plain mark of the same button where there is one; the basic profile
+/// none (a menu without icons has no column for them).
+pub fn action_icon(set: IconSet, a: crate::keymap::Action) -> &'static str {
+    use crate::keymap::Action as A;
+    let (nerd, uni) = match a {
+        A::Open => ("\u{f07c}", "▸"),
+        A::OpenWith => ("\u{f00a}", "▦"),
+        A::QuickLook => ("\u{f06e}", "◉"),
+        A::ShowPackage => ("\u{f1b2}", "▣"),
+        A::ExtractHere | A::ExtractToFolder => ("\u{f019}", "↓"),
+        A::Cut => ("\u{f0c4}", "✂"),
+        A::Copy => ("\u{f0c5}", "⧉"),
+        A::Paste => ("\u{f0ea}", "⎘"),
+        A::Rename | A::BulkRename => ("\u{f040}", "✎"),
+        A::Compress => ("\u{f1c6}", "▣"),
+        A::CopyPath => ("\u{f0c1}", "⚲"),
+        A::Properties => ("\u{f0ca}", "≣"),
+        A::Trash | A::DeletePermanently => ("\u{f1f8}", "✗"),
+        A::Bookmark => ("\u{f08d}", "⚲"),
+        A::Refresh => ("\u{f021}", "⟳"),
+        A::SelectAll => ("\u{f046}", "☑"),
+        A::OpenTerminal => ("\u{f120}", "›"),
+        A::NewFolder | A::NewFile => ("\u{f067}", "+"),
+        A::Undo => ("\u{f0e2}", "↶"),
+        A::Redo => ("\u{f01e}", "↷"),
+        A::History => ("\u{f1da}", "↶"),
+        A::Help => ("\u{f128}", "?"),
+        A::ToggleDetails => ("\u{f03a}", "≣"),
+        A::ToggleHidden => ("\u{f070}", "◉"),
+        A::ToggleSidebar => ("\u{f0c9}", "≣"),
+        _ => return "",
+    };
+    match set {
+        IconSet::Nerd => nerd,
+        IconSet::UnicodeIcons | IconSet::UnicodeStd => uni,
+        IconSet::None => "",
+    }
+}
+
 #[cfg(test)]
 mod ui_glyph_tests {
     use super::*;
@@ -448,6 +516,22 @@ mod ui_glyph_tests {
             }
             // With a symbol font or Unicode there is always something to draw.
             assert!(!ui(IconSet::Nerd, g).is_empty() && !ui(IconSet::UnicodeIcons, g).is_empty());
+        }
+    }
+
+    #[test]
+    fn every_action_icon_takes_one_cell_in_every_set() {
+        for a in crate::keymap::Action::ALL {
+            for set in [
+                IconSet::Nerd,
+                IconSet::UnicodeIcons,
+                IconSet::UnicodeStd,
+                IconSet::None,
+            ] {
+                let s = action_icon(set, a);
+                assert!(s.width() <= 1, "{a:?} in {set:?} is {s:?}");
+            }
+            assert_eq!(action_icon(IconSet::None, a), "", "the basic set has none");
         }
     }
 }

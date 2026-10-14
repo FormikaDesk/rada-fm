@@ -183,11 +183,7 @@ impl App {
         )];
         if rada_core::tagsearch::view_name(path).is_some() {
             // A tag is not a folder: nothing to pin or eject.
-            return MenuView {
-                at,
-                items,
-                selected: 0,
-            };
+            return MenuView::new(at, items);
         }
         let is_state = self.paths.bookmarks.iter().any(|b| b == path);
         let is_config = self.cfg_bookmarks.iter().any(|b| b == path);
@@ -197,18 +193,12 @@ impl App {
             items.push(MenuItem::bookmark(path.to_path_buf(), true, true));
         }
         if self.ejectable(path).is_some() {
-            items.push(MenuItem {
-                cmd: MenuCmd::Eject(path.to_path_buf()),
-                label: Key::SideMenuEject.tr().into(),
-                enabled: true,
-                gap_before: true,
-                checked: None,
-            });
+            items.push(MenuItem::command(
+                MenuCmd::Eject(path.to_path_buf()),
+                Key::SideMenuEject.tr(),
+                true,
+            ));
         }
-        MenuView {
-            at,
-            items,
-            selected: 0,
-        }
+        MenuView::new(at, items)
     }
 }

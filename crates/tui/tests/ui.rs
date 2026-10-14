@@ -88,7 +88,7 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
     let s = h.screen();
     // The message is wrapped in a box, so look for its pieces rather than one line.
     let flat = s
-        .replace(['│', '╭', '╮', '╰', '╯', '─'], " ")
+        .replace(['│', '┃', '╭', '╮', '╰', '╯', '─'], " ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -131,19 +131,13 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     h.keys("p");
     plan_modal(&mut h);
     let s = h.screen();
-    assert!(s.contains("Copy 1 item"), "{s}");
-    // The totals stack a number over its label.
-    let lines: Vec<&str> = s.lines().collect();
-    // The label sits under its number, inside the window (the panes behind it have borders
-    // of their own).
-    let i = lines
-        .iter()
-        .position(|l| l.contains("  file ") && l.contains("in total"))
-        .unwrap_or_else(|| panic!("no 'file' label: {s}"));
-    // Columns of the screen, not bytes: the pane behind the window has multi-byte marks.
-    let at = lines[i][..lines[i].find("file").unwrap()].chars().count();
-    assert_eq!(lines[i - 1].chars().nth(at), Some('1'), "{s}");
-    assert!(s.contains("What will happen"), "{s}");
+    // The head says what is asked, with the folder by its name; the item has its label.
+    assert!(s.contains("Copy 1 item to elsewhere.d"), "{s}");
+    assert!(s.contains("a.txt") && s.contains("new"), "{s}");
+    assert!(
+        s.contains("→") && s.contains("You can undo this"),
+        "from and to, and the way back: {s}"
+    );
     assert!(
         !dest.join("a.txt").exists(),
         "nothing happens before the plan is confirmed"
@@ -165,8 +159,9 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
 
     h.keys("u");
     h.wait("nothing to undo", |a| {
-        a.current_notice()
-            .is_some_and(|t| t.text.contains("nothing to undo"))
+        a.shown_notices()
+            .iter()
+            .any(|t| t.text.contains("nothing to undo"))
     });
 }
 
@@ -206,8 +201,9 @@ fn permanent_delete_needs_the_word_yes() {
     assert!(!dir.join("a.txt").exists());
     h.keys("u");
     h.wait("nothing to undo", |a| {
-        a.current_notice()
-            .is_some_and(|t| t.text.contains("nothing to undo"))
+        a.shown_notices()
+            .iter()
+            .any(|t| t.text.contains("nothing to undo"))
     });
 }
 

@@ -10,25 +10,25 @@ expression: shot(&mut h)
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
 │  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size │
 │                          │ │                                                                               │
-│ TAGS                     │ │ ☐ ▸ data                    6 days ago       Folder                           │
-│  ● Red                   │ │ ☐ ▸ src                     6 days ago       Folder                           │
-│  ● Orange                │ │ ☐ ▸ 目录                    6 days ago       Folder                           │
-│  ● Yellow                │ │ ☐ · a-very-long-file-name…  12 days ag╭──────────────────────────────╮    1 B │
-│  ● Green                 │ │ ☐ · backup.img              9 days ago│ Open                    Enter│ 420 MB │
-│  ● Blue                  │ │ ☐ · Cargo.toml              2 days ago│ Open with…              Alt+o│   42 B │
-│  ● Purple                │ │▌☐ · main.rs                 Yesterday │──────────────────────────────│   37 B │
-│  ● Gray                  │ │ ☐ · notes.txt               5 weeks ag│ Cut                    Ctrl+X│3.52 KB │
-│                          │ │ ☐ · README.md               Today 09:0│ Copy                   Ctrl+C│   73 B │
-│                          │ │ ☐ · тест-файл.md            Today 10:3│ Paste                  Ctrl+V│   13 B │
-│                          │ │ ☐ · 日本語のファイル名.txt  5 days ago│──────────────────────────────│   16 B │
-│                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028│ Rename                     F2│    6 B │
-│                          │ │                                       │ Compress…               Alt+z│        │
-│                          │ │                                       │──────────────────────────────│        │
-│                          │ │                                       │ Tags                        ▸│        │
-│                          │ │                                       │──────────────────────────────│        │
-│                          │ │                                       │ Copy the path    Ctrl+Shift+C│        │
-╰──────────────────────────╯ ╰───────────────────────────────────────│──────────────────────────────│────────╯
- 12 items                                                            │ Move to trash             Del│≣  ▦  ▥
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│──────────────────────────────│▄▄▄▄▄▄▄▄▄
-   Esc  close                                                        │ Properties          Alt+Enter│
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╰──────────────────────────────╯▀▀▀▀▀▀▀▀▀
+│ TAGS                     │ │ ☐ ▸ data                    6 days ag╭───────────────────────────────────────╮│
+│  ● Red                   │ │ ☐ ▸ src                     6 days ag│  · main.rs  ·  Rust source            ││
+│  ● Orange                │ │ ☐ ▸ 目录                    6 days ag│ ───────────────────────────────────── ││
+│  ● Yellow                │ │ ☐ · a-very-long-file-name…  12 days a│  ▸ Open                        Enter  ││
+│  ● Green                 │ │ ☐ · backup.img              9 days ag│  ▦ Open with…                      ›  ││
+│  ● Blue                  │ │ ☐ · Cargo.toml              2 days ag│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ││
+│  ● Purple                │ │▌☐ · main.rs                 Yesterday│  ✂ Cut                        Ctrl+X  ││
+│  ● Gray                  │ │ ☐ · notes.txt               5 weeks a│  ⧉ Copy                       Ctrl+C  ││
+│                          │ │ ☐ · README.md               Today 09:│  ⎘ Paste                      Ctrl+V  ││
+│                          │ │ ☐ · тест-файл.md            Today 10:│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ││
+│                          │ │ ☐ · 日本語のファイル名.txt  5 days ag│  ✎ Rename                         F2  ││
+│                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/202│  ▣ Compress…                   Alt+z  ││
+│                          │ │                                      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ││
+│                          │ │                                      │  ◆ Tags                            ›  ││
+│                          │ │                                      │  ⚲ Copy the path        Ctrl+Shift+C  ││
+│                          │ │                                      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   ││
+│                          │ │                                      │  ≣ Properties              Alt+Enter  ││
+╰──────────────────────────╯ ╰──────────────────────────────────────│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │╯
+ 12 items                                                           │  ✗ Move to trash                 Del  │
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│  ✗ Delete permanently      Shift+Del  │▄
+   Esc  close                                                       ╰───────────────────────────────────────╯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

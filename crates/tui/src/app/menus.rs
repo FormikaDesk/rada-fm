@@ -19,14 +19,10 @@ impl App {
     /// Open a dropdown with its corner at `at`.
     pub fn open_menu(&mut self, kind: MenuKind, at: (u16, u16)) {
         let items = self.menu_items(kind);
-        self.modal = Some(Modal::Menu(MenuView {
-            at,
-            items,
-            selected: 0,
-        }));
+        self.modal = Some(Modal::Menu(MenuView::new(at, items)));
     }
 
-    fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
+    pub(super) fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
         use Action::*;
         let ro = self.archive.is_some();
         // Nothing is made *in* a list of tagged items.
@@ -117,6 +113,50 @@ impl App {
         }
     }
 
+    /// The head of a submenu: the tags of what is selected get a title, the others none.
+    pub(super) fn submenu_title(&self, kind: MenuKind) -> Option<MenuTitle> {
+        match kind {
+            MenuKind::Tags => {
+                let what = if self.marked.len() > 1 {
+                    crate::fmt::count(self.marked.len() as u64, Key::ItemOne, Key::ItemMany)
+                } else {
+                    self.current()
+                        .map(|e| e.display.clone())
+                        .unwrap_or_default()
+                };
+                Some(MenuTitle {
+                    icon: "",
+                    icon_color: self.th.accent,
+                    name: rada_core::i18n::tf(Key::TagsOf, &[&what]),
+                    kind: String::new(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    /// The head of the menu of an item: its icon, its name and what kind of file it is; with
+    /// several items selected, how many.
+    fn item_menu_title(&self) -> Option<MenuTitle> {
+        let th = &self.th;
+        if self.marked.len() > 1 {
+            return Some(MenuTitle {
+                icon: crate::icons::ui(self.icons, crate::icons::Glyph::Checked),
+                icon_color: th.accent,
+                name: crate::fmt::count(self.marked.len() as u64, Key::ItemOne, Key::ItemMany),
+                kind: String::new(),
+            });
+        }
+        let e = self.current()?;
+        let (icon, icon_color) = crate::icons::icon(e, self.icons, th);
+        Some(MenuTitle {
+            icon,
+            icon_color,
+            name: e.display.clone(),
+            kind: rada_core::i18n::type_label(&e.type_label).into_owned(),
+        })
+    }
+
     /// The menu of the right button (or the Menu key): on an item, or on empty space.
     pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
         use Action::*;
@@ -127,14 +167,13 @@ impl App {
         let on_archive = self.on_archive_item();
         if on_item {
             let cur = self.current();
+            // Opening.
             items.push(MenuItem::act(Open, true, false));
             if cur.is_some_and(|e| e.package) {
                 items.push(MenuItem::act(ShowPackage, true, false));
             }
-            items.push(MenuItem::act(
-                OpenWith,
+            items.push(MenuItem::open_with(
                 cur.is_some_and(|e| !e.is_navigable_dir()) && !ro,
-                false,
             ));
             if self.svc.platform.opener().can_quick_look() {
                 items.push(MenuItem::act(QuickLook, !ro, false));
@@ -143,35 +182,36 @@ impl App {
                 items.push(MenuItem::act(ExtractHere, true, true));
                 items.push(MenuItem::act(ExtractToFolder, true, false));
             }
-            items.push(MenuItem::act(Cut, !ro, !(on_archive || ro)));
+            // The clipboard.
+            items.push(MenuItem::act(Cut, !ro, true));
             items.push(MenuItem::act(Copy, true, false));
             items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
+            // Changing it.
             items.push(MenuItem::act(Rename, !ro, true));
             if !ro {
                 items.push(MenuItem::act(Compress, true, false));
             }
+            // About it.
+            let mut gap = true;
             if self.tags_available() {
-                items.push(MenuItem::sub(
-                    MenuKind::Tags,
-                    Key::MenuTags.tr(),
-                    !ro,
-                    !(on_archive || ro),
-                ));
+                items.push(MenuItem::sub(MenuKind::Tags, Key::MenuTags.tr(), !ro, gap));
+                gap = false;
             }
             if let Some(e) = cur
                 && e.is_navigable_dir()
             {
                 let pinned =
                     self.paths.bookmarks.contains(&e.path) || self.cfg_bookmarks.contains(&e.path);
-                items.push(MenuItem::bookmark(e.path.clone(), !pinned, true));
+                items.push(MenuItem::bookmark(e.path.clone(), !pinned, gap));
+                gap = false;
             }
-            items.push(MenuItem::act(
-                CopyPath,
-                true,
-                cur.is_none_or(|e| !e.is_navigable_dir()),
-            ));
-            items.push(MenuItem::act(Trash, !ro, true));
+            items.push(MenuItem::act(CopyPath, true, gap));
             items.push(MenuItem::act(Properties, true, true));
+            // Taking it away: last, and red.
+            items.push(MenuItem::act(Trash, !ro, true));
+            if !ro {
+                items.push(MenuItem::act(DeletePermanently, true, false));
+            }
         } else {
             items.push(MenuItem::sub(
                 MenuKind::New,
@@ -201,11 +241,11 @@ impl App {
                 items.push(MenuItem::act(OpenTerminal, true, true));
             }
         }
-        MenuView {
-            at,
-            items,
-            selected: 0,
-        }
+        MenuView::new(at, items).titled(if on_item {
+            self.item_menu_title()
+        } else {
+            None
+        })
     }
 
     /// Do what a chosen menu entry says. The menu is already closed.
@@ -215,6 +255,7 @@ impl App {
             MenuCmd::Go(path) => self.open_dir(path),
             MenuCmd::Bookmark { path, add } => self.set_bookmark(path, add),
             MenuCmd::Sub(kind) => self.open_menu(kind, at),
+            MenuCmd::OpenWithList => self.dispatch(Action::OpenWith),
             MenuCmd::SortBy(key) => {
                 // Choosing the key that is already used leaves the order alone.
                 if key != self.sort.key {
@@ -285,10 +326,11 @@ impl App {
             .map(|c| {
                 MenuItem::choice(
                     MenuCmd::Tag(TagCmd::Toggle(Tag::standard_in(c, lang))),
-                    &format!("● {}", c.label(lang)),
+                    c.label(lang),
                     has_colour(c),
                     false,
                 )
+                .with_icon(MenuIcon::Dot(Some(c)))
             })
             .collect();
         // The tags of their own that the items already carry, so that they can be taken off.
@@ -303,27 +345,25 @@ impl App {
         }
         for (i, t) in others.into_iter().enumerate() {
             let on = everyone(&t.name);
-            items.push(MenuItem::choice(
-                MenuCmd::Tag(TagCmd::Toggle(t.clone())),
-                &format!("● {}", t.name),
-                on,
-                i == 0,
-            ));
+            items.push(
+                MenuItem::choice(MenuCmd::Tag(TagCmd::Toggle(t.clone())), &t.name, on, i == 0)
+                    .with_icon(MenuIcon::Dot(t.color)),
+            );
         }
-        items.push(MenuItem {
-            cmd: MenuCmd::Tag(TagCmd::New),
-            label: Key::MenuNewTag.tr().into(),
-            enabled: !targets.is_empty(),
-            gap_before: true,
-            checked: None,
-        });
-        items.push(MenuItem {
-            cmd: MenuCmd::Tag(TagCmd::Clear),
-            label: Key::MenuRemoveAllTags.tr().into(),
-            enabled: targets.iter().any(|e| !e.tags.is_empty()),
-            gap_before: false,
-            checked: None,
-        });
+        items.push(
+            MenuItem::command(MenuCmd::Tag(TagCmd::New), Key::MenuNewTag.tr(), true)
+                .with_icon(MenuIcon::Glyph(crate::icons::Glyph::New)),
+        );
+        items.last_mut().unwrap().enabled = !targets.is_empty();
+        items.push(
+            MenuItem::command(
+                MenuCmd::Tag(TagCmd::Clear),
+                Key::MenuRemoveAllTags.tr(),
+                false,
+            )
+            .with_icon(MenuIcon::Glyph(crate::icons::Glyph::Close)),
+        );
+        items.last_mut().unwrap().enabled = targets.iter().any(|e| !e.tags.is_empty());
         items
     }
 

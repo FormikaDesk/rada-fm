@@ -176,21 +176,6 @@ pub fn round_ends(buf: &mut Buffer, row: Rect, th: &Theme, look: Look, fill: Col
     }
 }
 
-/// The thin line under the bar: `▔` shaded from `grad_line_start` to `grad_line_end`. Only
-/// where the shades can be drawn.
-pub fn gradient_line(buf: &mut Buffer, row: Rect, th: &Theme, look: Look) {
-    if !look.caps || row.width == 0 || row.height == 0 {
-        return;
-    }
-    let w = row.width as usize;
-    let surround = outer(th);
-    for i in 0..w {
-        let cell = &mut buf[(row.x + i as u16, row.y)];
-        cell.set_symbol("▔");
-        cell.set_style(around(surround).fg(th.line_shade(i, w)));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,9 +277,6 @@ mod tests {
         let mut b = buf_of(12);
         tint_row(&mut b, Rect::new(0, 0, 12, 1), &th, look, RowTone::Cursor);
         assert!((1..11).all(|x| b[(x, 0)].bg == th.cursor));
-        let mut line = buf_of(12);
-        gradient_line(&mut line, Rect::new(0, 0, 12, 1), &th, look);
-        assert!((0..12).all(|x| line[(x, 0)].fg == th.accent));
     }
 
     #[test]
@@ -303,12 +285,6 @@ mod tests {
         assert_eq!(Look::new(&th, IconSet::Nerd, true), Look::FLAT);
         assert_eq!(Look::new(&th, IconSet::UnicodeIcons, false), Look::FLAT);
         assert_eq!(Look::new(&th, IconSet::None, false), Look::FLAT);
-        let mut b = buf_of(8);
-        gradient_line(&mut b, Rect::new(0, 0, 8, 1), &th, Look::FLAT);
-        assert!(
-            (0..8).all(|x| b[(x, 0)].symbol() == "x"),
-            "no line is drawn"
-        );
         let t16 = Theme::named("rada", ColorDepth::Ansi16).unwrap();
         let mut c = buf_of(8);
         tint_row(
@@ -322,17 +298,5 @@ mod tests {
             (0..8).all(|x| c[(x, 0)].bg == Color::Reset),
             "16 colours keep reverse video"
         );
-    }
-
-    #[test]
-    fn the_gradient_line_follows_the_theme_tokens() {
-        let th = Theme::named("rada", ColorDepth::True).unwrap();
-        let look = Look::new(&th, IconSet::Nerd, false);
-        assert!(look.shades);
-        let mut b = buf_of(30);
-        gradient_line(&mut b, Rect::new(0, 0, 30, 1), &th, look);
-        assert_eq!(b[(0, 0)].symbol(), "▔");
-        assert_eq!(b[(0, 0)].fg, th.grad_line_start);
-        assert_eq!(b[(29, 0)].fg, th.grad_line_end);
     }
 }

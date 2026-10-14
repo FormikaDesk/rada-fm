@@ -25,6 +25,9 @@ pub struct OpenWithView {
     pub selected: usize,
     /// The box "always use this for this kind of file", for the highlighted program.
     pub always: bool,
+    /// The menu this list was opened from ("Open with ›" of the context menu): it stays in
+    /// view behind the list, and Left or Esc gives it back.
+    pub under: Option<Box<MenuView>>,
 }
 
 /// A line of the list.
@@ -51,6 +54,7 @@ impl OpenWithView {
             cursor: 0,
             selected: 0,
             always: false,
+            under: None,
         }
     }
 
@@ -167,8 +171,10 @@ pub(super) fn open_with_chosen(
 
 impl App {
     /// The window, at once, and the programs when the worker has found them.
-    pub(super) fn open_with_window(&mut self, path: PathBuf) {
-        self.modal = Some(Modal::OpenWith(Box::new(OpenWithView::new(path.clone()))));
+    pub(super) fn open_with_window(&mut self, path: PathBuf, under: Option<Box<MenuView>>) {
+        let mut view = OpenWithView::new(path.clone());
+        view.under = under;
+        self.modal = Some(Modal::OpenWith(Box::new(view)));
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
         let state = platform.dirs().rada_state();
@@ -211,7 +217,20 @@ impl App {
     pub(super) fn on_open_with_key(&mut self, mut v: Box<OpenWithView>, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
-            KeyCode::Esc => return,
+            // Esc (or Left, with nothing typed) closes the list; if it came from the context
+            // menu, that is given back.
+            KeyCode::Esc => {
+                if let Some(m) = v.under.take() {
+                    self.modal = Some(Modal::Menu(*m));
+                }
+                return;
+            }
+            KeyCode::Left if v.filter.is_empty() && v.under.is_some() => {
+                if let Some(m) = v.under.take() {
+                    self.modal = Some(Modal::Menu(*m));
+                }
+                return;
+            }
             KeyCode::Enter => {
                 match v.current().cloned() {
                     Some(app) => self.launch_chosen(&v, app),

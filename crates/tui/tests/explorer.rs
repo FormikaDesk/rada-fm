@@ -585,7 +585,11 @@ fn the_dropdowns_open_menus_that_work() {
     h.keys("todo.txt");
     h.press("enter");
     plan_modal(&mut h);
-    assert!(h.screen().contains("New file"), "{}", h.screen());
+    assert!(
+        h.screen().contains("Create file todo.txt"),
+        "{}",
+        h.screen()
+    );
     run_plan_and_wait(&mut h);
     assert!(h.app.cwd.join("todo.txt").is_file());
     assert_eq!(
@@ -598,11 +602,12 @@ fn the_dropdowns_open_menus_that_work() {
     // Sort ▾ lists the keys with the current one marked.
     h.click(&Target::Menu(MenuKind::Sort));
     let s = h.screen();
+    let ticked = |s: &str, word: &str| s.lines().any(|l| l.contains(word) && l.contains('✓'));
     assert!(
-        s.contains("✓ Name") && s.contains("Date modified") && s.contains("Type"),
+        ticked(&s, "Name") && s.contains("Date modified") && s.contains("Type"),
         "{s}"
     );
-    assert!(s.contains("✓ Ascending"), "{s}");
+    assert!(ticked(&s, "Ascending"), "{s}");
     h.press("down");
     h.press("down");
     h.press("down"); // Size
@@ -1051,16 +1056,24 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
     ] {
         assert!(s.contains(needle), "{needle}:\n{s}");
     }
-    // Sort by ▸ opens the sort choices in its place.
-    h.press("down");
+    // Paste is greyed out and the cursor skips it. Sort by › opens the sort choices beside the
+    // menu, which stays; Left gives it back.
     h.press("down");
     h.press("enter");
     let s = h.screen();
     assert!(
-        s.contains("Date modified") && s.contains("Descending"),
+        s.contains("Date modified") && s.contains("Descending") && s.contains("Refresh"),
         "{s}"
     );
+    h.press("left");
+    let s = h.screen();
+    assert!(!s.contains("Descending") && s.contains("Refresh"), "{s}");
+    h.press("down");
+    h.press("right");
+    assert!(h.screen().contains("Columns"), "Right opens a submenu too");
     h.press("esc");
+    h.press("esc");
+    assert!(h.app.modal.is_none());
 }
 
 #[test]

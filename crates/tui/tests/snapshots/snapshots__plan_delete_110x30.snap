@@ -8,24 +8,24 @@ expression: shot(&mut h)
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo                     ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
-│  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮e │
-│  │                                                                                                      │  │
-│ T│   Delete                                                                                             │  │
-│  │  Permanently delete 1 item                                                                           │  │
-│  │  In    ~/demo/projects                                                                               │  │
-│  │                                                                                                      │B │
-│  │  1             3.52 KB                                                                               │B │
-│  │  file          freed                                                                                 │B │
-│  │                                                                                                      │B │
-│  │  ▲ PERMANENT: this cannot be undone                                                                  │B │
-│  │                                                                                                      │B │
-│  │  What will happen                                                                                    │B │
-│  │  · notes.txt                                 delete                                       3.52 KB    │B │
-│  │  This cannot be undone.  Type yes to confirm: ▏                                                      │B │
-│  │                                                                                                      │  │
-│  │   Enter  Run    Esc  Cancel                                                                          │  │
-│  │                                                                                                      │  │
-│  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯  │
+│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size │
+│                          │ │                                                                               │
+│ TAGS           ╭──────────────────────────────────────────────────────────────────────────╮                │
+│  ● Red         │                                                                          │                │
+│  ● Orange      │    ✗    Delete 1 item permanently?                                       │                │
+│  ● Yellow      │         3.52 KB  ·  In ~/demo/projects                                   │            1 B │
+│  ● Green       │  ──────────────────────────────────────────────────────────────────────  │         420 MB │
+│  ● Blue        │   · notes.txt                                                  3.52 KB   │           42 B │
+│  ● Purple      │                                                                          │           37 B │
+│  ● Gray        │   ▲ This cannot be undone: the files do not go to the trash.             │        3.52 KB │
+│                │                                                                          │           73 B │
+│                │  Type yes to confirm   ▏                                                 │           13 B │
+│                │                                                                          │           16 B │
+│                │  Tab buttons                              Cancel  Esc    Delete  Enter   │            6 B │
+│                │                                                                          │                │
+│                ╰──────────────────────────────────────────────────────────────────────────╯                │
+│                          │ │                                                                               │
+│                          │ │                                                                               │
 │                          │ │                                                                               │
 ╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯
  12 items                                                                                 v0.6.0 ⟳   ≣  ▦  ▥

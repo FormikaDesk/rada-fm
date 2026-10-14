@@ -550,7 +550,13 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
                             width: sz.width.min(pic.width),
                             height: sz.height.min(pic.height),
                         };
-                        f.render_stateful_widget(StatefulImage::default(), r, &mut ui.proto);
+                        // A picture the terminal draws lies over the cells: where a popup is
+                        // drawn it is left out (the cells under it stay as they are).
+                        let covered =
+                            ui.is_graphics() && app.popup_covers.iter().any(|c| c.intersects(r));
+                        if !covered {
+                            f.render_stateful_widget(StatefulImage::default(), r, &mut ui.proto);
+                        }
                         // The facts follow the picture directly, no empty row between.
                         facts_at = Rect {
                             x: inner.x,

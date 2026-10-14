@@ -1,5 +1,4 @@
-//! The soft look on a real frame: round ends, the shade behind the cursor row, the thin line
-//! under the bar, and what each of them becomes without Nerd Font glyphs, in 256 colours and
+//! The soft look on a real frame: round ends, the shade behind the cursor row, and what each of them becomes without Nerd Font glyphs, in 256 colours and
 //! in the basic profile.
 
 mod common;
@@ -81,24 +80,6 @@ fn selected_rows_are_tinted_with_round_ends_too() {
 }
 
 #[test]
-fn a_thin_shaded_line_runs_under_the_field() {
-    let mut h = scene(IconSet::Nerd);
-    let th = h.app.th.clone();
-    let _ = h.screen();
-    let field = h.app.bar_field;
-    let buf = h.term.backend().buffer().clone();
-    let y = field.y + 1;
-    let w = field.width as usize;
-    for i in 0..w {
-        let c = &buf[(field.x + i as u16, y)];
-        assert_eq!(c.symbol(), "▔", "cell {i}");
-        assert_eq!(c.fg, th.line_shade(i, w), "cell {i}");
-    }
-    assert_eq!(buf[(field.x, y)].fg, th.grad_line_start);
-    assert_eq!(buf[(field.x + field.width - 1, y)].fg, th.grad_line_end);
-}
-
-#[test]
 fn every_colour_of_a_soft_frame_is_a_token_or_a_shade_between_two() {
     for name in Theme::NAMES {
         let th = Theme::named(name, ColorDepth::True).unwrap();
@@ -106,7 +87,6 @@ fn every_colour_of_a_soft_frame_is_a_token_or_a_shade_between_two() {
         for w in 1..=200usize {
             for x in 0..w {
                 allowed.push(th.row_shade(x, w));
-                allowed.push(th.line_shade(x, w));
             }
         }
         let mut h = scene(IconSet::Nerd);
@@ -132,7 +112,7 @@ fn every_colour_of_a_soft_frame_is_a_token_or_a_shade_between_two() {
 }
 
 #[test]
-fn in_256_colours_the_shade_and_the_line_are_solid() {
+fn in_256_colours_the_shade_is_solid() {
     let mut h = scene(IconSet::Nerd);
     h.app.th = Theme::named("rada", ColorDepth::Ansi256).unwrap();
     let th = h.app.th.clone();
@@ -144,11 +124,7 @@ fn in_256_colours_the_shade_and_the_line_are_solid() {
     );
     // The ends are still round: the font is the same.
     assert_eq!(cells[0].symbol(), CAP_LEFT);
-    let field = h.app.bar_field;
     let buf = h.term.backend().buffer().clone();
-    for i in 0..field.width {
-        assert_eq!(buf[(field.x + i, field.y + 1)].fg, th.accent);
-    }
     // Nothing on the screen is a true colour.
     for y in 0..buf.area.height {
         for x in 0..buf.area.width {
@@ -169,7 +145,7 @@ fn without_nerd_glyphs_there_are_no_special_glyphs_and_no_shade() {
             !screen.contains(CAP_LEFT) && !screen.contains(CAP_RIGHT),
             "{icons:?}"
         );
-        assert!(!screen.contains('▔'), "{icons:?}: no gradient line");
+        assert!(!screen.contains('▔'), "{icons:?}: no line under the bar");
         let cells = cursor_cells(&mut h);
         let w = cells.len();
         assert!(

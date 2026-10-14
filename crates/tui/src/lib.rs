@@ -15,6 +15,7 @@ pub mod images;
 pub mod keymap;
 pub mod nav;
 pub mod palette;
+pub mod progicons;
 pub mod run;
 pub mod services;
 pub mod sidebar;

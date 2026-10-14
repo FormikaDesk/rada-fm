@@ -10,25 +10,25 @@ expression: shot(&mut h)
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
 │  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
-│     ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮     │
-│ TAGS│                                                                                                          │     │
-│  ● R│   Copy                                                                                                   │     │
-│  ● O│  Copy 2 items                                                                                            │     │
-│  ● Y│  From  ~/demo/projects                                                                                   │     │
-│  ● G│  To    ~/demo/backup                                                                                     │     │
-│  ● B│                                                                                                          │     │
-│  ● P│  2             79 B                                                                                      │     │
-│  ● G│  files         in total                                                                                  │     │
-│     │                                                                                                          │     │
-│     │  If a name already exists    skip  keep both  overwrite    c to change                                   │     │
-│     │                                                                                                          │     │
-│     │  What will happen                                                                                        │     │
-│     │  · Cargo.toml                                  copy                                              42 B    │     │
-│     │  · main.rs                                     copy                                              37 B    │     │
-│     │                                                                                                          │     │
-│     │   Enter  Run    Esc  Cancel       ↑↓ scroll                                                              │     │
-│     │                                                                                                          │     │
-│     ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯     │
+│                          │ │                                                                                         │
+│ TAGS                     │ │▌☐ · README.md               10/10/2026       Markdown                     3 B           │
+│  ● Red              ╭──────────────────────────────────────────────────────────────────────────╮                     │
+│  ● Orange           │                                                                          │                     │
+│  ● Yellow           │    ⧉    Copy 2 items to backup                                           │                     │
+│  ● Green            │         79 B  ·  ~/demo/projects → ~/demo/backup                         │                     │
+│  ● Blue             │  ──────────────────────────────────────────────────────────────────────  │                     │
+│  ● Purple           │   · Cargo.toml                                          new       42 B   │                     │
+│  ● Gray             │   · main.rs                                             new       37 B   │                     │
+│                     │                                                                          │                     │
+│                     │  If a name already exists    Keep both   Overwrite   Skip    ← →         │                     │
+│                     │                                                                          │                     │
+│                     │   ● You can undo this with Ctrl+Z: the new copies will be removed.       │                     │
+│                     │                                                                          │                     │
+│                     │  Tab buttons  ·  ↑↓ scroll                  Cancel  Esc    Copy  Enter   │                     │
+│                     │                                                                          │                     │
+│                     ╰──────────────────────────────────────────────────────────────────────────╯                     │
+│                          │ │                                                                                         │
+│                          │ │                                                                                         │
 │                          │ │                                                                                         │
 │                          │ │                                                                                         │
 │                          │ │                                                                                         │

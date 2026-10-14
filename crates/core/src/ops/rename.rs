@@ -208,7 +208,17 @@ static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl Engine {
     pub fn plan_bulk_rename(&self, items: &[PathBuf], pattern: &Pattern) -> Plan {
-        let mut plan = Plan::empty(OpKind::BulkRename, format!("Rename {} items", items.len()));
+        let mut plan = Plan::empty(
+            OpKind::BulkRename,
+            crate::i18n::tf(
+                crate::i18n::Key::TitleBulkRename,
+                &[&crate::i18n::count(
+                    items.len() as u64,
+                    crate::i18n::Key::ItemOne,
+                    crate::i18n::Key::ItemMany,
+                )],
+            ),
+        );
         let mut ws = WarningSet::default();
         let rules = self.platform.path_rules();
         // Compared component by component: `d/2` and `d\2` are the same place on Windows.

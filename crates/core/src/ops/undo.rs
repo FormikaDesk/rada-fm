@@ -279,7 +279,10 @@ impl Engine {
             engine: self,
             overlay: HashMap::new(),
         };
-        let mut plan = Plan::empty(OpKind::Undo, format!("Undo: {}", entry.title));
+        let mut plan = Plan::empty(
+            OpKind::Undo,
+            crate::i18n::tf(crate::i18n::Key::TitleUndo, &[&entry.title]),
+        );
         plan.reversible = false;
         let mut index_map = Vec::new();
         let mut blocked = Vec::new();

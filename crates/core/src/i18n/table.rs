@@ -48,6 +48,7 @@ pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::HomeLabel,
     Key::AboutChannelValue,
     Key::PvPdfPages,
+    Key::PolicyChange,
 ];
 
 strings! {
@@ -100,6 +101,8 @@ strings! {
     TitleTrash => "Move {0} to the trash", "Sposta {0} nel cestino";
     TitleDelete => "Permanently delete {0}", "Elimina definitivamente {0}";
     TitleRename => "Rename {0} to {1}", "Rinomina {0} in {1}";
+    TitleBulkRename => "Rename {0}", "Rinomina {0}";
+    TitleUndo => "Undo: {0}", "Annulla: {0}";
     TitleMkdir => "Create folder {0}", "Crea la cartella {0}";
     TitleMkfile => "Create file {0}", "Crea il file {0}";
     TitleExtract => "Extract {0}", "Estrai {0}";
@@ -443,19 +446,33 @@ strings! {
     PolSkip => "skip", "salta";
     PolKeep => "keep both", "tieni entrambi";
     PolOver => "overwrite", "sovrascrivi";
-    PolicyChange => "c to change", "c per cambiare";
+    PolicyChange => "← →", "← →";
+    PlanQDelete => "Delete {0} permanently?", "Eliminare definitivamente {0}?";
+    PlanQTrash => "Move {0} to the trash?", "Spostare {0} nel cestino?";
+    BadgeNew => "new", "nuovo";
+    BadgeExists => "already there", "esiste già";
+    HintTabButtons => "Tab buttons", "Tab pulsanti";
+    NoteUndoCopy => "You can undo this with {0}: the new copies will be removed.", "Si potrà annullare con {0}: le copie nuove verranno tolte.";
+    NoteUndoMove => "You can undo this with {0}: the items will go back where they were.", "Si potrà annullare con {0}: gli elementi torneranno dove erano.";
+    NoteUndoTrash => "You can undo this with {0}: the items will come back from the trash.", "Si potrà annullare con {0}: gli elementi usciranno dal cestino.";
+    NoteUndoExtract => "You can undo this with {0}: what is extracted will be removed.", "Si potrà annullare con {0}: ciò che viene estratto verrà tolto.";
+    NoteUndoCompress => "You can undo this with {0}: the archive will be removed.", "Si potrà annullare con {0}: l'archivio verrà tolto.";
+    NoteUndoRename => "You can undo this with {0}: the names will go back.", "Si potrà annullare con {0}: i nomi torneranno quelli di prima.";
+    NoteUndoTags => "You can undo this with {0}: the tags will go back.", "Si potrà annullare con {0}: i tag torneranno quelli di prima.";
+    NoteUndoNew => "You can undo this with {0}: what is made will be removed.", "Si potrà annullare con {0}: ciò che viene creato verrà tolto.";
+    NoteNoUndoTrash => "Not in the trash: the files are removed for good.", "Non finiscono nel cestino: i file vengono tolti per sempre.";
     PolicyTrashNote => "replaced items go to the trash first, so undo brings them back", "gli elementi sostituiti vanno prima nel cestino, così annullando tornano";
     PlanRenames => "Renames", "Rinomine";
     PlanWhat => "What will happen", "Cosa succederà";
-    PlanTabSteps => "Tab: every step", "Tab: ogni passaggio";
-    PlanTabSummary => "Tab: summary", "Tab: riepilogo";
+    PlanTabSteps => "d every step", "d ogni passaggio";
+    PlanTabSummary => "d summary", "d riepilogo";
     PlanWhatN => "What will happen ({0})", "Cosa succederà ({0})";
     ActExtractItem => "extract", "estrai";
     ActAddItem => "add", "aggiungi";
     AsName => "as {0}", "come {0}";
     AndNMore => "… and {0} more", "… e altri {0}";
     MoreStepsNotListed => "… more steps not listed", "… altri passaggi non elencati";
-    CannotBeUndone => "This cannot be undone.", "Non si può annullare.";
+    CannotBeUndone => "This cannot be undone: the files do not go to the trash.", "Non si può annullare: i file non passano dal cestino.";
     ArchiveMayBeBomb => "This archive may be a bomb.", "Questo archivio potrebbe essere una bomba.";
     TypePrefix => "Type ", "Scrivi ";
     ConfirmWord => "yes", "sì";
@@ -481,6 +498,10 @@ strings! {
     PaletteHint => "Jump to a folder, bookmark or disk…", "Vai a una cartella, un preferito o un disco…";
     PaletteNone => "No matches. Type a path starting with / or ~ to go anywhere.", "Nessun risultato. Scrivi un percorso che inizia con / o ~ per andare ovunque.";
     ChipOpenWith => "Open with", "Apri con";
+    OpenFileWith => "Open {0} with", "Apri {0} con";
+    AlwaysForExt => "Always use for .{0} files", "Usa sempre per i file .{0}";
+    AlwaysForKind => "Always use for this kind of file", "Usa sempre per questo tipo di file";
+    TagsOf => "Tags of {0}", "Tag di {0}";
     OpenWithHint => "Type to find a program…", "Scrivi per cercare un programma…";
     OpenWithLooking => "Looking for the programs that open it…", "Cerco i programmi che lo aprono…";
     OpenWithNone => "No installed program says it opens this kind of file.", "Nessun programma installato dichiara di aprire questo tipo di file.";
