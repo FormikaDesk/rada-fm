@@ -94,7 +94,7 @@ impl Entry {
         let shown = display::name(
             &platform
                 .attributes()
-                .shown_name(&name, meta)
+                .shown_name(&path, &name, meta)
                 .unwrap_or_else(|| name.clone()),
         );
         let package = meta.kind == FileKind::Dir && platform.attributes().is_package(&path, meta);

@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::path::Path;
 
 use crate::fs::FsMeta;
 
@@ -24,8 +25,14 @@ pub trait FileAttributes: Send + Sync {
     fn attrs(&self, name: &OsStr, meta: &FsMeta) -> Attrs;
 
     /// The name the system's own file manager shows for this entry when it is not the name on
-    /// the disk (the Finder drops `.localized` from a folder's name). `None`: the name as it is.
-    fn shown_name(&self, _name: &OsStr, _meta: &FsMeta) -> Option<std::ffi::OsString> {
+    /// the disk (the Finder drops `.localized` from a folder's name and shows "Scrivania" for
+    /// `Desktop`; `path` is where the entry is). `None`: the name as it is.
+    fn shown_name(
+        &self,
+        _path: &Path,
+        _name: &OsStr,
+        _meta: &FsMeta,
+    ) -> Option<std::ffi::OsString> {
         None
     }
 

@@ -45,7 +45,10 @@ pub fn icloud_drive(home: &Path) -> std::path::PathBuf {
 
 /// What the Finder hides: dot files (which include `.DS_Store`, `._*` and `.localized`), and
 /// anything the system flagged hidden.
-pub struct MacAttributes;
+pub struct MacAttributes {
+    /// The home folder: where the folders with a localized name stand.
+    pub home: std::path::PathBuf,
+}
 
 impl FileAttributes for MacAttributes {
     fn attrs(&self, name: &std::ffi::OsStr, meta: &FsMeta) -> Attrs {
@@ -64,8 +67,22 @@ impl FileAttributes for MacAttributes {
         meta.kind == FileKind::Dir && native::is_package(path)
     }
 
-    fn shown_name(&self, name: &std::ffi::OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
-        localized_folder_name(name, meta.kind == FileKind::Dir)
+    fn shown_name(
+        &self,
+        path: &Path,
+        name: &std::ffi::OsStr,
+        meta: &FsMeta,
+    ) -> Option<std::ffi::OsString> {
+        let dir = meta.kind == FileKind::Dir;
+        localized_folder_name(name, dir).or_else(|| {
+            // "Scrivania" for `Desktop` with an Italian interface.
+            if !dir {
+                return None;
+            }
+            super::foldernames::FolderNames::current()
+                .shown(path, &self.home)
+                .map(std::ffi::OsString::from)
+        })
     }
 }
 
@@ -511,11 +528,13 @@ type PlatformAttrs = MacAttributes;
 type PlatformAttrs = super::windows::WindowsAttributes;
 
 #[cfg(unix)]
-fn attrs() -> PlatformAttrs {
-    MacAttributes
+fn attrs(home: &Path) -> PlatformAttrs {
+    MacAttributes {
+        home: home.to_path_buf(),
+    }
 }
 #[cfg(not(unix))]
-fn attrs() -> PlatformAttrs {
+fn attrs(_home: &Path) -> PlatformAttrs {
     super::windows::WindowsAttributes
 }
 
@@ -529,6 +548,8 @@ pub struct MacPlatform {
     tags: super::tags::XattrTags,
     /// Tests: the standard folders come from `user-dirs.dirs` in the sandbox.
     sandbox_user_dirs: bool,
+    /// Where the system's tables of folder names are (tests: a folder of their own).
+    system_tables: std::path::PathBuf,
 }
 
 impl MacPlatform {
@@ -549,8 +570,8 @@ impl MacPlatform {
     /// A platform whose trash is `trash` (the tests give it a folder of their own).
     pub fn with_trash(dirs: Dirs, trash: Box<dyn TrashBackend>) -> Self {
         MacPlatform {
+            attrs: attrs(&dirs.home),
             dirs,
-            attrs: attrs(),
             trash,
             volumes: MacVolumes,
             opener: MacOpener {
@@ -560,7 +581,15 @@ impl MacPlatform {
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             tags: super::tags::XattrTags::finder(),
             sandbox_user_dirs: false,
+            system_tables: super::foldernames::SYSTEM_TABLES.into(),
         }
+    }
+
+    /// The system's tables of folder names are in `dir` instead of in the system's folder: for
+    /// tests, which must not depend on the machine.
+    pub fn with_system_tables(mut self, dir: &Path) -> Self {
+        self.system_tables = dir.to_path_buf();
+        self
     }
 
     /// The standard folders are those `user-dirs.dirs` names in the config folder (the
@@ -618,13 +647,23 @@ impl Platform for MacPlatform {
         UserDirs::conventional(&self.dirs.home, "Movies")
     }
     fn display_names(&self, places: &[std::path::PathBuf]) -> Vec<(std::path::PathBuf, String)> {
-        if self.sandbox_user_dirs {
-            return Vec::new();
-        }
-        name_candidates(places, &self.dirs.home)
+        let home = &self.dirs.home;
+        let names = super::foldernames::FolderNames::current_with(&self.system_tables);
+        name_candidates(places, home)
             .into_iter()
             .filter(|p| p.exists())
-            .filter_map(|p| native::display_name(&p).and_then(|n| only_different(&p, n)))
+            .filter_map(|p| {
+                // The standard folders are named in the language of the interface, from the
+                // system's table (or the reserve): "Scrivania" with an Italian interface, the
+                // name on disk with an English one, whatever the Finder's own language is.
+                if super::foldernames::is_system_folder(&p, home) {
+                    return names.shown(&p, home).and_then(|n| only_different(&p, n));
+                }
+                if self.sandbox_user_dirs {
+                    return None;
+                }
+                native::display_name(&p).and_then(|n| only_different(&p, n))
+            })
             .collect()
     }
     fn extra_places(&self) -> Vec<(PlaceKind, std::path::PathBuf)> {
@@ -698,6 +737,49 @@ mod tests {
         }
     }
 
+    /// The names of the Finder's folders on the platform itself (a Mac, with the tables of
+    /// the system in a folder of the test), in the language of the interface.
+    #[test]
+    fn the_standard_folders_are_named_in_the_language_of_the_interface() {
+        use crate::i18n::{Lang, with_lang};
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("home");
+        for f in ["Desktop", "Documents", "Music"] {
+            std::fs::create_dir_all(home.join(f)).unwrap();
+            std::fs::write(home.join(f).join(".localized"), b"").unwrap();
+        }
+        // This one is not the system's: it has no marker.
+        std::fs::create_dir_all(home.join("Movies")).unwrap();
+        let dirs = Dirs {
+            home: home.clone(),
+            config: t.path().join("c"),
+            data: t.path().join("d"),
+            state: t.path().join("s"),
+            cache: t.path().join("k"),
+        };
+        let tables = t.path().join("tables");
+        std::fs::create_dir_all(&tables).unwrap();
+        let p = MacPlatform::new(dirs)
+            .with_sandbox_user_dirs()
+            .with_system_tables(&tables);
+        let places: Vec<std::path::PathBuf> = ["Desktop", "Documents", "Music", "Movies"]
+            .iter()
+            .map(|f| home.join(f))
+            .collect();
+        let it = with_lang(Lang::It, || p.display_names(&places));
+        let get = |v: &[(std::path::PathBuf, String)], f: &str| {
+            v.iter()
+                .find(|(p, _)| p == &home.join(f))
+                .map(|(_, n)| n.clone())
+        };
+        assert_eq!(get(&it, "Desktop").as_deref(), Some("Scrivania"));
+        assert_eq!(get(&it, "Documents").as_deref(), Some("Documenti"));
+        assert_eq!(get(&it, "Music").as_deref(), Some("Musica"));
+        assert_eq!(get(&it, "Movies"), None, "no marker, no new name");
+        let en = with_lang(Lang::En, || p.display_names(&places));
+        assert!(en.is_empty(), "English keeps the names on disk: {en:?}");
+    }
+
     #[test]
     fn a_localized_folder_is_shown_without_the_suffix() {
         use std::ffi::OsStr;
@@ -722,7 +804,9 @@ mod tests {
     #[test]
     fn the_finder_hides_dot_files_and_folders_flagged_hidden() {
         use std::ffi::OsStr;
-        let a = MacAttributes;
+        let a = MacAttributes {
+            home: std::path::PathBuf::from("/Users/me"),
+        };
         let hidden = |name: &str, flags: Option<u32>| {
             a.attrs(OsStr::new(name), &meta_with(FileKind::Dir, flags))
                 .hidden

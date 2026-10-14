@@ -153,9 +153,17 @@ impl App {
         if let Some(tag) = rada_core::tagsearch::view_name(p) {
             return tf(Key::TagViewTitle, &[&tag]);
         }
-        p.file_name()
+        let on_disk = p
+            .file_name()
             .map(rada_core::display::name)
-            .unwrap_or_else(|| rada_core::display::path(p))
+            .unwrap_or_else(|| rada_core::display::path(p));
+        // What the Finder calls the folder ("Scrivania"), when that is not its name. (On
+        // Windows the tab keeps the name on disk for now: see the notes of 0.6.0-rc.8.)
+        if self.svc.platform.name().starts_with("macos") {
+            self.shown_name(p, on_disk)
+        } else {
+            on_disk
+        }
     }
 
     pub fn switch_tab(&mut self, to: usize) {

@@ -171,6 +171,116 @@ fn decode_binary(b: &[u8]) -> Option<Vec<String>> {
     Some(out)
 }
 
+/// A property list that is a dictionary of strings to strings (what a `.strings` file of the
+/// system is): binary, or XML. Anything else in it makes it unreadable (`None`).
+pub fn decode_string_dict(bytes: &[u8]) -> Option<std::collections::HashMap<String, String>> {
+    if bytes.starts_with(b"bplist00") {
+        decode_binary_dict(bytes)
+    } else {
+        decode_xml_dict(bytes)
+    }
+}
+
+fn decode_binary_dict(b: &[u8]) -> Option<std::collections::HashMap<String, String>> {
+    if b.len() < 8 + 32 {
+        return None;
+    }
+    let trailer = &b[b.len() - 32..];
+    let offset_size = trailer[6] as usize;
+    let ref_size = trailer[7] as usize;
+    let count = read_uint(&trailer[8..16])? as usize;
+    let top = read_uint(&trailer[16..24])? as usize;
+    let table_at = read_uint(&trailer[24..32])? as usize;
+    if !(1..=8).contains(&offset_size) || !(1..=8).contains(&ref_size) || top >= count {
+        return None;
+    }
+    let table_end = table_at.checked_add(count.checked_mul(offset_size)?)?;
+    if table_end > b.len() - 32 {
+        return None;
+    }
+    let offset_of = |i: usize| -> Option<usize> {
+        let at = table_at.checked_add(i.checked_mul(offset_size)?)?;
+        read_uint(b.get(at..at.checked_add(offset_size)?)?).map(|o| o as usize)
+    };
+    let length = |at: usize| -> Option<(usize, usize)> {
+        let nibble = (*b.get(at)? & 0x0F) as usize;
+        if nibble < 15 {
+            return Some((nibble, at + 1));
+        }
+        let int = *b.get(at + 1)?;
+        if int & 0xF0 != 0x10 || int & 0x0F > 3 {
+            return None;
+        }
+        let size = 1usize << (int & 0x0F);
+        let n = read_uint(b.get(at + 2..at + 2 + size)?)? as usize;
+        Some((n, at + 2 + size))
+    };
+    let string_of = |r: usize| -> Option<String> {
+        if r >= count {
+            return None;
+        }
+        let obj = offset_of(r)?;
+        let marker = *b.get(obj)?;
+        let (len, data) = length(obj)?;
+        match marker & 0xF0 {
+            0x50 => String::from_utf8(b.get(data..data.checked_add(len)?)?.to_vec()).ok(),
+            0x60 => {
+                let raw = b.get(data..data.checked_add(len.checked_mul(2)?)?)?;
+                let units: Vec<u16> = raw
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|c| u16::from_be_bytes(*c))
+                    .collect();
+                String::from_utf16(&units).ok()
+            }
+            _ => None,
+        }
+    };
+    let top_at = offset_of(top)?;
+    if b.get(top_at)? & 0xF0 != 0xD0 {
+        return None;
+    }
+    let (n, refs_at) = length(top_at)?;
+    if n > count {
+        return None;
+    }
+    let reference = |i: usize| -> Option<usize> {
+        let at = refs_at.checked_add(i.checked_mul(ref_size)?)?;
+        read_uint(b.get(at..at.checked_add(ref_size)?)?).map(|r| r as usize)
+    };
+    let mut out = std::collections::HashMap::with_capacity(n);
+    for i in 0..n {
+        let key = string_of(reference(i)?)?;
+        let value = string_of(reference(n + i)?)?;
+        out.insert(key, value);
+    }
+    Some(out)
+}
+
+/// `<dict><key>k</key><string>v</string>…</dict>`, with the usual entities.
+fn decode_xml_dict(b: &[u8]) -> Option<std::collections::HashMap<String, String>> {
+    let text = std::str::from_utf8(b).ok()?;
+    let start = text.find("<dict>")? + "<dict>".len();
+    let end = text.rfind("</dict>")?;
+    if end < start {
+        return None;
+    }
+    let mut out = std::collections::HashMap::new();
+    let mut rest = &text[start..end];
+    while let Some(i) = rest.find("<key>") {
+        let after = &rest[i + "<key>".len()..];
+        let close = after.find("</key>")?;
+        let key = unescape(&after[..close]);
+        let after = after[close + "</key>".len()..].trim_start();
+        let value_body = after.strip_prefix("<string>")?;
+        let close = value_body.find("</string>")?;
+        out.insert(key, unescape(&value_body[..close]));
+        rest = &value_body[close + "</string>".len()..];
+    }
+    Some(out)
+}
+
 /// `<array><string>a</string><string>b</string></array>`, with the usual entities.
 fn decode_xml(b: &[u8]) -> Option<Vec<String>> {
     let text = std::str::from_utf8(b).ok()?;

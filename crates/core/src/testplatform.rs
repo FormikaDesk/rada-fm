@@ -22,6 +22,9 @@ pub struct MacLikeSpec {
     pub package_suffixes: Vec<&'static str>,
     /// The names the "Finder" shows.
     pub names: Vec<(PathBuf, String)>,
+    /// A folder standing in for the system's tables of folder names: with it, the standard
+    /// folders of the home folder are named in the language of the interface, as on a Mac.
+    pub folder_tables: Option<PathBuf>,
     pub extra_places: Vec<(PlaceKind, PathBuf)>,
     /// Folders the system refuses until the person allows it, with the explanation.
     pub denied: Vec<AccessDenied>,
@@ -48,6 +51,7 @@ pub struct MacLike {
 struct Attrs2 {
     inner: Arc<dyn Platform>,
     suffixes: Vec<&'static str>,
+    folder_tables: Option<PathBuf>,
 }
 
 impl FileAttributes for Attrs2 {
@@ -57,9 +61,18 @@ impl FileAttributes for Attrs2 {
         a.hidden |= name.to_string_lossy().starts_with('.');
         a
     }
-    fn shown_name(&self, name: &OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
-        // The Finder's rule, as the real Mac attributes have it.
-        crate::platform::macos::localized_folder_name(name, meta.is_dir())
+    fn shown_name(&self, path: &Path, name: &OsStr, meta: &FsMeta) -> Option<std::ffi::OsString> {
+        // The Finder's rules, as the real Mac attributes have them.
+        crate::platform::macos::localized_folder_name(name, meta.is_dir()).or_else(|| {
+            let tables = self.folder_tables.as_deref()?;
+            meta.is_dir()
+                .then(|| {
+                    crate::platform::foldernames::FolderNames::current_with(tables)
+                        .shown(path, &self.inner.dirs().home)
+                })
+                .flatten()
+                .map(std::ffi::OsString::from)
+        })
     }
     fn is_package(&self, path: &Path, meta: &FsMeta) -> bool {
         meta.is_dir()
@@ -144,6 +157,7 @@ impl MacLike {
             attrs: Attrs2 {
                 inner: inner.clone(),
                 suffixes: spec.package_suffixes.clone(),
+                folder_tables: spec.folder_tables.clone(),
             },
             opener: Opener2 {
                 inner: inner.clone(),
@@ -195,8 +209,18 @@ impl Platform for MacLike {
     fn user_dirs(&self) -> UserDirs {
         self.inner.user_dirs()
     }
-    fn display_names(&self, _places: &[PathBuf]) -> Vec<(PathBuf, String)> {
-        self.spec.names.clone()
+    fn display_names(&self, places: &[PathBuf]) -> Vec<(PathBuf, String)> {
+        let mut out = self.spec.names.clone();
+        if let Some(tables) = &self.spec.folder_tables {
+            let home = &self.inner.dirs().home;
+            let names = crate::platform::foldernames::FolderNames::current_with(tables);
+            for p in places {
+                if let Some(n) = names.shown(p, home) {
+                    out.push((p.clone(), n));
+                }
+            }
+        }
+        out
     }
     fn extra_places(&self) -> Vec<(PlaceKind, PathBuf)> {
         self.spec.extra_places.clone()

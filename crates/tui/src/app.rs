@@ -979,8 +979,13 @@ impl App {
             .filter(|(_, e)| show || !e.hidden)
             .filter(|(_, e)| {
                 name_terms.is_empty() || {
+                    // The name shown and the name on disk both count: "Scrivania" and
+                    // "Desktop" find the same folder.
                     let name = e.display.to_lowercase();
-                    name_terms.iter().all(|t| name.contains(t.as_str()))
+                    let real = e.name.to_string_lossy().to_lowercase();
+                    name_terms
+                        .iter()
+                        .all(|t| name.contains(t.as_str()) || real.contains(t.as_str()))
                 }
             })
             .filter(|(_, e)| tag_terms.iter().all(|want| matches_tag(e, want)))
