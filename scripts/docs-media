@@ -5,13 +5,17 @@
 #
 #   scripts/docs-media               every tape
 #   scripts/docs-media principale    the tapes whose name starts with "principale"
+#   scripts/docs-media menu elimina  several prefixes
 #
 # RADA_BIN is the program to draw (default: target/release/rada, built if it is missing).
+# DOCS_OUT is a folder to draw into instead of docs/screenshots and docs/media (made if needed):
+# for pictures to look at before they go into the repository.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
-filter=${1:-}
+filters=("$@")
+out=${DOCS_OUT:-}
 
 for tool in vhs ttyd ffmpeg python3; do
   command -v "$tool" > /dev/null || { echo "$tool is needed" >&2; exit 1; }
@@ -35,25 +39,36 @@ done
 
 work=$(mktemp -d -t rada-docs-XXXXXX)
 mkdir -p "$work/bin" docs/screenshots docs/media/.scarto
+if [ -n "$out" ]; then mkdir -p "$out/.scarto"; fi
 ln -s "$bin" "$work/bin/rada"
 trap 'rm -r "$work"' EXIT
 
 for tape in docs/tapes/*.tape; do
   name=$(basename "$tape" .tape)
   case "$name" in ambiente*) continue ;; esac
-  case "$name" in "$filter"*) ;; *) continue ;; esac
+  wanted=0
+  if [ ${#filters[@]} -eq 0 ]; then wanted=1; fi
+  for f in "${filters[@]}"; do
+    case "$name" in "$f"*) wanted=1 ;; esac
+  done
+  [ "$wanted" = 1 ] || continue
   echo "== $name"
   home="$work/home-$name"
   python3 scripts/demo-home "$home" > /dev/null
   # What the tape promises (its Screenshot, and its Output unless that is a scrap): taken away
   # first, so that a recording that silently makes nothing is seen and not mistaken for the
   # picture of an earlier run.
-  promised=$(sed -n 's/^\(Screenshot\|Output\) "\(.*\)"$/\2/p' "$tape" | grep -v '/\.scarto/' || true)
+  run_tape=$tape
+  if [ -n "$out" ]; then
+    run_tape="$work/$name.tape"
+    sed "s|\"docs/screenshots/|\"$out/|; s|\"docs/media/|\"$out/|" "$tape" > "$run_tape"
+  fi
+  promised=$(sed -n 's/^\(Screenshot\|Output\) "\(.*\)"$/\2/p' "$run_tape" | grep -v '/\.scarto/' || true)
   # VHS now and then takes a picture of nothing: up to six tries are allowed.
   attempt=1
   while :; do
     for file in $promised; do rm -f -- "$file"; done
-    DEMO_HOME="$home" PATH="$work/bin:$PATH" vhs "$tape"
+    DEMO_HOME="$home" PATH="$work/bin:$PATH" vhs "$run_tape"
     missing=0
     for file in $promised; do
       [ -s "$file" ] || missing=1
@@ -67,3 +82,4 @@ for tape in docs/tapes/*.tape; do
 done
 
 rm -r docs/media/.scarto
+if [ -n "$out" ]; then rm -r "$out/.scarto"; fi

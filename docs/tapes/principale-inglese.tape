@@ -11,3 +11,4 @@ Sleep 2s
 Show
 Sleep 2500ms
 Screenshot "docs/screenshots/principale-inglese.png"
+Sleep 1s

@@ -147,7 +147,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // command bar next; the compact layout has neither, nor the address bar.
     let explorer = app.layout == LayoutKind::Explorer;
     let tabs_h = 1;
-    let gap_h = top_gap_height(explorer, area.height);
+    // The half row of air is made of ▀: the basic profile has no such glyph.
+    let gap_h = if app.basic {
+        0
+    } else {
+        top_gap_height(explorer, area.height)
+    };
     let address_h = u16::from(explorer);
     let commands_h = commands_height(explorer, area.height);
     let hints_h = hints_height(explorer && app.show_hints, area.height);

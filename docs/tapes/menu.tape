@@ -11,3 +11,4 @@ Sleep 800ms
 Ctrl+K
 Sleep 2500ms
 Screenshot "docs/screenshots/menu.png"
+Sleep 1s

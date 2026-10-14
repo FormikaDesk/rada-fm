@@ -23,3 +23,4 @@ Sleep 1500ms
 Enter
 Sleep 6s
 Screenshot "docs/screenshots/avanzamento.png"
+Sleep 1s

@@ -10,3 +10,4 @@ Show
 Type "?"
 Sleep 2500ms
 Screenshot "docs/screenshots/aiuto.png"
+Sleep 1s

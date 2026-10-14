@@ -13,3 +13,4 @@ Down
 Right 6
 Sleep 2500ms
 Screenshot "docs/screenshots/icone.png"
+Sleep 1s

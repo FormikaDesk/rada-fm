@@ -12,6 +12,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
+use super::popup::{Ctx, Tone};
 use super::widgets::{SPIN, button, centered, hit_spans, pad, pad_left, tail};
 use crate::app::*;
 use crate::fmt;
@@ -24,7 +25,7 @@ use crossterm::event::KeyCode;
 /// The card of a window: surface, rounded border and shadow (see [`super::popup`]); returns
 /// the usable area inside it, with air of two cells at the sides and one above and below. The
 /// colour a window used to give its border now says itself in the mark at its head.
-fn frame(f: &mut Frame, th: &Theme, r: Rect, _tone: Color) -> Rect {
+pub(super) fn frame(f: &mut Frame, th: &Theme, r: Rect, _tone: Color) -> Rect {
     let inner = super::popup::card(f.buffer_mut(), r, th);
     Rect {
         x: inner.x + 2,
@@ -34,14 +35,28 @@ fn frame(f: &mut Frame, th: &Theme, r: Rect, _tone: Color) -> Rect {
     }
 }
 
-fn chip<'a>(th: &Theme, text: &str, color: Color) -> Span<'a> {
-    Span::styled(
-        format!(" {text} "),
-        Style::default()
-            .fg(th.on_accent)
-            .bg(color)
-            .add_modifier(Modifier::BOLD),
+/// The label at the head of a window: a pill in the tint of its tone (see [`super::popup`]),
+/// the title follows it.
+pub(super) fn chip(ctx: &Ctx, text: &str, tone: Tone) -> Vec<Span<'static>> {
+    let th = ctx.th;
+    let c = tone.color(th);
+    let fill = th.tint_share(th.popup, c, if th.light { 0.18 } else { 0.28 });
+    super::popup::pill(
+        ctx,
+        text,
+        fill,
+        Style::default().fg(c).add_modifier(Modifier::BOLD),
     )
+}
+
+/// A line that starts with [`chip`] and goes on with a title in bold.
+pub(super) fn titled(ctx: &Ctx, label: &str, tone: Tone, title: &str) -> Line<'static> {
+    let mut spans = chip(ctx, label, tone);
+    spans.push(Span::styled(
+        format!("  {title}"),
+        ctx.base().add_modifier(Modifier::BOLD),
+    ));
+    Line::from(spans)
 }
 
 /// The preview of the item under the cursor over the whole screen.
@@ -88,7 +103,8 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
     app.hits.add(area, Target::Window);
 }
 
-fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &mut Hits) {
+fn draw_properties(f: &mut Frame, ctx: &Ctx, p: &PropsView, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
     let key_w = p.rows.iter().map(|(k, _)| k.width()).max().unwrap_or(8) + 2;
     let w = 80.min(area.width.saturating_sub(4));
     let value_w = (w as usize).saturating_sub(6 + key_w).max(10);
@@ -107,16 +123,12 @@ fn draw_properties(f: &mut Frame, th: &Theme, p: &PropsView, area: Rect, hits: &
     let rows = inner.height.saturating_sub(3) as usize;
     let scroll = p.scroll.min(lines.len().saturating_sub(rows));
     let mut out = vec![
-        Line::from(vec![
-            chip(th, Key::ChipProperties.tr(), th.accent),
-            Span::styled(
-                format!(
-                    "  {}",
-                    display::truncate(&p.title, inner.width as usize / 2)
-                ),
-                th.base().add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        titled(
+            ctx,
+            Key::ChipProperties.tr(),
+            Tone::Accent,
+            &display::truncate(&p.title, inner.width as usize / 2),
+        ),
         Line::raw(""),
     ];
     out.extend(lines.into_iter().skip(scroll).take(rows));
@@ -212,13 +224,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let r = centered(area, w, h);
             let inner = frame(f, &th, r, th.error);
             let mut lines = vec![
-                Line::from(vec![
-                    chip(&th, Key::ChipError.tr(), th.error),
-                    Span::styled(
-                        format!("  {}", Key::WentWrong.tr()),
-                        th.base().add_modifier(Modifier::BOLD),
-                    ),
-                ]),
+                titled(&ctx, Key::ChipError.tr(), Tone::Danger, Key::WentWrong.tr()),
                 Line::raw(""),
             ];
             for l in msg {
@@ -256,8 +262,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             lines.push(Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint())));
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Input(iv) => draw_input(f, &th, iv, area),
-        Modal::History(h) => draw_history(f, &th, h, area, spinner, &mut app.hits),
+        Modal::Input(iv) => draw_input(f, &ctx, iv, area),
+        Modal::History(h) => draw_history(f, &ctx, h, area, spinner, &mut app.hits),
         Modal::Result(r) => {
             let w = 90.min(area.width.saturating_sub(4));
             let wrapped: Vec<(ToastKind, String, bool)> = r
@@ -275,10 +281,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let inner = frame(f, &th, rect, th.warn);
             let title = display::truncate(&r.title, (w as usize).saturating_sub(10));
             let mut lines = vec![
-                Line::from(vec![
-                    chip(&th, Key::ChipDone.tr(), th.warn),
-                    Span::styled(format!("  {title}"), th.base().add_modifier(Modifier::BOLD)),
-                ]),
+                titled(&ctx, Key::ChipDone.tr(), Tone::Warn, &title),
                 Line::raw(""),
             ];
             let rows = inner.height.saturating_sub(5) as usize;
@@ -316,13 +319,12 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             let r = centered(area, 66, 9);
             let inner = frame(f, &th, r, th.warn);
             let lines = vec![
-                Line::from(vec![
-                    chip(&th, Key::ChipRunning.tr(), th.warn),
-                    Span::styled(
-                        format!("  {}", Key::OpInProgress.tr()),
-                        th.base().add_modifier(Modifier::BOLD),
-                    ),
-                ]),
+                titled(
+                    &ctx,
+                    Key::ChipRunning.tr(),
+                    Tone::Warn,
+                    Key::OpInProgress.tr(),
+                ),
                 Line::raw(""),
                 Line::from(Span::styled(Key::QuitWarn1.tr(), th.dim())),
                 Line::from(Span::styled(Key::QuitWarn2.tr(), th.dim())),
@@ -350,13 +352,13 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             );
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Help => draw_help(f, &th, area, &app.keymap, app.mouse, app.help_scroll),
+        Modal::Help => draw_help(f, &ctx, area, &app.keymap, app.mouse, app.help_scroll),
         Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, area, &mut app.hits),
-        Modal::Properties(p) => draw_properties(f, &th, p, area, &mut app.hits),
-        Modal::Update(u) => super::updates::draw_update(f, &th, u, area, &mut app.hits),
-        Modal::Access(d) => super::dialogs::draw_access(f, &th, d, area, &mut app.hits),
-        Modal::Eject(e) => super::dialogs::draw_eject(f, &th, e, area, &mut app.hits),
-        Modal::Font(v) => super::dialogs::draw_font(f, &th, v, area, &mut app.hits),
+        Modal::Properties(p) => draw_properties(f, &ctx, p, area, &mut app.hits),
+        Modal::Update(u) => super::updates::draw_update(f, &ctx, u, area, &mut app.hits),
+        Modal::Access(d) => super::dialogs::draw_access(f, &ctx, d, area, &mut app.hits),
+        Modal::Eject(e) => super::dialogs::draw_eject(f, &ctx, e, area, &mut app.hits),
+        Modal::Font(v) => super::dialogs::draw_font(f, &ctx, v, area, &mut app.hits),
         Modal::FullPreview => {}
     }
 }
@@ -517,7 +519,8 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
 
 // -------------------------------------------------------------------------------- others
 
-fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
+fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
+    let th = ctx.th;
     let (title, hint): (&str, String) = match &iv.kind {
         InputKind::Rename { .. } => (Key::VRename.tr(), Key::InNewName.tr().into()),
         InputKind::NewDir => (Key::VNewFolder.tr(), Key::InName.tr().into()),
@@ -580,7 +583,7 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
         .unwrap_or_else(|| " ".to_string());
     let after: String = iv.text.chars().skip(iv.cursor + 1).collect();
     let mut lines = vec![
-        Line::from(vec![chip(th, title, th.accent)]),
+        Line::from(chip(ctx, title, Tone::Accent)),
         Line::raw(""),
         Line::from(Span::styled(display::truncate(&hint, w), th.dim())),
         Line::from(vec![
@@ -628,18 +631,19 @@ fn draw_input(f: &mut Frame, th: &Theme, iv: &InputView, area: Rect) {
 
 fn draw_history(
     f: &mut Frame,
-    th: &Theme,
+    ctx: &Ctx,
     h: &HistoryView,
     area: Rect,
     spinner: &str,
     hits: &mut Hits,
 ) {
+    let th = ctx.th;
     let rows = h.entries.len().clamp(3, 16) as u16;
     let r = centered(area, 104, rows + 9);
     let inner = frame(f, th, r, th.accent);
     let w = inner.width as usize;
     let mut lines: Vec<Line> = vec![
-        Line::from(vec![chip(th, Key::ChipHistory.tr(), th.accent)]),
+        Line::from(chip(ctx, Key::ChipHistory.tr(), Tone::Accent)),
         Line::raw(""),
     ];
     if h.loading {
@@ -727,8 +731,9 @@ fn draw_history(
 }
 
 /// Every action with its keys in both schemes side by side, grouped, scrollable.
-fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, scroll: usize) {
+fn draw_help(f: &mut Frame, ctx: &Ctx, area: Rect, km: &Keymap, mouse: bool, scroll: usize) {
     use crate::keymap::Group;
+    let th = ctx.th;
     let w = 104.min(area.width.saturating_sub(4));
     let h = (area.height.saturating_sub(2)).min(46);
     let r = centered(area, w, h);
@@ -852,17 +857,18 @@ fn draw_help(f: &mut Frame, th: &Theme, area: Rect, km: &Keymap, mouse: bool, sc
     let max_scroll = lines.len().saturating_sub(rows.saturating_sub(2));
     let scroll = scroll.min(max_scroll);
     let mut out: Vec<Line> = vec![
-        Line::from(vec![
-            chip(th, Key::ChipKeys.tr(), th.accent),
-            Span::styled(
+        {
+            let mut head = chip(ctx, Key::ChipKeys.tr(), Tone::Accent);
+            head.push(Span::styled(
                 if max_scroll > 0 {
                     format!("   {}", Key::HelpScrollClose.tr())
                 } else {
                     format!("   {}", Key::HelpClose.tr())
                 },
-                th.faint(),
-            ),
-        ]),
+                ctx.faint(),
+            ));
+            Line::from(head)
+        },
         Line::raw(""),
     ];
     out.extend(lines.into_iter().skip(scroll).take(rows.saturating_sub(2)));

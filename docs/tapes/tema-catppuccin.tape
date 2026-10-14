@@ -9,3 +9,4 @@ Sleep 2s
 Show
 Sleep 2500ms
 Screenshot "docs/screenshots/tema-catppuccin.png"
+Sleep 1s

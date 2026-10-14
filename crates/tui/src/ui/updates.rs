@@ -7,28 +7,18 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph};
+use ratatui::widgets::Paragraph;
 
+use super::modals::titled;
+use super::popup::{Ctx, Tone};
 use super::widgets::{button, centered, hit_spans};
 use crate::app::UpdateView;
 use crate::fmt;
 use crate::hits::{Hits, Target};
-use crate::theme::Theme;
 use crossterm::event::KeyCode;
-use ratatui::style::{Color, Style};
 
 /// The buttons of the window and the clickable parts among them.
 type Buttons<'a> = (Vec<Span<'a>>, Vec<(usize, Target)>);
-
-fn chip<'a>(th: &Theme, text: &str, color: Color) -> Span<'a> {
-    Span::styled(
-        format!(" {text} "),
-        Style::default()
-            .fg(th.on_accent)
-            .bg(color)
-            .add_modifier(Modifier::BOLD),
-    )
-}
 
 /// What accepting would do, in the words of the person.
 pub fn what_happens(how: &Result<Mode, String>) -> String {
@@ -41,7 +31,8 @@ pub fn what_happens(how: &Result<Mode, String>) -> String {
 }
 
 /// The window, drawn over the dimmed interface.
-pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hits: &mut Hits) {
+pub fn draw_update(f: &mut Frame, ctx: &Ctx, view: &UpdateView, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
     let w = 84.min(area.width.saturating_sub(4));
     let text_w = (w as usize).saturating_sub(6);
     let mut head: Vec<Line> = Vec::new();
@@ -54,26 +45,22 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             how,
             scroll,
         } => {
-            head.push(Line::from(vec![
-                chip(th, Key::ChipUpdate.tr(), th.accent),
-                Span::styled(
-                    format!(
-                        "  {}",
-                        tf(
-                            Key::UpdateAvailable,
-                            &[
-                                &notice.version,
-                                &if notice.prerelease {
-                                    Key::PreRelease.tr()
-                                } else {
-                                    ""
-                                }
-                            ]
-                        )
-                    ),
-                    th.base().add_modifier(Modifier::BOLD),
+            head.push(titled(
+                ctx,
+                Key::ChipUpdate.tr(),
+                Tone::Accent,
+                &tf(
+                    Key::UpdateAvailable,
+                    &[
+                        &notice.version,
+                        &if notice.prerelease {
+                            Key::PreRelease.tr()
+                        } else {
+                            ""
+                        },
+                    ],
                 ),
-            ]));
+            ));
             head.push(Line::raw(""));
             head.push(Line::from(Span::styled(Key::WhatIsNew.tr(), th.dim())));
             let notes = notice.notes.trim();
@@ -128,13 +115,12 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
             (th.accent, *scroll)
         }
         UpdateView::Failed { message, log } => {
-            head.push(Line::from(vec![
-                chip(th, Key::ChipUpdate.tr(), th.error),
-                Span::styled(
-                    format!("  {}", Key::UpdateFailed.tr()),
-                    th.base().add_modifier(Modifier::BOLD),
-                ),
-            ]));
+            head.push(titled(
+                ctx,
+                Key::ChipUpdate.tr(),
+                Tone::Danger,
+                Key::UpdateFailed.tr(),
+            ));
             head.push(Line::raw(""));
             for l in fmt::wrap(message, text_w) {
                 body.push(Line::from(Span::styled(l, th.fg(th.error))));
@@ -174,14 +160,7 @@ pub fn draw_update(f: &mut Frame, th: &Theme, view: &UpdateView, area: Rect, hit
     let want = body.len() + fixed;
     let h = (want as u16).min(area.height.saturating_sub(2)).max(8);
     let rect = centered(area, w, h);
-    f.render_widget(Clear, rect);
-    let blk = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(th.fg(tone))
-        .padding(Padding::new(2, 2, 1, 1));
-    let inner = blk.inner(rect);
-    f.render_widget(blk, rect);
+    let inner = super::modals::frame(f, th, rect, tone);
 
     let rows = (inner.height as usize).saturating_sub(head.len() + foot.len() + 1);
     let scroll = scroll.min(body.len().saturating_sub(rows));

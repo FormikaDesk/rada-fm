@@ -12,3 +12,4 @@ Escape
 Down 3
 Sleep 2500ms
 Screenshot "docs/screenshots/stretta.png"
+Sleep 1s

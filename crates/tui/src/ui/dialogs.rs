@@ -4,46 +4,32 @@
 use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph};
+use ratatui::widgets::Paragraph;
 
+use super::modals::titled;
+use super::popup::{Ctx, Tone};
 use super::widgets::{button, centered, hit_spans};
 use crate::app::{EjectStage, EjectView, FontView};
 use crate::fmt;
 use crate::hits::{Hits, Target};
-use crate::theme::Theme;
 use crossterm::event::KeyCode;
-
-fn chip<'a>(th: &Theme, text: &str, color: Color) -> Span<'a> {
-    Span::styled(
-        format!(" {text} "),
-        Style::default()
-            .fg(th.on_accent)
-            .bg(color)
-            .add_modifier(Modifier::BOLD),
-    )
-}
 
 /// The window that explains a folder the system has not let the terminal open yet, with the
 /// way to open the page of the settings where that is changed.
 pub fn draw_access(
     f: &mut Frame,
-    th: &Theme,
+    ctx: &Ctx,
     d: &rada_core::platform::AccessDenied,
     area: Rect,
     hits: &mut Hits,
 ) {
+    let th = ctx.th;
     let w = 84.min(area.width.saturating_sub(4));
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
-        Line::from(vec![
-            chip(th, Key::ChipNoAccess.tr(), th.warn),
-            Span::styled(
-                format!("  {}", d.message()),
-                th.base().add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        titled(ctx, Key::ChipNoAccess.tr(), Tone::Warn, &d.message()),
         Line::raw(""),
     ];
     for l in fmt::wrap(Key::MacAsksOnce.tr(), text_w) {
@@ -82,14 +68,7 @@ pub fn draw_access(
     ];
     let h = (lines.len() as u16 + 1 + 4).min(area.height.saturating_sub(2));
     let rect = centered(area, w, h);
-    f.render_widget(Clear, rect);
-    let blk = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(th.fg(th.warn))
-        .padding(Padding::new(2, 2, 1, 1));
-    let inner = blk.inner(rect);
-    f.render_widget(blk, rect);
+    let inner = super::modals::frame(f, th, rect, th.warn);
     hit_spans(
         hits,
         inner.x,
@@ -106,17 +85,12 @@ pub fn draw_access(
 }
 
 /// Ejecting a disk: the question, the wait, or why it did not work.
-pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &mut Hits) {
+pub fn draw_eject(f: &mut Frame, ctx: &Ctx, e: &EjectView, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
     let w = 76.min(area.width.saturating_sub(4));
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
-        Line::from(vec![
-            chip(th, Key::BtnEject.tr(), th.accent),
-            Span::styled(
-                format!("  {}", e.name),
-                th.base().add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        titled(ctx, Key::BtnEject.tr(), Tone::Accent, &e.name),
         Line::raw(""),
     ];
     let (spans, targets, tone): (Vec<Span>, Vec<(usize, Target)>, Color) = match &e.stage {
@@ -166,14 +140,7 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
     lines.push(Line::raw(""));
     let h = (lines.len() as u16 + 1 + 4).min(area.height.saturating_sub(2));
     let rect = centered(area, w, h);
-    f.render_widget(Clear, rect);
-    let blk = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(th.fg(tone))
-        .padding(Padding::new(2, 2, 1, 1));
-    let inner = blk.inner(rect);
-    f.render_widget(blk, rect);
+    let inner = super::modals::frame(f, th, rect, tone);
     hit_spans(
         hits,
         inner.x,
@@ -186,18 +153,18 @@ pub fn draw_eject(f: &mut Frame, th: &Theme, e: &EjectView, area: Rect, hits: &m
 }
 
 /// The offer of a Nerd Font, made once.
-pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut Hits) {
+pub fn draw_font(f: &mut Frame, ctx: &Ctx, v: &FontView, area: Rect, hits: &mut Hits) {
     use crate::app::FontStage;
+    let th = ctx.th;
     let w = 80.min(area.width.saturating_sub(4));
     let text_w = (w as usize).saturating_sub(6);
     let mut lines = vec![
-        Line::from(vec![
-            chip(th, Key::ChipIcons.tr(), th.accent),
-            Span::styled(
-                format!("  {}", Key::FontCannotDraw.tr()),
-                th.base().add_modifier(Modifier::BOLD),
-            ),
-        ]),
+        titled(
+            ctx,
+            Key::ChipIcons.tr(),
+            Tone::Accent,
+            Key::FontCannotDraw.tr(),
+        ),
         Line::raw(""),
     ];
     let (spans, targets): (Vec<Span>, Vec<(usize, Target)>) = match v.stage {
@@ -232,14 +199,7 @@ pub fn draw_font(f: &mut Frame, th: &Theme, v: &FontView, area: Rect, hits: &mut
     lines.push(Line::raw(""));
     let h = (lines.len() as u16 + 1 + 4).min(area.height.saturating_sub(2));
     let rect = centered(area, w, h);
-    f.render_widget(Clear, rect);
-    let blk = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(th.fg(th.accent))
-        .padding(Padding::new(2, 2, 1, 1));
-    let inner = blk.inner(rect);
-    f.render_widget(blk, rect);
+    let inner = super::modals::frame(f, th, rect, th.accent);
     hit_spans(
         hits,
         inner.x,

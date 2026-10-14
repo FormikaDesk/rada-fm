@@ -13,3 +13,4 @@ Sleep 600ms
 Enter
 Sleep 2500ms
 Screenshot "docs/screenshots/tag-blu.png"
+Sleep 1s
