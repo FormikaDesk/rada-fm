@@ -2,22 +2,22 @@
 source: crates/tui/tests/snapshots.rs
 expression: out
 ---
-[rada-light] canvas #ecdfc6
-  text          #3b2f22
-  text_dim      #625340
-  muted         #a39478
+[rada-light] canvas #ebe4d5
+  text          #3a3229
+  text_dim      #5d5446
+  muted         #a09581
   accent        #405c84
   on_accent     #ffffff
-  selection     #e2d3b7
+  selection     #e1d9c8
   cursor        #6d87ad
-  mark          #e5d7bc
-  track         #cfbb96
+  mark          #e5decf
+  track         #cbbfa6
   success       #416433
   warn          #765513
   error         #8f443f
   kind.code     #8f5628
   kind.markup   #6f5296
-  kind.text     #625340
+  kind.text     #5d5446
   kind.doc      #8f443f
   kind.image    #6f5296
   kind.vector   #6f5296
@@ -25,12 +25,12 @@ expression: out
   kind.video    #8f443f
   kind.archive  #765513
   kind.data     #765513
-  kind.config   #625340
+  kind.config   #5d5446
   kind.binary   #416433
-  kind.other    #625340
+  kind.other    #5d5446
   kind.folder   #405c84
   kind.link     #2f6573
-  tint(accent)  #d3ccbc
+  tint(accent)  #d3d0c9
 [catppuccin-latte] canvas #eff1f5
   text          #3e4058
   text_dim      #5f6379

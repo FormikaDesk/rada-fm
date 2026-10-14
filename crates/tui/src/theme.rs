@@ -518,8 +518,8 @@ impl Theme {
         let mut t = Theme::paper(
             "rada-light",
             [
-                0xecdfc6, 0xe5d7bc, 0xe2d3b7, 0xcfbb96, 0x3b2f22, 0x625340, 0xa39478, 0x405c84,
-                0xe0d2b8, 0x6d87ad, 0xdbcaab, 0xe2d3b7, 0xe2d3b7, 0x405c84,
+                0xebe4d5, 0xe5decf, 0xe1d9c8, 0xcbbfa6, 0x3a3229, 0x5d5446, 0xa09581, 0x405c84,
+                0xddd6c7, 0x6d87ad, 0xd9d0bc, 0xe1d9c8, 0xe1d9c8, 0x405c84,
             ],
             [0x765513, 0x416433, 0x8f443f, 0x6f5296, 0x2f6573, 0x8f5628],
             [0x6d87ad, 0x8a78a8],
@@ -1615,10 +1615,10 @@ mod tests {
             format!("#{r:02x}{g:02x}{b:02x}")
         };
         let carta = Theme::named("rada-light", ColorDepth::True).unwrap();
-        assert_eq!(hex(carta.canvas), "#ecdfc6");
+        assert_eq!(hex(carta.canvas), "#ebe4d5");
         assert_eq!(carta.bg, Some(carta.canvas));
-        assert_eq!(hex(carta.track), "#cfbb96");
-        assert_eq!(hex(carta.text), "#3b2f22");
+        assert_eq!(hex(carta.track), "#cbbfa6");
+        assert_eq!(hex(carta.text), "#3a3229");
         let dark = Theme::named("rada", ColorDepth::True).unwrap();
         assert_eq!(hex(dark.canvas), "#1b1d27");
         assert_eq!(
@@ -1632,7 +1632,7 @@ mod tests {
         for (what, c) in [("canvas", carta.canvas), ("popup", carta.popup)] {
             let (r, g, b) = channels(c);
             assert!(
-                r < 0xf0 && g < 0xe8 && b < 0xd0,
+                r < 0xf0 && g < 0xe8 && b < 0xd8,
                 "{what} of Carta is warm paper: {}",
                 hex(c)
             );
