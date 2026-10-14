@@ -770,14 +770,31 @@ impl Bases {
     }
 }
 
-/// "Copy 5 items to /home/x/backup" -> ("Copy 5 items", Some("/home/x/backup")).
+/// "Copy 5 items to /home/x/backup" -> ("Copy 5 items", Some("/home/x/backup")). The path may
+/// begin with `/`, `~`, a drive (`D:\`) or `\\` (a network share).
 fn split_title(title: &str) -> (String, Option<String>) {
-    for marker in [" to /", " to ~", " in /", " in ~"] {
-        if let Some(i) = title.rfind(marker) {
-            return (title[..i].to_string(), Some(title[i + 4..].to_string()));
+    let looks_like_path = |rest: &str| {
+        let b = rest.as_bytes();
+        rest.starts_with(['/', '~', '\\'])
+            || (b.len() > 2
+                && b[0].is_ascii_alphabetic()
+                && b[1] == b':'
+                && matches!(b[2], b'\\' | b'/'))
+    };
+    let mut best: Option<usize> = None;
+    for marker in [" to ", " in "] {
+        for (i, _) in title.rmatch_indices(marker) {
+            if looks_like_path(&title[i + marker.len()..]) {
+                best = Some(best.map_or(i, |b| b.max(i)));
+                break;
+            }
         }
     }
-    (title.to_string(), None)
+    match best {
+        // " to " and " in " are both four bytes long.
+        Some(i) => (title[..i].to_string(), Some(title[i + 4..].to_string())),
+        None => (title.to_string(), None),
+    }
 }
 
 /// A word of the first column of the list of steps, padded to nine cells (and kept apart
@@ -887,4 +904,50 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             rada_core::ops::tag_names(after)
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_title_is_split_before_a_path_of_any_system() {
+        for path in [
+            "/home/x/backup",
+            "~/backup",
+            r"D:\a\b\backup",
+            "C:/Users/x/backup",
+            r"\\server\share\backup",
+        ] {
+            let t = format!("Copy 5 items to {path}");
+            assert_eq!(
+                split_title(&t),
+                ("Copy 5 items".to_string(), Some(path.to_string())),
+                "{t}"
+            );
+        }
+        // No path after the word: nothing to shorten.
+        assert_eq!(
+            split_title("Copy to the end"),
+            ("Copy to the end".to_string(), None)
+        );
+        assert_eq!(
+            split_title("Rename 3 items in the list"),
+            ("Rename 3 items in the list".to_string(), None)
+        );
+    }
+
+    #[test]
+    fn the_head_of_a_plan_names_the_folder_of_a_windows_path() {
+        let t = shorten_title(
+            r"Copy 1 item to D:\a\rada-fm\target\proc-500\elsewhere.d",
+            std::path::Path::new(r"C:\Users\x"),
+        );
+        // A backslash separates folders only on Windows.
+        if cfg!(windows) {
+            assert_eq!(t, "Copy 1 item to elsewhere.d");
+        } else {
+            assert!(t.starts_with("Copy 1 item to "), "{t}");
+        }
+    }
 }

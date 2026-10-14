@@ -8,6 +8,8 @@ use std::process::{Command, Output};
 
 struct World {
     root: tempfile::TempDir,
+    /// `settle` wrote the configuration (so it may write it again for another locale).
+    settled: std::cell::Cell<bool>,
 }
 
 impl World {
@@ -19,15 +21,35 @@ impl World {
         for d in ["home", "config/rada", "data", "state", "cache"] {
             fs::create_dir_all(root.path().join(d)).unwrap();
         }
-        World { root }
+        World {
+            root,
+            settled: std::cell::Cell::new(false),
+        }
     }
 
     fn p(&self, rel: &str) -> PathBuf {
         self.root.path().join(rel)
     }
 
+    /// Make the language of the system this locale. On Linux the program reads the locale
+    /// variables; on macOS and Windows it reads the system's settings, which a test cannot
+    /// set, so the same language is asked for in the configuration (unless a test wrote one).
+    fn settle(&self, locale: &str) {
+        let file = self.p("config/rada/config.toml");
+        if cfg!(not(target_os = "linux")) && (!file.exists() || self.settled.get()) {
+            self.settled.set(true);
+            let lang = if locale.starts_with("it") { "it" } else { "en" };
+            fs::write(file, format!("language = \"{lang}\"\n")).unwrap();
+        }
+    }
+
     /// Run rada with this locale (and nothing else of the language set).
     fn rada(&self, locale: &str, args: &[&str]) -> Output {
+        self.settle(locale);
+        self.rada_as_is(locale, args)
+    }
+
+    fn rada_as_is(&self, locale: &str, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_rada"))
             .args(args)
             .env_clear()
@@ -155,12 +177,16 @@ fn update_is_said_in_the_language() {
     let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/releases", dead.local_addr().unwrap());
     drop(dead);
+    w.settle(IT);
     let out = Command::new(env!("CARGO_BIN_EXE_rada"))
         .args(["update", "--check"])
         .env_clear()
         .env("PATH", std::env::var_os("PATH").unwrap_or_default())
         .env("LC_ALL", IT)
         .env("HOME", w.p("home"))
+        .env("USERPROFILE", w.p("home"))
+        .env("APPDATA", w.p("config"))
+        .env("LOCALAPPDATA", w.p("data"))
         .env("XDG_CONFIG_HOME", w.p("config"))
         .env("XDG_STATE_HOME", w.p("state"))
         .env("XDG_DATA_HOME", w.p("data"))
