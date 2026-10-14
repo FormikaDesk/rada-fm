@@ -2470,11 +2470,17 @@ impl App {
             "main" => {}
             "help" => self.modal = Some(Modal::Help),
             // The menu of the right button on the picture, and the menus beside it.
-            "menu" | "openwith" | "tagmenu" => {
-                self.restore_cursor(Some(OsString::from("photo.jpg")));
+            // "menubottom": the menu of a file among the last rows of the list.
+            "menu" | "openwith" | "tagmenu" | "menubottom" => {
+                let (file, at) = if scene == "menubottom" {
+                    ("song.mp3", (30, 28))
+                } else {
+                    ("photo.jpg", (24, 12))
+                };
+                self.restore_cursor(Some(OsString::from(file)));
                 self.ensure_visible();
                 self.request_preview();
-                let mut m = self.context_menu(true, (24, 12));
+                let mut m = self.context_menu(true, at);
                 let want = match scene {
                     "openwith" => Some(MenuCmd::OpenWithList),
                     "tagmenu" => Some(MenuCmd::Sub(MenuKind::Tags)),
