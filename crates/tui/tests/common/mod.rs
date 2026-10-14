@@ -387,6 +387,17 @@ impl H {
         out
     }
 
+    /// The buffer of a frame drawn from nothing: it depends on the state of the interface and
+    /// on nothing else. `screen` and the buffer of the backend keep what earlier frames drew
+    /// in the second cell of a wide glyph (the terminal skips it), and which frames came
+    /// before depends on when the workers answered; clearing first makes the colours of those
+    /// cells the same on every run.
+    pub fn redrawn_buffer(&mut self) -> ratatui::buffer::Buffer {
+        self.term.clear().unwrap();
+        self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
+        self.term.backend().buffer().clone()
+    }
+
     pub fn names(&self) -> Vec<String> {
         (0..self.app.visible.len())
             .filter_map(|i| self.app.entry_at(i))

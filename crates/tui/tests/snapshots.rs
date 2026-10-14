@@ -363,11 +363,9 @@ fn every_colour_on_screen_is_a_theme_token_in_every_theme() {
         let mut h = scene(120, 30);
         h.app.th = th.clone();
         // The scene was drawn with the first theme: the second cell of a wide glyph keeps what
-        // it had unless the terminal is cleared.
-        h.term.clear().unwrap();
+        // it had unless the frame is drawn from nothing.
         on(&mut h, "README.md");
-        let _ = h.screen();
-        let buf = h.term.backend().buffer().clone();
+        let buf = h.redrawn_buffer();
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
                 let cell = &buf[(x, y)];
@@ -482,8 +480,9 @@ fn main_screen_token_map_in_a_light_theme() {
     let mut h = scene(100, 26);
     h.app.th = th.clone();
     on(&mut h, "README.md");
-    let _ = h.screen();
-    let buf = h.term.backend().buffer().clone();
+    // Drawn from nothing: the second cell of a wide glyph (the folder has CJK and emoji
+    // names) keeps what earlier frames put there, and that depends on timing.
+    let buf = h.redrawn_buffer();
     let kinds = [
         th.kinds.code,
         th.kinds.markup,
