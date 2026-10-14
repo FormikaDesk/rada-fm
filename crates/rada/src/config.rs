@@ -19,6 +19,8 @@
 //!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
 //!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light
 //! appearance = "auto"        # auto | light | dark: which variant a theme name uses
+//! transparent_background = false  # true: the default dark theme leaves the terminal's own
+//!                            # background instead of painting its night blue
 //! bookmarks = ["~/projects", "/mnt/data"]
 //! images = "auto"            # auto | halfblocks | kitty | sixel | iterm2 | off
 //! image_max_megapixels = 50   # larger images are not decoded
@@ -88,6 +90,8 @@ pub struct FileConfig {
     pub images: Option<String>,
     pub theme: Option<String>,
     pub appearance: Option<String>,
+    /// The default dark theme leaves the terminal's background (like `catppuccin`).
+    pub transparent_background: bool,
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
     pub archive_limits: ArchiveLimits,
@@ -227,6 +231,7 @@ struct Raw {
     images: Option<String>,
     theme: Option<String>,
     appearance: Option<String>,
+    transparent_background: Option<bool>,
     bookmarks: Option<Vec<String>>,
     image_max_megapixels: Option<u32>,
     image_max_file_mb: Option<u64>,
@@ -309,6 +314,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         images: raw.images,
         theme: raw.theme,
         appearance: raw.appearance,
+        transparent_background: raw.transparent_background.unwrap_or(false),
         bookmarks: raw.bookmarks.unwrap_or_default(),
         mouse: raw.mouse.unwrap_or(true),
         hints: raw.show_hints.or(raw.hints).unwrap_or(true),
@@ -392,6 +398,13 @@ mod tests {
         let d = with_config("sidebar = true\n");
         assert_eq!(d.language, None);
         assert_eq!(d.tags_column, None);
+    }
+
+    #[test]
+    fn the_transparent_background_is_read_and_off_by_default() {
+        assert!(!with_config("sidebar = true\n").transparent_background);
+        assert!(with_config("transparent_background = true\n").transparent_background);
+        assert!(!with_config("transparent_background = false\n").transparent_background);
     }
 
     #[test]

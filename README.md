@@ -141,6 +141,7 @@ theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the termi
                       # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
                       # | nebbia-light
 appearance = "auto"   # auto | light | dark: which variant a theme name takes
+transparent_background = false  # true: the default dark theme leaves your terminal's background
 show_hidden = false
 sort = "name"         # name | size | date
 reverse = false

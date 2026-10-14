@@ -143,7 +143,11 @@ fn event_loop(
         let detection = crate::termtheme::detect_here(None);
         let light = detection.appearance.is_light();
         if let Some(theme) = crate::theme::Theme::variant(&a.name, light, a.depth) {
-            cfg.theme = theme;
+            cfg.theme = if a.transparent {
+                theme.transparent()
+            } else {
+                theme
+            };
         }
         tracing::info!(
             "terminal background — {} (in {:?})",

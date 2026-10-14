@@ -360,6 +360,7 @@ fn main() -> Result<()> {
             Some(rada_tui::app::Adaptive {
                 name: theme_name.clone(),
                 depth,
+                transparent: cfg_file.transparent_background,
             }),
         ),
         (true, Some(look)) => (
@@ -370,6 +371,12 @@ fn main() -> Result<()> {
             Theme::named(&theme_name, depth).expect("checked above"),
             None,
         ),
+    };
+    // `transparent_background`: the default dark theme leaves the terminal's background.
+    let theme = if cfg_file.transparent_background {
+        theme.transparent()
+    } else {
+        theme
     };
     let bookmarks = cfg_file
         .bookmarks

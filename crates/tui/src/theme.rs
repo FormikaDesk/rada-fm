@@ -630,6 +630,17 @@ impl Theme {
         t
     }
 
+    /// The default dark theme without its paint: the terminal's own background stays, as with
+    /// `catppuccin` and `tokyo-night` (`transparent_background = true`). Any other theme is
+    /// returned as it is.
+    pub fn transparent(mut self) -> Theme {
+        if self.name == "rada" {
+            self.bg = None;
+            self.popup = Color::Reset;
+        }
+        self
+    }
+
     /// Plain 16-colour theme for terminals that offer nothing more.
     fn ansi16(mut self) -> Theme {
         // Sixteen colours have no paper: the terminal's own background stays.
@@ -1636,6 +1647,36 @@ mod tests {
                 "{what} of Carta is warm paper: {}",
                 hex(c)
             );
+        }
+    }
+
+    #[test]
+    fn the_default_dark_theme_can_leave_the_terminals_background() {
+        let dark = Theme::named("rada", ColorDepth::True).unwrap();
+        assert!(dark.bg.is_some(), "painted by default");
+        let clear = dark.clone().transparent();
+        // Like catppuccin and tokyo-night: no paint, and menus filled with what is behind.
+        assert_eq!(clear.bg, None);
+        assert_eq!(clear.popup, Color::Reset);
+        for n in ["catppuccin", "tokyo-night"] {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            assert_eq!((t.bg, t.popup), (clear.bg, clear.popup), "{n}");
+        }
+        // The colours of the theme itself are untouched.
+        assert_eq!(
+            (clear.canvas, clear.text, clear.accent),
+            (dark.canvas, dark.text, dark.accent)
+        );
+        // Another theme stays as it is, the paper ones included.
+        for n in [
+            "rada-light",
+            "nebbia-light",
+            "catppuccin",
+            "tokyo-night-day",
+        ] {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let same = t.clone().transparent();
+            assert_eq!((same.bg, same.popup), (t.bg, t.popup), "{n}");
         }
     }
 

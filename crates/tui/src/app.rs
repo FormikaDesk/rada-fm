@@ -409,6 +409,8 @@ pub struct Config {
 pub struct Adaptive {
     pub name: String,
     pub depth: crate::theme::ColorDepth,
+    /// `transparent_background`: the default dark theme leaves the terminal's background.
+    pub transparent: bool,
 }
 
 /// Disks that do not exist, for screenshots that must not show the machine's own.
