@@ -26,7 +26,7 @@ expression: shot(&mut h)
 │    ■■■■□□□□□□     555 GB │ │ ☐ · notes.txt               Yesterday      │  ⎘ Paste                      Ctrl+V  │    │
 │  ⏏ USB drive             │ │▌☐ · photo.jpg               Today 13:30    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
 │    ■■■■□□□□□□    35.4 GB │ │ ☐ · README.md               Today 13:28    │  ✎ Rename                         F2  │    │
-│                          │ │ ☐ · report.pdf              4 days ago     │  ▣ Compress…                   Alt+z  │    │
+│                          │ │ ☐ · report.pdf              4 days ago     │  ▣ Compress…                   Alt+Z  │    │
 │ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
 │  ● Red                   │ │ ☐ · setup.sh                12 days ago    │  ◆ Tags                            ›  │    │
 │  ● Orange                │ │ ☐ · song.mp3                30/07/2026     │  ⚲ Copy the path        Ctrl+Shift+C  │    │
@@ -35,5 +35,5 @@ expression: shot(&mut h)
 ╰──────────────────────────╯ ╰────────────────────────────────────────────│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │────╯
  19 items                                                                 │  ✗ Move to trash                 Del  │  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄│  ✗ Delete permanently      Shift+Del  │▄▄▄▄▄
-   Esc  close                                                             ╰───────────────────────────────────────╯
+   ↑↓  choose     Enter  confirm     Esc  close                           ╰───────────────────────────────────────╯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

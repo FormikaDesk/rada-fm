@@ -995,12 +995,13 @@ impl Theme {
         }
     }
 
-    /// What lies under the shadow of a popup: the colour darkened (a light theme loses less).
+    /// What lies under the shadow of a popup: the colour darkened (a light theme loses 6% at
+    /// most: a dark block on paper is heavy, the edge only has to be felt).
     /// Only true colour can be shaded; every other colour is kept as it is.
     pub fn shadow(&self, c: Color) -> Color {
         match (self.depth, c) {
             (ColorDepth::True, Color::Rgb(r, g, b)) => {
-                let f = if self.light { 0.9 } else { 0.62 };
+                let f = if self.light { 0.94 } else { 0.62 };
                 rgb(
                     (r as f32 * f) as u8,
                     (g as f32 * f) as u8,
@@ -1400,6 +1401,22 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn the_shadow_of_a_popup_is_felt_on_paper_and_deep_on_dark() {
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let (r0, g0, b0) = channels(t.canvas);
+            let (r1, g1, b1) = channels(t.shadow(t.canvas));
+            let kept = (r1 as f32 + g1 as f32 + b1 as f32) / (r0 as f32 + g0 as f32 + b0 as f32);
+            if t.light {
+                // At most ~8% darker than the paper: a hint, not a block.
+                assert!((0.92..1.0).contains(&kept), "{n}: keeps {kept:.3}");
+            } else {
+                assert!(kept < 0.7, "{n}: keeps {kept:.3}");
+            }
+        }
     }
 
     #[test]

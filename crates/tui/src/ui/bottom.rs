@@ -69,16 +69,44 @@ fn hints(app: &App) -> Vec<Hint> {
                 Hint::fixed("Enter", Key::HGo),
                 Hint::fixed("Esc", Key::HClose),
             ],
-            Modal::OpenWith(_) => vec![
-                Hint::fixed("Enter", Key::HOpen),
-                Hint::fixed("Tab", Key::HAlways),
-                Hint::fixed("Esc", Key::HClose),
-            ],
+            Modal::OpenWith(v) => {
+                let mut h = vec![
+                    Hint::fixed("↑↓", Key::HChoose),
+                    Hint::fixed("Enter", Key::HOpen),
+                    Hint::fixed("Tab", Key::HAlways),
+                ];
+                // Opened from a menu, Left gives the menu back.
+                if v.under.is_some() && v.filter.is_empty() {
+                    h.push(Hint::fixed("←", Key::HBack));
+                }
+                h.push(Hint::fixed("Esc", Key::HClose));
+                h
+            }
+            // Only the keys that do something now: Right where an entry opens a menu, Left
+            // where there is a menu to go back to.
+            Modal::Menu(m) => {
+                let mut h = Vec::new();
+                if m.items.iter().filter(|i| i.selectable()).count() > 1 {
+                    h.push(Hint::fixed("↑↓", Key::HChoose));
+                }
+                if m.items
+                    .get(m.selected)
+                    .is_some_and(|i| i.enabled && i.opens_menu())
+                {
+                    h.push(Hint::fixed("→", Key::HOpen));
+                }
+                if m.parent.is_some() {
+                    h.push(Hint::fixed("←", Key::HBack));
+                }
+                h.push(Hint::fixed("Enter", Key::HConfirm));
+                h.push(Hint::fixed("Esc", Key::HClose));
+                h
+            }
             Modal::ConfirmQuit => vec![
                 Hint::fixed("Enter", Key::HQuit),
                 Hint::fixed("Esc", Key::HStay),
             ],
-            Modal::Scanning { .. } => vec![Hint::fixed("Esc", Key::HCancel)],
+            Modal::Scanning { .. } => vec![Hint::fixed("Esc", Key::HStop)],
             _ => vec![Hint::fixed("Esc", Key::HClose)],
         };
     }

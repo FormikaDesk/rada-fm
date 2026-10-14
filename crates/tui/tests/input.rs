@@ -743,7 +743,7 @@ fn a_request_given_as_data_goes_through_the_same_plan_window_and_journal() {
     // It is in the journal like any other operation, so it can be undone.
     h.press("u");
     plan_modal(&mut h);
-    assert!(h.screen().contains("Undo: Copy"));
+    assert!(h.screen().contains("Undo the copy of 1 item?"));
     run_plan_and_wait(&mut h);
     assert!(!dest.join("a.txt").exists());
 }

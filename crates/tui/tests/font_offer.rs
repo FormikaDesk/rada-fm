@@ -106,7 +106,7 @@ fn a_failure_is_said_and_the_offer_is_not_repeated() {
     h.key(KeyCode::Enter);
     h.wait("the failure", |a| a.modal.is_none());
     let s = h.screen();
-    assert!(s.contains("the font was not installed: no network"), "{s}");
+    assert!(s.contains("The font was not installed: no network"), "{s}");
     assert_eq!(
         (
             installs.load(Ordering::SeqCst),

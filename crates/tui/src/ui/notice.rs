@@ -118,7 +118,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             id: n.id,
             tone,
             mark: mark.to_string(),
-            title: n.text.replace('\n', " "),
+            title: fmt::capitalised(&n.text.replace('\n', " ")),
             data: String::new(),
             links,
             progress: None,

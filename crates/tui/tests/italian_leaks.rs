@@ -168,7 +168,13 @@ fn the_plan_windows_speak_italian() {
         h.press("ctrl+z");
         plan_modal(&mut h);
         leaks(&mut h, "the undo plan");
-        assert!(h.screen().contains("Annulla: "), "{}", h.screen());
+        let s = h.screen();
+        assert!(s.contains("Annullare la rinomina di 1 elemento?"), "{s}");
+        assert!(
+            s.contains("Annulla la rinomina") && s.contains("Chiudi"),
+            "{s}"
+        );
+        assert!(s.contains("torna al suo posto"), "{s}");
     });
 }
 

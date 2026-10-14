@@ -152,7 +152,7 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
 
     h.keys("u");
     plan_modal(&mut h);
-    assert!(h.screen().contains("Undo: Copy"));
+    assert!(h.screen().contains("Undo the copy of 1 item?"));
     run_plan_and_wait(&mut h);
     assert!(!dest.join("a.txt").exists(), "undo removed the copy");
     assert!(dir.join("a.txt").exists(), "the original is untouched");

@@ -173,16 +173,16 @@ fn notifications_pile_up_and_each_goes_when_its_time_is_up() {
     assert_eq!(h.app.notices.shown(now).len(), 2, "both are on screen");
     let s = h.screen();
     assert!(
-        s.contains("moved to the trash") && s.contains("cannot rename"),
+        s.contains("moved to the trash") && s.contains("Cannot rename"),
         "{s}"
     );
     // The first was there first and goes first; the other is an error and stays.
     h.app.advance_notices(Duration::from_millis(4100));
     let s = h.screen();
     assert!(!s.contains("moved to the trash"), "{s}");
-    assert!(s.contains("cannot rename"));
+    assert!(s.contains("Cannot rename"));
     h.app.advance_notices(Duration::from_secs(3600));
-    assert!(h.screen().contains("cannot rename"), "an error stays");
+    assert!(h.screen().contains("Cannot rename"), "an error stays");
 }
 
 #[test]
@@ -198,11 +198,11 @@ fn more_than_three_wait_for_room() {
     assert_eq!(h.app.notices.shown(now).len(), 3);
     assert_eq!(h.app.notices.waiting(), 1);
     let s = h.screen();
-    assert!(s.contains("done a") && s.contains("done c"), "{s}");
-    assert!(!s.contains("done d"), "{s}");
+    assert!(s.contains("Done a") && s.contains("Done c"), "{s}");
+    assert!(!s.contains("Done d"), "{s}");
     h.app.advance_notices(Duration::from_secs(7));
     let s = h.screen();
-    assert!(s.contains("done d"), "{s}");
+    assert!(s.contains("Done d"), "{s}");
 }
 
 #[test]

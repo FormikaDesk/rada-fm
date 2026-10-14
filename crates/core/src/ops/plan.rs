@@ -860,9 +860,21 @@ pub struct Plan {
     /// Set when this plan re-does an operation that was undone.
     #[serde(default)]
     pub redo_of: Option<String>,
+    /// Set on the plan of an undo: what kind of operation it takes back, and how many items
+    /// that one had (for the question the window asks).
+    #[serde(default)]
+    pub undoes: Option<UndoOf>,
     /// For a new archive: about how large it will be (a guess from the kind of files).
     #[serde(default)]
     pub estimated_bytes: Option<u64>,
+}
+
+/// The operation an undo plan takes back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct UndoOf {
+    pub kind: OpKind,
+    /// How many items that operation was about.
+    pub items: u64,
 }
 
 impl Plan {
@@ -881,6 +893,7 @@ impl Plan {
             preserved: Preserved::default(),
             request: None,
             redo_of: None,
+            undoes: None,
             estimated_bytes: None,
         }
     }

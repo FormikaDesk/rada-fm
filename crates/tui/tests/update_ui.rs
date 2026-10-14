@@ -39,7 +39,7 @@ fn a_newer_version_shows_in_the_status_bar_with_the_key() {
     offer(&mut h, Ok(Mode::Binary));
     let s = h.screen();
     assert!(
-        s.contains("New version 0.7.0 available — press Alt+u to update"),
+        s.contains("New version 0.7.0 available — press Alt+U to update"),
         "{s}"
     );
 }
@@ -50,7 +50,7 @@ fn a_narrow_bar_keeps_the_version_and_the_key() {
     let mut h = H::new(sb, dir, 56, 24);
     offer(&mut h, Ok(Mode::Binary));
     let s = h.screen();
-    assert!(s.contains("↑ 0.7.0 · Alt+u"), "{s}");
+    assert!(s.contains("↑ 0.7.0 · Alt+U"), "{s}");
     assert!(s.contains("3 items"), "the count keeps its place: {s}");
 }
 
@@ -125,7 +125,7 @@ fn without_an_update_worker_the_key_says_so() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 140, 30);
     h.press("alt+u");
-    assert!(h.screen().contains("updates are not available here"));
+    assert!(h.screen().contains("Updates are not available here"));
     assert!(h.app.modal.is_none());
 }
 
@@ -143,7 +143,7 @@ fn progress_and_the_end_show_in_the_bar_and_the_interface_stays_usable() {
     h.keys("j");
     assert_eq!(h.cursor_name(), "a.txt");
     h.press("alt+u");
-    assert!(h.screen().contains("an update is already running"));
+    assert!(h.screen().contains("An update is already running"));
 
     h.app
         .on_core_event(CoreEvent::Update(UpdateEvent::Done(Applied {
@@ -180,7 +180,7 @@ fn a_failed_update_explains_itself_and_offers_the_log() {
     // It stays in the bar so it can be looked at again.
     assert!(
         h.screen()
-            .contains("The update did not work — press Alt+u to see why")
+            .contains("The update did not work — press Alt+U to see why")
     );
     h.press("alt+u");
     assert!(matches!(
@@ -327,7 +327,7 @@ fn the_version_is_in_the_status_bar_and_a_click_asks_for_a_newer_one() {
     assert!(h.screen().contains(&shown), "{}", h.screen());
     // Without the worker it says so.
     h.click(&Target::CheckUpdates);
-    assert!(h.screen().contains("updates are not available here"));
+    assert!(h.screen().contains("Updates are not available here"));
     // With it, the network is asked at once (a day's rest does not count) and the answer is
     // a plain sentence.
     h.app.start_updates(ctx);

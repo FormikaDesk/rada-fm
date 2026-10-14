@@ -327,6 +327,11 @@ impl Engine {
             }
         }
         plan.totals.items = plan.steps.len() as u64;
+        plan.items = undo_items(&plan.steps);
+        plan.undoes = Some(UndoOf {
+            kind: entry.kind,
+            items: entry.totals.items.max(1),
+        });
         plan.warnings = ws.finish();
         Ok(UndoPlan {
             entry,
@@ -392,4 +397,104 @@ impl Engine {
         journal.mark_undone(&up.entry.id, remaining)?;
         Ok(report)
     }
+}
+
+/// What an undo does, one line per thing that comes back or goes away: the steps are grouped
+/// under the item they belong to (a copied folder is one line, not its thousand files).
+fn undo_items(steps: &[Step]) -> Vec<ItemSummary> {
+    use crate::fs::FileKind;
+    // The place each step is about, and what it does there.
+    let touched = |s: &Step| -> Option<(PathBuf, ItemAction, FileKind, u64, Option<PathBuf>)> {
+        Some(match s {
+            Step::RemoveFile { path, expect } => (
+                path.clone(),
+                ItemAction::Delete,
+                expect.as_ref().map_or(FileKind::File, |f| f.kind),
+                expect.as_ref().map_or(0, |f| f.size),
+                None,
+            ),
+            Step::RemoveDir { path } => (path.clone(), ItemAction::Delete, FileKind::Dir, 0, None),
+            Step::Rename { from, to } => (
+                from.clone(),
+                ItemAction::Move,
+                FileKind::File,
+                0,
+                Some(to.clone()),
+            ),
+            Step::Restore { item } => (
+                item.original.clone(),
+                ItemAction::Move,
+                FileKind::File,
+                0,
+                None,
+            ),
+            Step::CopyFile { src, dst, size, .. } => (
+                src.clone(),
+                ItemAction::Move,
+                FileKind::File,
+                *size,
+                Some(dst.clone()),
+            ),
+            Step::SetTags { path, .. } => {
+                (path.clone(), ItemAction::Retag, FileKind::File, 0, None)
+            }
+            _ => return None,
+        })
+    };
+    let all: Vec<_> = steps.iter().filter_map(touched).collect();
+    // The folder every path is in.
+    let mut common: Option<PathBuf> = None;
+    for (p, ..) in &all {
+        let Some(parent) = p.parent() else { continue };
+        common = Some(match common {
+            None => parent.to_path_buf(),
+            Some(c) => c
+                .ancestors()
+                .find(|a| parent.starts_with(a))
+                .map(Path::to_path_buf)
+                .unwrap_or(c),
+        });
+    }
+    let Some(common) = common else {
+        return Vec::new();
+    };
+    let mut items: Vec<ItemSummary> = Vec::new();
+    for (path, action, kind, bytes, target) in all {
+        let Ok(rest) = path.strip_prefix(&common) else {
+            continue;
+        };
+        let mut parts = rest.components();
+        let Some(first) = parts.next() else { continue };
+        let deeper = parts.next().is_some();
+        let top = common.join(first.as_os_str());
+        let slot = match items.iter().position(|i| i.path == top) {
+            Some(i) => i,
+            None => {
+                items.push(ItemSummary {
+                    path: top,
+                    kind: if deeper { FileKind::Dir } else { kind },
+                    action,
+                    files: 0,
+                    dirs: 0,
+                    symlinks: 0,
+                    bytes: 0,
+                    target: if deeper { None } else { target },
+                });
+                items.len() - 1
+            }
+        };
+        let it = &mut items[slot];
+        if deeper {
+            it.kind = FileKind::Dir;
+            it.target = None;
+        }
+        match kind {
+            FileKind::Dir => it.dirs += 1,
+            FileKind::Symlink => it.symlinks += 1,
+            _ => it.files += 1,
+        }
+        it.bytes += bytes;
+    }
+    items.sort_by(|a, b| a.path.cmp(&b.path));
+    items
 }

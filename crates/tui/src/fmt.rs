@@ -253,14 +253,25 @@ pub fn month_name(month: i8) -> &'static str {
     MONTHS[(month.clamp(1, 12) - 1) as usize].tr()
 }
 
+/// The text with its first letter in capitals ("impossibile…" → "Impossibile…").
+pub fn capitalised(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(first) => first.to_uppercase().chain(c).collect(),
+        None => String::new(),
+    }
+}
+
+/// A time left or taken, with its units apart from the numbers: `7 s`, `1 min 05 s`,
+/// `2 h 03 min`.
 pub fn duration(d: Duration) -> String {
     let s = d.as_secs();
     if s >= 3600 {
-        format!("{}h{:02}m", s / 3600, (s % 3600) / 60)
+        format!("{} h {:02} min", s / 3600, (s % 3600) / 60)
     } else if s >= 60 {
-        format!("{}m{:02}s", s / 60, s % 60)
+        format!("{} min {:02} s", s / 60, s % 60)
     } else {
-        format!("{s}s")
+        format!("{s} s")
     }
 }
 
@@ -324,6 +335,25 @@ pub fn wrap(text: &str, width: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn times_have_a_space_before_their_units() {
+        use std::time::Duration;
+        assert_eq!(duration(Duration::from_secs(7)), "7 s");
+        assert_eq!(duration(Duration::from_secs(80)), "1 min 20 s");
+        assert_eq!(
+            duration(Duration::from_secs(3 * 3600 + 5 * 60)),
+            "3 h 05 min"
+        );
+    }
+
+    #[test]
+    fn a_first_letter_goes_to_capitals() {
+        assert_eq!(capitalised("impossibile mostrare"), "Impossibile mostrare");
+        assert_eq!(capitalised("3 items"), "3 items");
+        assert_eq!(capitalised(""), "");
+        assert_eq!(capitalised("època"), "Època");
+    }
+
     use std::time::Duration;
 
     #[test]

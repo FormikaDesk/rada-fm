@@ -47,8 +47,8 @@ expression: shot(&mut h)
 │  │  Rename many                               R                                                         │  │
 │  │  New folder                                n                           Ctrl+Shift+N Ctrl+N F7        │  │
 │  │  Extract here                              e                           Ctrl+E                        │  │
-│  │  Extract to a folder…                      E                           Alt+e                         │  │
-│  │  Compress…                                 z                           Alt+z                         │  │
+│  │  Extract to a folder…                      E                           Alt+E                         │  │
+│  │  Compress…                                 z                           Alt+Z                         │  │
 │  │  Undo                                      u                           Ctrl+Z                        │  │
 │  │  Redo                                      Ctrl+R                      Ctrl+Y Ctrl+Shift+Z           │  │
 │  │                                                                                                      │  │

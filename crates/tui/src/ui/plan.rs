@@ -46,7 +46,10 @@ pub fn policy_step(p: ConflictPolicy, dir: isize) -> ConflictPolicy {
 const LISTED: usize = 6;
 
 /// The mark in the round head of the window.
-fn mark_of(ctx: &Ctx, kind: OpKind) -> &'static str {
+fn mark_of(ctx: &Ctx, kind: OpKind, redo: bool) -> &'static str {
+    if redo {
+        return icons::action_icon(ctx.set, Action::Redo);
+    }
     let a = match kind {
         OpKind::Copy => Action::Copy,
         OpKind::Move => Action::Cut,
@@ -86,10 +89,50 @@ fn title_of(plan: &rada_core::ops::Plan, home: &std::path::Path) -> String {
             Key::ItemMany,
         )
     };
+    // An undo, or a redo, asks what it takes back or does again.
+    if let Some(u) = &plan.undoes {
+        return tf(Key::UndoQ, &[&op_phrase(u.kind, u.items)]);
+    }
+    if plan.redo_of.is_some() {
+        return tf(Key::RedoQ, &[&op_phrase(plan.kind, items_of(plan))]);
+    }
     match plan.kind {
         OpKind::Delete => tf(Key::PlanQDelete, &[&items()]),
         OpKind::Trash => tf(Key::PlanQTrash, &[&items()]),
         _ => shorten_title(&plan.title, home),
+    }
+}
+
+/// How many items a plan is about.
+fn items_of(plan: &rada_core::ops::Plan) -> u64 {
+    plan.items.len().max(plan.totals.items as usize).max(1) as u64
+}
+
+/// "the copy" / "la copia": what an operation is called, without a count.
+fn op_noun(kind: OpKind) -> Key {
+    match kind {
+        OpKind::Copy => Key::OpNounCopy,
+        OpKind::Move => Key::OpNounMove,
+        OpKind::Trash => Key::OpNounTrash,
+        OpKind::Rename | OpKind::BulkRename => Key::OpNounRename,
+        OpKind::Extract => Key::OpNounExtract,
+        OpKind::Compress => Key::OpNounCompress,
+        OpKind::MakeDir => Key::OpNounMkdir,
+        OpKind::MakeFile => Key::OpNounMkfile,
+        OpKind::SetTags => Key::OpNounTags,
+        OpKind::Delete | OpKind::Undo => Key::OpNounDelete,
+    }
+}
+
+/// "the copy of 3 items" / "la copia di 3 elementi" (a new folder has no count).
+fn op_phrase(kind: OpKind, items: u64) -> String {
+    let noun = op_noun(kind).tr();
+    match kind {
+        OpKind::MakeDir | OpKind::MakeFile => noun.to_string(),
+        _ => tf(
+            Key::OpOfItems,
+            &[&noun, &fmt::count(items, Key::ItemOne, Key::ItemMany)],
+        ),
     }
 }
 
@@ -110,7 +153,17 @@ fn summary_of(plan: &rada_core::ops::Plan, bases: &Bases, home: &std::path::Path
 }
 
 /// What the run button says.
-fn run_label(kind: OpKind) -> &'static str {
+fn run_label(plan: &rada_core::ops::Plan) -> String {
+    if let Some(u) = &plan.undoes {
+        return tf(Key::BtnUndoOp, &[&op_noun(u.kind).tr()]);
+    }
+    if plan.redo_of.is_some() {
+        return tf(Key::BtnRedoOp, &[&op_noun(plan.kind).tr()]);
+    }
+    run_verb(plan.kind).to_string()
+}
+
+fn run_verb(kind: OpKind) -> &'static str {
     match kind {
         OpKind::Delete => Key::BtnDelete.tr(),
         OpKind::Trash => Action::Trash.label(),
@@ -179,7 +232,7 @@ pub fn draw(
     // The head: the round mark, what is asked, and the line under it.
     body.extend(popup::headline(
         ctx,
-        mark_of(ctx, plan.kind),
+        mark_of(ctx, plan.kind, plan.redo_of.is_some()),
         tone,
         &display::truncate(&title_of(plan, home), iw.saturating_sub(6)),
         &summary_of(plan, &bases, home),
@@ -210,14 +263,20 @@ pub fn draw(
         let right_w = 10usize;
         let show_badge = matches!(
             plan.kind,
-            OpKind::Copy | OpKind::Move | OpKind::Extract | OpKind::Compress
+            OpKind::Copy | OpKind::Move | OpKind::Extract | OpKind::Compress | OpKind::Undo
         );
         let badge_w = if show_badge {
-            [Key::BadgeNew, Key::BadgeExists]
-                .iter()
-                .map(|k| k.tr().width())
-                .max()
-                .unwrap_or(0)
+            [
+                Key::BadgeNew,
+                Key::BadgeExists,
+                Key::BadgeRemoved,
+                Key::BadgeBack,
+                Key::BadgeTagsBack,
+            ]
+            .iter()
+            .map(|k| k.tr().width())
+            .max()
+            .unwrap_or(0)
                 + 4
         } else {
             0
@@ -253,7 +312,15 @@ pub fn draw(
                 ),
             ];
             if show_badge {
-                let b = if exists_already(it.action) {
+                let b = if plan.kind == OpKind::Undo {
+                    match it.action {
+                        ItemAction::Delete | ItemAction::Trash => {
+                            popup::badge(ctx, Key::BadgeRemoved.tr(), Tone::Danger)
+                        }
+                        ItemAction::Retag => popup::badge(ctx, Key::BadgeTagsBack.tr(), Tone::Info),
+                        _ => popup::badge(ctx, Key::BadgeBack.tr(), Tone::Info),
+                    }
+                } else if exists_already(it.action) {
                     popup::badge(ctx, Key::BadgeExists.tr(), Tone::Warn)
                 } else {
                     popup::badge(ctx, Key::BadgeNew.tr(), Tone::Ok)
@@ -505,7 +572,7 @@ pub fn draw(
         let at = buttons.len();
         buttons.extend(popup::button(
             ctx,
-            run_label(plan.kind),
+            &run_label(plan),
             Some(key_name("Enter")),
             kind,
             !pv.cancel_focus && can_run,

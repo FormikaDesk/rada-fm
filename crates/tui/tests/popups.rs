@@ -141,3 +141,52 @@ fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
         "{card}"
     );
 }
+
+/// The last rows of the screen, where the key hints are.
+fn hint_row(h: &mut H) -> String {
+    let s = h.screen();
+    s.lines()
+        .rev()
+        .find(|l| l.contains("Esc"))
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[test]
+fn the_key_hints_of_a_menu_name_only_the_keys_that_work_now() {
+    let (mut h, _dest) = files(150, 40);
+    h.keys("j");
+    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    h.mouse(
+        MouseEventKind::Down(MouseButton::Right),
+        x,
+        y,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    // On "Open": choose, confirm, close; no Right (nothing opens), no Left (nothing behind).
+    let bar = hint_row(&mut h);
+    assert!(
+        bar.contains("choose") && bar.contains("confirm") && bar.contains("close"),
+        "{bar}"
+    );
+    assert!(!bar.contains("open") && !bar.contains("back"), "{bar}");
+    // On "Open with ›": Right opens it.
+    h.key(KeyCode::Down);
+    let bar = hint_row(&mut h);
+    assert!(bar.contains("→") && bar.contains("open"), "{bar}");
+    // Inside the submenu: Left goes back.
+    h.key(KeyCode::Right);
+    let bar = hint_row(&mut h);
+    assert!(bar.contains("←") && bar.contains("back"), "{bar}");
+    h.key(KeyCode::Esc);
+    h.key(KeyCode::Esc);
+}
+
+#[test]
+fn notification_titles_start_with_a_capital() {
+    let (mut h, _dest) = files(150, 40);
+    h.app
+        .notify(Notice::new(NoticeKind::Error, "cannot show this picture"));
+    let s = h.screen();
+    assert!(s.contains("Cannot show this picture"), "{s}");
+}

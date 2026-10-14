@@ -273,7 +273,7 @@ strings! {
     LSelectDown => "Extend selection down", "Estendi la selezione in giù";
     LSelectToFirst => "Extend selection to start", "Estendi la selezione all'inizio";
     LSelectToLast => "Extend selection to end", "Estendi la selezione alla fine";
-    LClearSelection => "Clear selection / cancel", "Annulla la selezione / interrompi";
+    LClearSelection => "Clear selection / cancel", "Deseleziona / interrompi";
     LCopy => "Copy", "Copia";
     LCut => "Cut", "Taglia";
     LPaste => "Paste", "Incolla";
@@ -377,7 +377,7 @@ strings! {
     BtnOpenFilesSettings => "Open Files & Folders settings", "Apri le impostazioni File e cartelle";
     BtnFullDisk => "Full Disk Access", "Accesso completo al disco";
     BtnClose => "Close", "Chiudi";
-    BtnCancel => "Cancel", "Annulla";
+    BtnCancel => "Cancel", "Chiudi";
     BtnHide => "Hide", "Nascondi";
     BtnTryAgain => "Try again", "Riprova";
     BtnEject => "Eject", "Espelli";
@@ -407,7 +407,7 @@ strings! {
     // ---- windows in front of the interface
     HintClose => "close", "chiudi";
     HintScroll => "scroll", "scorri";
-    HintCancel => "cancel", "annulla";
+    HintCancel => "cancel", "interrompi";
     HintMove => "move", "sposta";
     HintGo => "go", "vai";
     ChipProperties => "Properties", "Proprietà";
@@ -424,7 +424,7 @@ strings! {
     BtnUndoDone => "Undo what was done", "Annulla ciò che è stato fatto";
     ChipRunning => "Running", "In corso";
     OpInProgress => "An operation is in progress", "Un'operazione è in corso";
-    QuitWarn1 => "Quitting cancels it. Steps already finished stay in the", "Uscendo la annulli. I passaggi già conclusi restano nel";
+    QuitWarn1 => "Quitting cancels it. Steps already finished stay in the", "Uscendo la interrompi. I passaggi già conclusi restano nel";
     QuitWarn2 => "journal and can be undone.", "registro e si possono annullare.";
     BtnQuitAnyway => "Quit anyway", "Esci comunque";
     BtnStay => "Stay", "Resta";
@@ -453,6 +453,24 @@ strings! {
     PolicyChange => "← →", "← →";
     PlanQDelete => "Delete {0} permanently?", "Eliminare definitivamente {0}?";
     PlanQTrash => "Move {0} to the trash?", "Spostare {0} nel cestino?";
+    UndoQ => "Undo {0}?", "Annullare {0}?";
+    RedoQ => "Repeat {0}?", "Ripetere {0}?";
+    BtnUndoOp => "Undo {0}", "Annulla {0}";
+    BtnRedoOp => "Repeat {0}", "Ripeti {0}";
+    OpOfItems => "{0} of {1}", "{0} di {1}";
+    OpNounCopy => "the copy", "la copia";
+    OpNounMove => "the move", "lo spostamento";
+    OpNounTrash => "moving to the trash", "lo spostamento nel cestino";
+    OpNounRename => "the rename", "la rinomina";
+    OpNounExtract => "the extraction", "l'estrazione";
+    OpNounCompress => "the compression", "la compressione";
+    OpNounMkdir => "the creation of the folder", "la creazione della cartella";
+    OpNounMkfile => "the creation of the file", "la creazione del file";
+    OpNounTags => "the tag change", "la modifica dei tag";
+    OpNounDelete => "the deletion", "l'eliminazione";
+    BadgeRemoved => "will be removed", "verrà tolto";
+    BadgeBack => "goes back", "torna al suo posto";
+    BadgeTagsBack => "tags restored", "tag ripristinati";
     BadgeNew => "new", "nuovo";
     BadgeExists => "already there", "esiste già";
     HintTabButtons => "Tab buttons", "Tab pulsanti";
@@ -630,10 +648,13 @@ strings! {
 
     // ---- the status bar and the key hints
     HRun => "run", "esegui";
-    HCancel => "cancel", "annulla";
+    HCancel => "cancel", "chiudi";
     HOk => "ok", "ok";
     HGo => "go", "vai";
     HClose => "close", "chiudi";
+    HChoose => "choose", "scegli";
+    HConfirm => "confirm", "conferma";
+    HStop => "stop", "interrompi";
     HOpen => "open", "apri";
     HAlways => "always", "sempre";
     HQuit => "quit", "esci";
@@ -680,7 +701,7 @@ strings! {
     TooSmall => "terminal too small", "terminale troppo piccolo";
     EnlargeNotice => "Enlarge the window for the full layout (now {0}×{1})  Esc: hide", "Ingrandisci la finestra per vedere tutto (ora {0}×{1})  Esc: nascondi";
     ProgLeft => "{0} left", "ne restano {0}";
-    ProgCancel => "cancel", "annulla";
+    ProgCancel => "cancel", "interrompi";
 
     // ---- the preview
     PvEmptyFile => "Empty file", "File vuoto";
@@ -759,7 +780,7 @@ strings! {
     NDoneNotKept => "{0}: done, but some attributes could not be kept", "{0}: fatto, ma alcuni attributi non si sono potuti conservare";
     NProblems => "{0}: finished with {1} problem(s)", "{0}: concluso con {1} problema/i";
     NStopped => "{0}: stopped; press u to undo what was done", "{0}: fermato; premi u per annullare ciò che è stato fatto";
-    NCancelled => "{0}: cancelled; press u to undo what was done", "{0}: annullato; premi u per annullare ciò che è stato fatto";
+    NCancelled => "{0}: cancelled; press u to undo what was done", "{0}: interrotto; premi u per annullare ciò che è stato fatto";
     NInterrupted => "{0}: interrupted; press u to undo what was done", "{0}: interrotto; premi u per annullare ciò che è stato fatto";
     NSkippedFolderOne => "1 more skipped because its folder failed", "1 saltato in più perché la sua cartella ha dato errore";
     NSkippedFolderMany => "{0} more skipped because their folder failed", "{0} saltati in più perché la loro cartella ha dato errore";
@@ -780,7 +801,7 @@ strings! {
     TLiveOff => "live updates off: {0}", "aggiornamenti in tempo reale disattivati: {0}";
     TNothingUndo => "nothing to undo", "niente da annullare";
     TNothingRedo => "nothing to redo (redo only follows an undo, until another operation)", "niente da ripetere (si può ripetere solo dopo un annullamento, finché non c'è un'altra operazione)";
-    TBusy => "an operation is running; wait or press Esc to cancel it", "un'operazione è in corso: aspetta o premi Esc per annullarla";
+    TBusy => "an operation is running; wait or press Esc to cancel it", "un'operazione è in corso: aspetta o premi Esc per interromperla";
     TArchiveReadOnly => "an archive is read-only — cannot {0}; copy ({1}) items out to a folder instead", "un archivio è in sola lettura — non si può {0}; copia ({1}) gli elementi in una cartella";
     TNothingCopied => "nothing copied yet (y = copy, x = cut)", "non hai ancora copiato nulla (y = copia, x = taglia)";
     TYankCopiedOne => "{0} copied — go to the destination and press {1}", "{0} copiato — vai alla destinazione e premi {1}";
@@ -809,7 +830,7 @@ strings! {
     KeyCopyWord => "copy", "copia";
     KeyExtractWord => "extract", "estrai";
     KeyPasteWord => "paste", "incolla";
-    TCancelling => "cancelling…", "annullamento in corso…";
+    TCancelling => "cancelling…", "interruzione in corso…";
     THexOnlyBinary => "the hex dump is available for binary files", "il dump esadecimale è disponibile per i file binari";
     TDetailsOnNarrow => "details pane on — this terminal is too narrow to show it", "pannello dei dettagli attivo — questo terminale è troppo stretto per mostrarlo";
     TOpenWithFiles => "Open with… is for files", "Apri con… vale per i file";

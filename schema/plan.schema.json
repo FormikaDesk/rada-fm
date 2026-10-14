@@ -96,6 +96,18 @@
     "totals": {
       "$ref": "#/$defs/Totals"
     },
+    "undoes": {
+      "description": "Set on the plan of an undo: what kind of operation it takes back, and how many items\nthat one had (for the question the window asks).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UndoOf"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "warnings": {
       "type": "array",
       "items": {
@@ -1611,6 +1623,25 @@
       "required": [
         "original",
         "handle"
+      ]
+    },
+    "UndoOf": {
+      "description": "The operation an undo plan takes back.",
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "How many items that operation was about.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/OpKind"
+        }
+      },
+      "required": [
+        "kind",
+        "items"
       ]
     },
     "Warning": {

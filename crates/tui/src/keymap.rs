@@ -501,9 +501,9 @@ impl fmt::Display for Chord {
         match self.code {
             KeyCode::Char(' ') => f.write_str(Key::KeySpace.tr()),
             KeyCode::Char(c)
-                if self
-                    .mods
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::SUPER) =>
+                if self.mods.intersects(
+                    KeyModifiers::CONTROL | KeyModifiers::SUPER | KeyModifiers::ALT,
+                ) =>
             {
                 write!(f, "{}", c.to_ascii_uppercase())
             }
@@ -961,6 +961,22 @@ fn nav_rank(c: Chord) -> u8 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_letter_with_a_modifier_is_shown_in_capitals() {
+        let chord = |mods, c: char| Chord {
+            code: KeyCode::Char(c),
+            mods,
+        };
+        assert_eq!(chord(KeyModifiers::ALT, 'z').to_string(), "Alt+Z");
+        assert_eq!(chord(KeyModifiers::CONTROL, 'c').to_string(), "Ctrl+C");
+        assert_eq!(
+            chord(KeyModifiers::CONTROL | KeyModifiers::SHIFT, 'c').to_string(),
+            "Ctrl+Shift+C"
+        );
+        // Without a modifier the letter is the letter the key types.
+        assert_eq!(chord(KeyModifiers::NONE, 'y').to_string(), "y");
+    }
+
     use super::*;
 
     fn ev(code: KeyCode, mods: KeyModifiers) -> KeyEvent {
