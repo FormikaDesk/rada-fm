@@ -11,10 +11,16 @@
 //! ```
 //!
 //! The terminal is Ghostty if it is installed (a window of 180×45 with the Cmd keys let
-//! through, see [`ghostty_config`]), else iTerm2, else Terminal. Ghostty is not given rada
-//! with `-e`: on a Mac that makes it ask "Allow Ghostty to execute…?" (a question Ghostty
-//! keeps for every command given that way, for security) and, run through `open`, start the
-//! command twice. The command is its `initial-command` instead, in the settings file. The Dock shows the
+//! through, see [`ghostty_config`]), else iTerm2, else Terminal.
+//!
+//! Ghostty is never given rada as an argument or as a document. Its macOS application asks
+//! "Allow Ghostty to execute …?" for every file it is asked to open as a document (Finder,
+//! the Dock, or a path among the arguments that AppKit takes for a document: that is what
+//! `-e <path>` did on older versions of Ghostty, besides starting a second tab), and the
+//! maintainers keep that question on purpose (it is a security measure, not a setting). The
+//! command is the `initial-command` of a settings file instead, which Ghostty reads as
+//! configuration: no question, one window, one tab. `window-save-state = never` makes sure
+//! that the windows of the last run are not given back besides it. The Dock shows the
 //! terminal's icon while rada runs, not rada's: a window belongs to the program that draws it.
 
 use rada_core::i18n::{Key, tf};
@@ -319,11 +325,14 @@ pub fn command_script(exe: &Path) -> String {
 /// Keys Ghostty does not bind (Cmd+X, Cmd+I, Cmd+O, Cmd+Y, Cmd+Shift+N, Cmd+.) need nothing.
 ///
 /// The window's one command is `initial-command` (only the first terminal Ghostty opens runs
-/// it, once), written as `shell:` and a quoted path so that any folder name works.
+/// it, once), written as `shell:` and a quoted path so that any folder name works. Ghostty
+/// restores the windows of its last run on macOS unless told not to (`window-save-state`):
+/// a restored tab would stand beside the one that runs rada, so it is told not to.
 pub fn ghostty_config(exe: &Path) -> String {
     let mut out = format!(
         "# Written by `rada setup desktop`. Ghostty reads it only for the window Rada.app opens.\n\
          initial-command = shell:{}\n\
+         window-save-state = never\n\
          window-width = {WINDOW_COLUMNS}\n\
          window-height = {WINDOW_ROWS}\n\
          # This window is rada's: closing it ends this Ghostty.\n\
@@ -427,6 +436,33 @@ mod tests {
         let ghostty_line = launcher.lines().find(|l| l.contains("-a Ghostty")).unwrap();
         assert!(!ghostty_line.contains(" -e "), "{ghostty_line}");
         assert!(!ghostty_line.contains("initial-command"), "{ghostty_line}");
+    }
+
+    #[test]
+    fn ghostty_is_given_options_only_never_a_path_that_it_could_take_for_a_document() {
+        // AppKit reports a path among the arguments as a document to open, and Ghostty asks
+        // "Allow Ghostty to execute …?" for it and opens a tab of its own. Everything after
+        // `--args` is an option (`--name=value`); the program and the folders are in the file.
+        let exe = Path::new("/Users/utente/.cargo/bin/rada");
+        let launcher = launcher_script(exe);
+        let line = launcher.lines().find(|l| l.contains("-a Ghostty")).unwrap();
+        let after = line.split("--args").nth(1).expect("--args");
+        for word in after.split_whitespace() {
+            assert!(word.starts_with("--"), "{word} in {line}");
+        }
+        assert!(
+            !launcher
+                .lines()
+                .filter(|l| l.contains("Ghostty"))
+                .any(|l| l.contains("$RADA")),
+            "the program is not passed to Ghostty: {launcher}"
+        );
+        // The window of the last run is not given back beside the one that runs rada.
+        let c = ghostty_config(exe);
+        assert!(c.contains("window-save-state = never\n"), "{c}");
+        // One command, in the first window only.
+        assert_eq!(c.matches("initial-command").count(), 1, "{c}");
+        assert!(!c.lines().any(|l| l.starts_with("command ")), "{c}");
     }
 
     #[test]

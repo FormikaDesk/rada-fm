@@ -1,8 +1,8 @@
 # rada
 
-![rada: look around, select three items, copy them with a plan first, see the card, take it back with Ctrl+Z](docs/media/demo.gif)
+**The cross-platform terminal file manager where every destructive action is planned and undoable.**
 
-**A safe harbor for your files.**
+![rada: look around, select three items, copy them with a plan first, see the card, take it back with Ctrl+Z](docs/media/demo.gif)
 
 rada is a fast file manager for the terminal, written in Rust, driven by keyboard or mouse. It is built around three promises:
 
@@ -366,7 +366,9 @@ Three looks, each with a dark and a light variant:
 | `tokyo-night` | `tokyo-night-dark` | `tokyo-night-day` |
 | (only light) | | `nebbia-light` |
 
-`rada-light` is "paper": a warm off-white background instead of pure white, which is easier on the eyes. `nebbia-light` ("mist") is the same idea with a cool grey-blue paper. Both paint their own background; on a 16-colour terminal the terminal's background is kept.
+`rada-light` is **Carta**, warm parchment (`#ecdfc6`) with brown text instead of black on white, which is easier on the eyes; `rada` is a night blue (`#1b1d27`). `nebbia-light` ("mist") is the paper idea with a cool grey-blue paper. These three paint their own background; on a 16-colour terminal the terminal's background is kept.
+
+The whole interface has **one background**: the tab bar, the bar of the path, the command bar, the sidebar, the list, the details, the menus, the windows, the status bar and the key hints are all the same colour. Panels are told apart by thin rounded lines; fields, pills and key caps are a step darker (lighter, in the dark theme) than the background. The popups follow the same rule: no shadow, a border in the colour of what lies behind it, and a window is one tone from its line to its inside.
 
 ![Catppuccin](docs/screenshots/tema-catppuccin.png)
 ![Tokyo Night](docs/screenshots/tema-tokyo-night.png)
@@ -385,7 +387,7 @@ How rada finds out, cheapest and safest first, without ever taking a key from yo
 
 The result will be shown by `rada doctor` when that command exists; until then it is written to the log (`RADA_LOG=info`). The Windows console is not asked in this version (it falls back to dark unless you set `appearance`).
 
-Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. The terminal's own background is left alone, so transparency and your wallpaper keep working; the bars and the sidebar use a slightly different tone of their own.
+Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. `catppuccin` and `tokyo-night` leave the terminal's own background alone, so transparency and your wallpaper keep working there; they too use one tone for every zone.
 
 ## Terminals
 
@@ -512,7 +514,9 @@ rada setup font               # download and install JetBrainsMono Nerd Font Mon
 
 **Linux.** `setup desktop` writes `rada.desktop` to `~/.local/share/applications` and the icon to `~/.local/share/icons/hicolor` (SVG, and PNG at 48, 128 and 256 px), updates the desktop database when `update-desktop-database` is available, and prints each file it wrote. The entry declares `StartupWMClass=com.formikadesk.rada`, and `rada --spawn-terminal` (what the entry runs) starts the terminal with that identity — `ghostty --class=`, `kitty --class`, `alacritty --class`, `wezterm start --class`, `foot --app-id` — so a bar or workspace switcher shows **rada's icon** and not the terminal's. The entry does not claim folders, so a plain setup never changes what opens them; with `--default-file-manager` it declares `inode/directory` and uses `xdg-mime` to set rada as the handler (the previous handler is remembered and `--remove` puts it back). `--spawn-terminal` chooses, in this order, `xdg-terminal-exec`, `$TERMINAL`, then the first of ghostty, kitty, foot, alacritty, wezterm, konsole, gnome-terminal, xterm. The files for packagers are in `packaging/linux/`.
 
-**macOS.** `setup desktop` makes `~/Applications/Rada.app`, built from files only (no code to sign): an `Info.plist`, rada's icon as a real `.icns` at every size, and a small launcher that opens rada in **Ghostty** if it is installed — in a 180×45 window with its own settings, which hand the Cmd keys back to rada (see [macOS](#macos)) — else in **iTerm2**, else in **Terminal**. `--desktop` adds a link on the Desktop. **Known limits:** while rada runs, the Dock shows the terminal's icon, not rada's: a window belongs to the program that draws it. And Ghostty asks "Allow Ghostty to execute …?" when it is started with a command given with `-e`; its author keeps that question on purpose (it closed a security hole) and it cannot be switched off. Rada.app therefore does not use `-e`: the command is the `initial-command` in the settings file of its window, so it opens one window with one rada, and Ghostty has at most one question to ask per click. If it asks, choose *Allow*. Opening rada from inside a Ghostty window you already have never asks.
+**macOS.** `setup desktop` makes `~/Applications/Rada.app`, built from files only (no code to sign): an `Info.plist`, rada's icon as a real `.icns` at every size, and a small launcher that opens rada in **Ghostty** if it is installed — in a 180×45 window with its own settings, which hand the Cmd keys back to rada (see [macOS](#macos)) — else in **iTerm2**, else in **Terminal**. `--desktop` adds a link on the Desktop. **Known limits:** while rada runs, the Dock shows the terminal's icon, not rada's: a window belongs to the program that draws it.
+
+*"Allow Ghostty to execute …?"* is Ghostty's own question. Its macOS application asks it for every file it is asked to open **as a document** (a double click in the Finder, a drop on the Dock, or a path among its arguments, which is how `ghostty -e /path/to/rada` reaches it, and then it opens a second tab for that "document" besides the one that runs the command), and for a command given with `-e`. Its author keeps the question on purpose (a security measure, [discussion #10203](https://github.com/ghostty-org/ghostty/discussions/10203)); there is no setting that switches it off, and rada does not try to get round it. What can be done is to never give Ghostty rada as a document, and `Rada.app` does just that: its launcher passes options only (`open -n -a Ghostty --args --config-file=…`) and the program is the `initial-command` of the settings file of its window, which Ghostty reads as configuration and not as a document: **one window, one tab, no question**. The same file has `window-save-state = never`, so that the windows of the last run are not given back beside it (macOS does that unless told not to). If your Rada.app was made by an older version of rada (the first ones started Ghostty with `-e`, which is the two tabs and the question), make it again: `rada setup desktop` replaces the whole bundle. `cat ~/Applications/Rada.app/Contents/MacOS/Rada` must show a line `open -n -a Ghostty --args --config-file=…` and nothing else after it. Opening rada from inside a Ghostty window you already have never asks.
 
 **Windows.** `setup desktop` puts a shortcut with rada's icon in the Start menu (`--desktop`: on the Desktop too). If Windows Terminal is installed it adds a profile "rada" as a *fragment* (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\rada\`, the way Windows Terminal asks programs to add profiles, without editing your own settings) with the icon and — once the font is installed — the Nerd Font, and the shortcut opens that profile; otherwise the shortcut starts `rada.exe` itself, whose icon is built into the program, so the taskbar shows it.
 
