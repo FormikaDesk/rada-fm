@@ -128,7 +128,15 @@ fn ordering_by_size_uses_the_counted_size_of_folders() {
     assert_eq!(h.names(), ["big", "small", "f"]);
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
     counted(&mut h);
-    h.pump(50);
+    // The list is sorted again when the sizes have been heard, a moment after they are read:
+    // wait for that, not for a fixed time.
+    h.wait("the order", |a| {
+        let names: Vec<String> = (0..a.visible.len())
+            .filter_map(|i| a.entry_at(i))
+            .map(|e| e.display.clone())
+            .collect();
+        names == ["small", "big", "f"]
+    });
     // The smaller folder comes first, then the larger, before the files.
     assert_eq!(h.names(), ["small", "big", "f"], "{}", h.screen());
     h.keys("S");
