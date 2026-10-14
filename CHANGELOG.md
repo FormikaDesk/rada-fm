@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.7] - 2026-10-14
+
+A correction to how popups are drawn, seen on a real terminal: the border, the surface and the shadow of the rc.6 left half a cell of the popup's colour outside the rounded line. Icons, layout and texts are as they were. Still a **pre-release**.
+
+### Fixed
+- **The border of a popup is never a colour of its own.** The cells of `╭─╮│╰─╯` take the colour of the cell just outside the line (on a plain background: the one behind the popup, so that no band of the popup's colour sticks out, and none is left between the line and the inside). A menu, a submenu and a notification are filled with the theme's background, no lighter surface; a window dims the screen behind it as before, and its border and inside are one tone, the dimmed background a little lighter. Where a row of another colour (a selected row) goes on beyond the line, the line keeps that colour on its side.
+- **No shadows.** Menus, submenus, windows and notifications have none, in any theme; the `shadow` helper of the theme is gone.
+- **`popup_border` can be seen on the background in all seven themes** (non-text contrast of at least 3:1, also against the dimmed screen and the window), with a test. The `popup` token is now what a menu is filled with: the theme's background (the terminal's own where the theme leaves it alone).
+- **Menus opened near the bottom stay above the status bar and the key hints** (they move up, leaving a row of air over the bar). A submenu that opens on the left no longer leaves dark strips or an empty row at the bottom.
+- **A submenu and the list of programs sit right against their menu**, on either side, with the plain background between the two lines: the cursor row that passes behind no longer shows through a column of space.
+- **`.docx`, `.doc`, `.odt` and the other office files showed the PDF icon** (every kind of document did, in the list and in the menu header). Word files and text documents have the Word mark, spreadsheets, presentations and e-books their own; only `.pdf` has the PDF one.
+- The notification's coloured left side and its bottom edge are drawn with the same rule (the cell keeps the colour behind it).
+
+### Added
+- Cell-by-cell tests of the border of a menu, a submenu, the delete window and the stacked notifications on the real buffer, in a dark theme and in Carta (`crates/tui/tests/popup_edges.rs`).
+- A demo scene `menubottom` and the tape `docs/tapes/menu-fondo.tape`: the menu of a file among the last rows of the list.
+
 ## [0.6.0-rc.6] - 2026-10-14
 
 The windows that sit in front of the interface — menus, "Open with…", the plan, the undo, the notifications — are redone in one style, and the command line speaks the language too. Still a **pre-release**.
