@@ -2467,6 +2467,8 @@ impl App {
                 }));
                 self.svc.jobs.load_history();
             }
+            // The list of the files used lately (the demo home has a `recently-used.xbel`).
+            "recenti" => self.open_dir(rada_core::recents::view_path()),
             // A selection and something on the clipboard, to show the bottom bar at work.
             "selection" => {
                 let files: Vec<_> = self

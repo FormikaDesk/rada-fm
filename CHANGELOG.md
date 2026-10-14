@@ -5,6 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.8] - 2026-10-15
+
+Carta on a less warm paper, the names of the Finder on macOS, a "Recent" entry in the sidebar, and an option to leave the terminal's background alone. Still a **pre-release**.
+
+### Added
+- **Recent** in the sidebar, right under Home: a read-only list of the files used lately, the last used first (at most 200), with a *Last used* column instead of *Modified*. Enter opens the file; **Show in folder** (`Alt+F`, and the menu of the right button, also in the list of a tag) opens its folder with the cursor on it. Where the list comes from: macOS, Spotlight (`mdfind`, the last-used date of the last 30 days, asked on a worker with a timeout); Linux, `recently-used.xbel` in the data folder, only files that still exist; Windows, the user's Recent folder, whose shortcuts (`.lnk`) are read for the file they point at (the format is read directly, without the shell). If the source is missing or fails, the entry is not there and nothing is said. Hidden folders and the Mac's `Library` are left out.
+- **`transparent_background = true`** in the configuration: the default dark theme leaves the terminal's own background instead of painting its night blue, as `catppuccin` and `tokyo-night` do. Off by default; the other themes ignore it.
+- A demo scene `recenti` and the tapes `recenti` and `recenti-carta`; the demo home has a `recently-used.xbel`.
+
+### Changed
+- **Carta is less warm**: the background is `#ebe4d5` (it was `#ecdfc6`), fields and buttons `#e1d9c8`, keys `#d9d0bc`, lines `#cbbfa6`, text `#3a3229` (dim text `#5d5446`), the selected row `#ddd6c7`, taken from the reference picture; the contrast tests still pass (the text was darkened, not the background lightened). The whole interface is still one background.
+- **macOS: the folders of the Finder have the Finder's names, in the language of the interface.** With the interface in Italian, `Desktop` is shown as *Scrivania*, `Documents` as *Documenti*, `Downloads` as *Download*, `Pictures` as *Immagini*, `Music` as *Musica*, `Movies` as *Filmati*, `Public` as *Pubblica*, `Applications` as *Applicazioni* and `Library` as *Libreria*, in the sidebar, the list, the bar of the path and the tabs. The names come from the system's own table (`SystemFolderLocalizations/<lang>.lproj/SystemFolderLocalizations.strings`, binary, XML or text), with a short fixed table for Italian as a reserve; only folders in the home folder (or `/Applications` and `/Library`) that carry the `.localized` marker are renamed, as in the Finder. Only the shown name changes: the path, the search, copy, move, rename and the command line use the real name (the filter finds a folder by either). In English the names stay as they are, whatever the Finder's own language is. Linux and Windows are unchanged (on Windows the sidebar and the bar of the path already show Explorer's names; the tab keeps the name on disk for now).
+
 ## [0.6.0-rc.7] - 2026-10-14
 
 A correction to how popups are drawn, seen on a real terminal (half a cell of the popup's colour stuck out of the rounded line), and with it a new look for the colours: one background for the whole interface. Icons, layout and texts are as they were. Still a **pre-release**.

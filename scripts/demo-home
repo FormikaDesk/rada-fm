@@ -255,6 +255,26 @@ def main():
     tag(os.path.join(demo, "photo.jpg"), "Rosso", "Blu", "Viola")
     tag(os.path.join(demo, "report.pdf"), "Blu")
 
+    # The files used lately, the way the desktop's programs list them: "Recent" shows them.
+    used = [
+        ("projects/demo/photo.jpg", 40 * 60), ("projects/demo/README.md", 41 * 60),
+        ("projects/demo/main.rs", 55 * 60), ("projects/demo/notes.txt", DAY + 7200),
+        ("Documenti/relazione.txt", 2 * DAY), ("projects/demo/screenshot.png", DAY + 5000),
+        ("projects/demo/report.pdf", 4 * DAY), ("projects/demo/Cargo.toml", 3 * DAY),
+        ("projects/demo/data.json", 6 * DAY), ("Download/istruzioni.txt", 3 * DAY + 3600),
+        ("projects/demo/logo.svg", 5 * DAY), ("projects/demo/song.mp3", 9 * DAY),
+    ]
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<xbel version="1.0">']
+    for rel, secs in used:
+        when = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(NOW - secs))
+        lines.append(
+            f'  <bookmark href="file://{os.path.join(home, rel)}" added="{when}" '
+            f'modified="{when}" visited="{when}"/>'
+        )
+    lines.append("</xbel>")
+    with open(os.path.join(home, ".local/share/recently-used.xbel"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
     # A few things in the other folders, so that they are not empty.
     write(os.path.join(home, "Documenti/relazione.txt"), "Relazione di prova.\n", 2 * DAY)
     # A file with the name of one in the demo folder, so that a copy meets a clash.

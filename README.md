@@ -43,7 +43,7 @@ The names of the folders in the sidebar are the ones the system gives them (Ital
 
 ## Status
 
-Version 0.6.0-rc.7. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
+Version 0.6.0-rc.8. **Linux is supported.** Windows and macOS are a **pre-release**: the Recycle Bin / Trash, drives and volumes, the standard folders, opening files, and — new in this release — the things people expect of the Finder and Explorer (packages, localized names, ejecting, Quick Look, tags on macOS; localized names and ejecting on Windows) are implemented, and the whole test suite runs on all three systems in CI. The Mac version has had its first real-world try-out; nobody lives in the Windows one yet, so expect rough edges, and the parts of a copy that preserve attributes (ACLs, alternate data streams, resource forks, and the extended attributes other than tags) are not done there: the plan says so before anything is copied.
 
 rada is young and written by one person. The parts that touch your files — planning, copying, the journal, undo — are covered by unit tests, fault-injection tests (full disk, revoked rights, files that change or vanish), tests that kill the process with `SIGKILL` in the middle of an operation, and property tests that generate random trees and check that copy → undo and move → undo give back exactly the starting state, and that compress → extract gives back the same tree. That is a lot more than nothing and much less than years of use. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and please report anything strange. Review of the operations engine by other people is the help the project needs most ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
@@ -231,11 +231,11 @@ What is guaranteed, and what is not (RAR tested with 7-Zip and a stand-in, no ow
 
 ## Updates
 
-rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.7`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
+rada looks for a newer version **at most once a day**, in a background worker that never slows the start. It reads GitHub's public list of releases and sends nothing but `User-Agent: rada/<version>`; a network error is silent. A stable version only sees stable releases; a pre-release (`0.6.0-rc.8`) also sees later pre-releases (`channel = "stable"` or `"prerelease"` decides by hand, `check = false` turns the background check off).
 
 When one exists you see it twice: a pill in the accent colour in the tab bar, **↑ Update to X**, and the status bar, **New version X available — press Alt+U to update** (click either). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later.
 
-The status bar always shows the version that is running, **v0.6.0-rc.7 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
+The status bar always shows the version that is running, **v0.6.0-rc.8 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
 
 ```sh
 rada update --check     # only say whether a newer version exists, and what is in it
@@ -258,7 +258,8 @@ What a Mac user expects of a file manager, as far as a terminal allows:
 - **Permissions.** When macOS refuses a folder until you allow it, rada says so in words and opens the right page of System Settings (see [On a Mac](#on-a-mac)); the sidebar marks the folders that are waiting.
 - **Packages.** `.app`, `.bundle`, `.framework`, `.photoslibrary`, `.pages`, `.numbers`, `.key`, `.rtfd` and every folder the system treats as a package (asked of Launch Services, with the Finder's bundle bit as a second opinion — not guessed from the name) behave like files: `Enter` opens them with their program, they sort among the files, and the right-click menu has *Show package contents* (`Alt+↓`) to go inside.
 - **Hidden like in the Finder.** `.DS_Store`, `._*` files, `.localized` and every folder flagged hidden (`~/Library`) stay out of sight until you show hidden files (`.`, or `Cmd+Shift+.`).
-- **Names as the Finder shows them.** The sidebar and the breadcrumbs say *Scrivania*, *Documenti*, *Macintosh HD*, the way your language has them; **Properties** and **Copy path** still give the real path.
+- **Names as the Finder shows them.** With the interface in Italian, `Desktop` is *Scrivania*, `Documents` *Documenti*, `Downloads` *Download*, `Pictures` *Immagini*, `Music` *Musica*, `Movies` *Filmati*, `Public` *Pubblica*, `Applications` *Applicazioni* and `Library` *Libreria*: in the sidebar, the list, the bar of the path and the tabs, from the system's own table of folder names (a short fixed one is the reserve), and only for the folders that carry the Finder's `.localized` marker, as in the Finder. *Macintosh HD* and the other disks come from the system too. In English the names stay as they are. Only what is shown changes: **Properties**, **Copy path**, search, copy, move, rename and the command line use the real name.
+- **Recent** in the sidebar: the files you used lately, from Spotlight (see [Recent](#recent)).
 - **Natural order** everywhere: `file2` before `file10`, capitals mixed with small letters (`natural_sort = false` for letter by letter).
 - **Eject** in the right-click menu of a disk and with `Del` on it in the sidebar: a confirmation, then `diskutil eject`; a busy disk says who is using it ("Finder (process 412)…") and can be tried again. **iCloud Drive** is in the sidebar when it is there.
 - **Quick Look**: *Quick Look* in the item's menu, a button under *Preview* in the details pane, `Alt+Y` (and `Cmd+Y`), and `Q` in the full-screen preview. `Space` still means *select*.
@@ -335,7 +336,23 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 
 ### Navigation pane
 
-**Home**, then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of ten segments, `■■■■■■□□□□`, of how full it is, and what is free; `[######----]` in the basic profile), **TAGS** (the colours and your own tags) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
+**Home** and, under it, **Recent** (where the system has a list of the files you used lately: see [Recent](#recent)), then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of ten segments, `■■■■■■□□□□`, of how full it is, and what is free; `[######----]` in the basic profile), **TAGS** (the colours and your own tags) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
+
+### Recent
+
+Under **Home**, **Recent** lists the files you used lately, the last used first (at most 200), with a **Last used** column in place of *Modified*. It is a list like the one of a tag: you can open, copy and look at its files, but nothing can be made in it. `Enter` opens a file; **Show in folder** (`Alt+F`, or in the menu of the right button) goes to its folder with the cursor on it. Where the list comes from depends on the system, and when there is none the entry is not shown at all:
+
+| System | Source |
+|---|---|
+| macOS | Spotlight (`mdfind`): what was used in the last 30 days under your home folder, with the date of its last use |
+| Linux | `recently-used.xbel` in `~/.local/share` (the file the desktop's programs write), only files that still exist |
+| Windows | the shortcuts of your `Recent` folder, read for the file each one points at |
+
+Hidden folders and the Mac's `Library` are left out.
+
+![Recent, dark](docs/screenshots/recenti.png)
+
+![Recent on the light Carta theme](docs/screenshots/recenti-carta.png)
 
 ### Status bar and hints
 
@@ -367,9 +384,11 @@ Three looks, each with a dark and a light variant:
 | `tokyo-night` | `tokyo-night-dark` | `tokyo-night-day` |
 | (only light) | | `nebbia-light` |
 
-`rada-light` is **Carta**, warm parchment (`#ecdfc6`) with brown text instead of black on white, which is easier on the eyes; `rada` is a night blue (`#1b1d27`). `nebbia-light` ("mist") is the paper idea with a cool grey-blue paper. These three paint their own background; on a 16-colour terminal the terminal's background is kept.
+`rada-light` is **Carta**, soft parchment (`#ebe4d5`) with brown text instead of black on white, which is easier on the eyes; `rada` is a night blue (`#1b1d27`). `nebbia-light` ("mist") is the paper idea with a cool grey-blue paper. These three paint their own background; on a 16-colour terminal the terminal's background is kept.
 
 The whole interface has **one background**: the tab bar, the bar of the path, the command bar, the sidebar, the list, the details, the menus, the windows, the status bar and the key hints are all the same colour. Panels are told apart by thin rounded lines; fields, pills and key caps are a step darker (lighter, in the dark theme) than the background. The popups follow the same rule: no shadow, a border in the colour of what lies behind it, and a window is one tone from its line to its inside.
+
+**A transparent terminal.** The default dark theme paints its night blue, so it looks the same everywhere. If you would rather see your own terminal's background (a translucent window, a wallpaper), set `transparent_background = true` in the configuration: the default dark theme then leaves the background alone, as `catppuccin` and `tokyo-night` already do. It is off by default and only the default dark theme is affected; the light themes keep their paper.
 
 ![Catppuccin](docs/screenshots/tema-catppuccin.png)
 ![Tokyo Night](docs/screenshots/tema-tokyo-night.png)
@@ -458,7 +477,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
 | pin this folder (or the item in the navigation pane) · home | `B` · `~` | |
 | move between list and sidebar · show / hide the sidebar | `Tab` · `Ctrl+B` (both schemes) | |
-| update rada · Quick Look (macOS) · show package contents (macOS) | `Alt+U` · `Alt+Y` · `Alt+↓` (both schemes) | |
+| update rada · Quick Look (macOS) · show package contents (macOS) · show in folder (a list of tagged or recent items) | `Alt+U` · `Alt+Y` · `Alt+↓` · `Alt+F` (both schemes) | |
 | help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
 **`Ctrl+C` copies and never quits**: the terminal is in raw mode, so it arrives as an ordinary key, and a stray `SIGINT` is ignored. Quit with `q` or `Ctrl+Q`; `SIGTERM` and closing the terminal end rada in an orderly way (the running operation is cancelled, the terminal is restored).

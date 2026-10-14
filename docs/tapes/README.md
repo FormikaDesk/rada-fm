@@ -11,7 +11,7 @@ scripts/docs-media principale # the tapes whose name starts with it
 
 The terminal is 170×42 cells in JetBrainsMono Nerd Font. Each tape starts from
 `ambiente.tape` (the terminal and the environment: language, a home of its own, no network)
-`ambiente-carta.tape` (the same on the light "Carta" theme) or `ambiente-catppuccin.tape` and ends in a PNG of
+`ambiente-carta.tape` (the same on the light "Carta" theme; `recenti` and `recenti-carta` draw the Recent list) or `ambiente-catppuccin.tape` and ends in a PNG of
 `docs/screenshots/` or a GIF of `docs/media/`. VHS, `ttyd`, `ffmpeg`, python3 with Pillow and
 a JetBrainsMono Nerd Font have to be installed; nothing needs `sudo`.
 
