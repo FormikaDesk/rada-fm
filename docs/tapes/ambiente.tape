@@ -5,7 +5,7 @@ Set FontSize 14
 Set Padding 14
 # The size of the terminal (170x42 cells at this font) is set by each tape, before Source:
 # Set Width 1584 / Set Height 800.
-Set Theme "TokyoNight"
+Set Theme { "name": "Rada", "black": "#15161e", "red": "#f7768e", "green": "#9ece6a", "yellow": "#e0af68", "blue": "#86a0d4", "magenta": "#bb9af7", "cyan": "#7dcfff", "white": "#a9b1d6", "brightBlack": "#414868", "brightRed": "#f7768e", "brightGreen": "#9ece6a", "brightYellow": "#e0af68", "brightBlue": "#86a0d4", "brightMagenta": "#bb9af7", "brightCyan": "#7dcfff", "brightWhite": "#c8cde0", "background": "#1b1d27", "foreground": "#c8cde0", "selection": "#282c3a", "cursor": "#c8cde0" }
 Set TypingSpeed 70ms
 Set Framerate 24
 
