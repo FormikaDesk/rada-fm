@@ -70,7 +70,14 @@ fn folders_show_dots_while_counted_and_the_size_after() {
         h.screen()
     );
     // Files keep their own size, and nothing is invented for them.
-    assert!(row_of(&mut h, "f ").contains("1 B") || row_of(&mut h, " f").contains("1 B"));
+    // (The row of the file `f`, not the bar's "Search files…".)
+    assert!(
+        h.screen()
+            .lines()
+            .any(|l| l.contains(" f ") && l.contains("1 B")),
+        "{}",
+        h.screen()
+    );
 }
 
 #[test]

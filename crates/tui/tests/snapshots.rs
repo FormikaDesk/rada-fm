@@ -125,6 +125,10 @@ fn main_screen_with_marks_shows_the_selection_summary() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "a system with no tags has no Tags button in the command bar and no Tag column, which the Linux snapshot has"
+)]
 fn medium_terminal_has_no_preview() {
     let mut h = scene(84, 26);
     on(&mut h, "main.rs");
@@ -132,6 +136,10 @@ fn medium_terminal_has_no_preview() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "a system with no tags has no Tags button in the command bar and no Tag column, which the Linux snapshot has"
+)]
 fn narrow_terminal_drops_columns_in_order() {
     // Modified goes first, then the type, then the bar; the name keeps all the room.
     for (w, h_) in [(70u16, 24u16), (58, 22), (46, 20), (36, 18), (28, 14)] {
