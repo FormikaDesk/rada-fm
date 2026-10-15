@@ -8,23 +8,23 @@ expression: shot(&mut h)
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo                     ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀╭───────────────────────────────────────╮
 ╭──────────────────────────╮ ╭───────────────────────────────────────│  · main.rs  ·  Rust source            │
-│  ⌂ Home                  │ │ ☐   Name ↑                  Date modif│ ───────────────────────────────────── │
+│  ⌂  Home                 │ │ ☐   Name ↑                  Date modif│ ───────────────────────────────────── │
 │                          │ │                                       │  ▸ Open                        Enter  │
-│ TAGS                     │ │ ☐ ▸ data                    6 days ago│  ▦ Open with…                      ›  │
-│  ● Red                   │ │ ☐ ▸ src                     6 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
-│  ● Orange                │ │ ☐ ▸ 目录                    6 days ago│  ✂ Cut                        Ctrl+X  │
-│  ● Yellow                │ │ ☐ · a-very-long-file-name…  12 days ag│  ⧉ Copy                       Ctrl+C  │
-│  ● Green                 │ │ ☐ · backup.img              9 days ago│  ⎘ Paste                      Ctrl+V  │
-│  ● Blue                  │ │ ☐ · Cargo.toml              2 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
-│  ● Purple                │ │▌☐ · main.rs                 Yesterday │  ✎ Rename                         F2  │
-│  ● Gray                  │ │ ☐ · notes.txt               5 weeks ag│  ▣ Compress…                   Alt+Z  │
-│                          │ │ ☐ · README.md               Today 09:0│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
+│                          │ │ ☐ ▸ data                    6 days ago│  ▦ Open with…                      ›  │
+│ TAGS                     │ │ ☐ ▸ src                     6 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
+│  ●  Red                  │ │ ☐ ▸ 目录                    6 days ago│  ✂ Cut                        Ctrl+X  │
+│                          │ │ ☐ · a-very-long-file-name…  12 days ag│  ⧉ Copy                       Ctrl+C  │
+│  ●  Orange               │ │ ☐ · backup.img              9 days ago│  ⎘ Paste                      Ctrl+V  │
+│                          │ │ ☐ · Cargo.toml              2 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
+│  ●  Yellow               │ │▌☐ · main.rs                 Yesterday │  ✎ Rename                         F2  │
+│                          │ │ ☐ · notes.txt               5 weeks ag│  ▣ Compress…                   Alt+Z  │
+│  ●  Green                │ │ ☐ · README.md               Today 09:0│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │                          │ │ ☐ · тест-файл.md            Today 10:3│  ◆ Tags                            ›  │
-│                          │ │ ☐ · 日本語のファイル名.txt  5 days ago│  ⚲ Copy the path        Ctrl+Shift+C  │
+│  ●  Blue                 │ │ ☐ · 日本語のファイル名.txt  5 days ago│  ⚲ Copy the path        Ctrl+Shift+C  │
 │                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
-│                          │ │                                       │  ≣ Properties              Alt+Enter  │
+│  ●  Purple               │ │                                       │  ≣ Properties              Alt+Enter  │
 │                          │ │                                       │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
-│                          │ │                                       │  ✗ Move to trash                 Del  │
+│  ●  Gray                 │ │                                       │  ✗ Move to trash                 Del  │
 │                          │ │                                       │  ✗ Delete permanently      Shift+Del  │
 │                          │ │                                       ╰───────────────────────────────────────╯
 ╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯

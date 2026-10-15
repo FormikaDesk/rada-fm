@@ -8,23 +8,23 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│  ⌂ Home                  │ │     ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄         ☑ ╭───╮         │
+│  ⌂  Home                 │ │     ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄         ☑ ╭───╮         │
 │                          │ │     █████         █████         █████         █████         █████         │ · │         │
 │ PINNED                   │ │     ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ╰───╯         │
-│  ▭ Desktop             ⚲ │ │     assets         docs        scripts         src          tests      archive.tar…     │
-│  ▤ Documents           ⚲ │ │                                                                                         │
-│  ↓ Downloads           ⚲ │ │   ☑ ╭───╮       ☑ ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         │
-│  ▣ Pictures            ⚲ │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
-│  ♪ Music               ⚲ │ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         │
-│  ▶ Videos              ⚲ │ │   backup.zip    Cargo.toml    data.json      demo.mp4      logo.svg      main.rs        │
+│  ▭  Desktop            ⚲ │ │     assets         docs        scripts         src          tests      archive.tar…     │
+│  ▤  Documents          ⚲ │ │                                                                                         │
+│  ↓  Downloads          ⚲ │ │   ☑ ╭───╮       ☑ ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         │
+│  ▣  Pictures           ⚲ │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
+│  ♪  Music              ⚲ │ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         │
+│  ▶  Videos             ⚲ │ │   backup.zip    Cargo.toml    data.json      demo.mp4      logo.svg      main.rs        │
 │                          │ │                                                                                         │
 │ DEVICES                  │ │     ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         │
-│  ▥ System                │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
-│    ■■■■■■□□□□     183 GB │ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         │
-│  ▥ Data                  │ │   notes.txt     photo.jpg     README.md     report.pdf   screenshot.…    setup.sh       │
-│    ■■■■□□□□□□     555 GB │ │                                                                                         │
-│  ⏏ USB drive             │ │     ╭───╮                                                                               │
-│    ■■■■□□□□□□    35.4 GB │ │     │ · │                                                                               │
+│  ▥  System               │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
+│     ■■■■■■□□□□    183 GB │ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         │
+│  ▥  Data                 │ │   notes.txt     photo.jpg     README.md     report.pdf   screenshot.…    setup.sh       │
+│     ■■■■□□□□□□    555 GB │ │                                                                                         │
+│  ⏏  USB drive            │ │     ╭───╮                                                                               │
+│     ■■■■□□□□□□   35.4 GB │ │     │ · │                                                                               │
 │                          │ │     ╰───╯                                                                               │
 │ TAGS                     │ │    song.mp3                                                                             │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯

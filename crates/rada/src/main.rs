@@ -484,6 +484,15 @@ fn main() -> Result<()> {
         None => rada_tui::fmt::DateStyle::Relative,
         Some(n) => rada_tui::fmt::DateStyle::parse(n).with_context(|| tf(Key::MBadDates, &[&n]))?,
     };
+    let sidebar_density = match cfg_file.sidebar_density.as_deref() {
+        None => rada_tui::sidebar::Density::Auto,
+        Some(n) => rada_tui::sidebar::Density::parse(n).with_context(|| {
+            tf(
+                Key::MBadDensity,
+                &[&n, &rada_tui::sidebar::Density::NAMES.join(", ")],
+            )
+        })?,
+    };
     let saved_ui = rada_core::uistate::load(&dirs.rada_state());
     // Only folders that are still there come back.
     let mut saved_ui = saved_ui;
@@ -502,6 +511,7 @@ fn main() -> Result<()> {
         layout,
         view,
         dates,
+        sidebar_density,
         basic,
         tags_column: cfg_file.tags_column,
         date_format: rada_tui::fmt::DateFormat::from_env(),

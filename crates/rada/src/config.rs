@@ -38,6 +38,8 @@
 //! tags_column = true         # the Tag column of the list (View ▾ switches it too)
 //! remember_tabs = true       # reopen the tabs of the last session
 //! dates = "relative"         # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm)
+//! sidebar_density = "auto"   # auto (air between the entries when the terminal is tall enough) |
+//!                            # comfortable (always, even if the list then scrolls) | compact
 //! folder_sizes = "auto"      # auto (count the folders on screen in the background) | items
 //!                            # (only how many items each holds, no walk below) | off
 //! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"
@@ -105,6 +107,7 @@ pub struct FileConfig {
     pub view: Option<String>,
     pub remember_tabs: bool,
     pub dates: Option<String>,
+    pub sidebar_density: Option<String>,
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
@@ -246,6 +249,7 @@ struct Raw {
     view: Option<String>,
     remember_tabs: Option<bool>,
     dates: Option<String>,
+    sidebar_density: Option<String>,
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
@@ -324,6 +328,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         view: raw.view,
         remember_tabs: raw.remember_tabs.unwrap_or(true),
         dates: raw.dates,
+        sidebar_density: raw.sidebar_density,
         folder_sizes: raw.folder_sizes,
         folder_size_seconds: raw.folder_size_seconds,
         folder_size_entries: raw.folder_size_entries,
@@ -428,6 +433,13 @@ mod tests {
         assert!(!c.show_details_pane && !c.remember_tabs && !c.hints);
         assert_eq!(c.view.as_deref(), Some("icons"));
         assert_eq!(c.dates.as_deref(), Some("absolute"));
+        assert_eq!(d.sidebar_density, None);
+        assert_eq!(
+            with_config("sidebar_density = \"comfortable\"\n")
+                .sidebar_density
+                .as_deref(),
+            Some("comfortable")
+        );
         // The older name of the hints switch still works.
         assert!(!with_config("hints = false\n").hints);
     }

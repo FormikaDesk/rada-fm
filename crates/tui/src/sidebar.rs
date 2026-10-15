@@ -48,6 +48,31 @@ impl Mode {
     }
 }
 
+/// How much room the full pane leaves between its entries (`sidebar_density`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Density {
+    /// As roomy as the height of the terminal allows, compact when it allows nothing.
+    #[default]
+    Auto,
+    /// Roomy even when the list then has to scroll: never tighter than a gap between groups.
+    Comfortable,
+    /// One line to an entry, groups one gap apart: the pane as it has always been.
+    Compact,
+}
+
+impl Density {
+    pub const NAMES: [&'static str; 3] = ["auto", "comfortable", "compact"];
+
+    pub fn parse(s: &str) -> Option<Density> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Density::Auto),
+            "comfortable" => Some(Density::Comfortable),
+            "compact" => Some(Density::Compact),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Section {
     /// Home, alone at the top.

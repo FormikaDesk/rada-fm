@@ -212,6 +212,7 @@ impl H {
             start_explicit: false,
             dates: rada_tui::fmt::DateStyle::Relative,
             date_format: rada_tui::fmt::DateFormat::DEFAULT,
+            sidebar_density: Default::default(),
             basic: false,
             tags_column: None,
         };

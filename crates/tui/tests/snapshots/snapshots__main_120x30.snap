@@ -8,23 +8,23 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
 │                          │ │                                                                                         │
-│ TAGS                     │ │ ☐ ▸ data                    6 days ago       Folder                                     │
-│  ● Red                   │ │ ☐ ▸ src                     6 days ago       Folder                                     │
-│  ● Orange                │ │ ☐ ▸ 目录                    6 days ago       Folder                                     │
-│  ● Yellow                │ │ ☐ · a-very-long-file-name…  12 days ago      Archive (tar.gz)             1 B           │
-│  ● Green                 │ │ ☐ · backup.img              9 days ago       Disk image                420 MB           │
-│  ● Blue                  │ │ ☐ · Cargo.toml              2 days ago       Settings file               42 B           │
-│  ● Purple                │ │ ☐ · main.rs                 Yesterday        Rust source                 37 B           │
-│  ● Gray                  │ │ ☐ · notes.txt               5 weeks ago      Text document            3.52 KB           │
-│                          │ │▌☐ · README.md               Today 09:00      Markdown                    73 B           │
+│                          │ │ ☐ ▸ data                    6 days ago       Folder                                     │
+│ TAGS                     │ │ ☐ ▸ src                     6 days ago       Folder                                     │
+│  ●  Red                  │ │ ☐ ▸ 目录                    6 days ago       Folder                                     │
+│                          │ │ ☐ · a-very-long-file-name…  12 days ago      Archive (tar.gz)             1 B           │
+│  ●  Orange               │ │ ☐ · backup.img              9 days ago       Disk image                420 MB           │
+│                          │ │ ☐ · Cargo.toml              2 days ago       Settings file               42 B           │
+│  ●  Yellow               │ │ ☐ · main.rs                 Yesterday        Rust source                 37 B           │
+│                          │ │ ☐ · notes.txt               5 weeks ago      Text document            3.52 KB           │
+│  ●  Green                │ │▌☐ · README.md               Today 09:00      Markdown                    73 B           │
 │                          │ │ ☐ · тест-файл.md            Today 10:30      Markdown                    13 B           │
-│                          │ │ ☐ · 日本語のファイル名.txt  5 days ago       Text document               16 B           │
+│  ●  Blue                 │ │ ☐ · 日本語のファイル名.txt  5 days ago       Text document               16 B           │
 │                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028       Text document                6 B           │
+│  ●  Purple               │ │                                                                                         │
 │                          │ │                                                                                         │
-│                          │ │                                                                                         │
-│                          │ │                                                                                         │
+│  ●  Gray                 │ │                                                                                         │
 │                          │ │                                                                                         │
 │                          │ │                                                                                         │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯

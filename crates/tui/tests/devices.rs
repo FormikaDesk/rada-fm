@@ -89,9 +89,9 @@ fn an_open_phone_and_the_devices_that_are_plugged_in_are_in_the_sidebar() {
     for needle in [
         "DEVICES",
         "Pixel 6",
-        "Canon EOS",
         // The name is what is cut short, not the words after it.
-        "BLUE STI…",
+        "Canon E…",
+        "BLUE ST…",
         "not mounted",
     ] {
         assert!(screen.contains(needle), "{needle}:\n{screen}");
@@ -401,7 +401,7 @@ Volume(0): motorola edge 40
         let (mut h, _, calls) = run(GIO_UNMOUNTED, false);
         h.wait("the phone is listed", |a| !a.unmounted.is_empty());
         let screen = h.screen();
-        assert!(screen.contains("motorola"), "{screen}");
+        assert!(screen.contains("motorol…"), "{screen}");
         assert!(screen.contains("not mounted"), "{screen}");
         let id = "mtp://motorola_motorola_edge_40_ZY22FAKE0001/";
         h.click(&Target::Place(PathBuf::from(id)));

@@ -8,23 +8,23 @@ expression: shot(&mut h)
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo                     ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
-│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size │
+│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size │
 │                          │ │                                                                               │
-│ TAGS           ╭──────────────────────────────────────────────────────────────────────────╮                │
-│  ● Red         │                                                                          │                │
-│  ● Orange      │    ✗    Delete 1 item permanently?                                       │                │
-│  ● Yellow      │         3.52 KB  ·  In ~/demo/projects                                   │            1 B │
-│  ● Green       │  ──────────────────────────────────────────────────────────────────────  │         420 MB │
-│  ● Blue        │   · notes.txt                                                  3.52 KB   │           42 B │
-│  ● Purple      │                                                                          │           37 B │
-│  ● Gray        │   ▲ This cannot be undone: the files do not go to the trash.             │        3.52 KB │
-│                │                                                                          │           73 B │
+│                ╭──────────────────────────────────────────────────────────────────────────╮                │
+│ TAGS           │                                                                          │                │
+│  ●  Red        │    ✗    Delete 1 item permanently?                                       │                │
+│                │         3.52 KB  ·  In ~/demo/projects                                   │            1 B │
+│  ●  Orange     │  ──────────────────────────────────────────────────────────────────────  │         420 MB │
+│                │   · notes.txt                                                  3.52 KB   │           42 B │
+│  ●  Yellow     │                                                                          │           37 B │
+│                │   ▲ This cannot be undone: the files do not go to the trash.             │        3.52 KB │
+│  ●  Green      │                                                                          │           73 B │
 │                │  Type yes to confirm   ▏                                                 │           13 B │
-│                │                                                                          │           16 B │
+│  ●  Blue       │                                                                          │           16 B │
 │                │  Tab buttons                              Cancel  Esc    Delete  Enter   │            6 B │
-│                │                                                                          │                │
+│  ●  Purple     │                                                                          │                │
 │                ╰──────────────────────────────────────────────────────────────────────────╯                │
-│                          │ │                                                                               │
+│  ●  Gray                 │ │                                                                               │
 │                          │ │                                                                               │
 │                          │ │                                                                               │
 ╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯

@@ -18,7 +18,7 @@ use crate::app::App;
 use crate::fmt;
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
-use crate::sidebar::{Item, Mode, Origin, Section, current_index};
+use crate::sidebar::{Density, Item, Mode, Origin, Section, current_index};
 
 /// What is drawn on one screen row.
 enum Row {
@@ -29,25 +29,76 @@ enum Row {
     Usage(usize),
 }
 
-fn layout(items: &[Item], rail: bool) -> Vec<Row> {
+/// How much empty space there is between the entries, from none to a line after each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Air {
+    /// What the pane has always been: a gap between the groups, no more.
+    Compact,
+    /// A line between Home and Recent, and two between one group and the next.
+    Groups,
+    /// And a line after every second entry of a group.
+    Half,
+    /// And a line after every entry. A disk's bar stays under its disk.
+    Full,
+}
+
+fn layout(items: &[Item], rail: bool, air: Air) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut last: Option<Section> = None;
+    let mut in_group = 0usize;
     for (i, item) in items.iter().enumerate() {
         if last != Some(item.section) {
             if last.is_some() {
                 rows.push(Row::Gap);
+                if air >= Air::Groups {
+                    rows.push(Row::Gap);
+                }
             }
             if let Some(t) = item.section.title() {
                 rows.push(Row::Title(t));
             }
             last = Some(item.section);
+            in_group = 0;
         }
         rows.push(Row::Item(i));
         if !rail && item.usage.is_some() {
             rows.push(Row::Usage(i));
         }
+        in_group += 1;
+        let more_in_group = items
+            .get(i + 1)
+            .is_some_and(|next| next.section == item.section);
+        if more_in_group && !rail {
+            let gap = match air {
+                Air::Compact => false,
+                Air::Groups => item.section == Section::Home,
+                Air::Half => item.section == Section::Home || in_group.is_multiple_of(2),
+                Air::Full => true,
+            };
+            if gap {
+                rows.push(Row::Gap);
+            }
+        }
     }
     rows
+}
+
+/// The roomiest arrangement that shows every entry in `height` rows; the compact one when none
+/// does (`Auto`), or the lightest roomy one, with the list scrolling (`Comfortable`). The
+/// column of icons is always compact.
+fn choose_air(items: &[Item], rail: bool, height: usize, density: Density) -> Air {
+    if rail || density == Density::Compact {
+        return Air::Compact;
+    }
+    for air in [Air::Full, Air::Half, Air::Groups] {
+        if layout(items, rail, air).len() <= height {
+            return air;
+        }
+    }
+    match density {
+        Density::Comfortable => Air::Groups,
+        _ => Air::Compact,
+    }
 }
 
 pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
@@ -62,16 +113,17 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
     let focused = app
         .side_focus
         .then_some(app.side_cursor.min(items.len() - 1));
-    let mut rows = layout(&items, rail);
-    // The trash sits at the bottom of the pane when there is room to spare above it.
     let height = area.height as usize;
+    let air = choose_air(&items, rail, height, app.sidebar_density);
+    let mut rows = layout(&items, rail, air);
+    // The trash sits at the bottom of the pane when there is room to spare above it.
     let mut trash_row: Option<Row> = None;
     if rows.len() < height
         && let Some(Row::Item(i)) = rows.last()
         && items[*i].section == Section::Trash
     {
         trash_row = rows.pop();
-        if matches!(rows.last(), Some(Row::Gap)) {
+        while matches!(rows.last(), Some(Row::Gap)) {
             rows.pop();
         }
     }
@@ -145,7 +197,13 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         .unwrap_or_default();
                     let free_w = free.width().max(7);
                     let bar_w = segment_bar_width(app.basic);
-                    spans.push(Span::styled("   ", row_style));
+                    // Under the name, which starts one column later than the icon's cell.
+                    let indent = if item.glyph(app.icons).is_empty() {
+                        3
+                    } else {
+                        4
+                    };
+                    spans.push(Span::styled(" ".repeat(indent), row_style));
                     if let Some(u) = &item.usage {
                         spans.extend(segment_bar(&th, u.used, app.basic, row_style.bg));
                     }
@@ -188,10 +246,12 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), row_style));
                 } else {
+                    // A space on each side of the icon and one more after it: a wide symbol
+                    // of a Nerd Font overflows its cell, and must not touch the name.
                     let icon = if glyph.is_empty() {
                         " ".to_string()
                     } else {
-                        format!(" {glyph} ")
+                        format!(" {glyph}  ")
                     };
                     spans.push(Span::styled(icon, th.fg(icon_color).patch(row_style)));
                     let name_style = if marked {
@@ -259,5 +319,182 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sidebar::Usage;
+    use rada_core::platform::{PlaceKind, VolumeKind};
+    use std::path::PathBuf;
+
+    fn item(section: Section, origin: Origin, name: &str, usage: bool) -> Item {
+        Item {
+            section,
+            origin,
+            name: name.into(),
+            path: PathBuf::from(format!("/{name}")),
+            usage: usage.then_some(Usage { used: 0.5, free: 1 }),
+            locked: false,
+        }
+    }
+
+    /// Home and Recent, two pinned folders, two disks (each with its bar), three tags, the trash.
+    fn items() -> Vec<Item> {
+        let place = |k| Origin::Place(k);
+        vec![
+            item(Section::Home, place(PlaceKind::Home), "Home", false),
+            item(Section::Home, Origin::Recent, "Recent", false),
+            item(Section::Pinned, place(PlaceKind::Documents), "Docs", false),
+            item(Section::Pinned, place(PlaceKind::Downloads), "Down", false),
+            item(
+                Section::Devices,
+                Origin::Device(VolumeKind::Fixed),
+                "Sys",
+                true,
+            ),
+            item(
+                Section::Devices,
+                Origin::Device(VolumeKind::Removable),
+                "Usb",
+                true,
+            ),
+            item(Section::Tags, Origin::Tag(None), "Red", false),
+            item(Section::Tags, Origin::Tag(None), "Blue", false),
+            item(Section::Tags, Origin::Tag(None), "Gray", false),
+            item(Section::Trash, place(PlaceKind::Trash), "Trash", false),
+        ]
+    }
+
+    /// The rows as letters: `T`itle, `.` gap, item number, `u` for a disk's bar.
+    fn shape(rows: &[Row]) -> String {
+        rows.iter()
+            .map(|r| match r {
+                Row::Title(_) => "T".to_string(),
+                Row::Gap => ".".to_string(),
+                Row::Item(i) => i.to_string(),
+                Row::Usage(_) => "u".to_string(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_compact_layout_is_the_one_the_pane_always_had() {
+        assert_eq!(
+            shape(&layout(&items(), false, Air::Compact)),
+            ".01.T23.T4u5u.T678.9".replacen('.', "", 1),
+            "a gap between groups, a title over each group but Home's, nothing between entries"
+        );
+    }
+
+    #[test]
+    fn each_step_of_air_adds_only_blank_lines_and_never_takes_an_entry_away() {
+        let items = items();
+        let strip = |air: Air| -> String { shape(&layout(&items, false, air)).replace('.', "") };
+        let compact = strip(Air::Compact);
+        for air in [Air::Groups, Air::Half, Air::Full] {
+            assert_eq!(
+                strip(air),
+                compact,
+                "{air:?}: the same rows, with blanks between"
+            );
+        }
+        let lens: Vec<usize> = [Air::Compact, Air::Groups, Air::Half, Air::Full]
+            .iter()
+            .map(|a| layout(&items, false, *a).len())
+            .collect();
+        assert!(lens.windows(2).all(|w| w[0] < w[1]), "{lens:?}");
+    }
+
+    #[test]
+    fn groups_get_a_line_between_home_and_recent_and_two_between_one_group_and_the_next() {
+        let s = shape(&layout(&items(), false, Air::Groups));
+        assert_eq!(s, "0.1..T23..T4u5u..T678..9", "{s}");
+    }
+
+    #[test]
+    fn half_air_is_a_line_after_every_second_entry_and_full_air_after_each() {
+        let half = shape(&layout(&items(), false, Air::Half));
+        assert_eq!(half, "0.1..T23..T4u5u..T67.8..9", "{half}");
+        let full = shape(&layout(&items(), false, Air::Full));
+        assert_eq!(full, "0.1..T2.3..T4u.5u..T6.7.8..9", "{full}");
+    }
+
+    #[test]
+    fn a_disks_bar_stays_under_its_disk_at_every_step() {
+        for air in [Air::Compact, Air::Groups, Air::Half, Air::Full] {
+            let rows = layout(&items(), false, air);
+            for (k, r) in rows.iter().enumerate() {
+                if let Row::Item(i) = r
+                    && items()[*i].usage.is_some()
+                {
+                    assert!(
+                        matches!(rows.get(k + 1), Some(Row::Usage(j)) if j == i),
+                        "{air:?}: the bar is right under {i}: {}",
+                        shape(&rows)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_roomiest_layout_that_fits_is_chosen_and_the_compact_one_when_none_does() {
+        let items = items();
+        let need = |air| layout(&items, false, air).len();
+        assert_eq!(choose_air(&items, false, 200, Density::Auto), Air::Full);
+        assert_eq!(
+            choose_air(&items, false, need(Air::Full), Density::Auto),
+            Air::Full
+        );
+        assert_eq!(
+            choose_air(&items, false, need(Air::Full) - 1, Density::Auto),
+            Air::Half
+        );
+        assert_eq!(
+            choose_air(&items, false, need(Air::Half) - 1, Density::Auto),
+            Air::Groups
+        );
+        assert_eq!(
+            choose_air(&items, false, need(Air::Groups) - 1, Density::Auto),
+            Air::Compact
+        );
+        assert_eq!(choose_air(&items, false, 3, Density::Auto), Air::Compact);
+        // "comfortable" is never tighter than a gap between groups, even if the list scrolls.
+        assert_eq!(
+            choose_air(&items, false, 3, Density::Comfortable),
+            Air::Groups
+        );
+        assert_eq!(
+            choose_air(&items, false, 200, Density::Comfortable),
+            Air::Full
+        );
+        // "compact" and the column of icons are always as they were.
+        assert_eq!(
+            choose_air(&items, false, 200, Density::Compact),
+            Air::Compact
+        );
+        assert_eq!(
+            choose_air(&items, true, 200, Density::Comfortable),
+            Air::Compact
+        );
+        assert_eq!(
+            shape(&layout(&items, true, Air::Full))
+                .replace('.', "")
+                .len(),
+            shape(&layout(&items, true, Air::Compact))
+                .replace('.', "")
+                .len()
+        );
+    }
+
+    #[test]
+    fn the_density_names_parse() {
+        assert_eq!(Density::parse("auto"), Some(Density::Auto));
+        assert_eq!(Density::parse(" Comfortable "), Some(Density::Comfortable));
+        assert_eq!(Density::parse("compact"), Some(Density::Compact));
+        assert_eq!(Density::parse("roomy"), None);
+        assert_eq!(Density::default(), Density::Auto);
     }
 }

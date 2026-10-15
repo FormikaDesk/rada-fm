@@ -1022,6 +1022,7 @@ strings! {
     MBadKeymap => "unknown keymap \"{0}\" (use {1})", "scorciatoie sconosciute \"{0}\" (usa {1})";
     MBadLayout => "unknown layout \"{0}\" (use explorer or compact)", "disposizione sconosciuta \"{0}\" (usa explorer o compact)";
     MBadView => "unknown view \"{0}\" (use details, icons or columns)", "vista sconosciuta \"{0}\" (usa details, icons o columns)";
+    MBadDensity => "unknown sidebar_density \"{0}\" (use {1})", "sidebar_density sconosciuta \"{0}\" (usa {1})";
     MBadDates => "unknown dates \"{0}\" (use relative or absolute)", "formato delle date sconosciuto \"{0}\" (usa relative o absolute)";
     MBadFolderSizes => "unknown folder_sizes \"{0}\" (use auto, items or off)", "folder_sizes sconosciuto \"{0}\" (usa auto, items oppure off)";
     MRequestStdin => "cannot read the request from stdin", "impossibile leggere la richiesta dallo standard input";

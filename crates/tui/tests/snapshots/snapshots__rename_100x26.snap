@@ -6,23 +6,23 @@ expression: shot(&mut h)
   ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search file…                 Ctrl+P     ≣ Details
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo           ⋯
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
-│  ⌂ Home                  │ │ ☐   Name ↑        Date modified    Type                        Size │
+│  ⌂  Home                 │ │ ☐   Name ↑        Date modified    Type                        Size │
 │                          │ │                                                                     │
-│ TAGS                     │ │ ☐ ▸ data          6 days ago       Folder                           │
-│  ● Red                   │ │ ☐ ▸ src           6 days ago       Folder                           │
-│  ● O╭──────────────────────────────────────────────────────────────────────────────────────╮     │
-│  ● Y│                                                                                      │ 1 B │
-│  ● G│   Rename                                                                             │0 MB │
-│  ● B│                                                                                      │42 B │
-│  ● P│  New name                                                                            │37 B │
-│  ● G│  › main.rs                                                                           │2 KB │
-│     │                                                                                      │73 B │
+│                          │ │ ☐ ▸ data          6 days ago       Folder                           │
+│ TAGS                     │ │ ☐ ▸ src           6 days ago       Folder                           │
+│  ●  ╭──────────────────────────────────────────────────────────────────────────────────────╮     │
+│     │                                                                                      │ 1 B │
+│  ●  │   Rename                                                                             │0 MB │
+│     │                                                                                      │42 B │
+│  ●  │  New name                                                                            │37 B │
+│     │  › main.rs                                                                           │2 KB │
+│  ●  │                                                                                      │73 B │
 │     │                                                                                      │13 B │
-│     │                                                                                      │16 B │
+│  ●  │                                                                                      │16 B │
 │     ╰──────────────────────────────────────────────────────────────────────────────────────╯ 6 B │
+│  ●  Purple               │ │                                                                     │
 │                          │ │                                                                     │
-│                          │ │                                                                     │
-│                          │ │                                                                     │
+│  ●  Gray                 │ │                                                                     │
 │                          │ │                                                                     │
 │                          │ │                                                                     │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯

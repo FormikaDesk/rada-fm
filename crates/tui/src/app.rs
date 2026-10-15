@@ -398,6 +398,8 @@ pub struct Config {
     pub start_explicit: bool,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// How much room the sidebar leaves between its entries.
+    pub sidebar_density: crate::sidebar::Density,
     /// The basic profile (ASCII, 16 colours): no rounded ends, no shades, a plain look.
     pub basic: bool,
     /// The Tag column of the list: `None` follows the remembered choice, then shows it.
@@ -616,6 +618,8 @@ pub struct App {
     pub details: Option<bool>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
+    /// How much room the sidebar leaves between its entries (`sidebar_density`).
+    pub sidebar_density: crate::sidebar::Density,
     /// The basic profile: the soft shapes (rounded ends, shades) give way to plain ones.
     pub basic: bool,
     /// The Tag column of the list is shown.
@@ -782,6 +786,7 @@ impl App {
             details: cfg.details_pane,
             dates: cfg.dates,
             date_format: cfg.date_format,
+            sidebar_density: cfg.sidebar_density,
             basic: cfg.basic,
             show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
             folder_sizes: Default::default(),

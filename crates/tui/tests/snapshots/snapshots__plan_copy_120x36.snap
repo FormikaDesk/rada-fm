@@ -9,23 +9,23 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│  ⌂ Home                  │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
 │                          │ │                                                                                         │
-│ TAGS                     │ │▌☐ · README.md               10/10/2026       Markdown                     3 B           │
-│  ● Red              ╭──────────────────────────────────────────────────────────────────────────╮                     │
-│  ● Orange           │                                                                          │                     │
-│  ● Yellow           │    ⧉    Copy 2 items to backup                                           │                     │
-│  ● Green            │         79 B  ·  ~/demo/projects → ~/demo/backup                         │                     │
-│  ● Blue             │  ──────────────────────────────────────────────────────────────────────  │                     │
-│  ● Purple           │   · Cargo.toml                                          new       42 B   │                     │
-│  ● Gray             │   · main.rs                                             new       37 B   │                     │
-│                     │                                                                          │                     │
+│                          │ │▌☐ · README.md               10/10/2026       Markdown                     3 B           │
+│ TAGS                ╭──────────────────────────────────────────────────────────────────────────╮                     │
+│  ●  Red             │                                                                          │                     │
+│                     │    ⧉    Copy 2 items to backup                                           │                     │
+│  ●  Orange          │         79 B  ·  ~/demo/projects → ~/demo/backup                         │                     │
+│                     │  ──────────────────────────────────────────────────────────────────────  │                     │
+│  ●  Yellow          │   · Cargo.toml                                          new       42 B   │                     │
+│                     │   · main.rs                                             new       37 B   │                     │
+│  ●  Green           │                                                                          │                     │
 │                     │  If a name already exists    Keep both   Overwrite   Skip    ← →         │                     │
-│                     │                                                                          │                     │
+│  ●  Blue            │                                                                          │                     │
 │                     │   ● You can undo this with Ctrl+Z: the new copies will be removed.       │                     │
-│                     │                                                                          │                     │
+│  ●  Purple          │                                                                          │                     │
 │                     │  Tab buttons  ·  ↑↓ scroll                  Cancel  Esc    Copy  Enter   │                     │
-│                     │                                                                          │                     │
+│  ●  Gray            │                                                                          │                     │
 │                     ╰──────────────────────────────────────────────────────────────────────────╯                     │
 │                          │ │                                                                                         │
 │                          │ │                                                                                         │

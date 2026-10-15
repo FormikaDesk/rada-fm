@@ -86,9 +86,14 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
     h.wait("an error toast", |a| a.current_notice().is_some());
     chmod(&dir.join("locked"), 0o755);
     let s = h.screen();
-    // The message is wrapped in a box, so look for its pieces rather than one line.
+    // The message is wrapped in a card (its left edge is a `┃`): read the card alone, line after
+    // line, so that what the sidebar has on the same rows does not come between the words.
     let flat = s
-        .replace(['│', '┃', '╭', '╮', '╰', '╯', '─'], " ")
+        .lines()
+        .filter_map(|l| l.split_once('┃').map(|(_, card)| card))
+        .map(|card| card.split('│').next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join(" ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")

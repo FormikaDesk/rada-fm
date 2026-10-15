@@ -40,6 +40,11 @@ fn volume(mount: &str, label: &str, kind: VolumeKind, total_gb: u64, free_gb: u6
 /// An Italian home: Scaricati and Documenti exist (Immagini and the rest do not), a folder
 /// to work in, two bookmarks and two disks.
 fn italian(w: u16, h: u16) -> H {
+    italian_with(w, h, |_| {})
+}
+
+/// [`italian`], with the configuration adjusted by `tweak`.
+fn italian_with(w: u16, h: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'static) -> H {
     let sb = Sandbox::new();
     std::fs::create_dir_all(&sb.dirs.config).unwrap();
     std::fs::write(sb.dirs.config.join("user-dirs.dirs"), ITALIAN).unwrap();
@@ -59,7 +64,7 @@ fn italian(w: u16, h: u16) -> H {
         ),
     )
     .unwrap();
-    let mut h = H::new(sb, home.join("Scaricati"), w, h);
+    let mut h = H::with_config(sb, home.join("Scaricati"), w, h, tweak);
     h.wait("the places and bookmarks", |a| {
         a.paths.places.len() >= 3 && a.paths.bookmarks.len() == 2
     });
@@ -375,4 +380,172 @@ fn a_bookmark_of_a_folder_the_pane_already_lists_is_not_listed_again() {
         1,
         "{names:?}"
     );
+}
+
+// ----------------------------------------------------------------------- air between entries
+
+/// The screen row of an item of the sidebar (the first of its rows: a disk has two), if it is
+/// on screen.
+fn try_row_of(h: &mut H, path: PathBuf) -> Option<u16> {
+    let _ = h.screen();
+    h.app
+        .hits
+        .all()
+        .filter(|(_, t)| *t == Target::Place(path.clone()))
+        .map(|(r, _)| r.y)
+        .min()
+}
+
+fn row_of(h: &mut H, path: PathBuf) -> u16 {
+    try_row_of(h, path.clone()).unwrap_or_else(|| panic!("{} is on screen", path.display()))
+}
+
+/// The rows between two consecutive items of the same group, in a pane as tall as `height`.
+fn distance(height: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'static) -> u16 {
+    let mut h = italian_with(150, height, tweak);
+    let (a, b) = (place(&h, "Documenti"), place(&h, "Scaricati"));
+    let (ya, yb) = (row_of(&mut h, a), row_of(&mut h, b));
+    yb.abs_diff(ya)
+}
+
+#[test]
+fn a_tall_terminal_puts_a_blank_line_between_entries_and_a_short_one_keeps_them_together() {
+    assert_eq!(
+        distance(30, |_| {}),
+        1,
+        "30 rows hold the list as it always was"
+    );
+    assert_eq!(
+        distance(80, |_| {}),
+        2,
+        "80 rows have room for a line after every entry"
+    );
+}
+
+#[test]
+fn the_density_in_the_configuration_decides_how_much_air() {
+    use rada_tui::sidebar::Density;
+    assert_eq!(
+        distance(80, |c| c.sidebar_density = Density::Compact),
+        1,
+        "compact, even where there is room"
+    );
+    assert_eq!(
+        distance(80, |c| c.sidebar_density = Density::Comfortable),
+        2
+    );
+    // Comfortable where the terminal is short: the groups are apart (Home and the next group
+    // are further from each other than in the compact pane), though the entries are not.
+    let apart = |d: Density| {
+        let mut h = italian_with(150, 30, move |c| c.sidebar_density = d);
+        let (home, docs) = (h.app.home().to_path_buf(), place(&h, "Documenti"));
+        let (a, b) = (row_of(&mut h, home), row_of(&mut h, docs));
+        b - a
+    };
+    assert!(apart(Density::Comfortable) > apart(Density::Compact));
+}
+
+#[test]
+fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one_at_every_height() {
+    for height in [44u16, 56, 90] {
+        let mut h = italian(150, height);
+        let items = h.app.side_items();
+        // Every item has a row of its own, in the order of the list.
+        let ys: Vec<u16> = items
+            .iter()
+            .map(|i| row_of(&mut h, i.path.clone()))
+            .collect();
+        assert!(ys.windows(2).all(|w| w[0] < w[1]), "{height}: {ys:?}");
+        // A click on the row of an entry opens it.
+        let docs = place(&h, "Documenti");
+        h.click(&Target::Place(docs.clone()));
+        let d = docs.clone();
+        h.wait("Documenti", move |a| a.cwd == d && !a.is_loading());
+        // A click on an empty line does nothing at all.
+        let (gaps, shown): (Vec<u16>, Vec<u16>) = (
+            (ys[0]..=*ys.last().unwrap())
+                .filter(|y| !ys.contains(y))
+                .collect(),
+            ys.clone(),
+        );
+        let _ = shown;
+        let cwd = h.app.cwd.clone();
+        for y in gaps {
+            if h.app.hits.at(3, y).is_some() {
+                continue; // a title or a disk's bar: not an empty line, and not what is asked
+            }
+            h.mouse(
+                MouseEventKind::Down(crossterm::event::MouseButton::Left),
+                3,
+                y,
+                crossterm::event::KeyModifiers::NONE,
+            );
+            assert_eq!(h.app.cwd, cwd, "{height}: a click on the empty row {y}");
+            assert!(h.app.modal.is_none());
+        }
+        // The keyboard goes entry by entry, not row by row, and opens the one it is on.
+        h.press("tab");
+        let at = h
+            .app
+            .side_items()
+            .iter()
+            .position(|i| i.path == place(&h, "Scaricati"))
+            .unwrap();
+        let from = h.app.side_cursor;
+        for _ in from..at {
+            h.key(KeyCode::Down);
+        }
+        assert_eq!(h.app.side_cursor, at, "{height}");
+        h.key(KeyCode::Enter);
+        let want = place(&h, "Scaricati");
+        h.wait("Scaricati", move |a| a.cwd == want && !a.is_loading());
+    }
+}
+
+#[test]
+fn the_icon_has_a_space_after_it_in_every_entry() {
+    let mut h = italian(150, 60);
+    let screen = h.screen();
+    let lines: Vec<&str> = screen.lines().collect();
+    let items = h.app.side_items();
+    let mut seen = 0;
+    for item in &items {
+        let glyph = item.glyph(h.app.icons);
+        if glyph.is_empty() {
+            continue;
+        }
+        let y = row_of(&mut h, item.path.clone()) as usize;
+        let name: String = item.name.chars().take(3).collect();
+        assert!(
+            lines[y].contains(&format!("{glyph}  {name}")),
+            "{:?}: the icon, two cells of air, the name:\n{}",
+            item.name,
+            lines[y]
+        );
+        seen += 1;
+    }
+    assert!(
+        seen >= 10,
+        "Home, places, bookmarks, disks and tags were looked at: {seen}"
+    );
+}
+
+#[test]
+fn on_a_short_terminal_no_entry_is_cut_off_whatever_the_density() {
+    use rada_tui::sidebar::Density;
+    for density in [Density::Auto, Density::Comfortable, Density::Compact] {
+        let mut h = italian_with(150, 20, move |c| c.sidebar_density = density);
+        h.press("tab");
+        let n = h.app.side_items().len();
+        // Walk the whole list: the entry the keyboard is on is always on screen.
+        for k in 0..n {
+            let item = h.app.side_items()[h.app.side_cursor].clone();
+            assert!(
+                try_row_of(&mut h, item.path.clone()).is_some(),
+                "{density:?}: entry {k} ({}) is on screen when the keyboard is on it",
+                item.name
+            );
+            h.key(KeyCode::Down);
+        }
+    }
 }
