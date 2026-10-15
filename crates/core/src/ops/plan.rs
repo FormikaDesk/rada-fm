@@ -591,6 +591,22 @@ pub enum WarningKind {
     SetuidDropped,
     /// A hard link in an archive whose target is not being extracted.
     LinkTargetMissing,
+    /// Writing to a phone or a camera: the data reaches the device when the file is closed.
+    DeviceWrite,
+    /// A phone or a camera keeps no permissions, owner or extended attributes.
+    DeviceAttrs,
+    /// Links that cannot be stored on a phone or a camera: skipped.
+    DeviceLink,
+    /// Hard links copied as separate files on a phone or a camera.
+    DeviceHardLink,
+    /// Undoing what was done on a phone or a camera is not guaranteed.
+    DeviceUndo,
+    /// A phone or a camera has no trash: items go to the trash of this computer by a copy.
+    DeviceNoTrash,
+    /// Renaming and moving on a phone or a camera is not atomic.
+    DeviceRename,
+    /// An archive cannot be written straight onto a phone or a camera.
+    DeviceArchive,
     Other,
 }
 
@@ -716,6 +732,14 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::NamesChanged => pl(n, WNamesChangedOne, WNamesChangedMany, x),
         WarningKind::SetuidDropped => pl(n, WSetuidDroppedOne, WSetuidDroppedMany, x),
         WarningKind::LinkTargetMissing => pl(n, WLinkTargetMissingOne, WLinkTargetMissingMany, x),
+        WarningKind::DeviceWrite => t(WDeviceWrite).to_string(),
+        WarningKind::DeviceAttrs => t(WDeviceAttrs).to_string(),
+        WarningKind::DeviceLink => pl(n, WDeviceLinkOne, WDeviceLinkMany, x),
+        WarningKind::DeviceHardLink => pl(n, WDeviceHardLinkOne, WDeviceHardLinkMany, x),
+        WarningKind::DeviceUndo => t(WDeviceUndo).to_string(),
+        WarningKind::DeviceNoTrash => t(WDeviceNoTrash).to_string(),
+        WarningKind::DeviceRename => t(WDeviceRename).to_string(),
+        WarningKind::DeviceArchive => t(WDeviceArchive).to_string(),
         WarningKind::Other => detail.map_or_else(|| t(WOther).to_string(), str::to_string),
     }
 }

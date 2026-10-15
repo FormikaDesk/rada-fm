@@ -56,6 +56,7 @@ pub fn copy_tree(fs: &dyn FsEngine, src: &Path, dst: &Path, verify: bool) -> Res
                 atime: meta.atime,
                 verify,
                 sync: verify,
+                device: false,
             };
             fs.copy_file(&req, &mut |_| true)
                 .map(|_| ())

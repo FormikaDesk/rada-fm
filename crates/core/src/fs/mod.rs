@@ -365,6 +365,11 @@ pub struct CopyRequest {
     pub verify: bool,
     /// `fsync` before returning (always done when `verify` is set).
     pub sync: bool,
+    /// The source or the destination is a phone or a camera, seen through the desktop's virtual
+    /// filesystem: plain reads and writes only, permissions and dates are tried and never
+    /// fail the copy, and since the data reaches the device when the file is closed, the copy
+    /// is closed, measured and (when `verify` is set) read back before it counts as done.
+    pub device: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

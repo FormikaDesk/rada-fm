@@ -582,6 +582,7 @@ fn a_sparse_file_keeps_its_holes_and_progress_counts_the_real_bytes() {
                 atime: None,
                 verify: false,
                 sync: false,
+                device: false,
             },
             &mut ctl,
         )
@@ -622,6 +623,7 @@ fn a_file_that_is_all_hole_and_a_verified_sparse_copy_both_work() {
                 atime: None,
                 verify: false,
                 sync: false,
+                device: false,
             },
             &mut Count(0),
         )
@@ -642,6 +644,7 @@ fn a_file_that_is_all_hole_and_a_verified_sparse_copy_both_work() {
                 atime: None,
                 verify: true,
                 sync: true,
+                device: false,
             },
             &mut Count(0),
         )

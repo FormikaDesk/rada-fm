@@ -1788,6 +1788,46 @@
           "description": "A hard link in an archive whose target is not being extracted.",
           "type": "string",
           "const": "LinkTargetMissing"
+        },
+        {
+          "description": "Writing to a phone or a camera: the data reaches the device when the file is closed.",
+          "type": "string",
+          "const": "DeviceWrite"
+        },
+        {
+          "description": "A phone or a camera keeps no permissions, owner or extended attributes.",
+          "type": "string",
+          "const": "DeviceAttrs"
+        },
+        {
+          "description": "Links that cannot be stored on a phone or a camera: skipped.",
+          "type": "string",
+          "const": "DeviceLink"
+        },
+        {
+          "description": "Hard links copied as separate files on a phone or a camera.",
+          "type": "string",
+          "const": "DeviceHardLink"
+        },
+        {
+          "description": "Undoing what was done on a phone or a camera is not guaranteed.",
+          "type": "string",
+          "const": "DeviceUndo"
+        },
+        {
+          "description": "A phone or a camera has no trash: items go to the trash of this computer by a copy.",
+          "type": "string",
+          "const": "DeviceNoTrash"
+        },
+        {
+          "description": "Renaming and moving on a phone or a camera is not atomic.",
+          "type": "string",
+          "const": "DeviceRename"
+        },
+        {
+          "description": "An archive cannot be written straight onto a phone or a camera.",
+          "type": "string",
+          "const": "DeviceArchive"
         }
       ]
     }

@@ -440,7 +440,13 @@ impl Engine {
                 message: "the archive changed since the plan was made".into(),
             });
         }
-        let tmp = temp_sibling(dst);
+        // A device takes the data when the file is closed and cannot rename it: see CopyFile.
+        let device = self.platform.on_device(dst);
+        let tmp = if device {
+            dst.to_path_buf()
+        } else {
+            temp_sibling(dst)
+        };
         let mut sink = fs
             .create_file(&tmp, 0o600)
             .map_err(|e| Error::io("create", dst, e))?;
@@ -501,18 +507,36 @@ impl Engine {
             tracing::debug!("set time of {}: {e}", tmp.display());
         }
         if let Some(m) = mode
+            && !device
             && let Err(e) = fs.set_mode(&tmp, m)
         {
             return fail(Error::io("set permissions of", dst, e));
         }
-        // The bytes reach the disk before the name does: the journal will say "done" for
-        // this file, and after a power cut the name must not stand on an empty file.
-        if let Err(e) = fs.sync_file(&tmp)
-            && e.kind() != io::ErrorKind::Unsupported
-        {
-            return fail(Error::io("write", dst, e));
+        if device {
+            // What the device kept is what was sent, or this is not an extraction.
+            match fs.lstat(&tmp) {
+                Ok(m) if m.size == size => {}
+                Ok(m) => {
+                    return fail(Error::io(
+                        "write",
+                        dst,
+                        io::Error::other(format!("the device kept {} of {size} bytes", m.size)),
+                    ));
+                }
+                Err(e) => return fail(Error::io("write", dst, e)),
+            }
+        } else {
+            // The bytes reach the disk before the name does: the journal will say "done" for
+            // this file, and after a power cut the name must not stand on an empty file.
+            if let Err(e) = fs.sync_file(&tmp)
+                && e.kind() != io::ErrorKind::Unsupported
+            {
+                return fail(Error::io("write", dst, e));
+            }
         }
-        if let Err(e) = fs.rename_noreplace(&tmp, dst) {
+        if tmp != dst
+            && let Err(e) = fs.rename_noreplace(&tmp, dst)
+        {
             let _ = fs.remove_file(&tmp);
             return Err(if e.kind() == io::ErrorKind::AlreadyExists {
                 Error::AlreadyExists(dst.to_path_buf())
@@ -520,7 +544,9 @@ impl Engine {
                 Error::io2("finish extraction", &tmp, dst, e)
             });
         }
-        if let Some(parent) = dst.parent() {
+        if let Some(parent) = dst.parent()
+            && !device
+        {
             st.unsynced_dirs.insert(parent.to_path_buf());
         }
         let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
@@ -633,8 +659,12 @@ impl Engine {
                 }
                 // Owner and extended attributes first (they are set while the folder is still
                 // writable), then the permissions, then the time.
+                let device = self.platform.on_device(path);
                 let mut not_preserved = Vec::new();
-                if let Some(src) = src {
+                if let Some(src) = src
+                    && !device
+                    && !self.platform.on_device(src)
+                {
                     not_preserved = self
                         .platform
                         .fidelity()
@@ -642,8 +672,13 @@ impl Engine {
                         .not_preserved;
                 }
                 if let Some(m) = mode {
-                    fs.set_mode(path, *m)
-                        .map_err(|e| Error::io("set permissions of", path, e))?;
+                    // A folder on a device has no permissions to set: the plan said so.
+                    match fs.set_mode(path, *m) {
+                        Err(e) if !device => {
+                            return Err(Error::io("set permissions of", path, e));
+                        }
+                        _ => {}
+                    }
                 }
                 if let Some(t) = mtime {
                     // Best effort: a wrong folder time must not fail the operation.
@@ -675,7 +710,17 @@ impl Engine {
                     Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                     Err(e) => return Err(Error::io("inspect", dst, e)),
                 }
-                let tmp = temp_sibling(dst);
+                let to_device = self.platform.on_device(dst);
+                let device = to_device || self.platform.on_device(src);
+                // A device takes the data when the file is closed, so there is no half-written
+                // file to hide under another name, and no rename to trust: it is written under
+                // its own name (which this run has just seen to be free), and removed again if
+                // the copy does not complete.
+                let tmp = if to_device {
+                    dst.clone()
+                } else {
+                    temp_sibling(dst)
+                };
                 // Owner-writable while the attributes are set; the real permissions come last.
                 let req = CopyRequest {
                     src: src.clone(),
@@ -685,6 +730,7 @@ impl Engine {
                     atime: atime.map(Into::into),
                     verify: *verify,
                     sync: *remove_source,
+                    device,
                 };
                 if let Err(e) = fs.copy_file(&req, ctl) {
                     return Err(match copy_fault(&e) {
@@ -699,18 +745,24 @@ impl Engine {
                 }
                 // Owner, group, extended attributes and ACLs; whatever cannot be carried over
                 // is reported, never an error.
-                let not_preserved = self
-                    .platform
-                    .fidelity()
-                    .copy_attributes(src, &tmp, Preserve::default(), uid.zip(*gid))
-                    .not_preserved;
+                let not_preserved = if device {
+                    Vec::new()
+                } else {
+                    self.platform
+                        .fidelity()
+                        .copy_attributes(src, &tmp, Preserve::default(), uid.zip(*gid))
+                        .not_preserved
+                };
                 if let Some(m) = mode
+                    && !to_device
                     && let Err(e) = fs.set_mode(&tmp, *m)
                 {
                     let _ = fs.remove_file(&tmp);
                     return Err(Error::io("set permissions of", dst, e));
                 }
-                if let Err(e) = fs.rename_noreplace(&tmp, dst) {
+                if tmp != *dst
+                    && let Err(e) = fs.rename_noreplace(&tmp, dst)
+                {
                     let _ = fs.remove_file(&tmp);
                     return Err(if e.kind() == io::ErrorKind::AlreadyExists {
                         Error::AlreadyExists(dst.clone())
@@ -773,6 +825,8 @@ impl Engine {
                             atime: meta.atime,
                             verify: false,
                             sync: false,
+                            device: self.platform.on_device(existing)
+                                || self.platform.on_device(link),
                         };
                         fs.copy_file(&req, ctl)
                             .map_err(|e| Error::io2("copy", existing, link, e))?;

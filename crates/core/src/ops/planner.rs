@@ -104,6 +104,7 @@ impl Engine {
             engine: self,
             opts: *opts,
             dest_dev: None,
+            dest_device: self.platform.on_device(dest_dir),
             steps: Vec::new(),
             ws: WarningSet::default(),
             totals: Totals {
@@ -197,6 +198,19 @@ impl Engine {
         if t.cross_device {
             t.ws.add(WarningKind::CrossDevice, Severity::Info, None);
         }
+        // Phones and cameras: what is different there, said before anything is done.
+        let from_device = scan.roots.iter().any(|r| self.platform.on_device(&r.path));
+        if t.dest_device {
+            t.ws.add(WarningKind::DeviceWrite, Severity::Info, Some(dest_dir));
+        }
+        if t.dest_device || from_device {
+            t.ws.add(WarningKind::DeviceAttrs, Severity::Info, None);
+        }
+        // A copy from a device is undone by removing the copies, here; whatever puts something
+        // back onto a device is not.
+        if t.dest_device || (from_device && opts.mode == TransferMode::Move) {
+            t.ws.add(WarningKind::DeviceUndo, Severity::Warning, None);
+        }
         // Files that also have names outside the selection: their copies stand alone.
         for g in t.links.values() {
             if g.nlink > g.found {
@@ -243,6 +257,10 @@ impl Engine {
                 path: r.path.clone(),
             });
             plan.items.push(summary_of(r, ItemAction::Trash));
+            if self.platform.on_device(&r.path) {
+                ws.add(WarningKind::DeviceNoTrash, Severity::Warning, Some(&r.path));
+                ws.add(WarningKind::DeviceUndo, Severity::Warning, Some(&r.path));
+            }
         }
         plan.warnings = ws.finish();
         plan
@@ -392,6 +410,9 @@ impl Engine {
             bytes: 0,
             target: Some(to.clone()),
         });
+        if self.platform.on_device(from) {
+            ws.add(WarningKind::DeviceRename, Severity::Info, Some(from));
+        }
         plan.renames.push((from.to_path_buf(), to));
         plan.warnings = ws.finish();
         plan
@@ -485,6 +506,8 @@ struct Transfer<'a> {
     engine: &'a Engine,
     opts: TransferOptions,
     dest_dev: Option<u64>,
+    /// The destination is a phone or a camera.
+    dest_device: bool,
     steps: Vec<Step>,
     ws: WarningSet,
     totals: Totals,
@@ -503,6 +526,18 @@ struct Transfer<'a> {
     preserved: Preserved,
 }
 
+/// The permissions a copy is given: the source's, except that a device keeps none (nothing is
+/// asked of it) and says none that mean anything (what comes from it gets the usual ones).
+fn file_mode(source: Option<u32>, to_device: bool, from_device: bool, usual: u32) -> Option<u32> {
+    if to_device {
+        None
+    } else if from_device {
+        Some(usual)
+    } else {
+        source
+    }
+}
+
 struct LinkGroup {
     /// Index in `steps` of the step that copies the first name.
     step_index: usize,
@@ -516,6 +551,23 @@ struct LinkGroup {
 impl Transfer<'_> {
     fn ws_has_blocking(&self) -> bool {
         self.ws.has_blocking()
+    }
+
+    /// The device and the storage of it that `p` is in (`<root>/mtp:host=…/Internal storage`):
+    /// two paths with the same key are on one storage, where a move can be a rename.
+    fn device_key(&self, p: &Path) -> Option<PathBuf> {
+        let root = self.engine.platform.device_root()?;
+        let mut parts = p.strip_prefix(root).ok()?.components();
+        let device = parts.next()?;
+        let key = root.join(device);
+        Some(match parts.next() {
+            Some(storage) => key.join(storage),
+            None => key,
+        })
+    }
+
+    fn on_device(&self, p: &Path) -> bool {
+        self.engine.platform.on_device(p)
     }
 
     fn key(&self, p: &Path) -> OsString {
@@ -693,7 +745,19 @@ impl Transfer<'_> {
         match self.opts.mode {
             TransferMode::Copy => self.emit(node, dst, false),
             TransferMode::Move => {
-                let same_dev = node.meta.dev.is_some() && node.meta.dev == self.dest_dev;
+                let (from_key, to_key) = (self.device_key(&node.path), self.device_key(&dst));
+                let same_dev = match (&from_key, &to_key) {
+                    // The folders of all the devices are one filesystem to the system, and a
+                    // move from one phone to another (or to another storage of the same phone)
+                    // is a rename to it. It is a copy, then.
+                    (None, None) => node.meta.dev.is_some() && node.meta.dev == self.dest_dev,
+                    (Some(a), Some(b)) => a == b,
+                    _ => false,
+                };
+                if same_dev && from_key.is_some() {
+                    self.ws
+                        .add(WarningKind::DeviceRename, Severity::Info, Some(&node.path));
+                }
                 if same_dev {
                     let st = node.stats();
                     self.totals.files += st.files;
@@ -715,6 +779,10 @@ impl Transfer<'_> {
     /// Extended attributes, ACLs and owner of `node`: what the copy can keep, and what the
     /// plan has to say it cannot.
     fn note_attributes(&mut self, node: &ScanNode) {
+        // A device keeps none of this, and the plan has already said so.
+        if self.dest_device || self.on_device(&node.path) {
+            return;
+        }
         let a = node.attrs;
         if a.xattrs {
             self.preserved.xattr_items += 1;
@@ -756,8 +824,19 @@ impl Transfer<'_> {
                 let meta = &node.meta;
                 self.totals.files += 1;
                 self.totals.bytes += meta.size;
+                let from_device = self.on_device(&node.path);
+                let device = self.dest_device || from_device;
+                // A device has no hard links: what has several names is copied once per name.
+                if self.dest_device && meta.nlink.unwrap_or(1) > 1 {
+                    self.ws.add(
+                        WarningKind::DeviceHardLink,
+                        Severity::Info,
+                        Some(&node.path),
+                    );
+                }
                 // Names of one file inside the selection stay names of one file.
-                if meta.nlink.unwrap_or(1) > 1
+                if !self.dest_device
+                    && meta.nlink.unwrap_or(1) > 1
                     && let (Some(dev), Some(ino)) = (meta.dev, meta.ino)
                 {
                     if let Some(g) = self.links.get_mut(&(dev, ino)) {
@@ -789,7 +868,8 @@ impl Transfer<'_> {
                         },
                     );
                 }
-                let stored = meta.is_sparse().then(|| meta.stored_bytes());
+                // What a device says about blocks and holes means nothing.
+                let stored = (!device && meta.is_sparse()).then(|| meta.stored_bytes());
                 if stored.is_some() {
                     self.ws
                         .add(WarningKind::SparseFiles, Severity::Info, Some(&node.path));
@@ -800,16 +880,21 @@ impl Transfer<'_> {
                     src: node.path.clone(),
                     dst,
                     size: meta.size,
-                    mode: meta.mode,
+                    mode: file_mode(meta.mode, self.dest_device, from_device, 0o644),
                     mtime: meta.mtime.map(Into::into),
-                    atime: meta.atime.map(Into::into),
+                    atime: (!device).then(|| meta.atime.map(Into::into)).flatten(),
                     verify: mv || self.opts.verify,
                     remove_source: mv,
-                    uid: meta.uid,
-                    gid: meta.gid,
+                    uid: (!device).then_some(meta.uid).flatten(),
+                    gid: (!device).then_some(meta.gid).flatten(),
                     stored,
                     link_primary: false,
                 });
+            }
+            FileKind::Symlink if self.dest_device => {
+                // A phone or a camera cannot hold a link. It is left out, and said.
+                self.ws
+                    .add(WarningKind::DeviceLink, Severity::Warning, Some(&node.path));
             }
             FileKind::Symlink => {
                 match node.link_state {
@@ -846,11 +931,14 @@ impl Transfer<'_> {
                 }
                 self.note_unreadable_dir(node);
                 self.totals.dirs += 1;
+                let from_device = self.on_device(&node.path);
+                let device = self.dest_device || from_device;
                 // Owner can always write while the folder is being filled.
                 self.steps.push(Step::MakeDir {
                     path: dst.clone(),
                     restore_mode: None,
-                    mode: node.meta.mode.map(|m| m | 0o700),
+                    mode: file_mode(node.meta.mode, self.dest_device, from_device, 0o755)
+                        .map(|m| m | 0o700),
                 });
                 for c in &node.children {
                     self.emit_child(c, &dst, mv);
@@ -858,11 +946,11 @@ impl Transfer<'_> {
                 self.note_attributes(node);
                 self.steps.push(Step::FinishDir {
                     path: dst,
-                    mode: node.meta.mode,
+                    mode: file_mode(node.meta.mode, self.dest_device, from_device, 0o755),
                     mtime: node.meta.mtime.map(Into::into),
-                    src: Some(node.path.clone()),
-                    uid: node.meta.uid,
-                    gid: node.meta.gid,
+                    src: (!device).then(|| node.path.clone()),
+                    uid: (!device).then_some(node.meta.uid).flatten(),
+                    gid: (!device).then_some(node.meta.gid).flatten(),
                 });
                 if mv {
                     self.steps.push(Step::RemoveDir {

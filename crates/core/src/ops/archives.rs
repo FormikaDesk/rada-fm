@@ -297,6 +297,13 @@ impl Engine {
             Ok(_) => Some("not a folder".to_string()),
             Err(e) => Some(Error::io("open", dest, e).to_string()),
         };
+        if self.platform.on_device(dest) {
+            for kind in [WarningKind::DeviceWrite, WarningKind::DeviceAttrs] {
+                ex.ws.add(kind, Severity::Info, Some(dest));
+            }
+            ex.ws
+                .add(WarningKind::DeviceUndo, Severity::Warning, Some(dest));
+        }
         if let Some(detail) = problem {
             ex.ws.add_with(
                 WarningKind::NotWritable,
@@ -755,6 +762,11 @@ impl Engine {
                 Some(archive),
                 Some(why),
             );
+        }
+        if self.platform.on_device(dir) {
+            // An archive is written back and forth (headers are patched at the end), which a
+            // device that takes a file only when it is closed cannot do.
+            ws.add(WarningKind::DeviceArchive, Severity::Blocking, Some(dir));
         }
         match self.fs.stat(dir) {
             Ok(m) if m.is_dir() && self.fs.can_write(dir) => {}

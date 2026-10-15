@@ -281,25 +281,37 @@ impl FsEngine for LocalFs {
         }
         // Private until the very end: a partial copy of a private file is never exposed.
         let mut dst = create_dest(&req.dst)?;
-        let result = copy_body(&mut src, &mut dst, req, ctl).and_then(|outcome| {
-            finish_dest(&dst, req)?;
-            if req.verify {
-                // Same guard as `cp`/`rsync`: a source that moved under us is not a copy.
-                let after = src.metadata()?;
-                if after.len() != before.len() || after.modified().ok() != before.modified().ok() {
-                    return Err(fault(CopyFault::SourceChanged));
-                }
-            }
+        // On a device the read-back waits until the file is closed (see `finish_on_device`).
+        let body_req = CopyRequest {
+            verify: req.verify && !req.device,
+            ..req.clone()
+        };
+        let body = copy_body(&mut src, &mut dst, &body_req, ctl).and_then(|outcome| {
+            finish_dest(&dst, &body_req)?;
             Ok(outcome)
         });
-        match result {
-            Ok(o) => Ok(o),
+        let result = match body {
+            Ok(outcome) if req.device => {
+                finish_on_device(dst, &mut src, req, &before, &outcome, ctl).map(|()| outcome)
+            }
+            Ok(outcome) => {
+                let checked = if req.verify {
+                    source_unchanged(&src, &before)
+                } else {
+                    Ok(())
+                };
+                drop(dst);
+                checked.map(|()| outcome)
+            }
             Err(e) => {
                 drop(dst);
-                let _ = fs::remove_file(&req.dst);
                 Err(e)
             }
+        };
+        if result.is_err() {
+            let _ = fs::remove_file(&req.dst);
         }
+        result
     }
 
     fn available_space(&self, p: &Path) -> io::Result<u64> {
@@ -429,21 +441,104 @@ fn create_dest(p: &Path) -> io::Result<File> {
     o.open(p)
 }
 
+/// Same guard as `cp`/`rsync`: a source that moved under us is not a copy.
+fn source_unchanged(src: &File, before: &fs::Metadata) -> io::Result<()> {
+    let after = src.metadata()?;
+    if after.len() != before.len() || after.modified().ok() != before.modified().ok() {
+        return Err(fault(CopyFault::SourceChanged));
+    }
+    Ok(())
+}
+
+/// Close `f` and look at what the system answers: for a file on a device the answer to the
+/// last write is in the answer to `close`. A plain drop would throw it away.
+fn close_checked(f: File) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::IntoRawFd;
+        let fd = f.into_raw_fd();
+        // SAFETY: `fd` was just taken out of the `File`, which no longer closes it; this is the
+        // one close.
+        let r = unsafe { libc::close(fd) };
+        if r != 0 {
+            let e = io::Error::last_os_error();
+            // An interrupted close has closed the descriptor all the same.
+            if e.raw_os_error() != Some(libc::EINTR) {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        drop(f);
+        Ok(())
+    }
+}
+
+/// The end of a copy to or from a device: the file is closed (that is when the device takes
+/// it), what the device kept is measured against what was written, and, if asked, it is read
+/// back and compared with the source. Only then is the copy a copy.
+fn finish_on_device(
+    dst: File,
+    src: &mut File,
+    req: &CopyRequest,
+    before: &fs::Metadata,
+    outcome: &CopyOutcome,
+    ctl: &mut dyn CopyControl,
+) -> io::Result<()> {
+    close_checked(dst)?;
+    let kept = fs::metadata(&req.dst)?.len();
+    if kept != outcome.bytes {
+        return Err(fault(CopyFault::VerifyMismatch(format!(
+            "the device kept {kept} of {} bytes",
+            outcome.bytes
+        ))));
+    }
+    if req.verify {
+        let (len, want) = hash_fd(src, ctl)?;
+        let (got_len, got) = hash_path(&req.dst, ctl)?;
+        if got_len != len || got != want {
+            return Err(fault(CopyFault::VerifyMismatch(
+                "the copy read back from the device differs from the source".into(),
+            )));
+        }
+        source_unchanged(src, before)?;
+    }
+    Ok(())
+}
+
+/// Is this file on a FUSE filesystem (the desktop's virtual filesystem is one)? Holes cannot
+/// be asked of it, and it takes plain reads and writes.
+#[cfg(target_os = "linux")]
+fn on_fuse(f: &File) -> bool {
+    use std::os::fd::AsRawFd;
+    const FUSE_SUPER_MAGIC: i64 = 0x6573_5546;
+    let mut st = std::mem::MaybeUninit::<libc::statfs>::uninit();
+    // SAFETY: `st` is a valid out-pointer and the descriptor is open.
+    let r = unsafe { libc::fstatfs(f.as_raw_fd(), st.as_mut_ptr()) };
+    // SAFETY: fstatfs returned success, so the struct is initialised.
+    r == 0 && unsafe { st.assume_init() }.f_type as i64 == FUSE_SUPER_MAGIC
+}
+
 fn finish_dest(dst: &File, req: &CopyRequest) -> io::Result<()> {
+    // A device keeps no permissions and may keep no dates: try, and go on.
+    let quiet = |r: io::Result<()>| if req.device { Ok(()) } else { r };
     #[cfg(unix)]
     if let Some(m) = req.mode {
         use std::os::unix::fs::PermissionsExt;
-        dst.set_permissions(fs::Permissions::from_mode(m & 0o777))?;
+        quiet(dst.set_permissions(fs::Permissions::from_mode(m & 0o777)))?;
     }
     if let Some(mt) = req.mtime {
         let mut t = fs::FileTimes::new().set_modified(mt);
         if let Some(a) = req.atime {
             t = t.set_accessed(a);
         }
-        dst.set_times(t)?;
+        quiet(dst.set_times(t))?;
     }
     if req.sync || req.verify {
-        dst.sync_all()?;
+        // `fsync` on a device is a promise nobody keeps (the data goes at `close`).
+        quiet(dst.sync_all())?;
     }
     Ok(())
 }
@@ -462,9 +557,18 @@ fn copy_body(
         });
     }
 
-    // A sparse file keeps its holes: only the data regions are copied.
+    // A device is read and written plainly, from the first byte to the last.
+    if req.device {
+        return copy_rw(src, dst, ctl, false, &req.dst);
+    }
+
+    // A sparse file keeps its holes: only the data regions are copied (where the filesystem can
+    // say where they are: not on FUSE, which would only get the answer wrong).
     #[cfg(target_os = "linux")]
-    if let Some(done) = copy_sparse(src, dst, size, ctl, req)? {
+    if !on_fuse(src)
+        && !on_fuse(dst)
+        && let Some(done) = copy_sparse(src, dst, size, ctl, req)?
+    {
         return Ok(done);
     }
 
@@ -751,7 +855,6 @@ fn copy_sparse(
 }
 
 /// Hash an open file from its start (holes read as zeros, which is what they are).
-#[cfg(target_os = "linux")]
 fn hash_fd(f: &mut File, ctl: &mut dyn CopyControl) -> io::Result<(u64, u128)> {
     use std::io::Seek;
     f.seek(io::SeekFrom::Start(0))?;
