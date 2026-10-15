@@ -122,11 +122,21 @@ impl Avoid {
     /// The system's places and the mount points of network shares and of volumes that do not
     /// answer.
     pub fn for_volumes(volumes: &[Volume]) -> Avoid {
+        Avoid::for_volumes_and(volumes, None)
+    }
+
+    /// [`for_volumes`](Self::for_volumes), and the folder where the desktop shows phones and
+    /// cameras (`device_root`) with everything in it. Counting a phone means asking it for every
+    /// file it holds: slow, and it can hold the device for minutes.
+    pub fn for_volumes_and(volumes: &[Volume], device_root: Option<&Path>) -> Avoid {
         Avoid::new(
             volumes
                 .iter()
-                .filter(|v| v.kind == VolumeKind::Network || !v.responsive)
+                .filter(|v| {
+                    matches!(v.kind, VolumeKind::Network | VolumeKind::Device) || !v.responsive
+                })
                 .map(|v| v.mount_point.clone())
+                .chain(device_root.map(Path::to_path_buf))
                 .collect(),
         )
     }
@@ -649,6 +659,33 @@ mod tests {
         assert!(a.covers(Path::new("/mnt/nas/music")));
         assert!(a.covers(Path::new("/mnt/hung")));
         assert!(!a.covers(Path::new("/mnt/disk/x")));
+    }
+
+    #[test]
+    fn a_phone_is_never_counted_and_neither_is_the_folder_that_holds_the_phones() {
+        let phone = Volume {
+            mount_point: PathBuf::from("/run/user/1000/gvfs/mtp:host=Pixel_6"),
+            label: None,
+            fs_type: "mtp".into(),
+            device: "mtp://Pixel_6/".into(),
+            kind: VolumeKind::Device,
+            drive_letter: None,
+            total: None,
+            available: None,
+            read_only: false,
+            responsive: true,
+        };
+        let a = Avoid::for_volumes(std::slice::from_ref(&phone));
+        assert!(a.covers(Path::new(
+            "/run/user/1000/gvfs/mtp:host=Pixel_6/Internal/DCIM"
+        )));
+        assert!(!a.covers(Path::new("/run/user/1000/gvfs/mtp:host=Other")));
+        // A device that is not in the list (another kind of virtual folder) is covered by the
+        // folder they all live in.
+        let root = Path::new("/run/user/1000/gvfs");
+        let a = Avoid::for_volumes_and(&[], Some(root));
+        assert!(a.covers(&root.join("smb-share:server=nas,share=x/deep")));
+        assert!(!a.covers(Path::new("/run/user/1000/other")));
     }
 
     #[test]

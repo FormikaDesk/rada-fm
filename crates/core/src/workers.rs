@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crate::events::{CoreEvent, DirEvent, PreviewEvent};
-use crate::fs::FsEngine;
+use crate::fs::{FileKind, FsEngine};
 use crate::model::{self, EntryUpdate};
 use crate::platform::{Platform, Unmounted, Volume};
 use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
@@ -267,13 +267,27 @@ impl PreviewWorker {
                     // Reading inside an archive can take long: a newer request waiting means
                     // the answer is no longer wanted.
                     let superseded = || !rx.is_empty();
-                    let preview = preview::generate_in(
-                        fs.as_ref(),
-                        platform.as_ref().map(|p| p.attributes()),
-                        &req.path,
-                        &req.limits,
-                        &superseded,
-                    );
+                    let on_device = platform.as_ref().is_some_and(|p| p.on_device(&req.path));
+                    let preview = if on_device
+                        && fs.lstat(&req.path).is_ok_and(|m| m.kind != FileKind::Dir)
+                    {
+                        // The contents of a file on a phone or a camera are not read just
+                        // because the cursor passed over it: the device may send the whole file.
+                        Preview::Special(crate::i18n::t(crate::i18n::Key::PreviewOnDevice).into())
+                    } else {
+                        preview::generate_in(
+                            fs.as_ref(),
+                            // What is hidden is decided by the name alone on a device: asking
+                            // for the attributes of each entry would be a question per entry.
+                            platform
+                                .as_ref()
+                                .filter(|_| !on_device)
+                                .map(|p| p.attributes()),
+                            &req.path,
+                            &req.limits,
+                            &superseded,
+                        )
+                    };
                     // Decoding is slow: the header-only answer goes out first, the pixels
                     // follow. The decoder is only started once the header has been sent:
                     // started before, it could finish first, and the header (still

@@ -1366,7 +1366,8 @@ impl App {
             CoreEvent::Volumes(v) => {
                 self.volumes_seen = true;
                 self.volumes = if self.demo_volumes { demo_volumes() } else { v };
-                self.folder_sizes.set_volumes(&self.volumes);
+                self.folder_sizes
+                    .set_volumes(&self.volumes, self.svc.platform.device_root());
                 self.refresh_palette();
             }
             CoreEvent::Unmounted(list) => {

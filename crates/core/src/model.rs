@@ -88,9 +88,12 @@ impl Entry {
             };
             LinkInfo { target, state }
         });
-        // One attribute read per entry, in the worker. A link has no tags of its own.
+        // One attribute read per entry, in the worker. A link has no tags of its own, and a phone
+        // or a camera has no attributes to read (each read would be a question to the device).
         let tags = match platform.tags() {
-            Some(store) if meta.kind != FileKind::Symlink => store.read(&path).unwrap_or_default(),
+            Some(store) if meta.kind != FileKind::Symlink && !platform.on_device(&path) => {
+                store.read(&path).unwrap_or_default()
+            }
             _ => Vec::new(),
         };
         // What the system's file manager calls it, when that is not the name on the disk.

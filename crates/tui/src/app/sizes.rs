@@ -54,8 +54,8 @@ impl Default for Sizes {
 }
 
 impl Sizes {
-    pub fn set_volumes(&mut self, volumes: &[Volume]) {
-        self.avoid = Arc::new(Avoid::for_volumes(volumes));
+    pub fn set_volumes(&mut self, volumes: &[Volume], device_root: Option<&Path>) {
+        self.avoid = Arc::new(Avoid::for_volumes_and(volumes, device_root));
     }
 }
 

@@ -885,6 +885,7 @@ strings! {
     TOpeningWithNote2 => " — rada goes back to the system's choice for this kind of file", " — rada torna alla scelta del sistema per questo tipo di file";
     SideFree => "{0} · {1} free", "{0} · {1} liberi";
     SideMenuOpen => "Open", "Apri";
+    PreviewOnDevice => "on a phone or camera: not read, so that the device does not have to send the whole file", "su un telefono o una fotocamera: non letto, perché il dispositivo non debba inviare tutto il file";
     DevMissingGio => "gio was not found: install gvfs (and gvfs-mtp for phones) to open devices from rada", "gio non è stato trovato: installa gvfs (e gvfs-mtp per i telefoni) per aprire i dispositivi da rada";
     DevMissingUdisks => "udisksctl was not found: install udisks2 to mount disks from rada", "udisksctl non è stato trovato: installa udisks2 per montare i dischi da rada";
     DevNoMtp => "this system cannot open phones: install gvfs-mtp (on Arch: pacman -S gvfs-mtp)", "questo sistema non sa aprire i telefoni: installa gvfs-mtp (su Arch: pacman -S gvfs-mtp)";
