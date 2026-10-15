@@ -6,7 +6,7 @@
 //! distributions): so the folder is `0700` and the files `0600` on Unix. On Windows the folder
 //! inherits the rights of the user's profile.
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -29,13 +29,17 @@ pub fn create_private_dir(dir: &Path) -> io::Result<()> {
 
 /// Open options for a file of the state folder: created readable by the user alone (Unix).
 pub fn private_file_options() -> OpenOptions {
-    let mut o = OpenOptions::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
+        let mut o = OpenOptions::new();
         o.mode(0o600);
+        o
     }
-    o
+    #[cfg(not(unix))]
+    {
+        OpenOptions::new()
+    }
 }
 
 /// Write `bytes` as the whole content of `path`: into a file of its own name beside it, written
@@ -77,7 +81,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     }
     // The new name itself, too. (Windows has no such call for a folder.)
     #[cfg(unix)]
-    if let Err(e) = File::open(dir).and_then(|d| d.sync_all()) {
+    if let Err(e) = fs::File::open(dir).and_then(|d| d.sync_all()) {
         tracing::debug!("sync {}: {e}", dir.display());
     }
     Ok(())
@@ -178,7 +182,7 @@ mod tests {
         let f = dir.join("update.json");
         write_atomic(&f, b"{}").unwrap();
         assert_eq!(mode(&dir), 0o700);
-        assert_eq!(mode(&dir.parent().unwrap().to_path_buf()), 0o700);
+        assert_eq!(mode(dir.parent().unwrap()), 0o700);
         assert_eq!(mode(&f), 0o600);
         // Again, over the existing file: still private.
         write_atomic(&f, b"{ }").unwrap();

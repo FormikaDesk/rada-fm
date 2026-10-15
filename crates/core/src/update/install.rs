@@ -370,12 +370,12 @@ pub fn rollback(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::platform::spawn::is_text_file_busy;
     use std::io::Write;
 
     #[cfg(unix)]
     #[test]
     fn a_program_still_open_for_writing_is_tried_again_not_reported_as_broken() {
+        use crate::platform::spawn::is_text_file_busy;
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let exe = dir.path().join("rada");
