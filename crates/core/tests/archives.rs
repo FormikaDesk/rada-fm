@@ -319,9 +319,9 @@ fn a_link_is_found_whatever_the_case_where_the_destination_ignores_case() {
         Compression::None,
     );
     let wrote_under_link = |plan: &Plan| {
-        plan.steps.iter().any(|s| {
-            matches!(s, Step::ExtractFile { dst, .. } if dst.ends_with("foo/authorized_keys"))
-        })
+        plan.steps.iter().any(
+            |s| matches!(s, Step::ExtractFile { dst, .. } if dst.ends_with("foo/authorized_keys")),
+        )
     };
 
     // Names that differ in case are different names here: nothing to refuse.
@@ -1042,7 +1042,10 @@ fn extracted_files_and_their_folder_are_synced() {
     let a = sb.path("a.zip");
     write_zip(
         &a,
-        &[Member::file("one.txt", "1"), Member::file("sub/two.txt", "2")],
+        &[
+            Member::file("one.txt", "1"),
+            Member::file("sub/two.txt", "2"),
+        ],
     );
     let out = sb.mkdir("out");
     let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
