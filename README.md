@@ -324,6 +324,8 @@ An entry that is not mounted says so after its name (*Canon EOS  not mounted*); 
 - **undo is not guaranteed** for anything that puts something back on a phone (the plan says so; undo of a copy *from* a phone just removes the copy);
 - an **archive** cannot be written straight onto a phone: make it in a folder here, then copy it.
 
+If a phone does not show up, `rada debug devices` prints what rada sees and why each thing is listed or left out (read only; nothing is mounted).
+
 A move and a verified copy read the file back from the phone before the source is touched. Nothing is counted or read in the background on a phone: no folder sizes, no tag reads, no recursive scans, and the preview of a file there says it is not read (the phone may send the whole file). A phone listing is as quick as the phone is.
 
 ## Tags
