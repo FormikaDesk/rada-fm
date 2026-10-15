@@ -677,6 +677,71 @@ fn seven_zip_archives_extract_when_the_tool_to_make_them_exists() {
     assert_eq!(std::fs::metadata(out.join("empty")).unwrap().len(), 0);
 }
 
+/// CRC-32 (the one a `.7z` uses for its headers).
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for &b in data {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            crc = (crc >> 1) ^ (0xEDB8_8320 & 0u32.wrapping_sub(crc & 1));
+        }
+    }
+    !crc
+}
+
+/// A `.7z` that declares an LZMA2 dictionary of 2 GiB: made small and plain by 7z, then the
+/// one byte that says the dictionary size is changed and the checksums are made again.
+fn seven_zip_with_a_huge_dictionary(sb: &Sandbox) -> Option<PathBuf> {
+    if !have_tool("7z") {
+        return None;
+    }
+    let src = sb.mkdir("src7");
+    std::fs::write(src.join("a.txt"), "hello hello hello").unwrap();
+    let a = sb.path("big-dict.7z");
+    let ok = std::process::Command::new("7z")
+        // -mhc=off: the header is not compressed, so it can be read and changed here.
+        .args(["a", "-bso0", "-bsp0", "-mhc=off", "-m0=lzma2"])
+        .arg(&a)
+        .arg(src.join("a.txt"))
+        .status()
+        .unwrap()
+        .success();
+    assert!(ok);
+    let mut bytes = std::fs::read(&a).unwrap();
+    let off = 32 + u64::from_le_bytes(bytes[12..20].try_into().unwrap()) as usize;
+    let size = u64::from_le_bytes(bytes[20..28].try_into().unwrap()) as usize;
+    // A coder: flags (id of 1 byte, has properties), id of LZMA2, one property byte.
+    let at = bytes[off..off + size]
+        .windows(3)
+        .position(|w| w == [0x21, 0x21, 0x01])
+        .expect("an LZMA2 coder in the header")
+        + off
+        + 3;
+    bytes[at] = 38; // (2 | 0) << (38 / 2 + 11) = 2 GiB
+    let header_crc = crc32(&bytes[off..off + size]);
+    bytes[28..32].copy_from_slice(&header_crc.to_le_bytes());
+    let start_crc = crc32(&bytes[12..32]);
+    bytes[8..12].copy_from_slice(&start_crc.to_le_bytes());
+    std::fs::write(&a, bytes).unwrap();
+    Some(a)
+}
+
+#[test]
+fn a_7z_asking_for_gigabytes_of_dictionary_is_refused_before_it_is_unpacked() {
+    let sb = Sandbox::new();
+    let Some(a) = seven_zip_with_a_huge_dictionary(&sb) else {
+        eprintln!("skipped: no 7z to make a fixture");
+        return;
+    };
+    let e = sb.engine();
+    let out = sb.mkdir("out");
+    let err = plan_try(&e, &extract_req(&a, &out, ExtractInto::Here)).unwrap_err();
+    let said = err.to_string();
+    assert!(said.contains("2048 MiB of memory"), "{said}");
+    assert!(said.contains("limit is 1024 MiB"), "{said}");
+    assert!(std::fs::read_dir(&out).unwrap().next().is_none());
+}
+
 #[test]
 fn a_missing_rar_tool_is_said_plainly() {
     // Whatever is installed here, the message for "no program" must tell what to do.

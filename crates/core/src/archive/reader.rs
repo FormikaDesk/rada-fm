@@ -17,7 +17,7 @@ use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 
 use super::entry::{EntryKind, sanitize};
 use super::format::{Compression, Format};
-use super::index::{Index, sevenz_err, tar_kind};
+use super::index::{Index, sevenz_check_memory, sevenz_err, tar_kind};
 use super::{ArchiveError, external};
 
 const CHUNK: usize = 64 * 1024;
@@ -304,6 +304,7 @@ fn produce_single(ix: &Index, c: Compression, em: &Emitter) -> Result<(), Archiv
 fn produce_7z(ix: &Index, wanted: &[bool], last: usize, em: &Emitter) -> Result<(), ArchiveError> {
     let mut ar = sevenz_rust2::ArchiveReader::open(&ix.path, sevenz_rust2::Password::empty())
         .map_err(sevenz_err)?;
+    sevenz_check_memory(ar.archive())?;
     let mut n = 0usize;
     let mut failure: Option<ArchiveError> = None;
     let r = ar.for_each_entries(|_, reader| {

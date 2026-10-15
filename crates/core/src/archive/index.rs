@@ -672,8 +672,57 @@ pub(super) fn sevenz_err(e: sevenz_rust2::Error) -> ArchiveError {
     sevenz_error(e)
 }
 
+/// The most memory a block of a `.7z` may ask a decoder for (KiB), as for an xz block. The
+/// library does not limit it: a hostile file can declare a dictionary of gigabytes.
+const SEVENZ_MEMORY_KIB: u64 = 1 << 20;
+
+/// What a coder needs for its dictionary (LZMA, LZMA2) or its model (PPMd), in KiB. The other
+/// methods in use need little and are not counted.
+fn sevenz_coder_kib(c: &sevenz_rust2::Coder) -> u64 {
+    use sevenz_rust2::EncoderMethod as M;
+    let id = c.encoder_method_id();
+    let p = c.properties();
+    let word = |p: &[u8]| {
+        p.get(1..5)
+            .map(|b| u64::from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])))
+    };
+    let bytes = if id == M::ID_LZMA2 {
+        match p.first().map(|&b| u64::from(b & 0x3F)) {
+            Some(40) => Some(0xFFFF_FFFF),
+            Some(bits) if bits > 40 => Some(u64::MAX >> 12),
+            Some(bits) => Some((2 | (bits & 1)) << (bits / 2 + 11)),
+            None => None,
+        }
+    } else if id == M::ID_LZMA || id == M::ID_PPMD {
+        word(p)
+    } else {
+        None
+    };
+    bytes.map_or(0, |b| b.div_ceil(1024))
+}
+
+/// Refuse a `.7z` one of whose blocks asks for more memory than the limit, before any of it
+/// is unpacked. (A block is unpacked at a time; the coders of one block run together.)
+pub(super) fn sevenz_check_memory(ar: &sevenz_rust2::Archive) -> Result<(), ArchiveError> {
+    let worst = ar
+        .blocks
+        .iter()
+        .map(|b| b.coders.iter().map(sevenz_coder_kib).sum::<u64>())
+        .max()
+        .unwrap_or(0);
+    if worst > SEVENZ_MEMORY_KIB {
+        return Err(ArchiveError::Unsupported(format!(
+            "it needs {} MiB of memory to unpack (the limit is {} MiB)",
+            worst / 1024,
+            SEVENZ_MEMORY_KIB / 1024
+        )));
+    }
+    Ok(())
+}
+
 fn list_7z(ix: &mut Index) -> Result<(), ArchiveError> {
     let ar = sevenz_rust2::Archive::open(&ix.path).map_err(sevenz_error)?;
+    sevenz_check_memory(&ar)?;
     let order = sevenz_order(&ar);
     for &fi in &order {
         let f = &ar.files[fi];
