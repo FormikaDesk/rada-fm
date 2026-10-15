@@ -18,6 +18,7 @@ pub mod freedesktop;
 pub mod launch;
 pub mod macos;
 pub mod openwith;
+pub mod spawn;
 pub mod tags;
 pub mod trash;
 pub mod userdirs;

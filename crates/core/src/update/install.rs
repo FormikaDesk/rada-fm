@@ -8,6 +8,7 @@
 //! renamed) and put back if the second rename fails.
 
 use crate::i18n::{Key, tf};
+use crate::platform::spawn::spawn_retrying_busy;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -135,40 +136,15 @@ pub fn run_version(program: &Path, limit: Duration) -> Result<String, String> {
     }
 }
 
-/// Start `program --version`. A program that was written a moment ago can still be "busy" for
-/// writing ("Text file busy", ETXTBSY): another process that was being started at that
-/// very moment holds a copy of the file's descriptor until it has run its own program. That
-/// passes in a few milliseconds, so it is tried again rather than reported.
+/// Start `program --version`.
 fn spawn_version(program: &Path) -> io::Result<std::process::Child> {
-    const TRIES: u32 = 40;
-    let mut tried = 0;
-    loop {
-        let started = Command::new(program)
+    spawn_retrying_busy(
+        Command::new(program)
             .arg("--version")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn();
-        match started {
-            Err(e) if is_text_file_busy(&e) && tried < TRIES => {
-                tried += 1;
-                std::thread::sleep(Duration::from_millis(25));
-            }
-            other => return other,
-        }
-    }
-}
-
-fn is_text_file_busy(e: &io::Error) -> bool {
-    #[cfg(unix)]
-    {
-        e.raw_os_error() == Some(libc::ETXTBSY)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = e;
-        false
-    }
+            .stderr(Stdio::null()),
+    )
 }
 
 /// Mark the file runnable.
@@ -394,6 +370,7 @@ pub fn rollback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platform::spawn::is_text_file_busy;
     use std::io::Write;
 
     #[cfg(unix)]

@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::fs::FsEngine;
 use crate::model::{self, Entry};
+use crate::platform::spawn::spawn_retrying_busy;
 use crate::platform::{Platform, Tag, TagColor, TagStore};
 
 /// What a view path starts with.
@@ -126,13 +127,14 @@ pub fn run_tool(
     cancel: &dyn Fn() -> bool,
 ) -> Option<String> {
     use std::io::Read;
-    let mut child = Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
+    let mut child = spawn_retrying_busy(
+        Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null()),
+    )
+    .ok()?;
     let mut out = child.stdout.take()?;
     let reader = std::thread::spawn(move || {
         let mut bytes = Vec::new();

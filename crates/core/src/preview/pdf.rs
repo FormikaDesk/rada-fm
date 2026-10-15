@@ -17,6 +17,7 @@ use std::time::{Duration, Instant, SystemTime};
 use xxhash_rust::xxh3::xxh3_64;
 
 use super::image::{ImageInfo, ImageLimits};
+use crate::platform::spawn::spawn_retrying_busy;
 
 /// Title, author and number of pages, when the PDF says.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -184,8 +185,7 @@ pub(super) fn run_limited(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("LC_ALL", "C");
-    let mut child = cmd
-        .spawn()
+    let mut child = spawn_retrying_busy(&mut cmd)
         .map_err(|e| PdfProblem::Damaged(format!("cannot run the tool: {e}")))?;
     // Read both pipes on threads so that a chatty tool can never block on a full pipe.
     let drain = |mut r: Box<dyn Read + Send>, cap: usize| {
