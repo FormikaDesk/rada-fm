@@ -45,29 +45,36 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
         return vec![(title, app.cwd.clone())];
     }
     let home = app.home();
-    let (first, rest) = match app.cwd.strip_prefix(home) {
-        Ok(rest) => ((home_label(app), home.to_path_buf()), rest),
-        Err(_) => {
-            let mut root = PathBuf::new();
-            let mut label = String::new();
-            for c in app.cwd.components() {
-                match c {
-                    Component::Prefix(_) | Component::RootDir => {
-                        root.push(c.as_os_str());
-                        label = if label.is_empty() {
-                            display::name(c.as_os_str())
-                        } else {
-                            label
-                        };
+    // Inside a phone or a camera the path is the device's name, not the folders of the virtual
+    // filesystem that hold it; the real path stays in the details.
+    let (first, rest) = if let Some((label, root)) = app.device_head() {
+        let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
+        ((label, root), rest)
+    } else {
+        match app.cwd.strip_prefix(home) {
+            Ok(rest) => ((home_label(app), home.to_path_buf()), rest),
+            Err(_) => {
+                let mut root = PathBuf::new();
+                let mut label = String::new();
+                for c in app.cwd.components() {
+                    match c {
+                        Component::Prefix(_) | Component::RootDir => {
+                            root.push(c.as_os_str());
+                            label = if label.is_empty() {
+                                display::name(c.as_os_str())
+                            } else {
+                                label
+                            };
+                        }
+                        _ => break,
                     }
-                    _ => break,
                 }
+                if label.is_empty() || label == std::path::MAIN_SEPARATOR_STR {
+                    label = std::path::MAIN_SEPARATOR_STR.to_string();
+                }
+                let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
+                ((app.shown_name(&root, label), root), rest)
             }
-            if label.is_empty() || label == std::path::MAIN_SEPARATOR_STR {
-                label = std::path::MAIN_SEPARATOR_STR.to_string();
-            }
-            let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
-            ((app.shown_name(&root, label), root), rest)
         }
     };
     let mut out = vec![first];

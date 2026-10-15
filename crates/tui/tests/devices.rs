@@ -434,3 +434,54 @@ Volume(0): motorola edge 40
         assert_eq!(h.names(), ["Internal shared storage"]);
     }
 }
+
+#[test]
+fn inside_a_phone_the_path_bar_names_the_device_and_the_real_path_stays_in_the_details() {
+    let mut s = scene(None);
+    let storage = s.phone.join("Internal storage");
+    s.h.app.open_dir(storage.clone());
+    let dest = storage.clone();
+    s.h.wait("the storage", move |a| a.cwd == dest && !a.is_loading());
+    let screen = s.h.screen();
+    let bar = screen
+        .lines()
+        .find(|l| l.contains("Pixel 6"))
+        .unwrap_or_else(|| panic!("the device is named in the bar:\n{screen}"));
+    assert!(bar.contains("Pixel 6 › Internal storage"), "{bar}");
+    assert!(
+        !screen
+            .lines()
+            .take(8)
+            .any(|l| l.contains("gvfs") || l.contains("mtp:host")),
+        "the virtual filesystem's folders are not in the bar:\n{screen}"
+    );
+    // The first crumb is the device itself: a click goes to it.
+    s.h.click(&Target::Crumb(s.phone.clone()));
+    let phone = s.phone.clone();
+    s.h.wait("the device", move |a| a.cwd == phone && !a.is_loading());
+    // The bar of the folder holding the phones is the plain one.
+    s.h.app.open_dir(s.phone.parent().unwrap().to_path_buf());
+    let root = s.phone.parent().unwrap().to_path_buf();
+    s.h.wait("the folder of the devices", move |a| {
+        a.cwd == root && !a.is_loading()
+    });
+    assert!(s.h.app.device_head().is_none());
+    // The details of an item still give the real folder.
+    s.h.app.open_dir(storage.clone());
+    let dest = storage.clone();
+    s.h.wait("the storage again", move |a| {
+        a.cwd == dest && !a.is_loading()
+    });
+    s.h.keys("j");
+    s.h.wait("the details", |a| !a.preview.name.is_empty());
+    let screen = s.h.screen();
+    let location = screen
+        .lines()
+        .find(|l| l.contains("Location"))
+        .unwrap_or_else(|| panic!("the details have a Location row:\n{screen}"));
+    // The row is the real folder (cut at the width of the pane), not the device's name.
+    assert!(
+        location.contains(&storage.parent().unwrap().to_string_lossy()[..12]),
+        "{location}"
+    );
+}

@@ -6,8 +6,16 @@ use rada_core::i18n::{self, Key, tf};
 
 pub use rada_core::display::bytes as size;
 
+/// A time that says something: the very start of 1970 is what a filesystem (a phone's, say) gives
+/// when it has no date, not a date, so it is no time at all.
+pub fn known(t: Option<SystemTime>) -> Option<SystemTime> {
+    t.filter(|t| *t != SystemTime::UNIX_EPOCH)
+}
+
 pub fn date(t: Option<SystemTime>) -> String {
-    let Some(t) = t else { return "—".into() };
+    let Some(t) = known(t) else {
+        return "—".into();
+    };
     match jiff::Timestamp::try_from(t) {
         Ok(ts) => ts
             .to_zoned(jiff::tz::TimeZone::system())
@@ -35,7 +43,9 @@ pub fn short_path(p: &std::path::Path, home: &std::path::Path) -> String {
 
 /// "2 h ago", "yesterday", "Sep 17": a date read at a glance (in the language in use).
 pub fn relative(t: Option<SystemTime>, now: SystemTime) -> String {
-    let Some(t) = t else { return "—".into() };
+    let Some(t) = known(t) else {
+        return "—".into();
+    };
     let Ok(age) = now.duration_since(t) else {
         return Key::JustNow.tr().into();
     };
@@ -180,7 +190,9 @@ pub fn explorer_date_in(
     format: DateFormat,
     tz: &jiff::tz::TimeZone,
 ) -> String {
-    let Some(t) = t else { return "—".into() };
+    let Some(t) = known(t) else {
+        return "—".into();
+    };
     let (Ok(ts), Ok(now_ts)) = (jiff::Timestamp::try_from(t), jiff::Timestamp::try_from(now))
     else {
         return "—".into();
@@ -213,7 +225,9 @@ pub fn date_with_day(
     format: DateFormat,
     tz: &jiff::tz::TimeZone,
 ) -> String {
-    let Some(t) = t else { return "—".into() };
+    let Some(t) = known(t) else {
+        return "—".into();
+    };
     let (Ok(ts), Ok(now_ts)) = (jiff::Timestamp::try_from(t), jiff::Timestamp::try_from(now))
     else {
         return "—".into();
@@ -228,6 +242,9 @@ pub fn date_with_day(
 }
 
 pub fn clock(unix_secs: i64) -> String {
+    if unix_secs == 0 {
+        return "—".into();
+    }
     match jiff::Timestamp::from_second(unix_secs) {
         Ok(ts) => {
             let z = ts.to_zoned(jiff::tz::TimeZone::system());
@@ -451,6 +468,27 @@ mod tests {
         assert_eq!(f(day(2026, 10, 10, 15, 21)), "Today, 15:21");
         assert_eq!(f(day(2026, 10, 9, 9, 12)), "Yesterday, 09:12");
         assert_eq!(f(day(2026, 10, 8, 15, 21)), "08/10/2026 15:21");
+    }
+
+    #[test]
+    fn a_date_of_zero_is_no_date_in_every_formatter() {
+        let zero = Some(SystemTime::UNIX_EPOCH);
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_791_642_600);
+        let tz = jiff::tz::TimeZone::UTC;
+        assert_eq!(date(zero), "—");
+        assert_eq!(relative(zero, now), "—");
+        assert_eq!(clock(0), "—");
+        for style in [DateStyle::Relative, DateStyle::Absolute] {
+            assert_eq!(
+                explorer_date_in(zero, now, style, DateFormat::DEFAULT, &tz),
+                "—"
+            );
+        }
+        assert_eq!(date_with_day(zero, now, DateFormat::DEFAULT, &tz), "—");
+        // The second after it is a date like any other.
+        let one = Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1));
+        assert_ne!(date(one), "—");
+        assert!(date_with_day(one, now, DateFormat::DEFAULT, &tz).contains("1970"));
     }
 
     #[test]

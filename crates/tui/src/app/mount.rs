@@ -15,6 +15,21 @@ impl App {
             .map(|u| u.id.clone())
     }
 
+    /// When the folder in view is inside a phone or a camera: the name the device goes by (the
+    /// one the sidebar shows) and the folder that is the device, which stand for the long
+    /// path of the virtual filesystem at the head of the path bar.
+    pub fn device_head(&self) -> Option<(String, PathBuf)> {
+        let root = self.svc.platform.device_root()?;
+        let device = self.cwd.strip_prefix(root).ok()?.components().next()?;
+        let dir = root.join(device);
+        let label = self
+            .volumes
+            .iter()
+            .find(|v| v.mount_point == dir)
+            .and_then(|v| v.label.clone())?;
+        Some((label, dir))
+    }
+
     /// The devices to list: those plugged in, minus any that is already open (the two lists
     /// come from different threads and a moment apart).
     pub fn pending_devices(&self) -> Vec<&Unmounted> {

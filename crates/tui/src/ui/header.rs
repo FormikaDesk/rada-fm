@@ -46,7 +46,13 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
         return vec![(title, app.cwd.clone())];
     }
     let home = app.home();
-    let (first, rest) = match app.cwd.strip_prefix(home) {
+    // Inside a phone or a camera the path is the device's name, not the folders of the virtual
+    // filesystem that hold it; the real path stays in the details.
+    let (first, rest) = if let Some((label, root)) = app.device_head() {
+        let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
+        ((label, root), rest)
+    } else {
+        match app.cwd.strip_prefix(home) {
         Ok(rest) => ((home_mark(app.icons).to_string(), home.to_path_buf()), rest),
         Err(_) => {
             let mut root = PathBuf::new();
@@ -70,7 +76,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
             let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
             ((app.shown_name(&root, label), root), rest)
         }
-    };
+    }};
     let mut out = vec![first];
     let mut acc = out[0].1.clone();
     for c in rest.components() {
