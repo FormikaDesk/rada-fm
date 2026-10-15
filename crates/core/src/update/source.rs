@@ -337,6 +337,11 @@ mod tests {
             "fake-tool"
         };
         fs::write(d.path().join(name), "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(d.path().join(name), fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let found = find_program(&OsString::from("fake-tool"), &[d.path().to_path_buf()]);
         assert_eq!(PathBuf::from(found), d.path().join(name));
         // A name that is nowhere stays as it is, so that the error names it.
