@@ -10,14 +10,14 @@
 
 rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual desktop shortcuts work together, the interface is in English and Italian, and it looks the same in any modern terminal.
 
-![The main screen: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](docs/screenshots/principale-scuro.png)
+![The main screen in English: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](docs/screenshots/principale-inglese.png)
 
 ## Why rada
 
 - **Plan before action.** Copy, move, rename, trash and delete show what will happen first: files, bytes, symlinks, permissions, name conflicts. Nothing runs until you confirm.
 - **Journal and undo.** Every finished operation is recorded and can be undone, even after a restart. A file you changed afterwards is left alone, not overwritten.
 - **Recovery after a crash.** The journal is written as it goes. If rada is killed mid-copy, the next start removes the half-written file, keeps both copies of a cut move, and tells you. Tested with `SIGKILL`, full disks and property tests that check copy → undo gives back the starting state.
-- **Signed updates.** `rada update` checks a [minisign](https://jedisct1.github.io/minisign/) signature made with an offline key before it installs anything, and can roll back.
+- **Signed updates.** `rada update` checks a [minisign](https://jedisct1.github.io/minisign/) signature made with an offline key before it installs anything, and can roll back. Signed releases start with 0.6.0-rc.9.
 - **Phones and USB sticks.** On Linux, phones, cameras and unmounted sticks appear in the sidebar; you can mount, copy to and eject them, and the plan says what a phone cannot keep.
 - **Linux, macOS, Windows.** Linux is supported; macOS and Windows are a pre-release (Trash and Recycle Bin, Finder tags, Quick Look, drive ejection) and still have rough edges.
 
@@ -61,9 +61,12 @@ Run `rada`, `rada ~/Pictures`, or `rada photo.png`. Press `?` for every key; bot
 
 ## A closer look
 
-| ![Light theme](docs/screenshots/principale-carta.png) | ![English interface](docs/screenshots/principale-inglese.png) |
+<details>
+<summary>More screenshots</summary>
+
+| ![Light theme](docs/screenshots/principale-carta.png) | ![Italian interface](docs/screenshots/principale-scuro.png) |
 |---|---|
-| The light **Carta** theme. | The same screen in English (the pictures are mostly in Italian). |
+| The light **Carta** theme. | The same screen in Italian: the language follows the system, or `language = "it"` / `"en"`. |
 | ![Icons view](docs/screenshots/icone.png) | ![Columns view](docs/screenshots/colonne.png) |
 | **Icons** view. | **Columns** view, as in the Finder. |
 | ![Context menu](docs/screenshots/menu.png) | ![Open with](docs/screenshots/apri-con.png) |
@@ -85,9 +88,11 @@ Run `rada`, `rada ~/Pictures`, or `rada photo.png`. Press `?` for every key; bot
 
 ![Giving a file a tag from the menu, with its plan, and the list of everything that carries it](docs/media/tag.gif)
 
+</details>
+
 ## Verify downloads
 
-Releases are signed with [minisign](https://jedisct1.github.io/minisign/) by a key kept offline. The two public keys, the same ones built into `rada update`:
+Releases from 0.6.0-rc.9 on are signed with [minisign](https://jedisct1.github.io/minisign/) by a key kept offline; earlier ones are not. The two public keys, the same ones built into `rada update`:
 
 | | public key |
 |---|---|

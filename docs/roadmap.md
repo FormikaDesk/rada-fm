@@ -10,7 +10,7 @@
 
 ### Ideas, not planned yet
 
-- **Space analysis**: find what takes up room and suggest cleanups, with an optional assistant that runs locally, is off by default and only sees names and sizes — never contents. Every suggestion would still go through the usual plan and undo.
+- **Space analysis**: find what takes up room and suggest cleanups. Every suggestion would still go through the usual plan and undo.
 - **Remote filesystems** (SFTP) through the same engine.
 - **Plugins**.
 - Git integration, syntax-highlighted preview, recursive search, a trash browser, comparing and syncing two folders with a dry-run plan.

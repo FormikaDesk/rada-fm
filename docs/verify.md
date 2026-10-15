@@ -7,7 +7,7 @@ account on GitHub were taken over. rada itself checks the signature before it in
 [releases page](https://github.com/formikadesk/rada-fm/releases).
 
 Releases up to `0.6.0-rc.8` were published before signing existed and have no
-`SHA256SUMS.minisig`; the first release after that one is the first signed one.
+`SHA256SUMS.minisig`; signing starts with `0.6.0-rc.9`.
 
 ## The public keys
 
