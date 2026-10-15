@@ -1,16 +1,25 @@
 name: Release
 
-# A tag `v*` builds the binaries and publishes them as a GitHub Release; a tag with a hyphen
-# in it (v0.6.0-rc.2) is marked as a pre-release. Run by hand (workflow_dispatch) or by a push
-# to a branch `release-dry-run/*` it builds and checks everything but publishes nothing: the
-# binaries are only artifacts of the run. (A manual run needs the file on the default branch;
-# the branch does not.)
+# A tag `v<digit>...` builds the binaries and creates a DRAFT release with them and SHA256SUMS;
+# nothing is published from here. The release is signed and published by hand afterwards
+# (scripts/sign-release.sh <tag>, see docs/release.md): the signing key is never in GitHub,
+# so a stolen token or a compromised workflow cannot publish a release that rada will install.
+# A tag with a hyphen in it (v0.6.0-rc.2) is marked as a pre-release.
+#
+# Run by hand (workflow_dispatch) it builds everything and publishes nothing: the binaries are
+# only artifacts of the run. A push to a branch `release-dry-run/*` also creates a draft, named
+# `dry-run-<commit>` (a draft has no tag), to see the whole path; the draft is then deleted by hand.
+# (A manual run needs the file on the default branch; the branch does not.)
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]*"]
     branches: ["release-dry-run/**"]
   workflow_dispatch:
+
+# Read-only by default; the job that creates the draft asks for more.
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,9 +38,12 @@ jobs:
           - { target: x86_64-apple-darwin, os: macos-15-intel, archive: tar.gz }
           - { target: aarch64-apple-darwin, os: macos-latest, archive: tar.gz }
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable branch
+        with:
+          toolchain: stable
           targets: ${{ matrix.target }}
       - name: musl C compiler (the zstd library is compiled with the build)
         if: contains(matrix.target, 'musl')
@@ -77,23 +89,26 @@ jobs:
             tar -czf "$name.tar.gz" "$name"
             echo "file=$name.tar.gz" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rada-${{ matrix.target }}
           path: ${{ steps.package.outputs.file }}
           if-no-files-found: error
 
-  publish:
-    name: publish the release
-    # Only for a tag; a manual run stops at the artifacts.
-    if: github.ref_type == 'tag'
+  # A draft release with the binaries and SHA256SUMS. Only for a tag or a dry-run branch; a
+  # manual run stops at the artifacts.
+  draft:
+    name: create the draft release
+    if: github.ref_type == 'tag' || startsWith(github.ref, 'refs/heads/release-dry-run/')
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -101,8 +116,9 @@ jobs:
         working-directory: dist
         run: sha256sum rada-* > SHA256SUMS && cat SHA256SUMS
       - name: Notes from the changelog
+        id: notes
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
           awk -v v="$version" '
             /^## \[/ { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }
             found { print }
@@ -111,14 +127,30 @@ jobs:
             echo "no section [$version] in CHANGELOG.md" >&2
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           cat notes.md
-      - name: Create the release
+      - name: Create the draft
         env:
           GH_TOKEN: ${{ github.token }}
+          version: ${{ steps.notes.outputs.version }}
         run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+            title="rada $version"
+            verify="--verify-tag"
+          else
+            # A branch run: a draft under a name that is not a version, on this commit.
+            tag="dry-run-${GITHUB_SHA::7}"
+            title="rada $version (dry run)"
+            verify="--target $GITHUB_SHA"
+          fi
           flags=""
-          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "rada ${GITHUB_REF_NAME#v}" \
+          case "$version" in *-*) flags="--prerelease" ;; esac
+          [ "$GITHUB_REF_TYPE" = tag ] || flags="--prerelease"
+          # shellcheck disable=SC2086
+          gh release create "$tag" dist/* \
+            --draft \
+            --title "$title" \
             --notes-file notes.md \
-            --verify-tag $flags
+            $verify $flags
+          echo "Draft created: $tag. It is not published: sign it with scripts/sign-release.sh."
