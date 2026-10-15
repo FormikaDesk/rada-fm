@@ -6,23 +6,23 @@ expression: shot(&mut h)
   ←   →   ↑   ⟳     ⌕ txt▏                                                                 Esc     ≣ Details
   New ▾  │  Cut   Co Open the context menu  Shift+F10       command  ▾   Tags ▾  │  Undo                     ⋯
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
-│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size │
+│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size │
 │                          │ │                                                                               │
-│                          │ │▌☐ · notes.txt               5 weeks ago      Text document            3.52 KB │
-│ TAGS                     │ │ ☐ · 日本語のファイル名.txt  5 days ago       Text document               16 B │
-│  ●  Red                  │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028       Text document                6 B │
+│ TAGS                     │ │▌☐ · notes.txt               5 weeks ago      Text document            3.52 KB │
+│   ●  Red                 │ │ ☐ · 日本語のファイル名.txt  5 days ago       Text document               16 B │
+│   ●  Orange              │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028       Text document                6 B │
+│   ●  Yellow              │ │                                                                               │
+│   ●  Green               │ │                                                                               │
+│   ●  Blue                │ │                                                                               │
+│   ●  Purple              │ │                                                                               │
+│   ●  Gray                │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Orange               │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Yellow               │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Green                │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Blue                 │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Purple               │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Gray                 │ │                                                                               │
+│                          │ │                                                                               │
 ╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯
  3 of 12 items                                                                            v0.6.0 ⟳   ≣  ▦  ▥
    Enter  go     ↑↓  suggestions     Esc  cancel

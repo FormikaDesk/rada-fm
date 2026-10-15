@@ -8,23 +8,23 @@ expression: shot(&mut h)
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo                     ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
-│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size │
-│                          │ │                                                                               │
+│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size │
 │                          │ │                                                                               │
 │ TAGS                     │ │                                                                               │
-│  ●  Red                  │ │                                                                               │
+│   ●  Red                 │ │                                                                               │
+│   ●  Orange              │ │                                                                               │
+│   ●  Yellow              │ │                                                                               │
+│   ●  Green               │ │                        Nothing here matches the search                        │
+│   ●  Blue                │ │                                                                               │
+│   ●  Purple              │ │                                                                               │
+│   ●  Gray                │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Orange               │ │                        Nothing here matches the search                        │
 │                          │ │                                                                               │
-│  ●  Yellow               │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Green                │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Blue                 │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Purple               │ │                                                                               │
 │                          │ │                                                                               │
-│  ●  Gray                 │ │                                                                               │
+│                          │ │                                                                               │
 │                          │ │                                                                               │
 │                          │ │                                                                               │
 ╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯

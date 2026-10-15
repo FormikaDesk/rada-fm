@@ -43,9 +43,15 @@ fn the_offer_explains_itself_and_notes_that_it_was_made() {
     let (mut h, installs, shown) = with_offer(false);
     assert!(matches!(h.app.modal, Some(Modal::Font(_))));
     let raw = h.screen();
-    // The text is wrapped inside the window: compare it as running text.
+    // The text is wrapped inside the window: compare it as running text, the window alone (its
+    // left edge is a `││`, the pane's border and its own), so that what the sidebar has on the
+    // same rows does not come between the words.
     let s = raw
-        .replace('│', " ")
+        .lines()
+        .filter_map(|l| l.split_once("││").map(|(_, window)| window))
+        .map(|window| window.split('│').next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join(" ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");

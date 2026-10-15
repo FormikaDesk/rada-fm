@@ -38,8 +38,10 @@
 //! tags_column = true         # the Tag column of the list (View ▾ switches it too)
 //! remember_tabs = true       # reopen the tabs of the last session
 //! dates = "relative"         # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm)
-//! sidebar_density = "auto"   # auto (air between the entries when the terminal is tall enough) |
-//!                            # comfortable (always, even if the list then scrolls) | compact
+//! sidebar_density = "auto"   # auto (the same as compact) | compact (one line to an entry, one gap
+//!                            # between groups) | comfortable (blank lines between the entries as
+//!                            # the height of the terminal allows, never fewer than a gap between
+//!                            # groups)
 //! folder_sizes = "auto"      # auto (count the folders on screen in the background) | items
 //!                            # (only how many items each holds, no walk below) | off
 //! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"

@@ -83,11 +83,12 @@ fn layout(items: &[Item], rail: bool, air: Air) -> Vec<Row> {
     rows
 }
 
-/// The roomiest arrangement that shows every entry in `height` rows; the compact one when none
-/// does (`Auto`), or the lightest roomy one, with the list scrolling (`Comfortable`). The
-/// column of icons is always compact.
+/// The arrangement for a pane `height` rows tall. Only `Comfortable` asks for air: the roomiest
+/// arrangement that shows every entry, or the lightest roomy one, with the list scrolling,
+/// when none does. `Auto` and `Compact` are the pane as it has always been, and the column of
+/// icons is always compact.
 fn choose_air(items: &[Item], rail: bool, height: usize, density: Density) -> Air {
-    if rail || density == Density::Compact {
+    if rail || density != Density::Comfortable {
         return Air::Compact;
     }
     for air in [Air::Full, Air::Half, Air::Groups] {
@@ -95,10 +96,7 @@ fn choose_air(items: &[Item], rail: bool, height: usize, density: Density) -> Ai
             return air;
         }
     }
-    match density {
-        Density::Comfortable => Air::Groups,
-        _ => Air::Compact,
-    }
+    Air::Groups
 }
 
 pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
@@ -197,11 +195,11 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         .unwrap_or_default();
                     let free_w = free.width().max(7);
                     let bar_w = segment_bar_width(app.basic);
-                    // Under the name, which starts one column later than the icon's cell.
+                    // Under the name of the disk, where the name starts.
                     let indent = if item.glyph(app.icons).is_empty() {
-                        3
-                    } else {
                         4
+                    } else {
+                        5
                     };
                     spans.push(Span::styled(" ".repeat(indent), row_style));
                     if let Some(u) = &item.usage {
@@ -246,12 +244,14 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), row_style));
                 } else {
-                    // A space on each side of the icon and one more after it: a wide symbol
-                    // of a Nerd Font overflows its cell, and must not touch the name.
+                    // The entries stand one column further in than the titles of the groups,
+                    // which are what sets the groups apart. A space on each side of the icon and
+                    // one more after it: a wide symbol of a Nerd Font overflows its cell, and
+                    // must not touch the name.
                     let icon = if glyph.is_empty() {
-                        " ".to_string()
+                        "  ".to_string()
                     } else {
-                        format!(" {glyph}  ")
+                        format!("  {glyph}  ")
                     };
                     spans.push(Span::styled(icon, th.fg(icon_color).patch(row_style)));
                     let name_style = if marked {
@@ -440,52 +440,32 @@ mod tests {
     }
 
     #[test]
-    fn the_roomiest_layout_that_fits_is_chosen_and_the_compact_one_when_none_does() {
+    fn only_comfortable_asks_for_air_and_gets_the_roomiest_that_fits() {
         let items = items();
         let need = |air| layout(&items, false, air).len();
-        assert_eq!(choose_air(&items, false, 200, Density::Auto), Air::Full);
-        assert_eq!(
-            choose_air(&items, false, need(Air::Full), Density::Auto),
-            Air::Full
-        );
-        assert_eq!(
-            choose_air(&items, false, need(Air::Full) - 1, Density::Auto),
-            Air::Half
-        );
-        assert_eq!(
-            choose_air(&items, false, need(Air::Half) - 1, Density::Auto),
-            Air::Groups
-        );
-        assert_eq!(
-            choose_air(&items, false, need(Air::Groups) - 1, Density::Auto),
-            Air::Compact
-        );
-        assert_eq!(choose_air(&items, false, 3, Density::Auto), Air::Compact);
-        // "comfortable" is never tighter than a gap between groups, even if the list scrolls.
-        assert_eq!(
-            choose_air(&items, false, 3, Density::Comfortable),
-            Air::Groups
-        );
-        assert_eq!(
-            choose_air(&items, false, 200, Density::Comfortable),
-            Air::Full
-        );
-        // "compact" and the column of icons are always as they were.
-        assert_eq!(
-            choose_air(&items, false, 200, Density::Compact),
-            Air::Compact
-        );
+        // The default is the compact pane, at any height.
+        for height in [3, 40, 200] {
+            assert_eq!(
+                choose_air(&items, false, height, Density::Auto),
+                Air::Compact
+            );
+            assert_eq!(
+                choose_air(&items, false, height, Density::Compact),
+                Air::Compact
+            );
+        }
+        let comfortable = |height| choose_air(&items, false, height, Density::Comfortable);
+        assert_eq!(comfortable(200), Air::Full);
+        assert_eq!(comfortable(need(Air::Full)), Air::Full);
+        assert_eq!(comfortable(need(Air::Full) - 1), Air::Half);
+        assert_eq!(comfortable(need(Air::Half) - 1), Air::Groups);
+        // Never tighter than a gap between groups, even if the list scrolls.
+        assert_eq!(comfortable(need(Air::Groups) - 1), Air::Groups);
+        assert_eq!(comfortable(3), Air::Groups);
+        // The column of icons is always compact.
         assert_eq!(
             choose_air(&items, true, 200, Density::Comfortable),
             Air::Compact
-        );
-        assert_eq!(
-            shape(&layout(&items, true, Air::Full))
-                .replace('.', "")
-                .len(),
-            shape(&layout(&items, true, Air::Compact))
-                .replace('.', "")
-                .len()
         );
     }
 

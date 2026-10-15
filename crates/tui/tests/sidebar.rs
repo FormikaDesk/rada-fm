@@ -400,79 +400,89 @@ fn row_of(h: &mut H, path: PathBuf) -> u16 {
     try_row_of(h, path.clone()).unwrap_or_else(|| panic!("{} is on screen", path.display()))
 }
 
-/// The rows between two consecutive items of the same group, in a pane as tall as `height`.
+/// Two entries that follow each other in the same group, neither of them a disk: the two
+/// pinned folders of the scene (whatever the system, it has its two bookmarks).
+fn a_pair(h: &H) -> (PathBuf, PathBuf) {
+    let pinned: Vec<PathBuf> = h
+        .app
+        .side_items()
+        .into_iter()
+        .filter(|i| i.section == rada_tui::sidebar::Section::Pinned)
+        .map(|i| i.path)
+        .collect();
+    assert!(pinned.len() >= 2, "{pinned:?}");
+    (pinned[0].clone(), pinned[1].clone())
+}
+
+/// The rows between two consecutive entries of a group, on a terminal `height` rows tall.
 fn distance(height: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'static) -> u16 {
     let mut h = italian_with(150, height, tweak);
-    let (a, b) = (place(&h, "Documenti"), place(&h, "Scaricati"));
+    let (a, b) = a_pair(&h);
     let (ya, yb) = (row_of(&mut h, a), row_of(&mut h, b));
     yb.abs_diff(ya)
 }
 
 #[test]
-fn a_tall_terminal_puts_a_blank_line_between_entries_and_a_short_one_keeps_them_together() {
-    assert_eq!(
-        distance(30, |_| {}),
-        1,
-        "30 rows hold the list as it always was"
-    );
-    assert_eq!(
-        distance(80, |_| {}),
-        2,
-        "80 rows have room for a line after every entry"
-    );
+fn by_default_the_entries_of_a_group_stay_together_at_any_height() {
+    for height in [30u16, 56, 120] {
+        assert_eq!(
+            distance(height, |_| {}),
+            1,
+            "{height} rows: no blank line between entries, however much room there is"
+        );
+    }
 }
 
 #[test]
 fn the_density_in_the_configuration_decides_how_much_air() {
     use rada_tui::sidebar::Density;
+    for d in [Density::Auto, Density::Compact] {
+        assert_eq!(distance(120, move |c| c.sidebar_density = d), 1, "{d:?}");
+    }
     assert_eq!(
-        distance(80, |c| c.sidebar_density = Density::Compact),
-        1,
-        "compact, even where there is room"
+        distance(120, |c| c.sidebar_density = Density::Comfortable),
+        2,
+        "comfortable: a blank line after every entry where there is room for all of them"
     );
-    assert_eq!(
-        distance(80, |c| c.sidebar_density = Density::Comfortable),
-        2
-    );
-    // Comfortable where the terminal is short: the groups are apart (Home and the next group
+    // Comfortable where the terminal is short: the groups are apart (Home and the first group
     // are further from each other than in the compact pane), though the entries are not.
     let apart = |d: Density| {
         let mut h = italian_with(150, 30, move |c| c.sidebar_density = d);
-        let (home, docs) = (h.app.home().to_path_buf(), place(&h, "Documenti"));
-        let (a, b) = (row_of(&mut h, home), row_of(&mut h, docs));
+        let (home, first) = (h.app.side_items()[0].path.clone(), a_pair(&h).0);
+        let (a, b) = (row_of(&mut h, home), row_of(&mut h, first));
         b - a
     };
     assert!(apart(Density::Comfortable) > apart(Density::Compact));
 }
 
 #[test]
-fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one_at_every_height() {
-    for height in [44u16, 56, 90] {
-        let mut h = italian(150, height);
+fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
+    use rada_tui::sidebar::Density;
+    // The default and the compact pane (the same), and the comfortable one at the heights where
+    // its blank lines still leave room for every entry.
+    let cases = [
+        (Density::Auto, 60u16),
+        (Density::Compact, 120),
+        (Density::Comfortable, 100),
+        (Density::Comfortable, 160),
+    ];
+    for (density, height) in cases {
+        let mut h = italian_with(150, height, move |c| c.sidebar_density = density);
         let items = h.app.side_items();
         // Every item has a row of its own, in the order of the list.
         let ys: Vec<u16> = items
             .iter()
             .map(|i| row_of(&mut h, i.path.clone()))
             .collect();
-        assert!(ys.windows(2).all(|w| w[0] < w[1]), "{height}: {ys:?}");
-        // A click on the row of an entry opens it.
-        let docs = place(&h, "Documenti");
-        h.click(&Target::Place(docs.clone()));
-        let d = docs.clone();
-        h.wait("Documenti", move |a| a.cwd == d && !a.is_loading());
-        // A click on an empty line does nothing at all.
-        let (gaps, shown): (Vec<u16>, Vec<u16>) = (
-            (ys[0]..=*ys.last().unwrap())
-                .filter(|y| !ys.contains(y))
-                .collect(),
-            ys.clone(),
+        assert!(
+            ys.windows(2).all(|w| w[0] < w[1]),
+            "{density:?} {height}: {ys:?}"
         );
-        let _ = shown;
+        // A click on an empty line does nothing at all.
         let cwd = h.app.cwd.clone();
-        for y in gaps {
+        for y in (ys[0]..=*ys.last().unwrap()).filter(|y| !ys.contains(y)) {
             if h.app.hits.at(3, y).is_some() {
-                continue; // a title or a disk's bar: not an empty line, and not what is asked
+                continue; // the bar of a disk: not an empty line
             }
             h.mouse(
                 MouseEventKind::Down(crossterm::event::MouseButton::Left),
@@ -480,25 +490,37 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one_at_every
                 y,
                 crossterm::event::KeyModifiers::NONE,
             );
-            assert_eq!(h.app.cwd, cwd, "{height}: a click on the empty row {y}");
+            assert_eq!(
+                h.app.cwd, cwd,
+                "{density:?} {height}: a click on the empty row {y}"
+            );
             assert!(h.app.modal.is_none());
         }
+        // A click on the row of an entry opens it.
+        let (first, second) = a_pair(&h);
+        h.click(&Target::Place(first.clone()));
+        let want = first.clone();
+        h.wait("the first folder", move |a| {
+            a.cwd == want && !a.is_loading()
+        });
         // The keyboard goes entry by entry, not row by row, and opens the one it is on.
         h.press("tab");
         let at = h
             .app
             .side_items()
             .iter()
-            .position(|i| i.path == place(&h, "Scaricati"))
+            .position(|i| i.path == second)
             .unwrap();
         let from = h.app.side_cursor;
         for _ in from..at {
             h.key(KeyCode::Down);
         }
-        assert_eq!(h.app.side_cursor, at, "{height}");
+        assert_eq!(h.app.side_cursor, at, "{density:?} {height}");
         h.key(KeyCode::Enter);
-        let want = place(&h, "Scaricati");
-        h.wait("Scaricati", move |a| a.cwd == want && !a.is_loading());
+        let want = second.clone();
+        h.wait("the second folder", move |a| {
+            a.cwd == want && !a.is_loading()
+        });
     }
 }
 
@@ -511,9 +533,7 @@ fn the_icon_has_a_space_after_it_in_every_entry() {
     let mut seen = 0;
     for item in &items {
         let glyph = item.glyph(h.app.icons);
-        if glyph.is_empty() {
-            continue;
-        }
+        assert!(!glyph.is_empty(), "the scene draws icons");
         let y = row_of(&mut h, item.path.clone()) as usize;
         let name: String = item.name.chars().take(3).collect();
         assert!(
@@ -525,9 +545,63 @@ fn the_icon_has_a_space_after_it_in_every_entry() {
         seen += 1;
     }
     assert!(
-        seen >= 10,
-        "Home, places, bookmarks, disks and tags were looked at: {seen}"
+        seen >= 5,
+        "Home, places, bookmarks and disks were looked at: {seen}"
     );
+}
+
+#[test]
+fn the_entries_stand_one_column_in_from_the_titles_and_a_disks_bar_follows_its_disk() {
+    let mut h = italian(150, 60);
+    let screen = h.screen();
+    let lines: Vec<&str> = screen.lines().collect();
+    // The column (in cells, from the left edge of the screen) a text starts at in a line.
+    let start = |line: &str, text: &str| {
+        let at = line
+            .find(text)
+            .unwrap_or_else(|| panic!("{text:?} in {line:?}"));
+        line[..at].chars().count()
+    };
+    let title_row = lines
+        .iter()
+        .find(|l| l.contains("DEVICES"))
+        .expect("the title of the disks");
+    let title_x = start(title_row, "DEVICES");
+    let items = h.app.side_items();
+    let system = items.iter().find(|i| i.name == "System").unwrap().clone();
+    let y = row_of(&mut h, system.path.clone()) as usize;
+    let glyph_x = start(lines[y], system.glyph(h.app.icons));
+    assert_eq!(
+        glyph_x,
+        title_x + 2,
+        "the icon stands one column further in than the title does:\n{}\n{}",
+        title_row,
+        lines[y]
+    );
+    // The name two cells after the icon; the bar of the disk starts right under the name.
+    let name_x = start(lines[y], "System");
+    let bar_x = lines[y + 1]
+        .chars()
+        .enumerate()
+        .skip(2)
+        .find(|(_, c)| !c.is_whitespace())
+        .map(|(x, _)| x)
+        .expect("the bar");
+    assert_eq!(bar_x, name_x, "{}\n{}", lines[y], lines[y + 1]);
+    // The same for the other groups: every entry starts at the same column.
+    for item in items
+        .iter()
+        .filter(|i| i.section != rada_tui::sidebar::Section::Devices)
+    {
+        let y = row_of(&mut h, item.path.clone()) as usize;
+        assert_eq!(
+            start(lines[y], item.glyph(h.app.icons)),
+            glyph_x,
+            "{}: {}",
+            item.name,
+            lines[y]
+        );
+    }
 }
 
 #[test]

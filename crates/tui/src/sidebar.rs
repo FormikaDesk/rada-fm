@@ -51,12 +51,13 @@ impl Mode {
 /// How much room the full pane leaves between its entries (`sidebar_density`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Density {
-    /// As roomy as the height of the terminal allows, compact when it allows nothing.
+    /// The same as `Compact`: the group titles are what keeps the groups apart.
     #[default]
     Auto,
-    /// Roomy even when the list then has to scroll: never tighter than a gap between groups.
+    /// Blank lines between the entries, as many as the height of the terminal allows, and never
+    /// fewer than a gap between the groups, even if the list then has to scroll.
     Comfortable,
-    /// One line to an entry, groups one gap apart: the pane as it has always been.
+    /// One line to an entry, one gap between the groups.
     Compact,
 }
 

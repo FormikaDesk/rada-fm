@@ -11,8 +11,8 @@ expression: shot(&mut h)
 ╭──│                                                                                                      │──╮
 │  │   Keys    ↑↓ scroll · Esc close                                                                      │e │
 │  │                                                                                                      │  │
-│  │                                            Vim                         Classic                       │  │
-│ T│                                                                                                      │  │
+│ T│                                            Vim                         Classic                       │  │
+│  │                                                                                                      │  │
 │  │  Moving around                                                                                       │  │
 │  │  Move up                                   k ↑                         ↑                             │B │
 │  │  Move down                                 j ↓                         ↓                             │B │

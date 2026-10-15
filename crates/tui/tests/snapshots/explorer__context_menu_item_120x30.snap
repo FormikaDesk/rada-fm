@@ -9,29 +9,29 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│  ⌂  Home                 │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
 │                          │ │                                                                                         │
 │ PINNED                   │ │ ☐ ▸ assets                  3 days ago     ╭───────────────────────────────────────╮    │
-│  ▭  Desktop            ⚲ │ │ ☐ ▸ docs                    Yesterday      │  · photo.jpg  ·  JPEG image           │    │
-│  ▤  Documents          ⚲ │ │ ☐ ▸ scripts                 9 days ago     │ ───────────────────────────────────── │    │
-│  ↓  Downloads          ⚲ │ │ ☐ ▸ src                     Today 09:30    │  ▸ Open                        Enter  │    │
-│  ▣  Pictures           ⚲ │ │ ☐ ▸ tests                   2 days ago     │  ▦ Open with…                      ›  │    │
-│  ♪  Music              ⚲ │ │ ☐ · archive.tar.gz          8 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│  ▶  Videos             ⚲ │ │ ☐ · backup.zip              05/07/2026     │  ✂ Cut                        Ctrl+X  │    │
+│   ▭  Desktop           ⚲ │ │ ☐ ▸ docs                    Yesterday      │  · photo.jpg  ·  JPEG image           │    │
+│   ▤  Documents         ⚲ │ │ ☐ ▸ scripts                 9 days ago     │ ───────────────────────────────────── │    │
+│   ↓  Downloads         ⚲ │ │ ☐ ▸ src                     Today 09:30    │  ▸ Open                        Enter  │    │
+│   ▣  Pictures          ⚲ │ │ ☐ ▸ tests                   2 days ago     │  ▦ Open with…                      ›  │    │
+│   ♪  Music             ⚲ │ │ ☐ · archive.tar.gz          8 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│   ▶  Videos            ⚲ │ │ ☐ · backup.zip              05/07/2026     │  ✂ Cut                        Ctrl+X  │    │
 │                          │ │ ☐ · Cargo.toml              3 days ago     │  ⧉ Copy                       Ctrl+C  │    │
 │ DEVICES                  │ │ ☐ · data.json               6 days ago     │  ⎘ Paste                      Ctrl+V  │    │
-│  ▥  System               │ │ ☐ · demo.mp4                2 weeks ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│     ■■■■■■□□□□    183 GB │ │ ☐ · logo.svg                5 days ago     │  ✎ Rename                         F2  │    │
-│  ▥  Data                 │ │ ☐ · main.rs                 Today 14:10    │  ▣ Compress…                   Alt+Z  │    │
-│     ■■■■□□□□□□    555 GB │ │ ☐ · notes.txt               Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│  ⏏  USB drive            │ │▌☐ · photo.jpg               Today 13:30    │  ◆ Tags                            ›  │    │
-│     ■■■■□□□□□□   35.4 GB │ │ ☐ · README.md               Today 13:28    │  ⚲ Copy the path        Ctrl+Shift+C  │    │
+│   ▥  System              │ │ ☐ · demo.mp4                2 weeks ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│      ■■■■■■□□□□   183 GB │ │ ☐ · logo.svg                5 days ago     │  ✎ Rename                         F2  │    │
+│   ▥  Data                │ │ ☐ · main.rs                 Today 14:10    │  ▣ Compress…                   Alt+Z  │    │
+│      ■■■■□□□□□□   555 GB │ │ ☐ · notes.txt               Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│   ⏏  USB drive           │ │▌☐ · photo.jpg               Today 13:30    │  ◆ Tags                            ›  │    │
+│      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md               Today 13:28    │  ⚲ Copy the path        Ctrl+Shift+C  │    │
 │                          │ │ ☐ · report.pdf              4 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
 │ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │  ≣ Properties              Alt+Enter  │    │
-│  ●  Red                  │ │ ☐ · setup.sh                12 days ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│  ●  Orange               │ │ ☐ · song.mp3                30/07/2026     │  ✗ Move to trash                 Del  │    │
-│  ●  Yellow               │ │                                            │  ✗ Delete permanently      Shift+Del  │    │
-│  ●  Green                │ │                                            ╰───────────────────────────────────────╯    │
+│   ●  Red                 │ │ ☐ · setup.sh                12 days ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│   ●  Orange              │ │ ☐ · song.mp3                30/07/2026     │  ✗ Move to trash                 Del  │    │
+│   ●  Yellow              │ │                                            │  ✗ Delete permanently      Shift+Del  │    │
+│   ●  Green               │ │                                            ╰───────────────────────────────────────╯    │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
  19 items                                                                    v0.6.0 ⟳  183 GB free ■■■■■■□□□□  ≣  ▦  ▥
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
