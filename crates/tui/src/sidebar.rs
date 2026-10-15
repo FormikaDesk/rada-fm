@@ -110,6 +110,13 @@ pub struct Item {
 }
 
 impl Item {
+    /// A few words after the name, dimmed: what is the case of this item, when it is not what
+    /// the others are (a device that is plugged in and not mounted).
+    pub fn note(&self) -> Option<&'static str> {
+        matches!(self.origin, Origin::Unmounted(_))
+            .then(|| rada_core::i18n::Key::DevNotMounted.tr())
+    }
+
     /// The icon: a Nerd Font glyph, a plain Unicode mark, or nothing.
     pub fn glyph(&self, set: IconSet) -> &'static str {
         let (nerd, plain) = match &self.origin {
@@ -271,7 +278,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         out.push(Item {
             section: Section::Devices,
             origin: Origin::Unmounted(u.kind),
-            name: format!("{} ({})", u.name, rada_core::i18n::Key::DevNotMounted.tr()),
+            name: u.name.clone(),
             locked: false,
             path: PathBuf::from(&u.id),
             usage: None,

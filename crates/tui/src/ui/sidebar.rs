@@ -214,11 +214,20 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     } else {
                         0
                     };
-                    let room = w.saturating_sub(head + pin_w + 1);
+                    // What follows the name (a device that is not mounted) keeps its place: it is
+                    // the name that is cut short.
+                    let note = item.note().map(|n| format!(" {n}")).unwrap_or_default();
+                    let note_w = note.width();
+                    let room = w.saturating_sub(head + pin_w + 1 + note_w);
                     let name = rada_core::display::truncate(&item.name, room);
+                    spans.push(Span::styled(name, name_style.patch(row_style)));
+                    if note_w > 0 {
+                        spans.push(Span::styled(note, th.faint().patch(row_style)));
+                    }
+                    let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(
-                        pad(&name, w.saturating_sub(head + pin_w)),
-                        name_style.patch(row_style),
+                        " ".repeat(w.saturating_sub(pin_w).saturating_sub(used)),
+                        row_style,
                     ));
                     if item.locked {
                         // The system has not allowed this place yet: the same words as in
