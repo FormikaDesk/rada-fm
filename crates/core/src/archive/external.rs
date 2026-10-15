@@ -6,7 +6,7 @@
 //! all files one after the other in archive order, cut up with the sizes the listing gave.
 
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::SystemTime;
 
@@ -14,36 +14,12 @@ use super::ArchiveError;
 use super::entry::{Entry, EntryKind, sanitize};
 use super::index::{Index, ListControl, unix_time};
 use super::reader::Emitter;
+use crate::platform::which::which_in;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tool {
     SevenZip(PathBuf),
     Unrar(PathBuf),
-}
-
-fn is_executable(p: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        p.metadata()
-            .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    }
-    #[cfg(not(unix))]
-    {
-        p.is_file()
-    }
-}
-
-fn which_in(path_var: &std::ffi::OsStr, name: &str) -> Option<PathBuf> {
-    for dir in std::env::split_paths(path_var) {
-        for candidate in [name.to_string(), format!("{name}.exe")] {
-            let p = dir.join(&candidate);
-            if is_executable(&p) {
-                return Some(p);
-            }
-        }
-    }
-    None
 }
 
 impl Tool {

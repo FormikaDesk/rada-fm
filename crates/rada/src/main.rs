@@ -545,7 +545,8 @@ fn make_font_offer(dirs: &Dirs) -> rada_tui::FontOffer {
             Ok(tf(Key::MFontInstalled, &[&fontsetup::FAMILY]))
         }),
         shown: Arc::new(move || {
-            let _ = rada_core::statefile::write_atomic(&font_offered_file(&note_dirs), b"offered\n");
+            let _ =
+                rada_core::statefile::write_atomic(&font_offered_file(&note_dirs), b"offered\n");
         }),
     }
 }

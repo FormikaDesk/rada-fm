@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use super::install;
 use super::{Applied, Ctx};
+use crate::platform::which::{path_dirs, which_in_dirs};
 
 /// Where the log of the last update is.
 pub fn log_path(state_dir: &Path) -> PathBuf {
@@ -56,27 +57,12 @@ fn find_program(name: &OsString, extra: &[PathBuf]) -> OsString {
     if path.components().count() > 1 {
         return name.clone();
     }
-    let candidates = std::env::var_os("PATH")
-        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-        .unwrap_or_default()
-        .into_iter()
-        .chain(extra.iter().cloned());
-    let exts: &[&str] = if cfg!(windows) {
-        &["", ".exe", ".cmd", ".bat"]
-    } else {
-        &[""]
-    };
-    for dir in candidates {
-        for ext in exts {
-            let mut file = name.clone();
-            file.push(ext);
-            let full = dir.join(&file);
-            if full.is_file() {
-                return full.into_os_string();
-            }
-        }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let dirs = path_dirs(&path).chain(extra.iter().cloned());
+    match name.to_str().and_then(|n| which_in_dirs(dirs, n)) {
+        Some(found) => found.into_os_string(),
+        None => name.clone(),
     }
-    name.clone()
 }
 
 /// Run a command, sending each line of its output to the log and to `on_line`.

@@ -48,11 +48,7 @@ pub struct MacTools {
 
 impl MacTools {
     pub fn find_in(path: &OsStr) -> MacTools {
-        let find = |name: &str| {
-            std::env::split_paths(path)
-                .map(|d| d.join(name))
-                .find(|p| p.is_file())
-        };
+        let find = |name: &str| crate::platform::which::which_in(path, name);
         MacTools {
             sips: find("sips"),
             qlmanage: find("qlmanage"),

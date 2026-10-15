@@ -18,6 +18,7 @@ use xxhash_rust::xxh3::xxh3_64;
 
 use super::image::{ImageInfo, ImageLimits};
 use crate::platform::spawn::spawn_retrying_busy;
+use crate::platform::which::which_in;
 
 /// Title, author and number of pages, when the PDF says.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -119,11 +120,7 @@ pub struct Tools {
 impl Tools {
     /// Look in `path` (a `PATH`-style list).
     pub fn find_in(path: &OsStr) -> Tools {
-        let find = |name: &str| {
-            std::env::split_paths(path)
-                .map(|d| d.join(name))
-                .find(|p| p.is_file() && is_executable(p))
-        };
+        let find = |name: &str| which_in(path, name);
         Tools {
             pdftoppm: find("pdftoppm"),
             pdftotext: find("pdftotext"),
@@ -149,19 +146,6 @@ pub(super) fn tools_for(limits: &ImageLimits) -> Tools {
         Some(p) => Tools::find_in(p),
         None => Tools::installed().clone(),
     }
-}
-
-#[cfg(unix)]
-fn is_executable(p: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::metadata(p)
-        .map(|m| m.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(p: &Path) -> bool {
-    p.is_file()
 }
 
 // ------------------------------------------------------------------------------ running a tool

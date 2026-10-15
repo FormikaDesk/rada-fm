@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::platform::volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
+use crate::platform::which::on_path;
 use crate::{Error, Result};
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(700);
@@ -55,12 +56,6 @@ impl LinuxVolumes {
         });
         rx.recv_timeout(PROBE_TIMEOUT).ok().flatten()
     }
-}
-
-/// Whether a program of that name is in one of the folders of `PATH`.
-fn on_path(program: &str) -> bool {
-    std::env::var_os("PATH")
-        .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(program).is_file()))
 }
 
 impl Default for LinuxVolumes {

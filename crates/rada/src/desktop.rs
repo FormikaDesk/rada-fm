@@ -419,7 +419,7 @@ pub fn spawn_terminal(path: Option<&Path>) -> Result<()> {
         None => None,
     };
     let var = std::env::var("TERMINAL").ok();
-    let installed = |name: &str| which(name).is_some();
+    let installed = rada_core::platform::which::on_path;
     let cmd = terminal_command(&exe, path.as_deref(), var.as_deref(), &installed)
         .context(Key::MNoTerminal.tr())?;
     let mut c = Command::new(&cmd[0]);
@@ -436,24 +436,6 @@ pub fn spawn_terminal(path: Option<&Path>) -> Result<()> {
     c.spawn()
         .with_context(|| tf(Key::MCannotStart, &[&cmd[0]]))?;
     Ok(())
-}
-
-fn which(name: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    std::env::split_paths(&paths)
-        .map(|d| d.join(name))
-        .find(|p| p.is_file() && is_executable(p))
-}
-
-#[cfg(unix)]
-fn is_executable(p: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::metadata(p).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
-}
-
-#[cfg(not(unix))]
-fn is_executable(_: &Path) -> bool {
-    true
 }
 
 #[cfg(test)]

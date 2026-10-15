@@ -758,14 +758,10 @@ fn desktop_files(applications: &Path) -> Vec<(String, PathBuf)> {
 /// Whether the program a desktop file names (`TryExec`, else the first word of `Exec`) exists.
 #[cfg(unix)]
 fn program_exists(program: &str, path_var: &std::ffi::OsStr) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    let executable = |p: &Path| {
-        std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    };
     if program.contains('/') {
-        return executable(Path::new(program));
+        return super::which::is_executable(Path::new(program));
     }
-    std::env::split_paths(path_var).any(|d| executable(&d.join(program)))
+    super::which::which_in(path_var, program).is_some()
 }
 
 /// The installed applications that can open `path`, the system's default first.

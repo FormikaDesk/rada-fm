@@ -23,6 +23,7 @@ pub mod tags;
 pub mod trash;
 pub mod userdirs;
 pub mod volumes;
+pub mod which;
 pub mod windows;
 
 #[cfg(unix)]

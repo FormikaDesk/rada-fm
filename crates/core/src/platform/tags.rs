@@ -398,15 +398,11 @@ impl XattrTags {
     fn tool(&self, names: &[&str]) -> Option<std::path::PathBuf> {
         let dirs: Vec<std::path::PathBuf> = match &self.tool_dir {
             Some(d) => vec![d.clone()],
-            None => std::env::split_paths(&std::env::var_os("PATH")?).collect(),
+            None => super::which::path_dirs(&std::env::var_os("PATH")?).collect(),
         };
-        names.iter().find_map(|n| {
-            dirs.iter().map(|d| d.join(n)).find(|p| {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::metadata(p)
-                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-            })
-        })
+        names
+            .iter()
+            .find_map(|n| super::which::which_in_dirs(&dirs, n))
     }
 
     /// What the system's own index says carries the tag: Spotlight on a Mac, Baloo where it

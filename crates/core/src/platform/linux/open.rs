@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 use crate::platform::openwith::{self, AppDirs, DesktopEntry, MimeDb, OpenApp, OpenChoices};
+use crate::platform::which::on_path;
 use crate::platform::{Opener, split_command};
 use crate::{Error, Result};
 
@@ -64,18 +65,6 @@ const TERMINALS: &[&str] = &[
     "tilix",
     "xterm",
 ];
-
-fn on_path(name: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|paths| {
-        std::env::split_paths(&paths).any(|d| {
-            let p = d.join(name);
-            p.is_file()
-                && std::fs::metadata(&p).is_ok_and(|m| {
-                    std::os::unix::fs::PermissionsExt::mode(&m.permissions()) & 0o111 != 0
-                })
-        })
-    })
-}
 
 /// The terminal to run a program in: `$TERMINAL`, else the first emulator found.
 fn terminal_words() -> Option<Vec<String>> {
