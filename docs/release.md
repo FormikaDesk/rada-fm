@@ -46,8 +46,14 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
    asks for the passphrase of the key: the script never sees it), checks the signature it made,
    and, after you answer `y`, uploads `SHA256SUMS.minisig` and publishes. `--no-publish` stops before
    uploading; `--yes` does not ask. It refuses a release that is not a draft.
-5. Try it: `rada update --check` from an older copy should see the new version, and `rada update`
-   should install it.
+5. Check what was published: the release lists `SHA256SUMS.minisig` among its files
+   (`gh release view <tag> --json assets --jq '.assets[].name'`), and a manual check as in
+   [verify.md](verify.md) says `Signature and comment signature verified` with the trusted
+   comment `rada <tag>`.
+6. Try it: `rada update --check` from an older copy should see the new version, and `rada update`
+   should install it. (The first signed release, `0.6.0-rc.9`, is reached from `rc.8`, which does
+   not check signatures: that one step is covered by the hash only. From `rc.9` on, every update
+   is checked.)
 
 Needs: `gh` (logged in, with the right to publish releases of the repository), `rsign`
 (`cargo install --locked rsign2`) and `sha256sum`.

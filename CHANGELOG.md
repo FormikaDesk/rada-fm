@@ -3,9 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0-rc.9] - 2026-10-15
 
-Hardening after a review of the code, and phones. No new version yet.
+The first **signed** release: `rada update` now checks a signature before it installs anything. Also phones, cameras and USB sticks in the sidebar on Linux, a tidier sidebar, and fixes found in a review of the code. Still a **pre-release**.
+
+**Updating from rc.8:** rc.8 does not check signatures, so the step from rc.8 to rc.9 is checked only by the hash, as before. From rc.9 on every update is checked with the signature. To be sure about this first one, check the download by hand: [verify.md](https://github.com/formikadesk/rada-fm/blob/main/docs/verify.md).
 
 ### Documentation
 - **Documentation reorganized.** The README is now a short page (what rada is, why to trust it, install, a quick start, the public keys for verifying downloads, links) and everything else it used to hold moved, unchanged in substance, to `docs/`: `features.md`, `usage.md` (first steps, command line, all keys, mouse, requests as data), `interface.md`, `configuration.md`, `themes.md`, `terminals.md`, `archives.md`, `tags.md`, `devices.md`, `updates.md`, `install.md`, `desktop.md`, `platforms.md`, `development.md` and `roadmap.md`. `docs/verify.md` says that releases up to `0.6.0-rc.8` carry no signature. Added `.github/FUNDING.yml` (Ko-fi).
@@ -38,7 +40,7 @@ Hardening after a review of the code, and phones. No new version yet.
 - **An SVG over 20 MB is not drawn** (it was read whole, with no limit).
 - **Removing a tree uses `remove_dir_all`**, which cannot be sent through a link swapped in while it walks (it is used by the trash across volumes and by putting back).
 
-### Changed
+### Under the hood
 - One `write_atomic` (a temporary name of its own, `fsync`, rename, `fsync` of the folder) for the four state files that had a copy each.
 - The crates of the workspace depend on each other by path through `[workspace.dependencies]` (no version to keep up to date), and are marked `publish = false`.
 - CI: a job `cargo audit` and `cargo deny` (`deny.toml`: permissive licences, advisories as errors, duplicates as warnings, crates.io only); the token is read-only; the actions are pinned to commit hashes; `--locked` for the build and the tests.

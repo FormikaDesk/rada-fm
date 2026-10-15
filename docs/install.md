@@ -9,9 +9,9 @@ Windows and macOS builds are new: please report anything odd in an issue.
 Linux and macOS, for example (take the file name for your system from the releases page; `x86_64-unknown-linux-musl` is the static Linux build):
 
 ```sh
-curl -LO https://github.com/formikadesk/rada-fm/releases/download/v0.6.0-rc.8/rada-0.6.0-rc.8-x86_64-unknown-linux-musl.tar.gz
-tar xzf rada-0.6.0-rc.8-x86_64-unknown-linux-musl.tar.gz
-install -m 755 rada-0.6.0-rc.8-x86_64-unknown-linux-musl/rada ~/.local/bin/rada
+curl -LO https://github.com/formikadesk/rada-fm/releases/download/v0.6.0-rc.9/rada-0.6.0-rc.9-x86_64-unknown-linux-musl.tar.gz
+tar xzf rada-0.6.0-rc.9-x86_64-unknown-linux-musl.tar.gz
+install -m 755 rada-0.6.0-rc.9-x86_64-unknown-linux-musl/rada ~/.local/bin/rada
 ```
 
 Check the signature first when the release has one: [verify.md](verify.md).
