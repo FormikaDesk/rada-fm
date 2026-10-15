@@ -13,7 +13,7 @@ use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look, RowTone};
-use super::widgets::{pad_left, segment_bar, segment_bar_width};
+use super::widgets::{pad, pad_left, segment_bar, segment_bar_width};
 use crate::app::App;
 use crate::fmt;
 use crate::hits::Target;
@@ -220,15 +220,20 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     let note_w = note.width();
                     let room = w.saturating_sub(head + pin_w + 1 + note_w);
                     let name = rada_core::display::truncate(&item.name, room);
-                    spans.push(Span::styled(name, name_style.patch(row_style)));
-                    if note_w > 0 {
+                    if note_w == 0 {
+                        spans.push(Span::styled(
+                            pad(&name, w.saturating_sub(head + pin_w)),
+                            name_style.patch(row_style),
+                        ));
+                    } else {
+                        let name_w = name.width();
+                        spans.push(Span::styled(name, name_style.patch(row_style)));
                         spans.push(Span::styled(note, th.faint().patch(row_style)));
+                        spans.push(Span::styled(
+                            " ".repeat(w.saturating_sub(head + pin_w + name_w + note_w)),
+                            name_style.patch(row_style),
+                        ));
                     }
-                    let used: usize = spans.iter().map(|s| s.content.width()).sum();
-                    spans.push(Span::styled(
-                        " ".repeat(w.saturating_sub(pin_w).saturating_sub(used)),
-                        row_style,
-                    ));
                     if item.locked {
                         // The system has not allowed this place yet: the same words as in
                         // the window that opens when it is clicked.
