@@ -275,6 +275,7 @@ impl App {
             }
             MenuCmd::View(mode) => self.set_view(mode),
             MenuCmd::Eject(mount) => self.start_eject(&mount),
+            MenuCmd::Mount(id) => self.start_mount(&id),
             MenuCmd::Tag(cmd) => self.run_tag_cmd(cmd),
             MenuCmd::CheckUpdates => self.check_updates_now(),
             MenuCmd::About => self.open_about(),

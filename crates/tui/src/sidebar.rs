@@ -83,6 +83,8 @@ pub enum Origin {
         removable: bool,
     },
     Device(VolumeKind),
+    /// A stick or a phone that is plugged in and not mounted: opening it mounts it.
+    Unmounted(VolumeKind),
     /// A tag, in its colour if it has one.
     Tag(Option<Hue>),
     /// The files used lately, under Home, where the system has such a list.
@@ -124,7 +126,11 @@ impl Item {
             Origin::Bookmark { .. } => ("\u{f02e}", "★"),
             Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
-            Origin::Device(_) => ("\u{f0a0}", "▥"),
+            Origin::Device(VolumeKind::Device) | Origin::Unmounted(VolumeKind::Device) => {
+                ("\u{f10b}", "▯")
+            }
+            Origin::Unmounted(VolumeKind::Removable) => ("\u{f287}", "⏏"),
+            Origin::Device(_) | Origin::Unmounted(_) => ("\u{f0a0}", "▥"),
             // A dot in the tag's colour, in every set: it is the colour that says what it is.
             Origin::Tag(_) => ("●", "●"),
         };
@@ -259,6 +265,16 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             locked: app.denied_for(&v.mount_point).is_some(),
             path: v.mount_point.clone(),
             usage,
+        });
+    }
+    for u in app.pending_devices() {
+        out.push(Item {
+            section: Section::Devices,
+            origin: Origin::Unmounted(u.kind),
+            name: format!("{} ({})", u.name, rada_core::i18n::Key::DevNotMounted.tr()),
+            locked: false,
+            path: PathBuf::from(&u.id),
+            usage: None,
         });
     }
     if app.tags_supported() {

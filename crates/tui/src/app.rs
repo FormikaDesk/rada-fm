@@ -461,6 +461,7 @@ mod eject;
 mod font;
 mod input;
 mod menus;
+mod mount;
 mod notice;
 mod openwith;
 mod props;
@@ -534,6 +535,10 @@ pub struct App {
     previewed: Option<PathBuf>,
 
     pub volumes: Vec<Volume>,
+    /// Sticks and phones that are plugged in and not mounted: the sidebar offers to mount them.
+    pub unmounted: Vec<rada_core::platform::Unmounted>,
+    /// What is being mounted right now (by id), so that a second Enter does not start it again.
+    mounting: std::collections::HashSet<String>,
     /// The list of volumes has arrived from the worker at least once (tests wait for it so
     /// that a late answer does not replace the list they set).
     pub volumes_seen: bool,
@@ -728,6 +733,8 @@ impl App {
             preview_gen: 0,
             previewed: None,
             volumes: Vec::new(),
+            unmounted: Vec::new(),
+            mounting: Default::default(),
             volumes_seen: false,
             paths: Default::default(),
             cfg_bookmarks: cfg.bookmarks,
@@ -1107,6 +1114,11 @@ impl App {
     // ------------------------------------------------------------------ navigation
 
     pub fn open_dir(&mut self, path: PathBuf) {
+        // A device that is plugged in and not mounted is not a folder yet: opening it mounts it.
+        if let Some(id) = self.unmounted_id(&path) {
+            self.start_mount(&id);
+            return;
+        }
         if let Some(name) = self.cursor_name() {
             self.remembered.insert(self.cwd.clone(), name);
         }
@@ -1357,6 +1369,10 @@ impl App {
                 self.folder_sizes.set_volumes(&self.volumes);
                 self.refresh_palette();
             }
+            CoreEvent::Unmounted(list) => {
+                self.unmounted = if self.demo_volumes { Vec::new() } else { list };
+            }
+            CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
             CoreEvent::Paths(p) => {
                 self.paths = p;
                 self.refresh_palette();

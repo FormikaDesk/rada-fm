@@ -9,7 +9,7 @@ use crossbeam_channel::Sender;
 use crate::journal::JournalEntry;
 use crate::model::{Entry, EntryUpdate};
 use crate::ops::{ErrorChoice, ExecReport, Plan, Progress, Scan, UndoPlan};
-use crate::platform::Volume;
+use crate::platform::{Unmounted, Volume};
 use crate::preview::Preview;
 
 pub type JobId = u64;
@@ -126,6 +126,15 @@ pub enum CoreEvent {
     Watch(WatchEvent),
     Preview(PreviewEvent),
     Volumes(Vec<Volume>),
+    /// The devices that are plugged in and not mounted (sticks, phones), when that list changes.
+    Unmounted(Vec<Unmounted>),
+    /// A device was mounted, or the system said why not.
+    Mounted {
+        /// What was mounted (the id the list gave it) and its name.
+        id: String,
+        name: String,
+        result: Result<(), String>,
+    },
     /// Recent folders, bookmarks and standard places (from the places worker).
     Paths(crate::places::PathLists),
     Job(JobEvent),

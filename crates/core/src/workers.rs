@@ -12,7 +12,7 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use crate::events::{CoreEvent, DirEvent, PreviewEvent};
 use crate::fs::FsEngine;
 use crate::model::{self, EntryUpdate};
-use crate::platform::{Platform, Volume};
+use crate::platform::{Platform, Unmounted, Volume};
 use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
 
 // ------------------------------------------------------------------------------ folders
@@ -325,6 +325,7 @@ impl PreviewWorker {
 pub struct VolumesWorker {
     stop: Arc<AtomicBool>,
     refresh: Arc<AtomicBool>,
+    refresh_devices: Arc<AtomicBool>,
 }
 
 impl VolumesWorker {
@@ -337,6 +338,14 @@ impl VolumesWorker {
     ) -> VolumesWorker {
         let stop = Arc::new(AtomicBool::new(false));
         let refresh = Arc::new(AtomicBool::new(true));
+        let refresh_devices = Arc::new(AtomicBool::new(true));
+        Self::spawn_unmounted(
+            platform.clone(),
+            interval,
+            out.clone(),
+            stop.clone(),
+            refresh_devices.clone(),
+        );
         let (s, r) = (stop.clone(), refresh.clone());
         std::thread::Builder::new()
             .name("rada-volumes".into())
@@ -375,11 +384,50 @@ impl VolumesWorker {
                 }
             })
             .expect("spawn volumes worker");
-        VolumesWorker { stop, refresh }
+        VolumesWorker {
+            stop,
+            refresh,
+            refresh_devices,
+        }
+    }
+
+    /// The devices that are plugged in and not mounted, on a thread of their own: finding
+    /// them runs programs, and a phone that does not answer must not hold the list of disks.
+    fn spawn_unmounted(
+        platform: Arc<dyn Platform>,
+        interval: Duration,
+        out: Sender<CoreEvent>,
+        stop: Arc<AtomicBool>,
+        refresh: Arc<AtomicBool>,
+    ) {
+        std::thread::Builder::new()
+            .name("rada-devices".into())
+            .spawn(move || {
+                let mut last: Option<Vec<Unmounted>> = None;
+                while !stop.load(Ordering::Relaxed) {
+                    let found = platform.volumes().unmounted();
+                    if last.as_ref() != Some(&found) {
+                        last = Some(found.clone());
+                        if out.send(CoreEvent::Unmounted(found)).is_err() {
+                            return;
+                        }
+                    }
+                    // Until it is time again, or somebody asks for it now.
+                    let until = Instant::now() + interval;
+                    while Instant::now() < until
+                        && !stop.load(Ordering::Relaxed)
+                        && !refresh.swap(false, Ordering::Relaxed)
+                    {
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
+                }
+            })
+            .expect("spawn devices worker");
     }
 
     pub fn refresh_now(&self) {
         self.refresh.store(true, Ordering::Relaxed);
+        self.refresh_devices.store(true, Ordering::Relaxed);
     }
 }
 

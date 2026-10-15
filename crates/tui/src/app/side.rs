@@ -146,7 +146,9 @@ impl App {
             }
             Parent | ClearSelection | SwitchPane => self.side_focus = false,
             Bookmark => {
-                if let Some(item) = items.get(self.side_cursor) {
+                if let Some(item) = items.get(self.side_cursor)
+                    && !matches!(item.origin, Origin::Unmounted(_))
+                {
                     let add = !self.paths.bookmarks.contains(&item.path);
                     self.set_bookmark(item.path.clone(), add);
                 }
@@ -155,6 +157,9 @@ impl App {
                 Some(Origin::Device(_)) => {
                     let mount = items[self.side_cursor].path.clone();
                     self.start_eject(&mount);
+                }
+                Some(Origin::Unmounted(_)) => {
+                    self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3)
                 }
                 Some(Origin::Bookmark { removable: true }) => {
                     let path = items[self.side_cursor].path.clone();
@@ -184,6 +189,16 @@ impl App {
         )];
         if rada_core::tagsearch::view_name(path).is_some() {
             // A tag is not a folder: nothing to pin or eject.
+            return MenuView::new(at, items);
+        }
+        if let Some(id) = self.unmounted_id(path) {
+            // Plugged in and not mounted: there is no folder to pin, and "Open" is "Mount".
+            items.clear();
+            items.push(MenuItem::command(
+                MenuCmd::Mount(id),
+                Key::SideMenuMount.tr(),
+                true,
+            ));
             return MenuView::new(at, items);
         }
         let is_state = self.paths.bookmarks.iter().any(|b| b == path);

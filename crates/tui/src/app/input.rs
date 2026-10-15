@@ -28,6 +28,8 @@ pub enum MenuCmd {
     OpenWithList,
     /// Eject the disk mounted here.
     Eject(PathBuf),
+    /// Mount the device that is plugged in (by its id).
+    Mount(String),
     /// Change the tags of what is selected.
     Tag(TagCmd),
     SortBy(SortKey),
