@@ -517,8 +517,16 @@ fn on_fuse(f: &File) -> bool {
     let mut st = std::mem::MaybeUninit::<libc::statfs>::uninit();
     // SAFETY: `st` is a valid out-pointer and the descriptor is open.
     let r = unsafe { libc::fstatfs(f.as_raw_fd(), st.as_mut_ptr()) };
+    if r != 0 {
+        return false;
+    }
     // SAFETY: fstatfs returned success, so the struct is initialised.
-    r == 0 && unsafe { st.assume_init() }.f_type as i64 == FUSE_SUPER_MAGIC
+    let st = unsafe { st.assume_init() };
+    // The type of the field differs between targets (and between libcs).
+    #[allow(clippy::unnecessary_cast)]
+    {
+        st.f_type as i64 == FUSE_SUPER_MAGIC
+    }
 }
 
 fn finish_dest(dst: &File, req: &CopyRequest) -> io::Result<()> {

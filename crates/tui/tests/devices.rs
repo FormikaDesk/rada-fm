@@ -6,7 +6,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use common::*;
@@ -19,9 +19,9 @@ use rada_core::testutil::*;
 use rada_tui::app::Modal;
 use rada_tui::hits::Target;
 
-fn device(mount: &PathBuf, name: &str, uri: &str) -> Volume {
+fn device(mount: &Path, name: &str, uri: &str) -> Volume {
     Volume {
-        mount_point: mount.clone(),
+        mount_point: mount.to_path_buf(),
         label: Some(name.into()),
         fs_type: "mtp".into(),
         device: uri.into(),

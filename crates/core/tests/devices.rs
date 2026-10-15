@@ -202,7 +202,7 @@ fn what_a_phone_sends_back_is_given_the_usual_permissions_not_the_phones() {
     // On the "phone": files whose permissions mean nothing.
     std::fs::create_dir_all(storage.join("DCIM")).unwrap();
     std::fs::write(storage.join("DCIM/photo.jpg"), "jpeg").unwrap();
-    chmod(&storage.join("DCIM/photo.jpg"), 0o000 | 0o400);
+    chmod(&storage.join("DCIM/photo.jpg"), 0o400);
     chmod(&storage.join("DCIM"), 0o700);
     let dest = sb.mkdir("pc");
     let (plan, rep) = do_copy(&e, &[storage.join("DCIM")], &dest, ConflictPolicy::Skip);

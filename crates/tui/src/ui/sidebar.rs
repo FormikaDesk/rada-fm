@@ -13,7 +13,7 @@ use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look, RowTone};
-use super::widgets::{pad, pad_left, segment_bar, segment_bar_width};
+use super::widgets::{pad_left, segment_bar, segment_bar_width};
 use crate::app::App;
 use crate::fmt;
 use crate::hits::Target;
