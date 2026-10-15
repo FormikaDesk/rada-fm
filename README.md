@@ -89,8 +89,8 @@ sha256sum --check --ignore-missing SHA256SUMS      # OK for your archive
 
 | | public key |
 |---|---|
-| main | `PLACEHOLDER-main-key-not-made-yet` |
-| reserve | `PLACEHOLDER-reserve-key-not-made-yet` |
+| main | `RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ` |
+| reserve | `RWQ39NbBsAIJ5OJx/sP8k6/3iYAsNmaXG1ZASMIfQVXZkTcI2rw+BrCF` |
 
 More in [docs/verify.md](docs/verify.md); how a release is made and signed is in [docs/release.md](docs/release.md).
 

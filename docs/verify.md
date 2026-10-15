@@ -13,8 +13,8 @@ main key; the reserve key is kept apart and is only used if the main one is lost
 
 | | public key |
 |---|---|
-| main | `PLACEHOLDER-main-key-not-made-yet` |
-| reserve | `PLACEHOLDER-reserve-key-not-made-yet` |
+| main | `RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ` |
+| reserve | `RWQ39NbBsAIJ5OJx/sP8k6/3iYAsNmaXG1ZASMIfQVXZkTcI2rw+BrCF` |
 
 The same two keys are built into the program (`crates/core/src/update/sign.rs`) and written in
 the README. If they are not the same everywhere, do not trust the files.

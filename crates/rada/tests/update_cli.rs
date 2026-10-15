@@ -352,6 +352,7 @@ fn without_the_test_key_the_program_trusts_nobody() {
     let out = run_patiently(&mut cmd);
     assert!(!out.status.success());
     let t = text(&out);
-    assert!(t.contains("no public key"), "{t}");
+    // The keys built in are the author's: a release signed by anybody else does not pass.
+    assert!(t.contains("signature of SHA256SUMS is not valid"), "{t}");
     assert_eq!(fs::read(&w.exe).unwrap(), before);
 }

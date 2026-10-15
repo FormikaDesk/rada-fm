@@ -24,10 +24,10 @@ pub const PLACEHOLDER: &str = "PLACEHOLDER";
 /// The public keys a release may be signed with, in the base64 form of a minisign `.pub` file
 /// (the second line of it, `RW…`): the main key, then the reserve.
 pub const PUBLIC_KEYS: [&str; 2] = [
-    // PLACEHOLDER: the main key. Replaced by the public key made for the first signed release.
-    "PLACEHOLDER-main-key-not-made-yet",
-    // PLACEHOLDER: the reserve key, kept apart.
-    "PLACEHOLDER-reserve-key-not-made-yet",
+    // The main key, the one releases are signed with.
+    "RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ",
+    // The reserve key, kept apart.
+    "RWQ39NbBsAIJ5OJx/sP8k6/3iYAsNmaXG1ZASMIfQVXZkTcI2rw+BrCF",
 ];
 
 /// The list of keys a copy of rada trusts, as owned strings (what [`super::Ctx`] holds).
@@ -107,14 +107,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_keys_built_in_are_still_placeholders_until_the_first_signed_release() {
-        // When the real keys go in, this test is replaced by one that fails on a placeholder.
-        assert!(PUBLIC_KEYS.iter().all(|k| k.starts_with(PLACEHOLDER)));
+    fn the_keys_built_in_are_real_keys_and_no_placeholder_is_left() {
+        let me = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        for key in PUBLIC_KEYS {
+            assert!(!key.contains(PLACEHOLDER), "a placeholder is left: {key}");
+            assert!(
+                PublicKey::from_base64(key).is_ok(),
+                "{key} is not a minisign public key"
+            );
+        }
+        assert_ne!(
+            PUBLIC_KEYS[0], PUBLIC_KEYS[1],
+            "main and reserve are two keys"
+        );
+        // The same keys, and nothing else, where people are told to look.
+        for doc in ["../../README.md", "../../docs/verify.md"] {
+            let text = std::fs::read_to_string(me.join(doc)).unwrap();
+            assert!(!text.contains(PLACEHOLDER), "{doc} has a placeholder");
+            for key in PUBLIC_KEYS {
+                assert!(text.contains(key), "{doc} does not show {key}");
+            }
+        }
     }
 
     #[test]
     fn a_list_without_a_real_key_accepts_nothing() {
-        let err = verify_sums(b"x", "not a signature", "v1.0.0", &builtin_keys()).unwrap_err();
+        let placeholders = vec![
+            format!("{PLACEHOLDER}-main"),
+            format!("{PLACEHOLDER}-reserve"),
+        ];
+        let err = verify_sums(b"x", "not a signature", "v1.0.0", &placeholders).unwrap_err();
         assert!(err.contains("no public key"), "{err}");
         let err = verify_sums(b"x", "x", "v1", &["not base64 at all".into()]).unwrap_err();
         assert!(err.contains("no public key"), "{err}");

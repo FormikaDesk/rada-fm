@@ -772,8 +772,8 @@ fn a_build_with_no_real_key_installs_nothing() {
     let mut w = world("0.6.0-rc.1", Settings::default());
     w.publish("v0.7.0", false, &marking_program(NEW));
     w.list(&[("v0.7.0", false)]);
-    // The keys that ship in the source until the author's own are put there.
-    w.ctx.signing_keys = update::sign::builtin_keys();
+    // A list that holds no real key (an unofficial build, or one not finished).
+    w.ctx.signing_keys = vec![format!("{}-main", update::sign::PLACEHOLDER)];
     let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
     assert!(err.contains("no public key"), "{err}");
     assert_eq!(w.archive_requests("v0.7.0"), 0);
