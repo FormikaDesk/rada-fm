@@ -1032,6 +1032,53 @@ fn a_full_disk_in_the_middle_of_a_member_is_an_error_and_leaves_nothing_half_wri
     assert!(leftovers(&out).is_empty());
 }
 
+/// What was extracted is written to the disk before its name appears, and the folder is
+/// synced once the run is over. (`FaultFs` records the calls that it is told to fail.)
+#[test]
+fn extracted_files_and_their_folder_are_synced() {
+    let sb = Sandbox::new();
+    let ffs = FaultFs::new();
+    let e = sb.engine_with(ffs.clone());
+    let a = sb.path("a.zip");
+    write_zip(
+        &a,
+        &[Member::file("one.txt", "1"), Member::file("sub/two.txt", "2")],
+    );
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    // A folder that cannot be synced does not fail the extraction, but it is asked to.
+    ffs.fail(Op::SyncDir, "out", 5 /* EIO */);
+    ffs.fail(Op::SyncDir, "sub", 5);
+    let rep = run(&e, &plan);
+    assert!(rep.failed.is_empty(), "{:?}", rep.failed);
+    assert_eq!(read(&out.join("sub/two.txt")), "2");
+    let hits = ffs.hits.lock().unwrap().clone();
+    let synced_dirs: Vec<_> = hits
+        .iter()
+        .filter(|(op, _)| *op == Op::SyncDir)
+        .map(|(_, p)| p.clone())
+        .collect();
+    assert_eq!(synced_dirs.len(), 2, "{synced_dirs:?}");
+    assert_eq!(synced_dirs.iter().filter(|p| p.ends_with("out")).count(), 1);
+    assert_eq!(synced_dirs.iter().filter(|p| p.ends_with("sub")).count(), 1);
+}
+
+#[test]
+fn a_file_that_cannot_reach_the_disk_is_not_given_its_name() {
+    let sb = Sandbox::new();
+    let ffs = FaultFs::new();
+    let e = sb.engine_with(ffs.clone());
+    let a = sb.path("a.zip");
+    write_zip(&a, &[Member::file("one.txt", "1")]);
+    let out = sb.mkdir("out");
+    let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+    ffs.fail(Op::SyncFile, out.to_str().unwrap(), 5 /* EIO */);
+    let rep = run(&e, &plan);
+    assert_eq!(rep.failed.len(), 1);
+    assert!(!out.join("one.txt").exists());
+    assert!(leftovers(&out).is_empty());
+}
+
 #[test]
 fn an_archive_cut_after_the_plan_fails_the_member_loudly() {
     let sb = Sandbox::new();

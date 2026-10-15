@@ -159,6 +159,9 @@ struct RunState {
     /// Permissions to put back when the run is over, oldest first (applied newest first, so
     /// that a folder is locked again only after what is inside it is done).
     deferred_modes: Vec<(PathBuf, u32)>,
+    /// Folders that got new names (extracted files): written to the disk once, when the run
+    /// is over, and not after each file.
+    unsynced_dirs: std::collections::BTreeSet<PathBuf>,
     /// For each archive the plan reads: the members it will ask for, so that one pass over
     /// the archive serves them all.
     archive_wanted: std::collections::HashMap<PathBuf, Vec<usize>>,
@@ -229,6 +232,7 @@ impl Engine {
             skip_all: false,
             undo: plan.kind == OpKind::Undo,
             deferred_modes: Vec::new(),
+            unsynced_dirs: Default::default(),
             archive_wanted: archive_members(plan),
             archives: Default::default(),
         };
@@ -351,6 +355,11 @@ impl Engine {
             base_bytes += step.bytes();
             prog.steps_done += 1;
             prog.bytes_done = base_bytes;
+        }
+        for dir in &st.unsynced_dirs {
+            if let Err(e) = self.fs.sync_dir(dir) {
+                tracing::debug!("sync {}: {e}", dir.display());
+            }
         }
         // Folders that were opened up for the run get their own permissions back.
         for (path, mode) in st.deferred_modes.iter().rev() {
@@ -496,6 +505,13 @@ impl Engine {
         {
             return fail(Error::io("set permissions of", dst, e));
         }
+        // The bytes reach the disk before the name does: the journal will say "done" for
+        // this file, and after a power cut the name must not stand on an empty file.
+        if let Err(e) = fs.sync_file(&tmp)
+            && e.kind() != io::ErrorKind::Unsupported
+        {
+            return fail(Error::io("write", dst, e));
+        }
         if let Err(e) = fs.rename_noreplace(&tmp, dst) {
             let _ = fs.remove_file(&tmp);
             return Err(if e.kind() == io::ErrorKind::AlreadyExists {
@@ -503,6 +519,9 @@ impl Engine {
             } else {
                 Error::io2("finish extraction", &tmp, dst, e)
             });
+        }
+        if let Some(parent) = dst.parent() {
+            st.unsynced_dirs.insert(parent.to_path_buf());
         }
         let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
         Ok(StepResult {

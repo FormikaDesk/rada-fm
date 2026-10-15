@@ -412,6 +412,30 @@ pub trait FsEngine: Send + Sync {
 
     fn copy_file(&self, req: &CopyRequest, ctl: &mut dyn CopyControl) -> io::Result<CopyOutcome>;
 
+    /// Make what was written to the file at `p` reach the disk (`fsync`), so that a power cut
+    /// right after a rename cannot leave the new name on an empty or truncated file.
+    fn sync_file(&self, p: &Path) -> io::Result<()> {
+        // Windows flushes through a handle opened for writing; elsewhere reading is enough.
+        std::fs::OpenOptions::new()
+            .write(cfg!(windows))
+            .read(true)
+            .open(p)?
+            .sync_all()
+    }
+    /// Make the names in the folder `p` (new files, renames) reach the disk. Windows has no
+    /// such call for a folder: there it does nothing.
+    fn sync_dir(&self, p: &Path) -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            std::fs::File::open(p)?.sync_all()
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = p;
+            Ok(())
+        }
+    }
+
     fn available_space(&self, p: &Path) -> io::Result<u64>;
     fn can_read(&self, p: &Path) -> bool;
     fn can_write(&self, p: &Path) -> bool;

@@ -736,6 +736,10 @@ pub enum Op {
     CreateDir,
     CreateSymlink,
     HardLink,
+    /// Making a written file reach the disk (`fsync`); a rule matches the folder it is in.
+    SyncFile,
+    /// Making the names of a folder reach the disk.
+    SyncDir,
 }
 
 /// What happens when a copy has moved `after` bytes of a matching file.
@@ -1089,6 +1093,15 @@ impl FsEngine for FaultFs {
             (Some(errno), _) => Err(io::Error::from_raw_os_error(errno)),
             (None, r) => r,
         }
+    }
+    fn sync_file(&self, p: &Path) -> io::Result<()> {
+        // Like creating it: the file has a temporary name, so a rule matches its folder.
+        self.check(Op::SyncFile, p.parent().unwrap_or(p))?;
+        self.inner.sync_file(p)
+    }
+    fn sync_dir(&self, p: &Path) -> io::Result<()> {
+        self.check(Op::SyncDir, p)?;
+        self.inner.sync_dir(p)
     }
     fn available_space(&self, p: &Path) -> io::Result<u64> {
         self.inner.available_space(p)
