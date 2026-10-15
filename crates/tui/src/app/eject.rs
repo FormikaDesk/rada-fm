@@ -82,6 +82,8 @@ impl App {
                     self.modal = None;
                 }
                 self.toast(ToastKind::Ok, tf(Key::TEjected, &[&name]), 6);
+                // A phone going away is no change of mounts: look again now, not in five seconds.
+                self.svc.volumes.refresh_now();
             }
             Err(why) => {
                 if let Some(Modal::Eject(v)) = &mut self.modal

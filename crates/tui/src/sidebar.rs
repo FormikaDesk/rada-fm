@@ -134,7 +134,7 @@ impl Item {
             Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
             Origin::Device(VolumeKind::Device) | Origin::Unmounted(VolumeKind::Device) => {
-                ("\u{f10b}", "▯")
+                ("\u{f10b}", "▥")
             }
             Origin::Unmounted(VolumeKind::Removable) => ("\u{f287}", "⏏"),
             Origin::Device(_) | Origin::Unmounted(_) => ("\u{f0a0}", "▥"),
