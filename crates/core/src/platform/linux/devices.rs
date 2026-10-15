@@ -227,32 +227,45 @@ fn same_uri(a: &str, b: &str) -> bool {
     a.trim_end_matches('/') == b.trim_end_matches('/')
 }
 
-/// The phones and cameras in the output of `gio mount -li`: the mounted ones (a `Mount(n): name
-/// -> uri` line) and the ones that are only plugged in (a `Volume(n): name` with an
-/// `activation_root=uri`, and no mount of that uri).
-pub fn parse_gio(text: &str) -> Vec<GioDevice> {
-    let mut mounts: Vec<(String, String)> = Vec::new();
-    // (name, activation root) of every volume, the root filled in by a later line.
-    let mut volumes: Vec<(String, Option<String>)> = Vec::new();
+/// What `gio mount -li` printed, line by line, before anything is decided about it.
+#[derive(Debug, Default)]
+pub struct GioScan {
+    /// `Mount(n): name -> uri`
+    pub mounts: Vec<(String, String)>,
+    /// `Volume(n): name`, with the `activation_root=` that followed it.
+    pub volumes: Vec<(String, Option<String>)>,
+}
+
+pub fn scan_gio(text: &str) -> GioScan {
+    let mut scan = GioScan::default();
     for line in text.lines() {
         let line = line.trim();
         if let Some(rest) = line.strip_prefix("Mount(")
             && let Some((_, rest)) = rest.split_once("): ")
             && let Some((name, uri)) = rest.rsplit_once(" -> ")
         {
-            mounts.push((name.trim().to_string(), uri.trim().to_string()));
+            scan.mounts
+                .push((name.trim().to_string(), uri.trim().to_string()));
         } else if let Some(rest) = line.strip_prefix("Volume(")
             && let Some((_, name)) = rest.split_once("): ")
         {
-            volumes.push((name.trim().to_string(), None));
+            scan.volumes.push((name.trim().to_string(), None));
         } else if let Some(root) = line.strip_prefix("activation_root=")
-            && let Some(last) = volumes.last_mut()
+            && let Some(last) = scan.volumes.last_mut()
         {
             last.1 = Some(root.trim().to_string());
         }
     }
+    scan
+}
+
+/// The phones and cameras in the output of `gio mount -li`: the mounted ones (a `Mount(n): name
+/// -> uri` line) and the ones that are only plugged in (a `Volume(n): name` with an
+/// `activation_root=uri`, and no mount of that uri).
+pub fn parse_gio(text: &str) -> Vec<GioDevice> {
+    let scan = scan_gio(text);
     let mut out: Vec<GioDevice> = Vec::new();
-    for (name, uri) in &mounts {
+    for (name, uri) in &scan.mounts {
         if is_device_uri(uri) && !out.iter().any(|d| same_uri(&d.uri, uri)) {
             out.push(GioDevice {
                 name: name.clone(),
@@ -261,7 +274,7 @@ pub fn parse_gio(text: &str) -> Vec<GioDevice> {
             });
         }
     }
-    for (name, root) in volumes {
+    for (name, root) in scan.volumes {
         let Some(root) = root.filter(|r| is_device_uri(r)) else {
             continue;
         };
@@ -276,11 +289,38 @@ pub fn parse_gio(text: &str) -> Vec<GioDevice> {
     out
 }
 
-/// What `gio mount -li` says, or nothing when `gio` is missing, slow or fails.
+/// What `gio mount -li` says, or nothing when `gio` is missing, slow or fails. What is wrong is
+/// written to the log (and `rada debug devices` says it again): a device is never left out
+/// without a reason being kept.
 fn gio_devices(tools: &Tools) -> Vec<GioDevice> {
     match tools.run("gio", &["mount", "-li"], LIST_LIMIT) {
-        Ok(o) if o.ok => parse_gio(&o.stdout),
-        _ => Vec::new(),
+        Ok(o) if o.ok => {
+            let devices = parse_gio(&o.stdout);
+            let scan = scan_gio(&o.stdout);
+            if devices.is_empty()
+                && !o.stdout.trim().is_empty()
+                && scan.volumes.is_empty()
+                && scan.mounts.is_empty()
+            {
+                tracing::warn!(
+                    "gio mount -li printed something rada does not recognise: {}",
+                    first_line(&o.stdout)
+                );
+            }
+            devices
+        }
+        Ok(o) => {
+            tracing::warn!("gio mount -li failed: {}", first_line(&o.text()));
+            Vec::new()
+        }
+        Err(ToolError::Missing) => {
+            tracing::debug!("gio is not installed: no phones or cameras are listed");
+            Vec::new()
+        }
+        Err(e) => {
+            tracing::warn!("gio mount -li: {e:?}");
+            Vec::new()
+        }
     }
 }
 
@@ -396,63 +436,118 @@ const LSBLK_COLUMNS: [&str; 2] = [
 /// The partitions (or whole disks without a partition table) of removable drives that hold a
 /// filesystem and are not mounted, from `lsblk -J` output.
 pub fn parse_lsblk(json: &str) -> Vec<Unmounted> {
-    let Ok(root) = serde_json::from_str::<serde_json::Value>(json) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    if let Some(list) = root.get("blockdevices").and_then(|v| v.as_array()) {
-        for node in list {
-            walk_lsblk(node, false, &mut out);
-        }
-    }
-    out
+    judge_all_lsblk(json).0
 }
 
-fn walk_lsblk(node: &serde_json::Value, inherited: bool, out: &mut Vec<Unmounted>) {
+/// The sticks found in `lsblk -J` output, and what was said of every node, found or not.
+#[allow(clippy::type_complexity)]
+fn judge_all_lsblk(json: &str) -> (Vec<Unmounted>, Vec<(String, Result<(), String>)>) {
+    let mut out = Vec::new();
+    let mut judged = Vec::new();
+    let Ok(root) = serde_json::from_str::<serde_json::Value>(json) else {
+        judged.push(("(output)".into(), Err("not JSON".into())));
+        return (out, judged);
+    };
+    match root.get("blockdevices").and_then(|v| v.as_array()) {
+        Some(list) => {
+            for node in list {
+                walk_lsblk(node, false, &mut out, &mut judged);
+            }
+        }
+        None => judged.push(("(output)".into(), Err("no \"blockdevices\" list".into()))),
+    }
+    (out, judged)
+}
+
+/// Is this node of `lsblk` a stick that can be mounted? Either it is (with its name), or why
+/// not, in words.
+fn judge_lsblk(
+    node: &serde_json::Value,
+    removable: bool,
+    no_children: bool,
+) -> Result<Unmounted, String> {
+    let kind = text_of(node.get("type")).unwrap_or_default();
+    let fstype = text_of(node.get("fstype"));
+    let mounted = node
+        .get("mountpoints")
+        .and_then(|m| m.as_array())
+        .is_some_and(|m| m.iter().any(|p| p.as_str().is_some_and(|s| !s.is_empty())))
+        || text_of(node.get("mountpoint")).is_some();
+    if !removable {
+        return Err("not a removable drive (no hotplug flag, not on the USB bus)".into());
+    }
+    if kind != "part" && !(kind == "disk" && no_children) {
+        return Err(format!(
+            "type {kind:?}: neither a partition nor a disk without partitions"
+        ));
+    }
+    match &fstype {
+        None => return Err("no filesystem".into()),
+        Some(f) if !MOUNTABLE.contains(&f.as_str()) => {
+            return Err(format!("filesystem {f:?} is not one rada offers to mount"));
+        }
+        _ => {}
+    }
+    if mounted {
+        return Err("already mounted".into());
+    }
+    let Some(path) = text_of(node.get("path")) else {
+        return Err("no device path in the output (the PATH column is missing)".into());
+    };
+    let name = text_of(node.get("label"))
+        .or_else(|| text_of(node.get("model")))
+        .unwrap_or_else(|| path.clone());
+    Ok(Unmounted {
+        id: path,
+        name,
+        kind: VolumeKind::Removable,
+        size: size_of(node.get("size")),
+    })
+}
+
+fn walk_lsblk(
+    node: &serde_json::Value,
+    inherited: bool,
+    out: &mut Vec<Unmounted>,
+    judged: &mut Vec<(String, Result<(), String>)>,
+) {
     let removable = inherited
         || truthy(node.get("hotplug"))
+        || truthy(node.get("rm"))
         || text_of(node.get("tran")).is_some_and(|t| t == "usb");
     let children = node
         .get("children")
         .and_then(|c| c.as_array())
         .cloned()
         .unwrap_or_default();
-    let kind = text_of(node.get("type")).unwrap_or_default();
-    let holds_files = text_of(node.get("fstype")).is_some_and(|f| MOUNTABLE.contains(&f.as_str()));
-    let mounted = node
-        .get("mountpoints")
-        .and_then(|m| m.as_array())
-        .is_some_and(|m| m.iter().any(|p| p.as_str().is_some_and(|s| !s.is_empty())))
-        || text_of(node.get("mountpoint")).is_some();
-    let candidate = removable
-        && holds_files
-        && !mounted
-        && (kind == "part" || (kind == "disk" && children.is_empty()));
-    if candidate && let Some(path) = text_of(node.get("path")) {
-        let size = size_of(node.get("size"));
-        let name = text_of(node.get("label"))
-            .or_else(|| text_of(node.get("model")))
-            .unwrap_or_else(|| path.clone());
-        out.push(Unmounted {
-            id: path,
-            name,
-            kind: VolumeKind::Removable,
-            size,
-        });
+    let label = text_of(node.get("name")).unwrap_or_else(|| "?".into());
+    match judge_lsblk(node, removable, children.is_empty()) {
+        Ok(u) => {
+            judged.push((label, Ok(())));
+            out.push(u);
+        }
+        Err(why) => judged.push((label, Err(why))),
     }
     for c in &children {
-        walk_lsblk(c, removable, out);
+        walk_lsblk(c, removable, out, judged);
     }
 }
 
-/// The sticks that are plugged in and not mounted.
+/// The sticks that are plugged in and not mounted. A failure is written to the log.
 pub fn unmounted_disks(tools: &Tools) -> Vec<Unmounted> {
     for columns in LSBLK_COLUMNS {
         match tools.run("lsblk", &["-J", "-b", "-o", columns], LIST_LIMIT) {
             Ok(o) if o.ok => return parse_lsblk(&o.stdout),
             // The column list was refused by an older `lsblk`: try its spelling.
-            Ok(_) => continue,
-            Err(_) => break,
+            Ok(o) => tracing::debug!("lsblk -o {columns}: {}", first_line(&o.text())),
+            Err(ToolError::Missing) => {
+                tracing::debug!("lsblk is not installed: no sticks are listed");
+                break;
+            }
+            Err(e) => {
+                tracing::warn!("lsblk: {e:?}");
+                break;
+            }
         }
     }
     Vec::new()
@@ -601,6 +696,159 @@ pub fn removable_drive(sys: &Path, device: &str) -> bool {
         .any(|c| c.as_os_str().to_string_lossy().starts_with("usb"))
 }
 
+// ----------------------------------------------------------------------------- diagnosis
+
+fn tool_state(tools: &Tools, name: &str) -> String {
+    match tools.find(name) {
+        Some(p) => format!("{name}: {}", p.display()),
+        None => format!("{name}: NOT FOUND in PATH"),
+    }
+}
+
+/// What the device code sees, line by line, for `rada debug devices`: the folder of the
+/// virtual filesystem and every entry in it, what `gio` and `lsblk` print and what became of
+/// each thing in it, and the final lists. Nothing is mounted, unmounted or written.
+pub fn diagnose(gvfs: Option<&Path>, tools: &Tools, sys: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    out.push("[tools]".to_string());
+    for t in ["gio", "lsblk", "udisksctl"] {
+        out.push(format!("  {}", tool_state(tools, t)));
+    }
+
+    out.push("[gvfs folder]".to_string());
+    match gvfs {
+        None => out.push("  none (RADA_TEST_GVFS_DIR is empty)".into()),
+        Some(dir) => match std::fs::read_dir(dir) {
+            Err(e) => out.push(format!("  {}: cannot be read: {e}", dir.display())),
+            Ok(rd) => {
+                let mut names: Vec<String> = rd
+                    .flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect();
+                names.sort();
+                out.push(format!("  {}: {} entries", dir.display(), names.len()));
+                for n in &names {
+                    out.push(match device_scheme(n) {
+                        Some(s) => format!("  entry {n:?} -> device ({s})"),
+                        None => {
+                            format!("  entry {n:?} -> dropped: not a {SCHEMES:?} device folder")
+                        }
+                    });
+                }
+            }
+        },
+    }
+
+    out.push("[gio mount -li]".to_string());
+    let gio = match tools.run("gio", &["mount", "-li"], LIST_LIMIT) {
+        Err(e) => {
+            out.push(format!("  could not run: {e:?}"));
+            None
+        }
+        Ok(o) => {
+            out.push(format!(
+                "  exit {}, {} lines of output, {} of errors",
+                if o.ok { "ok" } else { "FAILED" },
+                o.stdout.lines().count(),
+                o.stderr.lines().count()
+            ));
+            for l in o.stderr.lines().take(5) {
+                out.push(format!("  stderr: {l}"));
+            }
+            o.ok.then_some(o.stdout)
+        }
+    };
+    if let Some(text) = &gio {
+        let scan = scan_gio(text);
+        out.push(format!(
+            "  read {} Mount lines and {} Volume lines",
+            scan.mounts.len(),
+            scan.volumes.len()
+        ));
+        for (name, uri) in &scan.mounts {
+            out.push(if is_device_uri(uri) {
+                format!("  Mount {name:?} -> {uri}: device (open)")
+            } else {
+                format!("  Mount {name:?} -> {uri}: dropped: not an mtp:// or gphoto2:// address")
+            });
+        }
+        for (name, root) in &scan.volumes {
+            out.push(match root {
+                None => format!("  Volume {name:?}: dropped: no activation_root line"),
+                Some(r) if !is_device_uri(r) => {
+                    format!(
+                        "  Volume {name:?} root {r}: dropped: not an mtp:// or gphoto2:// address"
+                    )
+                }
+                Some(r) if scan.mounts.iter().any(|(_, u)| same_uri(u, r)) => {
+                    format!("  Volume {name:?} root {r}: already open (listed as a Mount)")
+                }
+                Some(r) => format!("  Volume {name:?} root {r}: device (plugged in, not open)"),
+            });
+        }
+        if scan.mounts.is_empty() && scan.volumes.is_empty() && !text.trim().is_empty() {
+            out.push(
+                "  UNEXPECTED FORMAT: output has lines but no Mount( or Volume( line; first line:"
+                    .into(),
+            );
+            out.push(format!("    {}", first_line(text)));
+        }
+    }
+
+    out.push("[lsblk]".to_string());
+    let mut shown = false;
+    for columns in LSBLK_COLUMNS {
+        match tools.run("lsblk", &["-J", "-b", "-o", columns], LIST_LIMIT) {
+            Err(e) => {
+                out.push(format!("  could not run: {e:?}"));
+                shown = true;
+                break;
+            }
+            Ok(o) if !o.ok => {
+                out.push(format!("  -o {columns}: FAILED: {}", first_line(&o.text())))
+            }
+            Ok(o) => {
+                let (_, judged) = judge_all_lsblk(&o.stdout);
+                out.push(format!("  -o {columns}: ok, {} nodes", judged.len()));
+                for (name, verdict) in judged {
+                    out.push(match verdict {
+                        Ok(()) => {
+                            format!("  {name}: OFFERED (removable, not mounted, has a filesystem)")
+                        }
+                        Err(why) => format!("  {name}: dropped: {why}"),
+                    });
+                }
+                shown = true;
+                break;
+            }
+        }
+    }
+    if !shown {
+        out.push("  no column list was accepted".into());
+    }
+
+    out.push("[result]".to_string());
+    if let Some(dir) = gvfs {
+        let open = open_device_volumes(dir, tools);
+        out.push(format!("  open devices: {}", open.len()));
+        for v in &open {
+            out.push(format!(
+                "    {:?} at {} ({})",
+                v.label.as_deref().unwrap_or(""),
+                v.mount_point.display(),
+                v.device
+            ));
+        }
+    }
+    let pending = unmounted(tools);
+    out.push(format!("  plugged in and not mounted: {}", pending.len()));
+    for u in &pending {
+        out.push(format!("    {:?} id {} ({:?})", u.name, u.id, u.kind));
+    }
+    let _ = sys;
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,6 +889,141 @@ Volume(2): STICK
 Mount(1): files on nas -> smb://nas/files/
   Type: GDaemonMount
 ";
+
+    /// What `gio mount -li` printed on a real machine with a phone plugged in and not opened
+    /// (the serial number is made up): the internal drive first, then the phone as a volume.
+    const GIO_REAL_UNMOUNTED: &str = "\
+Drive(0): KBG40ZNS256G BG4A KIOXIA
+  Type: GProxyDrive (GProxyVolumeMonitorUDisks2)
+  ids:
+   unix-device: '/dev/nvme0n1'
+  themed icons:  [drive-harddisk-solidstate]  [drive-harddisk]  [drive]  [drive-harddisk-solidstate-symbolic]  [drive-harddisk-symbolic]  [drive-symbolic]
+  symbolic themed icons:  [drive-harddisk-solidstate-symbolic]  [drive-harddisk-symbolic]  [drive-symbolic]  [drive-harddisk-solidstate]  [drive-harddisk]  [drive]
+  is_removable=0
+  is_media_removable=0
+  has_media=1
+  is_media_check_automatic=1
+  can_poll_for_media=0
+  can_eject=0
+  can_start=0
+  can_stop=0
+  start_stop_type=shutdown
+  sort_key=00coldplug/00fixed/nvme0
+Volume(0): motorola edge 40
+  Type: GProxyVolume (GProxyVolumeMonitorMTP)
+  ids:
+   unix-device: '/dev/bus/usb/003/030'
+  activation_root=mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+  themed icons:  [phone]
+  symbolic themed icons:  [phone-symbolic]  [phone]
+  can_mount=1
+  can_eject=0
+  should_automount=1
+";
+
+    /// The same phone after the desktop has opened it (Nautilus, say), as gio prints it: the
+    /// volume with its mount below. Written from the documented format, as the first
+    /// fixture was; the real one has to be checked on a phone that is open.
+    const GIO_MOUNTED_BY_THE_DESKTOP: &str = "\
+Volume(0): motorola edge 40
+  Type: GProxyVolume (GProxyVolumeMonitorMTP)
+  ids:
+   unix-device: '/dev/bus/usb/003/030'
+  activation_root=mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+  can_mount=1
+  can_eject=0
+  should_automount=1
+  Mount(0): motorola edge 40 -> mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+    Type: GDaemonMount
+    default_location=mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+    themed icons:  [phone]
+    can_unmount=1
+    can_eject=0
+    is_shadowed=0
+";
+
+    #[test]
+    fn the_phone_that_a_real_gio_printed_is_found_as_plugged_in_and_not_open() {
+        let d = parse_gio(GIO_REAL_UNMOUNTED);
+        assert_eq!(
+            d,
+            [GioDevice {
+                name: "motorola edge 40".into(),
+                uri: "mtp://motorola_motorola_edge_40_ZY22FAKE0001/".into(),
+                mounted: false
+            }],
+            "the internal drive is not a phone; the volume is"
+        );
+    }
+
+    #[test]
+    fn a_phone_the_desktop_has_opened_is_found_as_open_and_only_once() {
+        let d = parse_gio(GIO_MOUNTED_BY_THE_DESKTOP);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].mounted);
+        assert_eq!(d[0].name, "motorola edge 40");
+        // Its folder in the virtual filesystem gets that name.
+        let sb = Sandbox::new();
+        let bin = Bin::new(&sb);
+        bin.gio(GIO_MOUNTED_BY_THE_DESKTOP, "exit 0");
+        let gvfs = sb.mkdir("gvfs");
+        std::fs::create_dir_all(gvfs.join("mtp:host=motorola_motorola_edge_40_ZY22FAKE0001"))
+            .unwrap();
+        let v = open_device_volumes(&gvfs, &bin.tools());
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].label.as_deref(), Some("motorola edge 40"));
+        assert_eq!(v[0].device, "mtp://motorola_motorola_edge_40_ZY22FAKE0001/");
+        // And it is not offered a second time as "not mounted".
+        assert!(unmounted_devices(&bin.tools()).is_empty());
+    }
+
+    #[test]
+    fn the_diagnosis_says_what_became_of_everything_and_what_went_wrong() {
+        let sb = Sandbox::new();
+        let bin = Bin::new(&sb);
+        bin.gio(GIO_REAL_UNMOUNTED, "exit 0");
+        let json = sb.root.join("lsblk.json");
+        std::fs::write(&json, LSBLK).unwrap();
+        bin.tool("lsblk", &format!("cat '{}'", json.display()));
+        let gvfs = sb.mkdir("gvfs");
+        std::fs::create_dir_all(gvfs.join("smb-share:server=nas,share=x")).unwrap();
+        let text = diagnose(Some(&gvfs), &bin.tools(), &sb.path("sys")).join("\n");
+        for want in [
+            "gio: ",
+            "udisksctl: NOT FOUND",
+            "entry \"smb-share:server=nas,share=x\" -> dropped",
+            "Volume \"motorola edge 40\" root mtp://motorola_motorola_edge_40_ZY22FAKE0001/: device (plugged in, not open)",
+            "sdb3: dropped: already mounted",
+            "nvme0n1p2: dropped: not a removable drive",
+            "sdd: dropped: not a removable drive",
+            "sdb1: OFFERED",
+            "sdb2: dropped: filesystem \"crypto_LUKS\"",
+            "plugged in and not mounted: 3",
+        ] {
+            assert!(text.contains(want), "{want:?} missing from:\n{text}");
+        }
+
+        // A command that fails, and one that prints something nobody expected, are said.
+        bin.gio("", "exit 0");
+        bin.tool(
+            "gio",
+            "echo 'Error: the volume monitor is not running' >&2; exit 1",
+        );
+        let text = diagnose(Some(&gvfs), &bin.tools(), &sb.path("sys")).join("\n");
+        assert!(
+            text.contains("exit FAILED") && text.contains("volume monitor is not running"),
+            "{text}"
+        );
+        bin.tool("gio", "echo 'something else entirely'");
+        let text = diagnose(Some(&gvfs), &bin.tools(), &sb.path("sys")).join("\n");
+        assert!(text.contains("UNEXPECTED FORMAT"), "{text}");
+        let none = Tools::with_path(sb.mkdir("empty-bin").into_os_string());
+        let text = diagnose(None, &none, &sb.path("sys")).join("\n");
+        assert!(
+            text.contains("gio: NOT FOUND") && text.contains("could not run: Missing"),
+            "{text}"
+        );
+    }
 
     #[test]
     fn gio_output_gives_the_open_and_the_plugged_in_devices_and_nothing_else() {

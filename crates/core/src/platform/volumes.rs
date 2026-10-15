@@ -56,6 +56,12 @@ pub trait VolumeLister: Send + Sync {
         Vec::new()
     }
 
+    /// What the code that lists disks and devices sees and decides, line by line, for
+    /// `rada debug devices`. Reads only.
+    fn diagnose(&self) -> Vec<String> {
+        vec!["nothing to say about devices on this system".to_string()]
+    }
+
     /// Whether this device can be mounted from here.
     fn can_mount(&self, _device: &Unmounted) -> bool {
         false
@@ -158,6 +164,29 @@ impl DeviceFilter {
             .filter(|e| !e.is_empty())
             .partition(|e: &String| e.starts_with('/'));
         DeviceFilter { fs_types, mounts }
+    }
+
+    /// The entry of the list that keeps this mount out, or `None` if it stays in.
+    pub fn why_hides(&self, fs_type: &str, mount_point: &std::path::Path) -> Option<String> {
+        for pat in &self.fs_types {
+            let hit = match pat.strip_suffix('*') {
+                Some(prefix) => fs_type.starts_with(prefix),
+                None => fs_type == pat,
+            };
+            if hit {
+                return Some(format!("filesystem type {fs_type:?} matches {pat:?}"));
+            }
+        }
+        for pat in &self.mounts {
+            let hit = match pat.strip_suffix("/*") {
+                Some(dir) => mount_point.starts_with(dir),
+                None => mount_point == std::path::Path::new(pat),
+            };
+            if hit {
+                return Some(format!("mount point matches {pat:?}"));
+            }
+        }
+        None
     }
 
     /// Does the mount of `fs_type` at `mount_point` stay out of the list?

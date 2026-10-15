@@ -317,3 +317,120 @@ fn pasting_onto_a_phone_shows_what_is_different_there_in_the_plan_before_anythin
         "hello"
     );
 }
+
+// ------------------------------------------------ the real platform, with stand-in programs
+
+#[cfg(target_os = "linux")]
+mod linux_pipeline {
+    //! The whole way from the programs' words to the sidebar: the Linux platform, its lister,
+    //! the worker thread, the event and the screen. Only `gio`, `lsblk` and `udisksctl` are
+    //! stand-ins, and they print what a real machine printed (the serial number is made up).
+    use super::*;
+    use rada_core::platform::Platform;
+    use rada_core::platform::linux::LinuxPlatform;
+    use rada_core::platform::linux::devices::Tools;
+
+    const GIO_UNMOUNTED: &str = "\
+Drive(0): KBG40ZNS256G BG4A KIOXIA
+  Type: GProxyDrive (GProxyVolumeMonitorUDisks2)
+  ids:
+   unix-device: '/dev/nvme0n1'
+  is_removable=0
+Volume(0): motorola edge 40
+  Type: GProxyVolume (GProxyVolumeMonitorMTP)
+  ids:
+   unix-device: '/dev/bus/usb/003/030'
+  activation_root=mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+  themed icons:  [phone]
+  can_mount=1
+  can_eject=0
+  should_automount=1
+";
+
+    const GIO_OPEN: &str = "\
+Volume(0): motorola edge 40
+  Type: GProxyVolume (GProxyVolumeMonitorMTP)
+  activation_root=mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+  can_mount=1
+  Mount(0): motorola edge 40 -> mtp://motorola_motorola_edge_40_ZY22FAKE0001/
+    Type: GDaemonMount
+    can_unmount=1
+";
+
+    fn tool(dir: &Path, name: &str, body: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        let exe = dir.join(name);
+        std::fs::write(&exe, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    fn run(listing: &str, gvfs_entry: bool) -> (H, PathBuf, PathBuf) {
+        let sb = Sandbox::new();
+        let bin = sb.mkdir("tools");
+        let calls = sb.root.join("calls.log");
+        let list = sb.root.join("gio.txt");
+        std::fs::write(&list, listing).unwrap();
+        tool(
+            &bin,
+            "gio",
+            &format!(
+                "echo \"gio $*\" >> '{}'\nif [ \"$1 $2\" = \"mount -li\" ]; then cat '{}'; fi",
+                calls.display(),
+                list.display()
+            ),
+        );
+        tool(&bin, "lsblk", "echo '{\"blockdevices\": []}'");
+        let gvfs = sb.mkdir("gvfs");
+        let phone = gvfs.join("mtp:host=motorola_motorola_edge_40_ZY22FAKE0001");
+        if gvfs_entry {
+            std::fs::create_dir_all(phone.join("Internal shared storage")).unwrap();
+        }
+        sb.mkdir("work");
+        let start = sb.path("work");
+        let platform: Arc<dyn Platform> = Arc::new(
+            LinuxPlatform::new(sb.dirs.clone())
+                .with_gvfs_dir(Some(gvfs))
+                .with_tools(Tools::with_path(bin.into_os_string())),
+        );
+        let h = H::with_system(sb, start, 150, 34, (Arc::new(LocalFs), platform), |_| {});
+        (h, phone, calls)
+    }
+
+    #[test]
+    fn a_phone_that_is_plugged_in_and_not_open_is_in_the_sidebar_and_enter_mounts_it() {
+        let (mut h, _, calls) = run(GIO_UNMOUNTED, false);
+        h.wait("the phone is listed", |a| !a.unmounted.is_empty());
+        let screen = h.screen();
+        assert!(screen.contains("motorola"), "{screen}");
+        assert!(screen.contains("not mounted"), "{screen}");
+        let id = "mtp://motorola_motorola_edge_40_ZY22FAKE0001/";
+        h.click(&Target::Place(PathBuf::from(id)));
+        let log = calls.clone();
+        h.wait("gio was asked to mount it", move |_| {
+            std::fs::read_to_string(&log)
+                .unwrap_or_default()
+                .contains(&format!("gio mount {id}"))
+        });
+    }
+
+    #[test]
+    fn a_phone_the_desktop_has_already_opened_is_in_the_sidebar_under_its_name() {
+        let (mut h, phone, _) = run(GIO_OPEN, true);
+        h.wait("the phone is listed", |a| {
+            a.volumes.iter().any(|v| {
+                v.kind == VolumeKind::Device && v.label.as_deref() == Some("motorola edge 40")
+            })
+        });
+        let screen = h.screen();
+        assert!(screen.contains("motorola edge 40"), "{screen}");
+        assert!(
+            !screen.contains("not mounted"),
+            "it is open, not waiting to be mounted:\n{screen}"
+        );
+        assert!(h.app.pending_devices().is_empty());
+        // And it opens.
+        h.click(&Target::Place(phone.clone()));
+        h.wait("the phone", move |a| a.cwd == phone && !a.is_loading());
+        assert_eq!(h.names(), ["Internal shared storage"]);
+    }
+}

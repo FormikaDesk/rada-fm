@@ -132,6 +132,41 @@ impl VolumeLister for LinuxVolumes {
         devices::unmounted(&self.tools)
     }
 
+    fn diagnose(&self) -> Vec<String> {
+        let mut out = vec!["[mountinfo]".to_string()];
+        match std::fs::read(MOUNTINFO) {
+            Err(e) => out.push(format!("  {MOUNTINFO}: cannot be read: {e}")),
+            Ok(text) => {
+                let kept: Vec<PathBuf> = select_mounts(&text, &self.filter)
+                    .into_iter()
+                    .map(|m| m.mount_point)
+                    .collect();
+                for line in text.split(|&b| b == b'\n') {
+                    let Some(m) = parse_line(line) else { continue };
+                    let verdict = match self.filter.why_hides(&m.fstype, &m.mount_point) {
+                        Some(why) => format!("dropped: {why}"),
+                        None if kept.contains(&m.mount_point) => {
+                            format!("LISTED as {:?}", classify(&m, &self.sys))
+                        }
+                        None => "dropped: a bind mount of something already listed, or hidden by a later mount".into(),
+                    };
+                    out.push(format!(
+                        "  {} ({} {}): {verdict}",
+                        m.mount_point.display(),
+                        m.fstype,
+                        m.source
+                    ));
+                }
+            }
+        }
+        out.extend(devices::diagnose(
+            self.gvfs_dir.as_deref(),
+            &self.tools,
+            &self.sys,
+        ));
+        out
+    }
+
     fn can_mount(&self, _d: &Unmounted) -> bool {
         // Whatever is listed can be asked for; a tool that is missing is answered with what to
         // install, when the person tries.

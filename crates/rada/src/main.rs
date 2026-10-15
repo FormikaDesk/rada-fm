@@ -46,6 +46,19 @@ enum Command {
     },
     /// Say what rada found out about this terminal, and which profile it will use.
     Doctor,
+    /// What rada sees of the machine, for finding out why something is not there.
+    #[command(hide = true)]
+    Debug {
+        #[command(subcommand)]
+        what: DebugWhat,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DebugWhat {
+    /// Every disk, phone, camera and stick the sidebar could list, with where it came from and
+    /// why each one that is left out is left out. Reads only; nothing is mounted.
+    Devices,
 }
 
 #[derive(Subcommand, Debug)]
@@ -195,6 +208,17 @@ fn main() -> Result<()> {
         };
         for l in lines {
             println!("{l}");
+        }
+        return Ok(());
+    }
+    if let Some(Command::Debug {
+        what: DebugWhat::Devices,
+    }) = &cli.command
+    {
+        let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
+        let platform = platform::current(dirs);
+        for line in platform.volumes().diagnose() {
+            println!("{line}");
         }
         return Ok(());
     }
