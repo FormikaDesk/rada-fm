@@ -417,7 +417,8 @@ impl VolumesWorker {
         std::thread::Builder::new()
             .name("rada-devices".into())
             .spawn(move || {
-                let mut last: Option<Vec<Unmounted>> = None;
+                // The interface starts with none: an empty answer is not news.
+                let mut last: Option<Vec<Unmounted>> = Some(Vec::new());
                 while !stop.load(Ordering::Relaxed) {
                     let found = platform.volumes().unmounted();
                     if last.as_ref() != Some(&found) {
