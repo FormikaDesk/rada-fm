@@ -20,3 +20,8 @@ Thumbs.db
 *.snap.new
 *.pending-snap
 docs/media/.scarto/
+
+# signing keys: they live outside the repository (see docs/release.md) and must never be added
+*.key
+*.sec
+rada-release/

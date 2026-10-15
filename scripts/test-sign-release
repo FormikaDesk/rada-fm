@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Tries scripts/sign-release.sh against a stand-in for `gh` and a key made on the spot:
+# nothing here touches GitHub or the real signing key. Needs rsign.
+#   scripts/test-sign-release
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/bin" "$tmp/keys"
+rsign="${RSIGN:-rsign}"
+"$rsign" generate -p "$tmp/keys/t.pub" -s "$tmp/keys/t.key" -W -f > /dev/null
+
+# The stand-in: a folder is the draft; the calls are written to a log.
+cat > "$tmp/bin/gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_LOG"
+case "$1 $2" in
+  "release view") echo "${FAKE_DRAFT:-true}" ;;
+  "release download")
+    while [ $# -gt 0 ]; do [ "$1" = --dir ] && dest="$2"; shift; done
+    cp "$FAKE_DRAFT_DIR"/* "$dest"/ ;;
+  "release upload") cp "${@: -1}" "$FAKE_UPLOADED" ;;
+  "release edit") ;;
+  *) echo "unexpected call: $*" >&2; exit 2 ;;
+esac
+GH
+chmod +x "$tmp/bin/gh"
+
+new_draft() {
+  rm -rf "$tmp/draft" "$tmp/uploaded"; mkdir "$tmp/draft"
+  printf 'one' > "$tmp/draft/rada-0.0.1-a.tar.gz"
+  printf 'two' > "$tmp/draft/rada-0.0.1-b.zip"
+  (cd "$tmp/draft" && sha256sum rada-* > SHA256SUMS)
+  : > "$tmp/log"
+}
+run() {
+  GH="$tmp/bin/gh" RSIGN="$rsign" RSIGN_SIGN_FLAGS=-W RADA_SIGN_KEY="${KEY:-$tmp/keys/t.key}" RADA_SIGN_PUB="$tmp/keys/t.pub" \
+    FAKE_LOG="$tmp/log" FAKE_DRAFT_DIR="$tmp/draft" FAKE_UPLOADED="$tmp/uploaded" \
+    "$here/sign-release.sh" "$@" > "$tmp/out" 2>&1
+}
+fail() { echo "FAILED: $1"; sed 's/^/  | /' "$tmp/out"; exit 1; }
+published() { grep -q 'release edit .*--draft=false' "$tmp/log"; }
+uploaded() { grep -q 'release upload' "$tmp/log"; }
+
+# 1. the usual way: signed, checked, uploaded, published
+new_draft
+run v0.0.1 --yes || fail "the usual way"
+published || fail "not published"
+"$rsign" verify -p "$tmp/keys/t.pub" -x "$tmp/uploaded" "$tmp/draft/SHA256SUMS" > /dev/null || fail "the uploaded signature does not verify"
+grep -qx 'trusted comment: rada v0.0.1' "$tmp/uploaded" || fail "wrong trusted comment"
+
+# 2. --no-publish uploads nothing
+new_draft
+run v0.0.1 --no-publish || fail "--no-publish"
+! uploaded && ! published || fail "--no-publish touched the release"
+
+# 3. a binary that is not what SHA256SUMS says: not signed, not published
+new_draft; printf 'tampered' > "$tmp/draft/rada-0.0.1-a.tar.gz"
+! run v0.0.1 --yes || fail "a changed binary was signed"
+! uploaded && ! published || fail "a changed binary was published"
+
+# 4. a file that SHA256SUMS does not list
+new_draft; printf 'extra' > "$tmp/draft/rada-0.0.1-extra.zip"
+! run v0.0.1 --yes || fail "an unlisted file was signed over"
+! uploaded && ! published || fail "an unlisted file was published"
+
+# 5. a release that is already published is left alone
+new_draft
+! FAKE_DRAFT=false run v0.0.1 --yes || fail "a published release was signed"
+! uploaded && ! published || fail "a published release was changed"
+
+# 6. no key, no signing
+new_draft
+! KEY="$tmp/keys/missing.key" run v0.0.1 --yes || fail "signed without a key"
+
+# 7. answering no at the question publishes nothing
+new_draft
+! (echo n | run v0.0.1) || fail "published after 'n'"
+! uploaded && ! published || fail "published after 'n'"
+
+echo "sign-release: all cases pass"
