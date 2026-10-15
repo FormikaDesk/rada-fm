@@ -16,8 +16,8 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
-rada-core = { path = "../core", version = "0.6.0-rc.2" }
-rada-tui = { path = "../tui", version = "0.6.0-rc.2" }
+rada-core = { workspace = true }
+rada-tui = { workspace = true }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
@@ -38,7 +38,7 @@ embed-resource = "3"
 crossterm = "0.29"
 image = { version = "0.25", default-features = false, features = ["png"] }
 tempfile = "3.27.0"
-rada-core = { path = "../core", version = "0.6.0-rc.2", features = ["testutil"] }
+rada-core = { workspace = true, features = ["testutil"] }
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 tar = { version = "0.4", default-features = false }
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }

@@ -14,6 +14,12 @@ readme = "README.md"
 keywords = ["file-manager", "tui", "terminal", "undo", "rust"]
 categories = ["command-line-utilities", "filesystem"]
 
+# The crates of the workspace, by path: the version follows [workspace.package] and is not
+# written twice.
+[workspace.dependencies]
+rada-core = { path = "crates/core" }
+rada-tui = { path = "crates/tui" }
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 

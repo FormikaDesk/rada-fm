@@ -16,7 +16,7 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
-rada-core = { path = "../core", version = "0.6.0-rc.2" }
+rada-core = { workspace = true }
 ratatui = "0.30"
 crossterm = "0.29"
 crossbeam-channel = "0.5"
@@ -29,7 +29,7 @@ image = { version = "0.25", default-features = false }
 [dev-dependencies]
 insta = "1.49.0"
 serde_json = "1.0.151"
-rada-core = { path = "../core", features = ["testutil"] }
+rada-core = { workspace = true, features = ["testutil"] }
 
 [target."cfg(unix)".dependencies]
 signal-hook = "0.4.5"
