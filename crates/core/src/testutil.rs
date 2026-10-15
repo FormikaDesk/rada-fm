@@ -129,7 +129,6 @@ struct Process {
 #[cfg(unix)]
 const OPENERS: &[&str] = &[
     "xdg-open",
-    "gio",
     "kde-open",
     "kde-open5",
     "kde-open6",
@@ -139,10 +138,20 @@ const OPENERS: &[&str] = &[
     "start",
 ];
 
-/// The system's search tools. A test never asks the real index of whoever runs it: each name
-/// is a script that finds nothing (the search falls back to walking the sandbox).
+/// The system's search tools, and the ones that list and mount devices. A test never asks the
+/// real index, nor the real disks and phones, of whoever runs it: each name is a script that
+/// finds nothing (the search falls back to walking the sandbox; the device lists stay empty).
+/// A test of the device code puts its own stand-ins in a folder of its own.
 #[cfg(unix)]
-const SEARCHERS: &[&str] = &["mdfind", "baloosearch", "baloosearch6", "osascript"];
+const SEARCHERS: &[&str] = &[
+    "mdfind",
+    "baloosearch",
+    "baloosearch6",
+    "osascript",
+    "gio",
+    "lsblk",
+    "udisksctl",
+];
 
 /// Write the stand-ins into `bin`: scripts that add a line to `log` and fail.
 #[cfg(unix)]
@@ -308,6 +317,9 @@ fn process() -> &'static Process {
             std::env::set_var("XDG_CACHE_HOME", &d.cache);
             // The tests do not speak the language of whoever runs them.
             std::env::set_var("RADA_TAG_LANGUAGE", "en");
+            // The phones and cameras of whoever runs the tests are none of their business: the
+            // folder where the desktop would show them is one that does not exist.
+            std::env::set_var("RADA_TEST_GVFS_DIR", scratch.join("no-gvfs"));
         }
         let launches = install_opener_traps(&scratch);
         Process {
@@ -327,7 +339,7 @@ pub fn assert_real_paths_untouched() {
 }
 
 /// Fail (panic) if anything in this test process tried to run the system's real opener
-/// (`xdg-open`, `open`, `gio`, `kde-open`, `start`…): that would open a program on the
+/// (`xdg-open`, `open`, `kde-open`, `start`…): that would open a program on the
 /// desktop of whoever runs the tests. Opening goes through the sandbox's recording opener.
 pub fn assert_no_real_opener_run() {
     let log = std::fs::read_to_string(&process().launches).unwrap_or_default();

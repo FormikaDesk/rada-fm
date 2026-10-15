@@ -10,6 +10,10 @@ pub enum VolumeKind {
     Network,
     Optical,
     Virtual,
+    /// A phone or a camera seen through the desktop's virtual filesystem (MTP, PTP): a
+    /// folder that is a window onto the device, not a disk. Nothing is counted in it and
+    /// the operations that need a real filesystem are not trusted there.
+    Device,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -29,9 +33,39 @@ pub struct Volume {
     pub responsive: bool,
 }
 
+/// A device that is plugged in and has no folder yet: a USB stick that is not mounted, a
+/// phone the desktop has not opened. The sidebar lists it with a "Mount" action.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unmounted {
+    /// What the mount tool is given: `/dev/sdb1` for a disk, `mtp://host/` for a phone.
+    pub id: String,
+    /// The name to show: the label of the disk, the model of the phone.
+    pub name: String,
+    /// `Removable` for a disk, `Device` for a phone or a camera.
+    pub kind: VolumeKind,
+    pub size: Option<u64>,
+}
+
 /// Enumerates mounted volumes. May block: only ever call it from a worker thread.
 pub trait VolumeLister: Send + Sync {
     fn list(&self) -> Result<Vec<Volume>>;
+
+    /// The devices that are plugged in and not mounted. May block, and may run a program:
+    /// worker thread only. A tool that is missing means an empty list, never an error.
+    fn unmounted(&self) -> Vec<Unmounted> {
+        Vec::new()
+    }
+
+    /// Whether this device can be mounted from here.
+    fn can_mount(&self, _device: &Unmounted) -> bool {
+        false
+    }
+
+    /// Mount it. The error says in plain words what to do (install a tool, unlock the phone,
+    /// close the program that holds it). May block: call it from a thread of its own.
+    fn mount(&self, _device: &Unmounted) -> Result<()> {
+        Err(crate::Error::Unsupported("mount"))
+    }
 
     /// Wait up to `timeout` for the set of mounts to change; `true` if it did.
     /// The default just sleeps, so callers fall back to periodic polling.

@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::platform::volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
-use crate::platform::which::on_path;
+use super::devices::{self, Tools};
+use crate::platform::volumes::{DeviceFilter, Unmounted, Volume, VolumeKind, VolumeLister};
 use crate::{Error, Result};
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(700);
@@ -20,6 +20,11 @@ pub struct LinuxVolumes {
     /// Mounts whose last probe is still blocked: never probed twice in parallel.
     stuck: Mutex<HashMap<PathBuf, Arc<AtomicBool>>>,
     filter: DeviceFilter,
+    /// Where the desktop keeps the phones and cameras it has opened.
+    gvfs_dir: Option<PathBuf>,
+    tools: Tools,
+    /// `/sys`, to tell a stick from an internal disk.
+    sys: PathBuf,
 }
 
 impl LinuxVolumes {
@@ -31,7 +36,38 @@ impl LinuxVolumes {
         LinuxVolumes {
             stuck: Mutex::new(HashMap::new()),
             filter,
+            gvfs_dir: devices::gvfs_dir(),
+            tools: Tools::system(),
+            sys: PathBuf::from("/sys"),
         }
+    }
+
+    /// Choose which mounts stay out of the list.
+    pub fn filtered(mut self, filter: DeviceFilter) -> Self {
+        self.filter = filter;
+        self
+    }
+
+    /// Look for phones and cameras in `dir` (tests; the system's own is the default).
+    pub fn with_gvfs_dir(mut self, dir: Option<PathBuf>) -> Self {
+        self.gvfs_dir = dir;
+        self
+    }
+
+    /// Run `gio`, `lsblk` and `udisksctl` from these folders (a `PATH`-style list).
+    pub fn with_tools(mut self, tools: Tools) -> Self {
+        self.tools = tools;
+        self
+    }
+
+    /// Read the kind of drive from this `/sys` (tests).
+    pub fn with_sys(mut self, sys: PathBuf) -> Self {
+        self.sys = sys;
+        self
+    }
+
+    pub fn gvfs_dir(&self) -> Option<&Path> {
+        self.gvfs_dir.as_deref()
     }
 
     /// `statvfs` on a helper thread, abandoned after [`PROBE_TIMEOUT`]: (total, available).
@@ -73,7 +109,7 @@ impl VolumeLister for LinuxVolumes {
             let space = self.probe(&m.mount_point);
             out.push(Volume {
                 label: labels.get(&m.source).cloned(),
-                kind: classify(&m),
+                kind: classify(&m, &self.sys),
                 drive_letter: None,
                 total: space.map(|s| s.0),
                 available: space.map(|s| s.1),
@@ -84,14 +120,42 @@ impl VolumeLister for LinuxVolumes {
                 device: m.source,
             });
         }
+        // The phones and cameras are folders of the desktop's virtual filesystem, not mounts
+        // of their own: their mount is filtered out above and they are added here.
+        if let Some(dir) = &self.gvfs_dir {
+            out.extend(devices::open_device_volumes(dir, &self.tools));
+        }
         Ok(out)
     }
 
+    fn unmounted(&self) -> Vec<Unmounted> {
+        devices::unmounted(&self.tools)
+    }
+
+    fn can_mount(&self, _d: &Unmounted) -> bool {
+        // Whatever is listed can be asked for; a tool that is missing is answered with what to
+        // install, when the person tries.
+        true
+    }
+
+    fn mount(&self, d: &Unmounted) -> Result<()> {
+        devices::mount(&self.tools, d)
+    }
+
     fn can_eject(&self, v: &Volume) -> bool {
-        v.kind == VolumeKind::Removable && v.device.starts_with("/dev/") && on_path("udisksctl")
+        match v.kind {
+            VolumeKind::Removable => {
+                v.device.starts_with("/dev/") && self.tools.find("udisksctl").is_some()
+            }
+            VolumeKind::Device => self.tools.find("gio").is_some(),
+            _ => false,
+        }
     }
 
     fn eject(&self, v: &Volume) -> Result<()> {
+        if v.kind == VolumeKind::Device {
+            return devices::unmount_device(&self.tools, &v.device);
+        }
         crate::platform::eject::eject_with_udisks(&v.device)
     }
 
@@ -216,14 +280,18 @@ fn is_network(fstype: &str) -> bool {
     ) || fstype.starts_with("fuse.sshfs")
 }
 
-fn classify(m: &MountLine) -> VolumeKind {
+fn classify(m: &MountLine, sys: &Path) -> VolumeKind {
     if is_network(&m.fstype) {
         VolumeKind::Network
     } else if matches!(m.fstype.as_str(), "iso9660" | "udf") {
         VolumeKind::Optical
     } else if m.fstype == "tmpfs" {
         VolumeKind::Virtual
-    } else if m.mount_point.starts_with("/run/media") || m.mount_point.starts_with("/media") {
+    } else if m.mount_point.starts_with("/run/media")
+        || m.mount_point.starts_with("/media")
+        // A stick mounted by hand somewhere else is still a stick.
+        || devices::removable_drive(sys, &m.source)
+    {
         VolumeKind::Removable
     } else {
         VolumeKind::Fixed
@@ -380,6 +448,95 @@ mod tests {
         assert!(f.hides("fuse.sshfs", Path::new("/x")));
         assert!(f.hides("ext4", Path::new("/mnt/a/b")));
         assert!(!f.hides("ext4", Path::new("/mntx")));
+    }
+
+    /// A `/sys` with one stick on the USB bus and one internal disk.
+    fn fake_sys(root: &Path) -> PathBuf {
+        let sys = root.join("sys");
+        let mk = |bus: &str, disk: &str, part: &str| {
+            let d = sys.join("devices/pci0").join(bus).join("block").join(disk);
+            std::fs::create_dir_all(d.join(part)).unwrap();
+            std::fs::write(d.join("removable"), "0\n").unwrap();
+            std::fs::write(d.join(part).join("partition"), "1").unwrap();
+            std::fs::create_dir_all(sys.join("class/block")).unwrap();
+            std::os::unix::fs::symlink(d.join(part), sys.join("class/block").join(part)).unwrap();
+        };
+        mk("usb1/1-2", "sdb", "sdb1");
+        mk("ata1", "sda", "sda1");
+        sys
+    }
+
+    #[test]
+    fn a_stick_mounted_in_an_unusual_place_is_still_removable() {
+        let sb = crate::testutil::Sandbox::new();
+        let sys = fake_sys(&sb.root);
+        let line = |dev: &str, at: &str| {
+            parse_line(
+                format!("42 28 8:17 / {at} rw,relatime shared:70 - ext4 {dev} rw").as_bytes(),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            classify(&line("/dev/sdb1", "/mnt/stick"), &sys),
+            VolumeKind::Removable
+        );
+        assert_eq!(
+            classify(&line("/dev/sda1", "/mnt/data"), &sys),
+            VolumeKind::Fixed
+        );
+        assert_eq!(
+            classify(&line("/dev/sda1", "/run/media/u/X"), &sys),
+            VolumeKind::Removable,
+            "the folders the desktop mounts into still say removable"
+        );
+    }
+
+    #[test]
+    fn the_list_has_the_open_phones_and_they_can_be_ejected_with_gio_only() {
+        let sb = crate::testutil::Sandbox::new();
+        let gvfs = sb.mkdir("gvfs");
+        std::fs::create_dir_all(gvfs.join("mtp:host=Pixel_6_1A2B3C4D")).unwrap();
+        let bin = sb.mkdir("tools");
+        let none = Tools::with_path(sb.mkdir("none").into_os_string());
+        let with_gio = |dir: &Path| {
+            use std::os::unix::fs::PermissionsExt;
+            let exe = dir.join("gio");
+            std::fs::write(&exe, "#!/bin/sh\nexit 0\n").unwrap();
+            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+            Tools::with_path(dir.as_os_str().to_owned())
+        };
+        let lister = LinuxVolumes::new()
+            .with_gvfs_dir(Some(gvfs.clone()))
+            .with_tools(none);
+        let all = lister.list().unwrap();
+        let phone = all
+            .iter()
+            .find(|v| v.kind == VolumeKind::Device)
+            .expect("the phone is in the list");
+        assert_eq!(phone.mount_point, gvfs.join("mtp:host=Pixel_6_1A2B3C4D"));
+        assert_eq!(phone.label.as_deref(), Some("Pixel 6"));
+        assert!(
+            !all.iter().any(|v| v.mount_point == gvfs),
+            "the folder of the virtual filesystem is not a disk of its own"
+        );
+        assert!(!lister.can_eject(phone), "no gio, no eject");
+        let lister = lister.with_tools(with_gio(&bin));
+        assert!(lister.can_eject(phone));
+        assert!(lister.can_mount(&Unmounted {
+            id: "mtp://x/".into(),
+            name: "x".into(),
+            kind: VolumeKind::Device,
+            size: None
+        }));
+        // No folder for the devices: the list is the mounts alone.
+        let plain = LinuxVolumes::new().with_gvfs_dir(None);
+        assert!(
+            plain
+                .list()
+                .unwrap()
+                .iter()
+                .all(|v| v.kind != VolumeKind::Device)
+        );
     }
 
     #[test]

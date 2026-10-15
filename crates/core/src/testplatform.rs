@@ -12,7 +12,7 @@ use crate::Result;
 use crate::fs::FsMeta;
 use crate::platform::{
     AccessDenied, Attrs, Dirs, Fidelity, FileAttributes, Opener, PathRules, PlaceKind, Platform,
-    TagStore, TrashBackend, UserDirs, Volume, VolumeLister,
+    TagStore, TrashBackend, Unmounted, UserDirs, Volume, VolumeLister,
 };
 
 /// What the stand-in says and has.
@@ -205,6 +205,9 @@ impl Platform for MacLike {
     fn path_rules(&self) -> PathRules {
         self.inner.path_rules()
     }
+    fn device_root(&self) -> Option<&Path> {
+        self.inner.device_root()
+    }
     fn fidelity(&self) -> &dyn Fidelity {
         self.inner.fidelity()
     }
@@ -337,6 +340,9 @@ impl Platform for Recording {
     fn path_rules(&self) -> PathRules {
         self.inner.path_rules()
     }
+    fn device_root(&self) -> Option<&Path> {
+        self.inner.device_root()
+    }
     fn fidelity(&self) -> &dyn Fidelity {
         self.inner.fidelity()
     }
@@ -409,6 +415,160 @@ impl Platform for WithPathRules {
     }
     fn path_rules(&self) -> PathRules {
         self.rules.clone()
+    }
+    fn device_root(&self) -> Option<&Path> {
+        self.inner.device_root()
+    }
+    fn fidelity(&self) -> &dyn Fidelity {
+        self.inner.fidelity()
+    }
+    fn user_dirs(&self) -> UserDirs {
+        self.inner.user_dirs()
+    }
+    fn display_names(&self, places: &[PathBuf]) -> Vec<(PathBuf, String)> {
+        self.inner.display_names(places)
+    }
+    fn extra_places(&self) -> Vec<(PlaceKind, PathBuf)> {
+        self.inner.extra_places()
+    }
+    fn tags(&self) -> Option<&dyn TagStore> {
+        self.inner.tags()
+    }
+    fn recent_available(&self) -> bool {
+        self.inner.recent_available()
+    }
+    fn recent_files(
+        &self,
+        cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(PathBuf, std::time::SystemTime)>> {
+        self.inner.recent_files(cancel)
+    }
+    fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
+        self.inner.explain_denied(path, err)
+    }
+}
+
+/// A platform with phones and cameras: a folder standing in for the one where the desktop shows
+/// them, a fixed list of what is open and what is only plugged in, and a mount and an eject that
+/// start nothing: they write down what was asked and move the device from one list to the
+/// other.
+pub struct WithDevices {
+    inner: Arc<dyn Platform>,
+    root: PathBuf,
+    lister: DeviceLister,
+}
+
+/// What the stand-in has plugged in.
+#[derive(Clone, Default)]
+pub struct DevicesSpec {
+    /// Where the phones and cameras are shown: devices are folders directly below it.
+    pub root: PathBuf,
+    /// What is open (and mounted disks, if the test wants some).
+    pub volumes: Vec<Volume>,
+    /// What is plugged in and not open.
+    pub unmounted: Vec<Unmounted>,
+    /// What a mount answers: `None` works, `Some(text)` fails with that text.
+    pub mount_error: Option<String>,
+}
+
+struct DeviceLister {
+    state: Mutex<(Vec<Volume>, Vec<Unmounted>)>,
+    root: PathBuf,
+    mount_error: Option<String>,
+    log: CallLog,
+}
+
+impl VolumeLister for DeviceLister {
+    fn list(&self) -> Result<Vec<Volume>> {
+        Ok(self.state.lock().unwrap().0.clone())
+    }
+    fn unmounted(&self) -> Vec<Unmounted> {
+        self.state.lock().unwrap().1.clone()
+    }
+    fn wait_for_change(&self, timeout: Duration) -> bool {
+        std::thread::sleep(timeout.min(Duration::from_millis(100)));
+        false
+    }
+    fn can_mount(&self, _d: &Unmounted) -> bool {
+        true
+    }
+    fn mount(&self, d: &Unmounted) -> Result<()> {
+        self.log.lock().unwrap().push(format!("mount {}", d.id));
+        if let Some(text) = &self.mount_error {
+            return Err(crate::Error::Invalid(text.clone()));
+        }
+        let mut st = self.state.lock().unwrap();
+        st.1.retain(|u| u.id != d.id);
+        st.0.push(Volume {
+            mount_point: self.root.join(&d.name),
+            label: Some(d.name.clone()),
+            fs_type: "mtp".into(),
+            device: d.id.clone(),
+            kind: d.kind,
+            drive_letter: None,
+            total: None,
+            available: None,
+            read_only: false,
+            responsive: true,
+        });
+        Ok(())
+    }
+    fn can_eject(&self, v: &Volume) -> bool {
+        matches!(
+            v.kind,
+            crate::platform::VolumeKind::Removable | crate::platform::VolumeKind::Device
+        )
+    }
+    fn eject(&self, v: &Volume) -> Result<()> {
+        self.log
+            .lock()
+            .unwrap()
+            .push(format!("eject {}", v.mount_point.display()));
+        let mut st = self.state.lock().unwrap();
+        st.0.retain(|x| x.mount_point != v.mount_point);
+        Ok(())
+    }
+}
+
+impl WithDevices {
+    pub fn new(inner: Arc<dyn Platform>, spec: DevicesSpec, log: CallLog) -> WithDevices {
+        WithDevices {
+            inner,
+            root: spec.root.clone(),
+            lister: DeviceLister {
+                state: Mutex::new((spec.volumes, spec.unmounted)),
+                root: spec.root,
+                mount_error: spec.mount_error,
+                log,
+            },
+        }
+    }
+}
+
+impl Platform for WithDevices {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+    fn dirs(&self) -> &Dirs {
+        self.inner.dirs()
+    }
+    fn trash(&self) -> &dyn TrashBackend {
+        self.inner.trash()
+    }
+    fn volumes(&self) -> &dyn VolumeLister {
+        &self.lister
+    }
+    fn attributes(&self) -> &dyn FileAttributes {
+        self.inner.attributes()
+    }
+    fn opener(&self) -> &dyn Opener {
+        self.inner.opener()
+    }
+    fn path_rules(&self) -> PathRules {
+        self.inner.path_rules()
+    }
+    fn device_root(&self) -> Option<&Path> {
+        Some(&self.root)
     }
     fn fidelity(&self) -> &dyn Fidelity {
         self.inner.fidelity()

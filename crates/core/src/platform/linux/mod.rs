@@ -1,5 +1,6 @@
 //! The complete platform: Linux.
 
+pub mod devices;
 mod fidelity;
 mod mounts;
 mod open;
@@ -36,7 +37,25 @@ impl LinuxPlatform {
 
     /// Choose which mounts stay out of the disk list.
     pub fn with_device_filter(mut self, filter: super::DeviceFilter) -> Self {
-        self.volumes = mounts::LinuxVolumes::with_filter(filter);
+        self.volumes = self.volumes.filtered(filter);
+        self
+    }
+
+    /// Look for phones and cameras in `dir` instead of the desktop's own folder (tests).
+    pub fn with_gvfs_dir(mut self, dir: Option<std::path::PathBuf>) -> Self {
+        self.volumes = self.volumes.with_gvfs_dir(dir);
+        self
+    }
+
+    /// Run the helper programs (`gio`, `lsblk`, `udisksctl`) from these folders (tests).
+    pub fn with_tools(mut self, tools: devices::Tools) -> Self {
+        self.volumes = self.volumes.with_tools(tools);
+        self
+    }
+
+    /// Read what kind of drive a device is from this `/sys` (tests).
+    pub fn with_sys(mut self, sys: std::path::PathBuf) -> Self {
+        self.volumes = self.volumes.with_sys(sys);
         self
     }
 
@@ -76,6 +95,9 @@ impl Platform for LinuxPlatform {
     }
     fn path_rules(&self) -> PathRules {
         PathRules::POSIX
+    }
+    fn device_root(&self) -> Option<&std::path::Path> {
+        self.volumes.gvfs_dir()
     }
     fn fidelity(&self) -> &dyn super::Fidelity {
         &self.fidelity

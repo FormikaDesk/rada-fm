@@ -182,6 +182,8 @@ pub fn drive_display_name(label: &str, kind: VolumeKind, letter: char) -> String
             VolumeKind::Optical => "CD Drive",
             VolumeKind::Virtual => "RAM Disk",
             VolumeKind::Fixed => "Local Disk",
+            // Windows lists its own devices as drives; this kind only comes from Linux.
+            VolumeKind::Device => "Device",
         }
     } else {
         label.trim()

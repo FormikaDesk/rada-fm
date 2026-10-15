@@ -43,7 +43,7 @@ pub use openwith::{OpenApp, OpenChoices};
 pub use tags::{Tag, TagColor, TagStore};
 pub use trash::{TrashBackend, TrashHandle, TrashedItem};
 pub use userdirs::{PlaceKind, UserDirs};
-pub use volumes::{DeviceFilter, Volume, VolumeKind, VolumeLister};
+pub use volumes::{DeviceFilter, Unmounted, Volume, VolumeKind, VolumeLister};
 
 use crate::Result;
 
@@ -201,6 +201,18 @@ pub trait Platform: Send + Sync {
         _cancel: &dyn Fn() -> bool,
     ) -> Option<Vec<(std::path::PathBuf, std::time::SystemTime)>> {
         None
+    }
+    /// The folder under which the desktop shows phones and cameras (`$XDG_RUNTIME_DIR/gvfs`),
+    /// `None` where there is none. Each device is a folder directly below it.
+    fn device_root(&self) -> Option<&Path> {
+        None
+    }
+    /// Is `path` inside a phone or a camera? Such a place is a window onto the device: it
+    /// has no permissions, no links and no atomic rename, and what is written reaches the
+    /// device when the file is closed.
+    fn on_device(&self, path: &Path) -> bool {
+        self.device_root()
+            .is_some_and(|root| path.starts_with(root) && path != root)
     }
     /// Where tags are kept on this system; `None` where they are not supported (Windows).
     fn tags(&self) -> Option<&dyn TagStore> {
