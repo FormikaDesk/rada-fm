@@ -670,24 +670,6 @@ fn capitalised(s: &str) -> String {
     }
 }
 
-#[allow(dead_code)]
-fn verb(kind: OpKind) -> &'static str {
-    match kind {
-        OpKind::Copy => Key::VCopy,
-        OpKind::Move => Key::VMove,
-        OpKind::Rename | OpKind::BulkRename => Key::VRename,
-        OpKind::MakeDir => Key::VNewFolder,
-        OpKind::MakeFile => Key::VNewFile,
-        OpKind::Trash => Key::VTrash,
-        OpKind::Delete => Key::VDelete,
-        OpKind::Undo => Key::VUndo,
-        OpKind::Extract => Key::VExtract,
-        OpKind::Compress => Key::VCompress,
-        OpKind::SetTags => Key::VTags,
-    }
-    .tr()
-}
-
 /// The two folders a plan is about, named once at the top; everything else is shown
 /// relative to them (`→` marks something that lives in the destination).
 struct Bases {
