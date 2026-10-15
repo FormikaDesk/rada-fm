@@ -74,9 +74,25 @@ rada is young and written by one person. The parts that touch your files — pla
 
 ## Download
 
-Binaries for Linux (static, x86_64 and aarch64), Windows (x86_64) and macOS (Intel and Apple silicon) are on the [releases page](https://github.com/formikadesk/rada-fm/releases), with a `SHA256SUMS` file. Unpack the archive and put `rada` (`rada.exe`) somewhere on your `PATH` (on a Mac, `~/.local/bin` or `/usr/local/bin` will do; no Homebrew is needed). Once it is installed, rada can [update itself](#updates).
+Binaries for Linux (static, x86_64 and aarch64), Windows (x86_64) and macOS (Intel and Apple silicon) are on the [releases page](https://github.com/formikadesk/rada-fm/releases), with a `SHA256SUMS` file and its signature, `SHA256SUMS.minisig`. Unpack the archive and put `rada` (`rada.exe`) somewhere on your `PATH` (on a Mac, `~/.local/bin` or `/usr/local/bin` will do; no Homebrew is needed). Once it is installed, rada can [update itself](#updates).
 
 Windows and macOS builds are new: please report anything odd in an issue.
+
+### Verify the download
+
+Every release is signed with [minisign](https://jedisct1.github.io/minisign/), by a key that is kept on the author's own computer, not on GitHub. To check a download by hand (`rada update` does it for you, and refuses an update that does not verify):
+
+```sh
+minisign -Vm SHA256SUMS -P <the main public key>    # "Signature and comment signature verified", Trusted comment: rada v<version>
+sha256sum --check --ignore-missing SHA256SUMS      # OK for your archive
+```
+
+| | public key |
+|---|---|
+| main | `PLACEHOLDER-main-key-not-made-yet` |
+| reserve | `PLACEHOLDER-reserve-key-not-made-yet` |
+
+More in [docs/verify.md](docs/verify.md); how a release is made and signed is in [docs/release.md](docs/release.md).
 
 ### On a Mac
 
@@ -247,9 +263,11 @@ How it updates depends on how this copy got here (`method = "auto"`, or choose):
 
 | | |
 |---|---|
-| **binary** — downloaded from the releases | downloads the archive for this system and processor (Intel or Apple silicon on a Mac; under Rosetta, the native one), checks it against the release's `SHA256SUMS`, starts the new program once with `--version`, then replaces the running one atomically (on Windows the running file is renamed out of the way first). The old one is kept for `--rollback`. A file rada writes has no macOS quarantine flag; rada checks and clears it anyway. |
+| **binary** — downloaded from the releases | downloads the archive for this system and processor (Intel or Apple silicon on a Mac; under Rosetta, the native one), checks the minisign signature of the release's `SHA256SUMS` (against two public keys built into the program; the signed comment must name this release, so an old signed release cannot be shown again) and the archive against it, starts the new program once with `--version`, then replaces the running one atomically (on Windows the running file is renamed out of the way first). The old one is kept for `--rollback`. A file rada writes has no macOS quarantine flag; rada checks and clears it anyway. |
 | **source** — built from a git checkout (`source_dir`, or the checkout the program sits in) | in that folder: stops with an explanation unless the working tree is clean and the branch is `main`; `git pull --ff-only`; `cargo build --release --locked`; puts the new program in place of the running one; `cargo clean`. Progress shows in the status bar, the interface stays usable, and if a step fails the old program is untouched and the log (`$XDG_STATE_HOME/rada/update/last.log`) can be opened from the window. |
 | **package** — installed by a package manager (a system path, the AUR, Scoop, Homebrew) | touches nothing and says which tool to use. |
+
+An update that is not signed by the author is refused, and nothing is installed; the old program and the way back (`--rollback`) stay as they were. A *source* update trusts the git repository you chose, and a *package* the package manager: neither goes through the signature.
 
 ## macOS
 

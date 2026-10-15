@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+Hardening after a review of the code. No new version yet.
+
+### Security
+- **Updates are signed.** Every release now carries `SHA256SUMS.minisig`, a [minisign](https://jedisct1.github.io/minisign/) signature of `SHA256SUMS`, and `rada update` refuses a release that has none or whose signature is not valid for one of the two public keys built into the program (the main one and a reserve). The signed comment must be exactly `rada <tag>` of the release being installed, so an old signed release cannot be shown again as a new one. The order is: signature, then the hash of the archive, then unpacking, and only then is the new program started (`--version`) and, on a Mac, the quarantine flag removed; before, the program was run before any signature existed. With an invalid or missing signature nothing is downloaded or changed, and the way back stays as it was. The keys in the source are placeholders until the first signed release: until then a build installs nothing. Source and package updates are unchanged (they trust the repository you chose and the package manager). How to check a download by hand: `docs/verify.md`.
+- **Releases are published by hand.** The release workflow creates a **draft** with the binaries and `SHA256SUMS` and publishes nothing; `scripts/sign-release.sh <tag>` downloads the draft, checks the hashes again, signs with the offline key (the passphrase is asked by `rsign`) and publishes. The workflow runs only for tags `v<digit>…`, has a read-only token except in the job that makes the draft, and every action is pinned to a commit hash. The flow is in `docs/release.md`.
+- **`rustls` 0.23.46** (RUSTSEC-2026-0346, -0347, -0348, -0349).
+- **The state folder is private.** `~/.local/state/rada` (and the journal, the interface state, the update state, the logs) is `0700` and its files `0600` on Unix; an existing install is corrected at start. Before, the folder was `755` and the journal readable by other users of the machine when the home folder allowed it.
+- **A `.7z` that asks for more than 1 GiB of memory for one block** (a dictionary of gigabytes) is refused before it is unpacked, as an `.xz` already was.
+- **Extracting an archive keeps the links of the archive in view whatever the case** where the destination ignores case (macOS, Windows): a file under `foo/` is not written through a link called `Foo`.
+- **Extracted files are written to the disk before they get their name** (`fsync` of the file, then of the folder when the run ends), so a power cut cannot leave a name on an empty file with a journal that says "done".
+- **An empty entry in `PATH`** (`/usr/bin::/bin`) is no longer the current folder when rada looks for a program (`7z`, `unrar`, `xdg-open`, the terminal, `pdftoppm`…): one function, `platform::which`, replaces seven copies.
+- **An SVG over 20 MB is not drawn** (it was read whole, with no limit).
+- **Removing a tree uses `remove_dir_all`**, which cannot be sent through a link swapped in while it walks (it is used by the trash across volumes and by putting back).
+
+### Changed
+- One `write_atomic` (a temporary name of its own, `fsync`, rename, `fsync` of the folder) for the four state files that had a copy each.
+- `sevenz-rust2` 0.24 and `lzma-rust2` 0.22 (one `lzma-rust2` in the tree). The crates of the workspace depend on each other by path through `[workspace.dependencies]` (no version to keep up to date), and are marked `publish = false`.
+- CI: a job `cargo audit` and `cargo deny` (`deny.toml`: permissive licences, advisories as errors, duplicates as warnings, crates.io only); the token is read-only; the actions are pinned to commit hashes; `--locked` for the build and the tests.
+
+### Fixed
+- A flaky test (`spotlight_is_asked_for_the_tag_by_the_name_the_finder_stores`, one failure in 360): starting a program that was written a moment before could fail with "Text file busy" when another test forked at that instant, and the search tool turned the failure into "no result". The retry that the updater already had is now one function (`platform::spawn::spawn_retrying_busy`) used by the updater, the tag search and the PDF tools.
+- Removed `verb()`, which nothing called.
+
 ## [0.6.0-rc.8] - 2026-10-15
 
 Carta on a less warm paper, the names of the Finder on macOS, a "Recent" entry in the sidebar, and an option to leave the terminal's background alone. Still a **pre-release**.
