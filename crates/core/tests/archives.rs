@@ -305,6 +305,7 @@ fn nothing_is_written_through_a_link_the_archive_made() {
 /// through a link called `Foo`: the check of the archive's links has to see that.
 #[test]
 fn a_link_is_found_whatever_the_case_where_the_destination_ignores_case() {
+    use rada_core::platform::PathRules;
     use rada_core::testplatform::WithPathRules;
     let sb = Sandbox::new();
     let dir = sb.mkdir("out");
@@ -325,7 +326,13 @@ fn a_link_is_found_whatever_the_case_where_the_destination_ignores_case() {
     };
 
     // Names that differ in case are different names here: nothing to refuse.
-    let exact = sb.engine();
+    let exact = Engine::local(Arc::new(WithPathRules::new(
+        sb.platform(),
+        PathRules {
+            case_insensitive: false,
+            ..sb.platform().path_rules()
+        },
+    )));
     let plan = plan_req(&exact, &extract_req(&a, &dir, ExtractInto::Here));
     assert!(warning(&plan, WarningKind::UnsafePath).is_none());
     assert!(wrote_under_link(&plan));

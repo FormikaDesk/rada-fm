@@ -21,7 +21,7 @@ Hardening after a review of the code. No new version yet.
 
 ### Changed
 - One `write_atomic` (a temporary name of its own, `fsync`, rename, `fsync` of the folder) for the four state files that had a copy each.
-- `sevenz-rust2` 0.24 and `lzma-rust2` 0.22 (one `lzma-rust2` in the tree). The crates of the workspace depend on each other by path through `[workspace.dependencies]` (no version to keep up to date), and are marked `publish = false`.
+- The crates of the workspace depend on each other by path through `[workspace.dependencies]` (no version to keep up to date), and are marked `publish = false`.
 - CI: a job `cargo audit` and `cargo deny` (`deny.toml`: permissive licences, advisories as errors, duplicates as warnings, crates.io only); the token is read-only; the actions are pinned to commit hashes; `--locked` for the build and the tests.
 
 ### Fixed

@@ -676,29 +676,47 @@ pub(super) fn sevenz_err(e: sevenz_rust2::Error) -> ArchiveError {
 /// library does not limit it: a hostile file can declare a dictionary of gigabytes.
 const SEVENZ_MEMORY_KIB: u64 = 1 << 20;
 
+/// The property bytes of a coder. The library keeps them private; its `Debug` text shows them
+/// (`properties: [24]`). If that text ever looks different, this returns `None` and the caller
+/// refuses the block: a limit that cannot be applied must not be skipped.
+fn sevenz_properties(c: &sevenz_rust2::Coder) -> Option<Vec<u8>> {
+    let text = format!("{c:?}");
+    let list = text.split("properties: [").nth(1)?.split(']').next()?;
+    list.split(',')
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(|n| n.parse::<u8>().ok())
+        .collect()
+}
+
 /// What a coder needs for its dictionary (LZMA, LZMA2) or its model (PPMd), in KiB. The other
-/// methods in use need little and are not counted.
+/// methods in use need little and are not counted. `u64::MAX` when the coder asks for memory
+/// and its properties cannot be read.
 fn sevenz_coder_kib(c: &sevenz_rust2::Coder) -> u64 {
     use sevenz_rust2::EncoderMethod as M;
     let id = c.encoder_method_id();
-    let p = c.properties();
+    let lzma2 = id == M::ID_LZMA2;
+    if !(lzma2 || id == M::ID_LZMA || id == M::ID_PPMD) {
+        return 0;
+    }
+    let Some(p) = sevenz_properties(c) else {
+        return u64::MAX;
+    };
     let word = |p: &[u8]| {
         p.get(1..5)
             .map(|b| u64::from(u32::from_le_bytes([b[0], b[1], b[2], b[3]])))
     };
-    let bytes = if id == M::ID_LZMA2 {
+    let bytes = if lzma2 {
         match p.first().map(|&b| u64::from(b & 0x3F)) {
             Some(40) => Some(0xFFFF_FFFF),
             Some(bits) if bits > 40 => Some(u64::MAX >> 12),
             Some(bits) => Some((2 | (bits & 1)) << (bits / 2 + 11)),
             None => None,
         }
-    } else if id == M::ID_LZMA || id == M::ID_PPMD {
-        word(p)
     } else {
-        None
+        word(&p)
     };
-    bytes.map_or(0, |b| b.div_ceil(1024))
+    bytes.map_or(u64::MAX, |b| b.div_ceil(1024))
 }
 
 /// Refuse a `.7z` one of whose blocks asks for more memory than the limit, before any of it
@@ -707,13 +725,22 @@ pub(super) fn sevenz_check_memory(ar: &sevenz_rust2::Archive) -> Result<(), Arch
     let worst = ar
         .blocks
         .iter()
-        .map(|b| b.coders.iter().map(sevenz_coder_kib).sum::<u64>())
+        .map(|b| {
+            b.coders
+                .iter()
+                .map(sevenz_coder_kib)
+                .fold(0u64, u64::saturating_add)
+        })
         .max()
         .unwrap_or(0);
     if worst > SEVENZ_MEMORY_KIB {
         return Err(ArchiveError::Unsupported(format!(
-            "it needs {} MiB of memory to unpack (the limit is {} MiB)",
-            worst / 1024,
+            "it needs {} of memory to unpack (the limit is {} MiB)",
+            if worst == u64::MAX {
+                "more than can be known".to_string()
+            } else {
+                format!("{} MiB", worst / 1024)
+            },
             SEVENZ_MEMORY_KIB / 1024
         )));
     }
