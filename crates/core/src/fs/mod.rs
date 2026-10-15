@@ -404,6 +404,11 @@ pub trait FsEngine: Send + Sync {
     fn rename_noreplace(&self, from: &Path, to: &Path) -> io::Result<()>;
     fn remove_file(&self, p: &Path) -> io::Result<()>;
     fn remove_dir(&self, p: &Path) -> io::Result<()>;
+    /// Remove the folder `p` and everything in it. Never follows a link, not even one put in
+    /// place of a folder while this runs (the standard library walks with open folders).
+    fn remove_dir_all(&self, p: &Path) -> io::Result<()> {
+        std::fs::remove_dir_all(p)
+    }
     fn set_mode(&self, p: &Path, mode: u32) -> io::Result<()>;
     fn set_mtime(&self, p: &Path, mtime: SystemTime, atime: Option<SystemTime>) -> io::Result<()>;
     /// A new name `link` for the existing file `existing` (a hard link). Fails with

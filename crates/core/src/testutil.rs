@@ -1026,6 +1026,10 @@ impl FsEngine for FaultFs {
         self.check(Op::RemoveDir, p)?;
         self.inner.remove_dir(p)
     }
+    fn remove_dir_all(&self, p: &Path) -> io::Result<()> {
+        self.check(Op::RemoveDir, p)?;
+        self.inner.remove_dir_all(p)
+    }
     fn set_mode(&self, p: &Path, m: u32) -> io::Result<()> {
         self.inner.set_mode(p, m)
     }

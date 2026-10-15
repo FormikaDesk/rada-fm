@@ -11,12 +11,8 @@ use crate::{Error, Result};
 
 /// Remove a file, symlink or whole directory tree without following symlinks.
 pub fn remove_tree(fs: &dyn FsEngine, p: &Path) -> io::Result<()> {
-    let meta = fs.lstat(p)?;
-    if meta.kind == FileKind::Dir {
-        for item in fs.read_dir(p)? {
-            remove_tree(fs, &item.path)?;
-        }
-        fs.remove_dir(p)
+    if fs.lstat(p)?.kind == FileKind::Dir {
+        fs.remove_dir_all(p)
     } else {
         fs.remove_file(p)
     }
