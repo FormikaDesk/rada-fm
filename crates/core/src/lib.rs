@@ -19,6 +19,7 @@ pub mod platform;
 pub mod preview;
 pub mod recents;
 pub mod schema;
+pub mod statefile;
 pub mod tagsearch;
 pub mod uistate;
 pub mod update;

@@ -57,13 +57,10 @@ pub fn load(state_dir: &Path) -> UiState {
 /// Write the state now. Errors are returned for the caller to log; losing this file only
 /// costs a remembered toggle.
 pub fn save(state_dir: &Path, state: &UiState) -> std::io::Result<()> {
-    std::fs::create_dir_all(state_dir)?;
-    let tmp = state_dir.join("ui.json.tmp");
-    std::fs::write(
-        &tmp,
-        serde_json::to_vec_pretty(state).map_err(std::io::Error::other)?,
-    )?;
-    std::fs::rename(tmp, state_dir.join(FILE))
+    crate::statefile::write_atomic(
+        &state_dir.join(FILE),
+        &serde_json::to_vec_pretty(state).map_err(std::io::Error::other)?,
+    )
 }
 
 /// Write it from a thread of its own.

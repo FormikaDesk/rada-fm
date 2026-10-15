@@ -207,7 +207,7 @@ impl PlacesStore {
                             recents.retain(|x| *x != p);
                             recents.insert(0, p);
                             recents.truncate(MAX_RECENT);
-                            write(&state_dir, &recent_file, &recents);
+                            write(&recent_file, &recents);
                         }
                         Req::ToggleBookmark(p) => {
                             if let Some(i) = bookmarks.iter().position(|x| *x == p) {
@@ -215,7 +215,7 @@ impl PlacesStore {
                             } else {
                                 bookmarks.push(p);
                             }
-                            write(&state_dir, &mark_file, &bookmarks);
+                            write(&mark_file, &bookmarks);
                         }
                     }
                     if !send(&recents, &bookmarks, &known, has_recents) {
@@ -259,17 +259,13 @@ fn read(file: &Path) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
-fn write(dir: &Path, file: &Path, list: &[PathBuf]) {
+fn write(file: &Path, list: &[PathBuf]) {
     let data: Vec<P> = list.iter().cloned().map(P).collect();
     let Ok(json) = serde_json::to_vec(&data) else {
         return;
     };
-    if std::fs::create_dir_all(dir).is_err() {
-        return;
-    }
-    let tmp = file.with_extension("json.tmp");
-    if std::fs::write(&tmp, json).is_ok() {
-        let _ = std::fs::rename(&tmp, file);
+    if let Err(e) = crate::statefile::write_atomic(file, &json) {
+        tracing::debug!("cannot save {}: {e}", file.display());
     }
 }
 

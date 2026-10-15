@@ -9,7 +9,7 @@
 //! file reconstructs the history; nothing else is stored.
 
 use std::collections::HashMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -268,9 +268,10 @@ impl Journal {
     pub fn open(path: impl Into<PathBuf>) -> Result<Journal> {
         let path = path.into();
         if let Some(dir) = path.parent() {
-            create_private_dir(dir).map_err(|e| Error::io("create journal folder", dir, e))?;
+            crate::statefile::create_private_dir(dir)
+                .map_err(|e| Error::io("create journal folder", dir, e))?;
         }
-        let file = OpenOptions::new()
+        let file = crate::statefile::private_file_options()
             .create(true)
             .append(true)
             .open(&path)
@@ -626,20 +627,5 @@ impl Journal {
         let mut remaining = remaining.unwrap_or_else(|| (0..steps.len()).collect());
         remaining.retain(|i| !done_since.contains(i));
         Ok((steps, remaining))
-    }
-}
-
-fn create_private_dir(dir: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(dir)
-    }
-    #[cfg(not(unix))]
-    {
-        fs::create_dir_all(dir)
     }
 }

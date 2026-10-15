@@ -252,13 +252,10 @@ impl CheckState {
 
     fn save(&self, ctx: &Ctx) {
         let write = || -> std::io::Result<()> {
-            fs::create_dir_all(&ctx.state_dir)?;
-            let tmp = ctx.state_dir.join("update.json.tmp");
-            fs::write(
-                &tmp,
-                serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?,
-            )?;
-            fs::rename(tmp, ctx.state_file())
+            crate::statefile::write_atomic(
+                &ctx.state_file(),
+                &serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?,
+            )
         };
         if let Err(e) = write() {
             tracing::warn!("cannot save the update state: {e}");

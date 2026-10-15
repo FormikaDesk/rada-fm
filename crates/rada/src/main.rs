@@ -205,6 +205,7 @@ fn main() -> Result<()> {
     }) = &cli.command
     {
         let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
+        rada_core::statefile::tighten(&dirs.rada_state());
         let cfg_file = config::load(&dirs);
         cfg_file.apply_language();
         let settings = cfg_file.update_settings(&dirs.home)?;
@@ -245,6 +246,8 @@ fn main() -> Result<()> {
         None => None,
     };
     let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
+    // A state folder from an earlier version may be open to other users: close it first.
+    rada_core::statefile::tighten(&dirs.rada_state());
     let _log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
     cfg_file.apply_language();
@@ -542,11 +545,7 @@ fn make_font_offer(dirs: &Dirs) -> rada_tui::FontOffer {
             Ok(tf(Key::MFontInstalled, &[&fontsetup::FAMILY]))
         }),
         shown: Arc::new(move || {
-            let file = font_offered_file(&note_dirs);
-            if let Some(dir) = file.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            let _ = std::fs::write(file, "offered\n");
+            let _ = rada_core::statefile::write_atomic(&font_offered_file(&note_dirs), b"offered\n");
         }),
     }
 }

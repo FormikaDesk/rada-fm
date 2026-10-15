@@ -873,10 +873,10 @@ impl Prefs {
     }
 
     pub fn save(&self, state_dir: &Path) -> std::io::Result<()> {
-        std::fs::create_dir_all(state_dir)?;
-        let tmp = state_dir.join("open_with.json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(self).unwrap_or_default())?;
-        std::fs::rename(&tmp, state_dir.join(PREFS_FILE))
+        crate::statefile::write_atomic(
+            &state_dir.join(PREFS_FILE),
+            &serde_json::to_vec_pretty(self).unwrap_or_default(),
+        )
     }
 
     /// `id` was used: first among the recent.
