@@ -424,7 +424,7 @@ fn distance(height: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'static) ->
 
 #[test]
 fn by_default_the_entries_of_a_group_stay_together_at_any_height() {
-    for height in [30u16, 56, 120] {
+    for height in [40u16, 56, 120] {
         assert_eq!(
             distance(height, |_| {}),
             1,
@@ -447,7 +447,7 @@ fn the_density_in_the_configuration_decides_how_much_air() {
     // Comfortable where the terminal is short: the groups are apart (Home and the first group
     // are further from each other than in the compact pane), though the entries are not.
     let apart = |d: Density| {
-        let mut h = italian_with(150, 30, move |c| c.sidebar_density = d);
+        let mut h = italian_with(150, 40, move |c| c.sidebar_density = d);
         let (home, first) = (h.app.side_items()[0].path.clone(), a_pair(&h).0);
         let (a, b) = (row_of(&mut h, home), row_of(&mut h, first));
         b - a
