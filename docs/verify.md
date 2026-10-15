@@ -6,6 +6,9 @@ account on GitHub were taken over. rada itself checks the signature before it in
 (`rada update`); this page is how to check by hand a file you downloaded from the
 [releases page](https://github.com/formikadesk/rada-fm/releases).
 
+Releases up to `0.6.0-rc.8` were published before signing existed and have no
+`SHA256SUMS.minisig`; the first release after that one is the first signed one.
+
 ## The public keys
 
 There are two, made together before the first signed release. Releases are signed with the

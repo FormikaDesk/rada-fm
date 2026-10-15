@@ -1,0 +1,63 @@
+# Configuration
+
+The configuration file is optional.
+
+Optional config: `$XDG_CONFIG_HOME/rada/config.toml`
+
+```toml
+profile = "auto"      # auto | modern | basic: see "Terminals"
+icons = "auto"        # auto | nerd | unicode-icons | unicode-std | none: see "Terminals"
+theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the terminal), or a fixed
+                      # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
+                      # | nebbia-light
+appearance = "auto"   # auto | light | dark: which variant a theme name takes
+transparent_background = false  # true: the default dark theme leaves your terminal's background
+show_hidden = false
+sort = "name"         # name | size | date
+reverse = false
+bookmarks = ["~/projects", "/mnt/data"]
+images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
+image_max_megapixels = 50
+image_max_file_mb = 128
+pdf_max_file_mb = 512     # larger PDFs are not drawn
+pdf_timeout_seconds = 8   # a PDF that takes longer to draw is given up on
+mouse = true          # false: rada never captures the mouse
+sidebar = true        # the navigation pane; Ctrl+B toggles it and remembers
+show_hints = true     # false: no row of key hints at the bottom (`hints` is the older name)
+layout = "explorer"   # explorer | compact (no bar, command bar or hints: the most room)
+show_details_pane = true  # false: never show the details pane by itself (Alt+P still does)
+view = "details"      # details | icons | columns: how a new tab shows a folder
+tags_column = true    # the coloured dots of the tags in their own column of the Details view
+language = "auto"     # auto (from the system) | it | en
+remember_tabs = true  # reopen the tabs of the last session
+dates = "relative"    # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm, in the order of your locale)
+sidebar_density = "auto"  # auto (the same as compact) | compact: one line to an entry, one gap between the groups | comfortable: blank lines between the entries as the height of the terminal allows (a line after every entry where all fit, after every second one, or only between the groups), even if the pane then scrolls
+folder_sizes = "auto" # auto: count the size of the folders you can see, in the background | items: only how many items each holds | off
+folder_size_seconds = 3   # one count gives up after this long and shows "> size"
+folder_size_entries = 200000  # ...or after this many files and folders
+keymap = "vim+classic"   # vim+classic (default) | vim | classic
+natural_sort = true   # file2 before file10, capitals and small letters mixed (as the Finder and Explorer do)
+cmd_keys = true       # macOS: ask the terminal to report the Cmd key, for Cmd+C/V/X and friends
+
+[archives]
+max_extract_gb = 8        # an extraction that would write more asks for a typed "yes"
+max_ratio = 200           # ...and so does one that unpacks this many times its size
+
+[update]
+check = true              # look for a newer rada, at most once a day, in the background
+channel = "auto"          # auto | stable | prerelease (see Updates)
+method = "auto"           # auto | binary | source | package
+source_dir = "~/rada-fm"  # the git checkout the `source` method updates
+
+[devices]
+hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
+                      # disks: a name is a filesystem type (`fuse.*` a prefix), `/path` a mount point,
+                      # `/path/*` it and everything below
+
+[keys]                # per action; replaces all of its keys, [] unbinds it
+copy = ["y", "ctrl+c"]
+trash = ["d", "delete"]
+quit = "ctrl+q"
+```
+
+State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with the tabs that were open, whether you hid the navigation pane or the details pane, and the view of each tab); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).
