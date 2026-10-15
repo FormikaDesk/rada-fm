@@ -394,6 +394,29 @@ fn a_broken_svg_is_a_message_not_a_crash() {
     assert!(matches!(settled(&rx, 1).state, ImageState::Failed(_)));
 }
 
+#[test]
+fn an_svg_over_the_size_limit_is_refused() {
+    let sb = Sandbox::new();
+    // A valid SVG followed by blank space, 21 MB in all.
+    let mut svg =
+        b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"/>".to_vec();
+    svg.resize(21 << 20, b'\n');
+    let p = sb.write("huge.svg", svg);
+    let (w, rx) = worker();
+    request(&w, &p, 1, Limits::default());
+    let ImageState::Failed(why) = settled(&rx, 1).state else {
+        panic!("a 21 MB SVG must not be drawn");
+    };
+    assert!(why.contains("bigger than 20 MB"), "{why}");
+    // One that fits is still drawn.
+    let ok = sb.write(
+        "ok.svg",
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#,
+    );
+    request(&w, &ok, 2, Limits::default());
+    assert!(matches!(settled(&rx, 2).state, ImageState::Ready(_)));
+}
+
 /// JPEG with an EXIF orientation tag inserted right after SOI.
 fn with_orientation(jpeg: &[u8], orientation: u16) -> Vec<u8> {
     let mut exif = b"Exif\0\0".to_vec();

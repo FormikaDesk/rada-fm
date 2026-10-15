@@ -352,12 +352,40 @@ fn downscale(img: DynamicImage, max_edge: u32) -> DynamicImage {
     }
 }
 
+/// The largest SVG that is drawn. The renderer has no time limit and the whole file is held in
+/// memory (and again as a tree): a bigger one is said so, not drawn.
+const MAX_SVG_BYTES: u64 = 20 << 20;
+
+/// The content of an SVG file, if it is not bigger than [`MAX_SVG_BYTES`] (checked while
+/// reading too, for a file that grows meanwhile).
+fn read_svg(path: &Path) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let too_big = || {
+        format!(
+            "the SVG is bigger than {} MB: not drawn",
+            MAX_SVG_BYTES >> 20
+        )
+    };
+    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    if file.metadata().map_err(|e| e.to_string())?.len() > MAX_SVG_BYTES {
+        return Err(too_big());
+    }
+    let mut data = Vec::new();
+    file.take(MAX_SVG_BYTES + 1)
+        .read_to_end(&mut data)
+        .map_err(|e| e.to_string())?;
+    if data.len() as u64 > MAX_SVG_BYTES {
+        return Err(too_big());
+    }
+    Ok(data)
+}
+
 fn load_svg(
     path: &Path,
     limits: &ImageLimits,
     info: &mut ImageInfo,
 ) -> Result<DynamicImage, String> {
-    let data = std::fs::read(path).map_err(|e| e.to_string())?;
+    let data = read_svg(path)?;
     let opt = resvg::usvg::Options {
         fontdb: fonts(),
         ..Default::default()
