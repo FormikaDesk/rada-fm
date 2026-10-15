@@ -67,6 +67,7 @@ rada is young and written by one person. The parts that touch your files — pla
 | **PDF and document previews** | The first page of a PDF is drawn like an image, with page count, title and author below it — with **no program to install on macOS and Windows** (macOS draws it with `sips`, Windows with its own PDF renderer). On Linux poppler (`pdftoppm`; `pdftotext` for a text fallback) does it, and when it is missing the message gives the install command for your distribution. On macOS Quick Look draws Office documents, Pages, Numbers, Keynote, RTF and videos (the picture the Finder shows); on Windows the shell's thumbnails do, when Windows has a handler for the type. Password-protected and damaged files say so. Drawing runs in a worker with a time limit and is stopped the moment you move to another file; pages are cached in the cache folder and pruned by age and size. |
 | **Archives** | `Enter` on a zip, tar (`.gz` `.bz2` `.xz` `.zst`), 7z or RAR opens it like a read-only folder; the path reads `photos.zip › 2024`, and text and pictures inside are previewed. Extract here or into a folder, or compress a selection, always with a plan, byte progress, cancel and undo. Paths that climb out of the destination, links that lead out, password-protected files and decompression bombs are stopped or confirmed first. See [Archives](#archives). |
 | **Real disks only** | The sidebar lists real disks, partitions, removable drives and network shares, not `tmpfs`, `proc`, `binderfs`, snap loops, bind-mount duplicates or `/boot/efi`. The list is configurable (`[devices] hide`). |
+| **Phones, cameras and sticks** | On Linux the sidebar also lists phones and cameras (MTP/PTP, through gvfs) and USB sticks that are plugged in and not mounted, with a **Mount** action, and lets you eject them. A copy to or from a phone uses the same plan, progress bar and cancel, and the plan says what is different there (no permissions, no links, no trash, undo not guaranteed). Needs `gvfs-mtp` on Arch (`gvfs-gphoto2` for cameras, `udisks2` for sticks). See [Phones, cameras and sticks](#phones-cameras-and-sticks). |
 | **Binary files get a card** | Instead of a wall of hex: file type, size, dates, permissions and, for executables, the architecture (ELF, PE and Mach-O are read from the header, never run). The hex dump is one key away (`H`). |
 | **Hostile names are harmless** | Newlines, escape sequences, bidi controls and invalid UTF-8 in file names are shown as visible escapes. Paths are `Path`/`OsString` everywhere, never text. |
 
@@ -298,6 +299,33 @@ Things that do **not** work: `Cmd+Q`, `Cmd+W`, `Cmd+T`, `Cmd+N` and the rest of 
 - **PDF previews** use Windows' own renderer (`Windows.Data.Pdf`, Windows 10 and later) and other documents the shell's thumbnails, when Windows has a handler for the type. No program to install. The choice of the system renderer over a bundled one is explained in the [changelog](CHANGELOG.md).
 - **Not supported**: tags (the menu entry is absent), ACLs and alternate data streams in copies.
 
+## Phones, cameras and sticks
+
+Linux. The **DEVICES** part of the sidebar lists, besides the mounted disks:
+
+| What | Shown when | What rada runs |
+|---|---|---|
+| a **phone** (MTP) or a **camera** (PTP) the desktop has opened | it is a folder of the virtual filesystem (`$XDG_RUNTIME_DIR/gvfs/mtp:host=…`) | nothing to list it; `gio mount -u` to eject it |
+| a phone or a camera that is **plugged in and not mounted** | `gio mount -li` lists it | `gio mount <uri>` (**Mount**) |
+| a **USB stick or card** that is plugged in and not mounted | `lsblk` lists a removable drive with a filesystem rada can open (not an encrypted or RAID member) and no mount point | `udisksctl mount -b <device>` (**Mount**) |
+| a stick mounted **anywhere**, `/mnt/stick` included | the drive is flagged removable or sits on the USB bus (read from `/sys`) | `udisksctl unmount` and `power-off` (**Eject**) |
+
+An entry that is not mounted says so after its name (*Canon EOS  not mounted*); `Enter`, a click or its menu mounts it, and once it is open it is an ordinary entry. The programs run with the C locale and a time limit, in a thread of their own, so a phone that does not answer never holds the list of disks. Nothing is mounted or unmounted unless you ask.
+
+**What to install.** On Arch: `gvfs-mtp` for phones (it brings `libmtp`), `gvfs-gphoto2` for cameras, `udisks2` for sticks; `gvfs` is the base. Without a tool, **Mount** says what is missing (*"this system cannot open phones: install gvfs-mtp (on Arch: pacman -S gvfs-mtp)"*) and rada goes on. A phone must be unlocked and set to *File transfer* in its USB notification; if another program holds it (a photo app, another file manager) the message says so.
+
+**Copying to and from a phone** is the same plan, progress bar and cancel as any copy, off the interface thread. The plan tells you, before anything is done, what is different there:
+
+- the data reaches the phone when the file is **closed**, so a big file can wait at 100% for a while; each file is written under its final name (no temporary file, no rename), and one the phone did not keep whole is removed and reported;
+- **permissions, owner and extended attributes are not kept**, dates only if the phone accepts them; what comes from a phone gets the usual permissions (`644`, `755`);
+- **links** cannot be stored on a phone and are skipped (said); files that are hard links of each other become separate files;
+- renaming and moving are **not atomic** and some phones refuse them; a move between two phones or two storages of one phone is a copy, verified, then the source is removed;
+- a phone has **no trash**: deleting copies each item to your trash first (slow for big files), checks it and then removes it from the phone;
+- **undo is not guaranteed** for anything that puts something back on a phone (the plan says so; undo of a copy *from* a phone just removes the copy);
+- an **archive** cannot be written straight onto a phone: make it in a folder here, then copy it.
+
+A move and a verified copy read the file back from the phone before the source is touched. Nothing is counted or read in the background on a phone: no folder sizes, no tag reads, no recursive scans, and the preview of a file there says it is not read (the phone may send the whole file). A phone listing is as quick as the phone is.
+
 ## Tags
 
 ![Giving a file a tag from the menu, with its plan, and the list of everything that carries it](docs/media/tag.gif)
@@ -354,7 +382,7 @@ The name with its icon, the type and size, a big preview (pictures, a PDF's firs
 
 ### Navigation pane
 
-**Home** and, under it, **Recent** (where the system has a list of the files you used lately: see [Recent](#recent)), then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of ten segments, `■■■■■■□□□□`, of how full it is, and what is free; `[######----]` in the basic profile), **TAGS** (the colours and your own tags) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
+**Home** and, under it, **Recent** (where the system has a list of the files you used lately: see [Recent](#recent)), then **PINNED** (your standard folders under the names your system really uses — *Scaricati* and *Documenti* on an Italian desktop — and the folders you pin, marked with a pin), **DEVICES** (each disk with a bar of ten segments, `■■■■■■□□□□`, of how full it is, and what is free; `[######----]` in the basic profile; on Linux also phones, cameras and sticks, even when not mounted: see [Phones, cameras and sticks](#phones-cameras-and-sticks)), **TAGS** (the colours and your own tags) and the **Trash**. Pin a folder from the context menu or with `B`; `Del` on a pinned folder (with the keyboard focus on it) unpins it. The folders pinned in the config file (`bookmarks`) can only be unpinned there. The place you are in has a quiet background. `Tab` moves the keyboard into the pane (`↑` `↓`, `Enter` opens, `Tab` or `Esc` leaves). `Ctrl+B` shows or hides it. Below 100 columns it becomes a column of icons (hover or move onto one and its name shows in the status bar), below 60 it goes.
 
 ### Recent
 

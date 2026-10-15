@@ -27,6 +27,10 @@ meantime is never overwritten; the step fails with "already exists".
 *Tests:* `faults.rs` (full disk in the middle of a file, rights revoked, destination unplugged,
 file created meanwhile), `crash.rs`.
 
+*Not on a phone or a camera:* there the file is written under its final name (the device takes
+the data when the file is closed, and cannot be trusted with a rename), and is removed again if
+the copy does not complete. See the limits below.
+
 ### One failure does not stop the rest
 
 Errors are handled per step. You choose to skip, skip all, retry or abort; the message always
@@ -178,6 +182,17 @@ These are real, and we would rather you read them here than discover them.
 - **Races you cause.** rada checks that a destination name is free at the moment it creates
   it, never earlier, but it cannot stop another program from changing the folder between two
   of its steps.
+- **Phones and cameras** (MTP and PTP, through the desktop's virtual filesystem) are not a
+  filesystem rada can make promises about. A copy there is the same plan with a progress bar,
+  a cancel and a journal entry, and the plan says what is different before anything is done:
+  the file is written under its final name and reaches the device when it is closed (what the
+  device kept is measured, and a move or a verified copy is read back, before the source is
+  touched); permissions, owner and attributes are not kept; links are skipped; renaming and
+  moving are not atomic; there is no trash (a delete goes through a verified copy into the
+  trash of this computer); and **undo is not guaranteed**, because the device cannot promise
+  that what is on it is as rada left it. Undo of a copy *from* a phone removes the copy, here,
+  and is as sure as any. This was written from the documented behaviour of gvfs and tested
+  against folders standing in for devices, not against a real phone.
 - **Windows and macOS** are a pre-release. The engine, the journal and undo are the same
   code and the same tests as on Linux, run in CI on both; the Recycle Bin (Windows) and
   `~/.Trash` (macOS) are real. What is not done: preservation of attributes (ACLs and
