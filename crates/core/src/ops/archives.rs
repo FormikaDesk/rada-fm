@@ -359,12 +359,14 @@ impl Engine {
         let archive_name = archive.file_name().unwrap_or_default().to_os_string();
         let rules = self.platform.path_rules();
         let rules = &rules;
-        // The archive's own links, so that nothing is written through one.
-        let link_paths: HashSet<&Path> = ix
+        // The archive's own links, so that nothing is written through one. Compared the way
+        // the destination compares names: where `Foo` and `foo` are the same folder, a file
+        // under `foo` goes through the link `Foo`.
+        let link_paths: HashSet<OsString> = ix
             .entries
             .iter()
             .filter(|e| e.kind == EntryKind::Symlink)
-            .map(|e| e.path.as_path())
+            .map(|e| ex.key(&e.path))
             .collect();
         let mut counts: Vec<Count> = vec![Count::default(); selection.len().max(1)];
         let mut setuid = 0u64;
@@ -406,7 +408,7 @@ impl Engine {
             if e.path
                 .ancestors()
                 .skip(1)
-                .any(|a| !a.as_os_str().is_empty() && link_paths.contains(a))
+                .any(|a| !a.as_os_str().is_empty() && link_paths.contains(&ex.key(a)))
             {
                 ex.ws.add_with(
                     WarningKind::UnsafePath,

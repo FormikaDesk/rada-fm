@@ -301,6 +301,47 @@ fn nothing_is_written_through_a_link_the_archive_made() {
     assert_eq!(read(&dir.join("fine.txt")), "ok");
 }
 
+/// Where `Foo` and `foo` are the same folder (macOS, Windows), a file under `foo` is written
+/// through a link called `Foo`: the check of the archive's links has to see that.
+#[test]
+fn a_link_is_found_whatever_the_case_where_the_destination_ignores_case() {
+    use rada_core::testplatform::WithPathRules;
+    let sb = Sandbox::new();
+    let dir = sb.mkdir("out");
+    let a = sb.path("case.tar");
+    write_tar(
+        &a,
+        &[
+            Member::symlink("Foo", "/somewhere/else"),
+            Member::file("foo/authorized_keys", "evil"),
+            Member::file("fine.txt", "ok"),
+        ],
+        Compression::None,
+    );
+    let wrote_under_link = |plan: &Plan| {
+        plan.steps.iter().any(|s| {
+            matches!(s, Step::ExtractFile { dst, .. } if dst.ends_with("foo/authorized_keys"))
+        })
+    };
+
+    // Names that differ in case are different names here: nothing to refuse.
+    let exact = sb.engine();
+    let plan = plan_req(&exact, &extract_req(&a, &dir, ExtractInto::Here));
+    assert!(warning(&plan, WarningKind::UnsafePath).is_none());
+    assert!(wrote_under_link(&plan));
+
+    // Where they are the same name, the file would go through the link: refused.
+    let folded = Engine::local(WithPathRules::case_insensitive(sb.platform()));
+    let plan = plan_req(&folded, &extract_req(&a, &dir, ExtractInto::Here));
+    assert_eq!(warning(&plan, WarningKind::UnsafePath).unwrap().count, 1);
+    assert!(!wrote_under_link(&plan), "{:#?}", plan.steps);
+    let kept = plan
+        .steps
+        .iter()
+        .any(|s| matches!(s, Step::ExtractFile { dst, .. } if dst.ends_with("fine.txt")));
+    assert!(kept, "the rest of the archive is still extracted");
+}
+
 #[cfg(unix)]
 #[test]
 fn links_inside_the_archive_come_out_as_links() {

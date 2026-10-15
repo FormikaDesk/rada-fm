@@ -365,3 +365,76 @@ impl Platform for Recording {
         self.inner.explain_denied(path, err)
     }
 }
+
+/// The platform of the machine running the tests, but with other rules for names: to plan as
+/// if the destination were a volume where `Foo` and `foo` are the same file (macOS, Windows).
+pub struct WithPathRules {
+    inner: Arc<dyn Platform>,
+    rules: PathRules,
+}
+
+impl WithPathRules {
+    pub fn new(inner: Arc<dyn Platform>, rules: PathRules) -> Self {
+        Self { inner, rules }
+    }
+
+    /// `inner`, with names that ignore case.
+    pub fn case_insensitive(inner: Arc<dyn Platform>) -> Arc<dyn Platform> {
+        let rules = PathRules {
+            case_insensitive: true,
+            ..inner.path_rules()
+        };
+        Arc::new(Self::new(inner, rules))
+    }
+}
+
+impl Platform for WithPathRules {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+    fn dirs(&self) -> &Dirs {
+        self.inner.dirs()
+    }
+    fn trash(&self) -> &dyn TrashBackend {
+        self.inner.trash()
+    }
+    fn volumes(&self) -> &dyn VolumeLister {
+        self.inner.volumes()
+    }
+    fn attributes(&self) -> &dyn FileAttributes {
+        self.inner.attributes()
+    }
+    fn opener(&self) -> &dyn Opener {
+        self.inner.opener()
+    }
+    fn path_rules(&self) -> PathRules {
+        self.rules.clone()
+    }
+    fn fidelity(&self) -> &dyn Fidelity {
+        self.inner.fidelity()
+    }
+    fn user_dirs(&self) -> UserDirs {
+        self.inner.user_dirs()
+    }
+    fn display_names(&self, places: &[PathBuf]) -> Vec<(PathBuf, String)> {
+        self.inner.display_names(places)
+    }
+    fn extra_places(&self) -> Vec<(PlaceKind, PathBuf)> {
+        self.inner.extra_places()
+    }
+    fn tags(&self) -> Option<&dyn TagStore> {
+        self.inner.tags()
+    }
+    fn recent_available(&self) -> bool {
+        self.inner.recent_available()
+    }
+    fn recent_files(
+        &self,
+        cancel: &dyn Fn() -> bool,
+    ) -> Option<Vec<(PathBuf, std::time::SystemTime)>> {
+        self.inner.recent_files(cancel)
+    }
+    fn explain_denied(&self, path: &Path, err: &std::io::Error) -> Option<AccessDenied> {
+        self.inner.explain_denied(path, err)
+    }
+}
