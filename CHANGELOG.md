@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **`scripts/sign-release.sh` without `RADA_REPO`** signed the release but then failed to upload the signature and publish (`fatal: not a git repository`): it had moved to a temporary folder and `gh` could not tell which repository it was in. The repository is now asked of `gh` once, before leaving the folder the script was started from, printed (`Repository: owner/name`) and passed with `-R` to every call; if it cannot be told, the script stops at once and says to set `RADA_REPO`. `scripts/test-sign-release` has three new cases for it.
+
 ## [0.6.0-rc.9] - 2026-10-15
 
 The first **signed** release: `rada update` now checks a signature before it installs anything. Also phones, cameras and USB sticks in the sidebar on Linux, a tidier sidebar, and fixes found in a review of the code. Still a **pre-release**.

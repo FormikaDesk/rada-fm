@@ -35,8 +35,7 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
 3. Wait for the workflow *Release* to finish. It builds five targets and creates a **draft** with the
    archives and `SHA256SUMS` (a pre-release when the version has a hyphen, as in `-rc.1`).
    Look at the draft on GitHub if you like: the notes, the files.
-4. Sign and publish, from a clone of the repository (so that `gh` knows which one), on the computer
-   that has the key:
+4. Sign and publish, from a clone of the repository, on the computer that has the key:
 
    ```sh
    scripts/sign-release.sh v0.6.0
@@ -45,7 +44,10 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
    It downloads the draft, checks every hash again, shows you what it signs, runs `rsign` (which
    asks for the passphrase of the key: the script never sees it), checks the signature it made,
    and, after you answer `y`, uploads `SHA256SUMS.minisig` and publishes. `--no-publish` stops before
-   uploading; `--yes` does not ask. It refuses a release that is not a draft.
+   uploading; `--yes` does not ask. It refuses a release that is not a draft. It asks `gh` which
+   repository the clone is once, at the start, prints it (`Repository: owner/name`) and names it in
+   every later call; `RADA_REPO=owner/name` is only needed to run it from a folder that is not a
+   clone (or to point it elsewhere).
 5. Check what was published: the release lists `SHA256SUMS.minisig` among its files
    (`gh release view <tag> --json assets --jq '.assets[].name'`), and a manual check as in
    [verify.md](verify.md) says `Signature and comment signature verified` with the trusted

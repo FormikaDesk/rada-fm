@@ -17,7 +17,8 @@
 #           --no-publish   stop after step 4 (nothing is uploaded; the signature is printed)
 # Environment: RADA_SIGN_KEY  secret key  (default ~/.config/rada-release/rada-main.key)
 #              RADA_SIGN_PUB  public key  (default: the secret key's name with .pub)
-#              RADA_REPO      owner/name  (default: the repository of the current folder)
+#              RADA_REPO      owner/name  (default: the repository of the folder the script is run from,
+#                             asked of `gh` once, before the script leaves that folder)
 #              RSIGN          the signing program (default: rsign)
 #              RSIGN_SIGN_FLAGS  extra options for `rsign sign` (the tests of the script use -W)
 #              GH             the GitHub CLI (default: gh)
@@ -41,8 +42,6 @@ key="${RADA_SIGN_KEY:-$HOME/.config/rada-release/rada-main.key}"
 pub="${RADA_SIGN_PUB:-${key%.key}.pub}"
 rsign="${RSIGN:-rsign}"
 gh="${GH:-gh}"
-repo=()
-[ -z "${RADA_REPO:-}" ] || repo=(-R "$RADA_REPO")
 
 command -v "$gh" > /dev/null || die "the GitHub CLI ($gh) is needed"
 command -v "$rsign" > /dev/null || die "rsign is needed: cargo install --locked rsign2"
@@ -50,15 +49,24 @@ command -v sha256sum > /dev/null || die "sha256sum is needed"
 [ -f "$key" ] || die "no secret key at $key (see docs/release.md)"
 [ -f "$pub" ] || die "no public key at $pub"
 
+# The repository is found once, here, before the script moves to its temporary folder (outside
+# any repository `gh` would find none); every `gh` call below says which one with -R.
+repo="${RADA_REPO:-}"
+if [ -z "$repo" ]; then
+  repo="$("$gh" repo view --json nameWithOwner -q .nameWithOwner 2> /dev/null)" || repo=""
+  [ -n "$repo" ] || die "cannot tell which GitHub repository this is (run the script from a clone of it, or set RADA_REPO=owner/name)"
+fi
+echo "Repository: $repo"
+
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 # Only a draft is signed: a published release must not change under the people who have it.
-is_draft="$("$gh" release view "$tag" ${repo[@]+"${repo[@]}"} --json isDraft --jq .isDraft)"
+is_draft="$("$gh" release view "$tag" -R "$repo" --json isDraft --jq .isDraft)"
 [ "$is_draft" = true ] || die "$tag is not a draft release (already published, or it does not exist)"
 
 echo "Downloading the files of the draft $tag..."
-"$gh" release download "$tag" ${repo[@]+"${repo[@]}"} --dir "$work" --pattern '*'
+"$gh" release download "$tag" -R "$repo" --dir "$work" --pattern '*'
 cd "$work"
 
 [ -f SHA256SUMS ] || die "the draft has no SHA256SUMS"
@@ -101,6 +109,6 @@ if [ "$yes" = 0 ]; then
   [ "$answer" = y ] || [ "$answer" = Y ] || die "not published; the draft is as it was"
 fi
 
-"$gh" release upload "$tag" ${repo[@]+"${repo[@]}"} SHA256SUMS.minisig
-"$gh" release edit "$tag" ${repo[@]+"${repo[@]}"} --draft=false
+"$gh" release upload "$tag" -R "$repo" SHA256SUMS.minisig
+"$gh" release edit "$tag" -R "$repo" --draft=false
 echo "$tag is signed and published."

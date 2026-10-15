@@ -6,15 +6,24 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bin" "$tmp/keys"
+mkdir -p "$tmp/bin" "$tmp/keys" "$tmp/clone"
+git init -q "$tmp/clone"
 rsign="${RSIGN:-rsign}"
 "$rsign" generate -p "$tmp/keys/t.pub" -s "$tmp/keys/t.key" -W -f > /dev/null
 
-# The stand-in: a folder is the draft; the calls are written to a log.
+# The stand-in: a folder is the draft; the calls are written to a log. Like the real `gh`, it finds
+# a repository by itself only from inside a clone, and says which one with -R otherwise.
 cat > "$tmp/bin/gh" <<'GH'
 #!/usr/bin/env bash
-echo "$*" >> "$FAKE_LOG"
+echo "$PWD: $*" >> "$FAKE_LOG"
+named=0
+for a in "$@"; do [ "$a" = -R ] && named=1; done
+if [ "$named" = 0 ] && ! git rev-parse --git-dir > /dev/null 2>&1; then
+  echo "fatal: not a git repository (or any of the parent directories): .git" >&2
+  exit 128
+fi
 case "$1 $2" in
+  "repo view") [ -z "${FAKE_NO_REPO:-}" ] || exit 1; echo "FormikaDesk/test-repo" ;;
   "release view") echo "${FAKE_DRAFT:-true}" ;;
   "release download")
     while [ $# -gt 0 ]; do [ "$1" = --dir ] && dest="$2"; shift; done
@@ -33,8 +42,10 @@ new_draft() {
   (cd "$tmp/draft" && sha256sum rada-* > SHA256SUMS)
   : > "$tmp/log"
 }
+# The script is started from inside a clone, as it is in real life.
 run() {
-  GH="$tmp/bin/gh" RSIGN="$rsign" RSIGN_SIGN_FLAGS=-W RADA_SIGN_KEY="${KEY:-$tmp/keys/t.key}" RADA_SIGN_PUB="$tmp/keys/t.pub" \
+  cd "$tmp/clone"
+  env -u RADA_REPO ${TEST_REPO:+RADA_REPO="$TEST_REPO"} GH="$tmp/bin/gh" RSIGN="$rsign" RSIGN_SIGN_FLAGS=-W RADA_SIGN_KEY="${KEY:-$tmp/keys/t.key}" RADA_SIGN_PUB="$tmp/keys/t.pub" \
     FAKE_LOG="$tmp/log" FAKE_DRAFT_DIR="$tmp/draft" FAKE_UPLOADED="$tmp/uploaded" \
     "$here/sign-release.sh" "$@" > "$tmp/out" 2>&1
 }
@@ -77,5 +88,29 @@ new_draft
 new_draft
 ! (echo n | run v0.0.1) || fail "published after 'n'"
 ! uploaded && ! published || fail "published after 'n'"
+
+# 8. no RADA_REPO: the repository is asked once, from the clone, and every call names it with -R
+#    (inside the temporary folder `gh` finds no repository: this is what failed with the real one)
+new_draft
+run v0.0.1 --yes || fail "without RADA_REPO"
+published || fail "without RADA_REPO: not published"
+grep -qx 'Repository: FormikaDesk/test-repo' "$tmp/out" || fail "the repository is not printed"
+[ "$(grep -c 'repo view' "$tmp/log")" = 1 ] || fail "the repository was asked more than once"
+grep 'repo view' "$tmp/log" | grep -q "^$tmp/clone: " || fail "the repository was asked outside the clone"
+! grep 'release ' "$tmp/log" | grep -qv -- '-R FormikaDesk/test-repo' || fail "a call went without -R"
+
+# 9. RADA_REPO set: used as it is, `gh` is not asked which repository this is
+new_draft
+TEST_REPO=other/place run v0.0.1 --yes || fail "with RADA_REPO"
+! grep -q 'repo view' "$tmp/log" || fail "RADA_REPO set, yet the repository was asked"
+grep -qx 'Repository: other/place' "$tmp/out" || fail "RADA_REPO not printed"
+! grep 'release ' "$tmp/log" | grep -qv -- '-R other/place' || fail "RADA_REPO not used on every call"
+published || fail "with RADA_REPO: not published"
+
+# 10. the repository cannot be told: a clear message, and nothing is downloaded, signed or changed
+new_draft
+! FAKE_NO_REPO=1 run v0.0.1 --yes || fail "went on without knowing the repository"
+grep -q 'RADA_REPO' "$tmp/out" || fail "the message does not say to set RADA_REPO"
+! grep -q 'release ' "$tmp/log" || fail "touched a release without knowing the repository"
 
 echo "sign-release: all cases pass"
