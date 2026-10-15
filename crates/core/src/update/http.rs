@@ -73,6 +73,21 @@ impl Http {
             .map_err(|e| tf(Key::UpHttpAnswer, &[&url, &e]))
     }
 
+    /// A small file as it is, byte for byte (what a signature is checked against).
+    pub fn get_bytes(&self, url: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
+        let mut resp = self
+            .api
+            .get(url)
+            .header("Accept", "application/octet-stream")
+            .call()
+            .map_err(|e| describe(e, url))?;
+        resp.body_mut()
+            .with_config()
+            .limit(max_bytes)
+            .read_to_vec()
+            .map_err(|e| tf(Key::UpHttpAnswer, &[&url, &e]))
+    }
+
     /// Download `url` into the new file `dest`. `progress(done, total)` is called as bytes
     /// arrive; returning `false` stops the download. A file larger than `max_bytes` is
     /// refused.

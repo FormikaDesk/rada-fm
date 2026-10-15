@@ -44,3 +44,4 @@ flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 tar = { version = "0.4", default-features = false }
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sha2 = "0.10"
+minisign = "0.10"

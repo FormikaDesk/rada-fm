@@ -47,6 +47,8 @@ sevenz-rust2 = { version = "0.24", default-features = false, features = ["bzip2"
 # Updates: HTTPS with rustls (certificates bundled, nothing read from the system) and SHA-256.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"
+# The signature of a release: minisign, checked against public keys built into the program.
+minisign-verify = "0.3"
 # Page count, title and author of a PDF when poppler is not there to say.
 lopdf = { version = "0.45", default-features = false }
 
@@ -90,3 +92,5 @@ windows = { version = "0.62", features = [
 tempfile = "3"
 rada-core = { path = ".", features = ["testutil"] }
 proptest = "1.11.0"
+# Signs the stand-in releases of the update tests with keys made for the test.
+minisign = "0.10"

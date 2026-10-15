@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crossbeam_channel::unbounded;
+use minisign::KeyPair;
 use rada_core::events::CoreEvent;
 use rada_core::testutil::Sandbox;
 use rada_core::testweb::Server;
@@ -66,12 +67,52 @@ fn program(version: &str) -> Vec<u8> {
     format!("#!/bin/sh\necho \"rada {version}\"\n").into_bytes()
 }
 
+/// Like [`program`], and it leaves a mark in the folder it is started in: a test that finds no
+/// mark knows that the new program was never run.
+fn marking_program(version: &str) -> Vec<u8> {
+    format!("#!/bin/sh\ntouch \"$(dirname \"$0\")/was-run\"\necho \"rada {version}\"\n")
+        .into_bytes()
+}
+
+/// A key pair made for a test (never a real key), and what it signs.
+struct Signer {
+    pair: KeyPair,
+}
+
+impl Signer {
+    fn new() -> Signer {
+        Signer {
+            pair: KeyPair::generate_unencrypted_keypair().expect("a test key pair"),
+        }
+    }
+
+    /// The public key as the program wants it in its list.
+    fn public(&self) -> String {
+        self.pair.pk.to_base64()
+    }
+
+    /// A signature file for `data` with the trusted comment `comment`.
+    fn sign(&self, data: &[u8], comment: &str) -> String {
+        minisign::sign(
+            Some(&self.pair.pk),
+            &self.pair.sk,
+            std::io::Cursor::new(data),
+            Some(comment),
+            Some("signature from a test key"),
+        )
+        .expect("a signature")
+        .into_string()
+    }
+}
+
 struct World {
     sb: Sandbox,
     server: Server,
     ctx: Ctx,
     exe: PathBuf,
     target: &'static str,
+    /// The key the releases are signed with, and the only one the program trusts.
+    signer: Signer,
 }
 
 fn target() -> &'static str {
@@ -100,6 +141,7 @@ fn world(current: &str, mut settings: Settings) -> World {
     let bin = sb.mkdir("install/bin");
     let exe = bin.join(exe_name());
     fs::write(&exe, b"the old program").unwrap();
+    let signer = Signer::new();
     let ctx = Ctx {
         current: Version::parse(current).unwrap(),
         settings,
@@ -114,6 +156,7 @@ fn world(current: &str, mut settings: Settings) -> World {
         cargo: "cargo".into(),
         // Only a system that can run a shell script checks the new program by running it.
         run_check: cfg!(unix),
+        signing_keys: vec![signer.public()],
         extra_env: Vec::new(),
     };
     World {
@@ -122,6 +165,7 @@ fn world(current: &str, mut settings: Settings) -> World {
         ctx,
         exe,
         target: target(),
+        signer,
     }
 }
 
@@ -152,9 +196,24 @@ impl World {
         );
         self.server
             .route(&format!("/files/{tag}/{archive}"), 200, bytes);
-        self.server
-            .route(&format!("/files/{tag}/SHA256SUMS"), 200, sums.clone());
+        self.set_sums(tag, &sums);
         (archive, sums)
+    }
+
+    /// Serve `sums` as the SHA256SUMS of `tag`, signed as the author signs a release.
+    fn set_sums(&self, tag: &str, sums: &str) {
+        self.set_sums_signed_by(tag, sums, &self.signer, &format!("rada {tag}"));
+    }
+
+    /// Serve `sums`, signed by `signer` with the trusted comment `comment`.
+    fn set_sums_signed_by(&self, tag: &str, sums: &str, signer: &Signer, comment: &str) {
+        self.server
+            .route(&format!("/files/{tag}/SHA256SUMS"), 200, sums.to_string());
+        self.server.route(
+            &format!("/files/{tag}/SHA256SUMS.minisig"),
+            200,
+            signer.sign(sums.as_bytes(), comment),
+        );
     }
 
     fn list(&self, entries: &[(&str, bool)]) {
@@ -166,9 +225,11 @@ impl World {
                 format!(
                     r#"{{"tag_name":"{tag}","prerelease":{pre},"draft":false,"body":"Notes for {tag}","assets":[
                     {{"name":"{a}","browser_download_url":"{}","size":1}},
-                    {{"name":"SHA256SUMS","browser_download_url":"{}","size":1}}]}}"#,
+                    {{"name":"SHA256SUMS","browser_download_url":"{}","size":1}},
+                    {{"name":"SHA256SUMS.minisig","browser_download_url":"{}","size":1}}]}}"#,
                     self.server.url(&format!("/files/{tag}/{a}")),
                     self.server.url(&format!("/files/{tag}/SHA256SUMS")),
+                    self.server.url(&format!("/files/{tag}/SHA256SUMS.minisig")),
                 )
             })
             .collect();
@@ -385,11 +446,8 @@ fn a_binary_update_downloads_checks_and_swaps_the_program() {
 fn a_wrong_checksum_installs_nothing() {
     let w = world("0.6.0-rc.1", Settings::default());
     let (archive, _) = w.publish("v0.7.0", false, &program(NEW));
-    w.server.route(
-        "/files/v0.7.0/SHA256SUMS",
-        200,
-        format!("{}  {archive}\n", "ab".repeat(32)),
-    );
+    // Signed by the author, and still wrong: only the signature is not enough.
+    w.set_sums("v0.7.0", &format!("{}  {archive}\n", "ab".repeat(32)));
     w.list(&[("v0.7.0", false)]);
     let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
     assert!(err.contains("does not match its checksum"), "{err}");
@@ -406,11 +464,7 @@ fn an_archive_that_is_not_one_is_refused_even_with_a_matching_checksum() {
     let junk = b"this is not an archive at all".to_vec();
     w.server
         .route(&format!("/files/v0.7.0/{archive}"), 200, junk.clone());
-    w.server.route(
-        "/files/v0.7.0/SHA256SUMS",
-        200,
-        format!("{}  {archive}\n", sha(&junk)),
-    );
+    w.set_sums("v0.7.0", &format!("{}  {archive}\n", sha(&junk)));
     w.list(&[("v0.7.0", false)]);
     let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
     assert!(err.contains("damaged") || err.contains("archive"), "{err}");
@@ -431,11 +485,7 @@ fn an_archive_without_the_program_is_refused() {
     };
     w.server
         .route(&format!("/files/v0.7.0/{archive}"), 200, bytes.clone());
-    w.server.route(
-        "/files/v0.7.0/SHA256SUMS",
-        200,
-        format!("{}  {archive}\n", sha(&bytes)),
-    );
+    w.set_sums("v0.7.0", &format!("{}  {archive}\n", sha(&bytes)));
     w.list(&[("v0.7.0", false)]);
     let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
     assert!(err.contains("does not contain"), "{err}");
@@ -541,6 +591,234 @@ fn there_is_nothing_to_go_back_to_before_the_first_update() {
     let w = world("0.6.0-rc.1", Settings::default());
     let err = update::rollback(&w.ctx).unwrap_err();
     assert!(err.contains("no earlier version"), "{err}");
+}
+
+// -------------------------------------------------------------------------- signatures
+
+impl World {
+    /// Nothing was installed, nothing was left behind, and the new program never ran.
+    fn assert_untouched(&self) {
+        assert_eq!(fs::read(&self.exe).unwrap(), b"the old program");
+        assert_eq!(self.leftovers(), Vec::<String>::new());
+        assert!(!self.exe.parent().unwrap().join("was-run").exists());
+    }
+
+    fn archive_requests(&self, tag: &str) -> usize {
+        let v = Version::parse(tag).unwrap();
+        self.server.count(&format!(
+            "/files/{tag}/{}",
+            release::archive_name(&v, self.target)
+        ))
+    }
+}
+
+#[test]
+fn the_signature_is_checked_before_the_checksum_and_before_the_program_ever_runs() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &marking_program(NEW));
+    w.list(&[("v0.7.0", false)]);
+    let mut steps = Vec::new();
+    update::apply(&w.ctx, &w.newest(), &mut |s| steps.push(s)).unwrap();
+    let at = |what: &str| {
+        steps
+            .iter()
+            .position(|s| s.starts_with(what))
+            .unwrap_or_else(|| panic!("no step '{what}' in {steps:?}"))
+    };
+    assert!(
+        at("checking the signature") < at("downloading"),
+        "{steps:?}"
+    );
+    assert!(at("downloading") < at("checking the download"), "{steps:?}");
+    assert!(at("checking the download") < at("unpacking"), "{steps:?}");
+    // The log says which key signed.
+    let log = fs::read_to_string(w.ctx.log_path()).unwrap();
+    assert!(
+        log.contains("signed by key 1 of 1: \"rada v0.7.0\""),
+        "{log}"
+    );
+    #[cfg(unix)]
+    assert!(w.exe.parent().unwrap().join("was-run").exists());
+}
+
+#[test]
+fn a_release_signed_with_another_key_is_refused_before_anything_is_downloaded_or_run() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    let (archive, sums) = w.publish("v0.7.0", false, &marking_program(NEW));
+    // Same files, signed by somebody else: the checksum is right, the signature is not ours.
+    w.set_sums_signed_by("v0.7.0", &sums, &Signer::new(), "rada v0.7.0");
+    w.list(&[("v0.7.0", false)]);
+    let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+    assert!(
+        err.contains("signature of SHA256SUMS is not valid"),
+        "{err}"
+    );
+    assert!(err.contains("nothing was installed"), "{err}");
+    assert_eq!(w.archive_requests("v0.7.0"), 0, "{archive} was downloaded");
+    w.assert_untouched();
+}
+
+#[test]
+fn a_genuine_signature_of_another_release_does_not_do_for_this_one() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    let (_, sums) = w.publish("v0.7.0", false, &marking_program(NEW));
+    // The author's own signature, but made for v0.6.9: an old release shown again.
+    w.set_sums_signed_by("v0.7.0", &sums, &w.signer, "rada v0.6.9");
+    w.list(&[("v0.7.0", false)]);
+    let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+    assert!(err.contains("rada v0.6.9"), "{err}");
+    assert!(err.contains("rada v0.7.0"), "{err}");
+    assert_eq!(w.archive_requests("v0.7.0"), 0);
+    w.assert_untouched();
+
+    // The comment has to be exactly that, not something that starts or ends like it.
+    for comment in [
+        "rada v0.7.0 ",
+        "rada v0.7.0-rc.1",
+        "rada v0.7.",
+        "v0.7.0",
+        "RADA V0.7.0",
+        "",
+    ] {
+        w.set_sums_signed_by("v0.7.0", &sums, &w.signer, comment);
+        let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+        assert!(err.contains("not for"), "'{comment}': {err}");
+        w.assert_untouched();
+    }
+}
+
+#[test]
+fn checksums_changed_after_they_were_signed_are_refused() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    let (archive, sums) = w.publish("v0.7.0", false, &marking_program(NEW));
+    // An attacker swaps the program and writes the matching line in SHA256SUMS; the signature
+    // file is the genuine one for the original text.
+    let evil = marking_program("0.7.0 but not the author's");
+    let work = w.sb.mkdir("evil");
+    let inner = release::inner_path(&Version::parse("v0.7.0").unwrap(), w.target);
+    let bytes = if archive.ends_with(".zip") {
+        zip_bytes(&work, &archive, &[(&inner, &evil)])
+    } else {
+        tar_gz(&work, &archive, &[(&inner, &evil)])
+    };
+    w.server
+        .route(&format!("/files/v0.7.0/{archive}"), 200, bytes.clone());
+    w.server.route(
+        "/files/v0.7.0/SHA256SUMS",
+        200,
+        format!("{}  {archive}\n", sha(&bytes)),
+    );
+    assert_ne!(sums, format!("{}  {archive}\n", sha(&bytes)));
+    w.list(&[("v0.7.0", false)]);
+    let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+    assert!(
+        err.contains("signature of SHA256SUMS is not valid"),
+        "{err}"
+    );
+    assert_eq!(w.archive_requests("v0.7.0"), 0);
+    w.assert_untouched();
+}
+
+#[test]
+fn a_release_without_a_signature_is_not_installed() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &marking_program(NEW));
+    w.list(&[("v0.7.0", false)]);
+
+    // No signature file among the files of the release.
+    let mut r = w.newest();
+    r.assets.retain(|a| a.name != "SHA256SUMS.minisig");
+    let err = update::apply(&w.ctx, &r, &mut quiet).unwrap_err();
+    assert!(err.contains("has no SHA256SUMS.minisig"), "{err}");
+    assert!(err.contains("not signed"), "{err}");
+    assert_eq!(
+        w.server.count("/files/v0.7.0/SHA256SUMS"),
+        0,
+        "nothing was read"
+    );
+    assert_eq!(w.archive_requests("v0.7.0"), 0);
+    w.assert_untouched();
+
+    // Listed, but the file is not there.
+    w.server
+        .routes
+        .lock()
+        .unwrap()
+        .remove("/files/v0.7.0/SHA256SUMS.minisig");
+    let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+    assert!(err.contains("404"), "{err}");
+    assert_eq!(w.archive_requests("v0.7.0"), 0);
+    w.assert_untouched();
+
+    // A file that is not a signature.
+    for junk in [
+        "",
+        "hello",
+        "untrusted comment: x\nnot base64\ntrusted comment: y\nnor this",
+    ] {
+        w.server
+            .route("/files/v0.7.0/SHA256SUMS.minisig", 200, junk.to_string());
+        let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+        assert!(
+            err.contains("signature of SHA256SUMS is not valid"),
+            "'{junk}': {err}"
+        );
+        w.assert_untouched();
+    }
+}
+
+#[test]
+fn a_build_with_no_real_key_installs_nothing() {
+    let mut w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &marking_program(NEW));
+    w.list(&[("v0.7.0", false)]);
+    // The keys that ship in the source until the author's own are put there.
+    w.ctx.signing_keys = update::sign::builtin_keys();
+    let err = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap_err();
+    assert!(err.contains("no public key"), "{err}");
+    assert_eq!(w.archive_requests("v0.7.0"), 0);
+    w.assert_untouched();
+}
+
+#[test]
+fn the_reserve_key_signs_releases_as_well_as_the_main_one() {
+    let mut w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &program(NEW));
+    w.list(&[("v0.7.0", false)]);
+    let main_key_not_used = Signer::new();
+    w.ctx.signing_keys = vec![main_key_not_used.public(), w.signer.public()];
+    let done = update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap();
+    assert_eq!(done.version, NEW);
+    let log = fs::read_to_string(w.ctx.log_path()).unwrap();
+    assert!(log.contains("signed by key 2 of 2"), "{log}");
+}
+
+#[test]
+fn a_refused_update_leaves_the_way_back_as_it_was() {
+    let w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &program(NEW));
+    w.list(&[("v0.7.0", false)]);
+    update::apply(&w.ctx, &w.newest(), &mut quiet).unwrap();
+    let kept = w.ctx.update_dir().join("previous");
+    let (path, info) = update::install::read_backup(&kept).unwrap();
+    let before = (fs::read(&path).unwrap(), info.version.clone());
+    let installed = fs::read(&w.exe).unwrap();
+
+    // The next release is not signed by the author.
+    let mut ctx = w.ctx.clone();
+    ctx.current = Version::parse(NEW).unwrap();
+    let (_, sums) = w.publish("v0.8.0", false, &program("0.8.0"));
+    w.set_sums_signed_by("v0.8.0", &sums, &Signer::new(), "rada v0.8.0");
+    w.list(&[("v0.8.0", false)]);
+    let release = update::newest_release(&ctx)
+        .unwrap()
+        .expect("a newer release");
+    assert!(update::apply(&ctx, &release, &mut quiet).is_err());
+
+    assert_eq!(fs::read(&w.exe).unwrap(), installed);
+    let (path, info) = update::install::read_backup(&kept).unwrap();
+    assert_eq!((fs::read(&path).unwrap(), info.version), before);
+    assert_eq!(w.leftovers(), Vec::<String>::new());
 }
 
 // -------------------------------------------------------------------------- package mode
@@ -954,4 +1232,29 @@ esac
         let err = r.apply().unwrap_err();
         assert!(err.contains("not a git checkout"), "{err}");
     }
+}
+
+// ------------------------------------------------------------- the tool that signs releases
+
+/// Files made by `rsign` (the tool `scripts/sign-release.sh` signs with) for a key pair made
+/// to be thrown away: the format the program reads is the format that tool writes.
+#[test]
+fn a_signature_made_by_the_rsign_tool_is_read() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/minisign");
+    let sums = fs::read(dir.join("SHA256SUMS")).unwrap();
+    let sig = fs::read_to_string(dir.join("SHA256SUMS.minisig")).unwrap();
+    let public = fs::read_to_string(dir.join("test.pub")).unwrap();
+    // The second line of the .pub file is the key the program's list holds.
+    let key = public.lines().nth(1).unwrap().trim().to_string();
+    let keys = vec![key];
+
+    let signed = update::sign::verify_sums(&sums, &sig, "v0.0.1-fixture", &keys).unwrap();
+    assert_eq!(signed.comment, "rada v0.0.1-fixture");
+    assert_eq!(signed.key, 0);
+
+    let wrong_tag = update::sign::verify_sums(&sums, &sig, "v0.0.2", &keys).unwrap_err();
+    assert!(wrong_tag.contains("rada v0.0.1-fixture"), "{wrong_tag}");
+    let mut changed = sums.clone();
+    changed[0] = b'3';
+    assert!(update::sign::verify_sums(&changed, &sig, "v0.0.1-fixture", &keys).is_err());
 }

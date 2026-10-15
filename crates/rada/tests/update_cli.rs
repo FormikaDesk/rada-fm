@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
+use minisign::KeyPair;
 use rada_core::testweb::Server;
 use sha2::{Digest, Sha256};
 
@@ -22,6 +23,9 @@ struct World {
     server: Server,
     /// The copy of rada that the tests run (and that an update replaces).
     exe: PathBuf,
+    /// The key the stand-in releases are signed with, made for this test: the program is told
+    /// to trust it (a build for tests can be; a release cannot).
+    signer: KeyPair,
 }
 
 impl World {
@@ -55,6 +59,7 @@ impl World {
             root,
             server: Server::start(),
             exe,
+            signer: KeyPair::generate_unencrypted_keypair().unwrap(),
         }
     }
 
@@ -75,8 +80,26 @@ impl World {
             .env("APPDATA", self.p("xdg/config"))
             .env("LOCALAPPDATA", self.p("xdg/data"))
             .env("RADA_UPDATE_API", self.server.url("/releases"))
+            .env("RADA_TEST_SIGNING_KEY", self.signer.pk.to_base64())
             .stdin(Stdio::null());
         run_patiently(&mut cmd)
+    }
+
+    /// Serve `sums` as SHA256SUMS of release `version`, signed by the author as a release is.
+    fn set_sums(&self, version: &str, sums: &str) {
+        let signature = minisign::sign(
+            Some(&self.signer.pk),
+            &self.signer.sk,
+            std::io::Cursor::new(sums.as_bytes()),
+            Some(&format!("rada v{version}")),
+            None,
+        )
+        .unwrap()
+        .into_string();
+        self.server
+            .route("/files/SHA256SUMS", 200, sums.to_string());
+        self.server
+            .route("/files/SHA256SUMS.minisig", 200, signature);
     }
 
     /// List one release, with a program inside that says its version.
@@ -120,17 +143,18 @@ impl World {
             .map(|b| format!("{b:02x}"))
             .collect();
         self.server.route(&format!("/files/{name}"), 200, archive);
-        self.server
-            .route("/files/SHA256SUMS", 200, format!("{sum}  {name}\n"));
+        self.set_sums(version, &format!("{sum}  {name}\n"));
         self.server.route(
             "/releases",
             200,
             format!(
                 r#"[{{"tag_name":"v{version}","prerelease":false,"draft":false,"body":"Tags in Finder colours\n- Faster everything","assets":[
                 {{"name":"{name}","browser_download_url":"{}","size":1}},
-                {{"name":"SHA256SUMS","browser_download_url":"{}","size":1}}]}}]"#,
+                {{"name":"SHA256SUMS","browser_download_url":"{}","size":1}},
+                {{"name":"SHA256SUMS.minisig","browser_download_url":"{}","size":1}}]}}]"#,
                 self.server.url(&format!("/files/{name}")),
                 self.server.url("/files/SHA256SUMS"),
+                self.server.url("/files/SHA256SUMS.minisig"),
             ),
         );
     }
@@ -260,11 +284,7 @@ fn a_checksum_that_does_not_match_installs_nothing() {
     let w = World::new();
     w.publish(NEW, format!("#!/bin/sh\necho \"rada {NEW}\"\n").as_bytes());
     let name = format!("rada-{NEW}-{}.tar.gz", target());
-    w.server.route(
-        "/files/SHA256SUMS",
-        200,
-        format!("{}  {name}\n", "cd".repeat(32)),
-    );
+    w.set_sums(NEW, &format!("{}  {name}\n", "cd".repeat(32)));
     let before = fs::read(&w.exe).unwrap();
     let out = w.run(&["update", "--yes"]);
     assert!(!out.status.success());
@@ -273,5 +293,65 @@ fn a_checksum_that_does_not_match_installs_nothing() {
         "{}",
         text(&out)
     );
+    assert_eq!(fs::read(&w.exe).unwrap(), before);
+}
+
+#[cfg_attr(windows, ignore = "the program in the test archive is a shell script")]
+#[test]
+fn a_release_that_is_not_signed_by_the_author_installs_nothing() {
+    let w = World::new();
+    w.publish(NEW, format!("#!/bin/sh\necho \"rada {NEW}\"\n").as_bytes());
+    // Same files, same checksums, signed with some other key.
+    let other = KeyPair::generate_unencrypted_keypair().unwrap();
+    let sums = String::from_utf8(
+        w.server.routes.lock().unwrap()["/files/SHA256SUMS"]
+            .body
+            .clone(),
+    )
+    .unwrap();
+    let forged = minisign::sign(
+        Some(&other.pk),
+        &other.sk,
+        std::io::Cursor::new(sums.as_bytes()),
+        Some(&format!("rada v{NEW}")),
+        None,
+    )
+    .unwrap()
+    .into_string();
+    w.server.route("/files/SHA256SUMS.minisig", 200, forged);
+    let before = fs::read(&w.exe).unwrap();
+    let out = w.run(&["update", "--yes"]);
+    assert!(!out.status.success());
+    let t = text(&out);
+    assert!(t.contains("signature of SHA256SUMS is not valid"), "{t}");
+    assert!(t.contains("nothing was installed"), "{t}");
+    assert_eq!(fs::read(&w.exe).unwrap(), before);
+    assert!(!w.p("xdg/state/rada/update/previous").exists());
+}
+
+#[test]
+fn without_the_test_key_the_program_trusts_nobody() {
+    let w = World::new();
+    w.publish(NEW, b"whatever");
+    // The key only a test build can be given is not set: this is what a release does.
+    let mut cmd = Command::new(&w.exe);
+    cmd.args(["update", "--yes"])
+        .env("LC_ALL", "en_US.UTF-8")
+        .env("HOME", w.p("home"))
+        .env("USERPROFILE", w.p("home"))
+        .env("XDG_CONFIG_HOME", w.p("xdg/config"))
+        .env("XDG_DATA_HOME", w.p("xdg/data"))
+        .env("XDG_STATE_HOME", w.p("xdg/state"))
+        .env("XDG_CACHE_HOME", w.p("xdg/cache"))
+        .env("APPDATA", w.p("xdg/config"))
+        .env("LOCALAPPDATA", w.p("xdg/data"))
+        .env("RADA_UPDATE_API", w.server.url("/releases"))
+        .env_remove("RADA_TEST_SIGNING_KEY")
+        .stdin(Stdio::null());
+    let before = fs::read(&w.exe).unwrap();
+    let out = run_patiently(&mut cmd);
+    assert!(!out.status.success());
+    let t = text(&out);
+    assert!(t.contains("no public key"), "{t}");
     assert_eq!(fs::read(&w.exe).unwrap(), before);
 }

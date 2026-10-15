@@ -15,6 +15,7 @@ pub mod http;
 pub mod install;
 pub mod mode;
 pub mod release;
+pub mod sign;
 pub mod source;
 pub mod version;
 
@@ -45,6 +46,7 @@ pub const RETRY_AFTER: Duration = Duration::from_secs(60 * 60);
 
 const MAX_LIST_BYTES: u64 = 8 << 20;
 const MAX_SUMS_BYTES: u64 = 1 << 20;
+const MAX_SIGNATURE_BYTES: u64 = 4 << 10;
 const MAX_ARCHIVE_BYTES: u64 = 256 << 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -127,8 +129,12 @@ pub struct Ctx {
     pub os_id: Option<String>,
     pub git: OsString,
     pub cargo: OsString,
-    /// Start the new program with `--version` before installing it.
+    /// Start the new program with `--version` before installing it (after it was checked).
     pub run_check: bool,
+    /// The public keys a release may be signed with ([`sign::builtin_keys`]; tests put their
+    /// own). Never read from the environment or a file: whoever could change those could
+    /// install a program of their own.
+    pub signing_keys: Vec<String>,
     /// Variables set for the programs an update starts (`git`, `cargo`): tests keep them away
     /// from the real configuration.
     pub extra_env: Vec<(OsString, OsString)>,
@@ -167,6 +173,7 @@ impl Ctx {
             git: "git".into(),
             cargo: "cargo".into(),
             run_check: true,
+            signing_keys: sign::builtin_keys(),
             extra_env: Vec::new(),
         })
     }
@@ -430,6 +437,10 @@ fn apply_binary(
             release.tag
         )
     })?;
+    let signature = release.asset("SHA256SUMS.minisig").ok_or_else(|| {
+        // Nothing is downloaded for a release that is not signed.
+        tf(Key::UpSigMissing, &[&release.tag])
+    })?;
     let http = ctx.http();
     // Plain addresses are for a mirror or a test, which the API address said to expect.
     let work = ctx
@@ -438,8 +449,30 @@ fn apply_binary(
     let _ = fs::remove_dir_all(&work);
     fs::create_dir_all(&work).map_err(|e| tf(Key::UpCannotCreate, &[&work.display(), &e]))?;
     let result = (|| {
+        // Order matters. The signature is checked before any hash in SHA256SUMS is believed,
+        // the hash before the archive is unpacked, and the new program is started only after
+        // all of that (below, `--version`), never before.
         report(Key::UpReadingSums.tr().to_string());
-        let sums_text = http.get_text(&sums.url, MAX_SUMS_BYTES)?;
+        let sums_bytes = http.get_bytes(&sums.url, MAX_SUMS_BYTES)?;
+        let signature_text =
+            String::from_utf8_lossy(&http.get_bytes(&signature.url, MAX_SIGNATURE_BYTES)?)
+                .into_owned();
+        report(Key::UpSigChecking.tr().to_string());
+        let signed = sign::verify_sums(
+            &sums_bytes,
+            &signature_text,
+            &release.tag,
+            &ctx.signing_keys,
+        )
+        .inspect_err(|e| log.line(&format!("signature refused: {e}")))?;
+        log.line(&format!(
+            "SHA256SUMS signed by key {} of {}: \"{}\"",
+            signed.key + 1,
+            ctx.signing_keys.len(),
+            signed.comment
+        ));
+        let sums_text = String::from_utf8(sums_bytes)
+            .map_err(|_| tf(Key::UpSigBad, &[&"SHA256SUMS is not text"]))?;
         let want = release::checksum_for(&sums_text, &archive_name)
             .ok_or_else(|| tf(Key::UpSumsMissing, &[&archive_name]))?;
         log.line(&format!("{archive_name} should be {want}"));

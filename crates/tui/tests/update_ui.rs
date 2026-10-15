@@ -216,6 +216,7 @@ fn accepting_starts_the_worker_and_a_worker_that_cannot_work_ends_in_the_failure
         git: "git".into(),
         cargo: "cargo".into(),
         run_check: false,
+        signing_keys: Vec::new(),
         extra_env: Vec::new(),
     };
     let mut h = H::new(sb, dir, 140, 36);
@@ -288,6 +289,7 @@ fn worker_with_releases(
         git: "git".into(),
         cargo: "cargo".into(),
         run_check: false,
+        signing_keys: Vec::new(),
         extra_env: Vec::new(),
     };
     (server, ctx)

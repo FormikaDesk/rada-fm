@@ -396,7 +396,7 @@ strings! {
     PreRelease => " (pre-release)", " (pre-release)";
     WhatIsNew => "What is new", "Novità";
     NoReleaseNotes => "(no release notes)", "(nessuna nota di rilascio)";
-    UpdateBinary => "rada will download the program for this system, check it against the release's SHA256SUMS and replace this one. The old one is kept: `rada update --rollback` brings it back.", "rada scaricherà il programma per questo sistema, lo verificherà con gli SHA256SUMS della versione e sostituirà questo. Quello vecchio viene conservato: `rada update --rollback` lo riporta.";
+    UpdateBinary => "rada will download the program for this system, check the signature of the release's SHA256SUMS and the program against it, and replace this one. The old one is kept: `rada update --rollback` brings it back.", "rada scaricherà il programma per questo sistema, controllerà la firma degli SHA256SUMS della versione e il programma con essi, e sostituirà questo. Quello vecchio viene conservato: `rada update --rollback` lo riporta.";
     UpdateSource => "rada will update the git checkout in {0} (it must be on main with nothing uncommitted), build it, put the new program in place of this one and clean the build folder. This takes a few minutes; you can keep working.", "rada aggiornerà la copia git in {0} (deve essere su main e senza modifiche non salvate), la compilerà, metterà il nuovo programma al posto di questo e pulirà la cartella di compilazione. Ci vuole qualche minuto; puoi continuare a lavorare.";
     BtnUpdateNow => "Update now", "Aggiorna ora";
     BtnLater => "Later", "Più tardi";
@@ -1078,7 +1078,7 @@ strings! {
 
     // ---- the command line: updating
     UNoNotes => "(no release notes)", "(nessuna nota di rilascio)";
-    UBinary => "It will download the program for this system, check it against the release's SHA256SUMS, and replace this one (the old one is kept for `rada update --rollback`).", "Scaricherà il programma per questo sistema, lo controllerà con le SHA256SUMS della versione e sostituirà questo (il vecchio resta per `rada update --rollback`).";
+    UBinary => "It will download the program for this system, check the signature of the release's SHA256SUMS and the program against it, and replace this one (the old one is kept for `rada update --rollback`).", "Scaricherà il programma per questo sistema, controllerà la firma delle SHA256SUMS della versione e il programma con esse, e sostituirà questo (il vecchio resta per `rada update --rollback`).";
     USource => "It will update the git checkout in {0} (`git pull --ff-only`, on branch main with no uncommitted changes), build it (`cargo build --release --locked`), put the new program in place of this one and run `cargo clean`.", "Aggiornerà la copia git in {0} (`git pull --ff-only`, sul ramo main e senza modifiche non salvate), la compilerà (`cargo build --release --locked`), metterà il programma nuovo al posto di questo ed eseguirà `cargo clean`.";
     UNotTerminal => "not a terminal: add --yes to update without being asked", "non è un terminale: aggiungi --yes per aggiornare senza che venga chiesto";
     UPrompt => "{0} [y/N] ", "{0} [s/N] ";
@@ -1102,6 +1102,11 @@ strings! {
     UpCannotWrite => "cannot write {0}: {1}", "impossibile scrivere {0}: {1}";
     UpReadingSums => "reading the checksums", "leggo le somme di controllo";
     UpSumsMissing => "SHA256SUMS does not list {0}", "SHA256SUMS non elenca {0}";
+    UpSigMissing => "release {0} has no SHA256SUMS.minisig: it is not signed, so nothing was installed", "la release {0} non ha SHA256SUMS.minisig: non è firmata, quindi non è stato installato nulla";
+    UpSigChecking => "checking the signature", "controllo la firma";
+    UpSigNoKey => "this copy of rada has no public key to check a signature with (it is not an official build), so nothing was installed", "questa copia di rada non ha una chiave pubblica con cui controllare una firma (non è una build ufficiale), quindi non è stato installato nulla";
+    UpSigBad => "the signature of SHA256SUMS is not valid ({0}): the release is not signed by the author, so nothing was installed", "la firma di SHA256SUMS non è valida ({0}): la release non è firmata dall'autore, quindi non è stato installato nulla";
+    UpSigTag => "the signature is for \"{0}\", not for \"{1}\" (an old release shown again?), so nothing was installed", "la firma è per \"{0}\", non per \"{1}\" (una vecchia release riproposta?), quindi non è stato installato nulla";
     UpDownloading => "downloading {0}: {1}", "scarico {0}: {1}";
     UpChecking => "checking the download", "controllo il file scaricato";
     UpChecksumBad => "the downloaded file does not match its checksum (expected {0}, got {1}); nothing was installed", "il file scaricato non corrisponde alla sua somma di controllo (attesa {0}, trovata {1}); non è stato installato nulla";
