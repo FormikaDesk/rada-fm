@@ -214,10 +214,22 @@ fn setup_shell_puts_zsh_in_zdotdir() {
     assert!(!sb.p("home/.zshrc").exists());
 }
 
+// Unix only: Windows does not read $SHELL (a program started from cmd or PowerShell has none that
+// means anything) and sets up PowerShell unless `--shell` says otherwise, so an unknown $SHELL
+// there is not an error. The next test is the same check through `--shell`, for every system.
+#[cfg(unix)]
 #[test]
-fn setup_shell_with_an_unknown_shell_says_what_to_do() {
+fn setup_shell_with_an_unknown_dollar_shell_says_what_to_do() {
     let sb = Sandbox::new();
     let o = sb.shell_cmd("/bin/tcsh", &["--yes"]);
+    assert!(!o.status.success());
+    assert!(text(&o).contains("--shell bash|zsh|fish"), "{}", text(&o));
+}
+
+#[test]
+fn setup_shell_with_an_unknown_shell_flag_says_what_to_do() {
+    let sb = Sandbox::new();
+    let o = sb.shell_cmd("", &["--yes", "--shell", "tcsh"]);
     assert!(!o.status.success());
     assert!(text(&o).contains("--shell bash|zsh|fish"), "{}", text(&o));
 }

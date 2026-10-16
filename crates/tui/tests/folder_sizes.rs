@@ -153,12 +153,21 @@ fn the_details_pane_says_how_many_items_and_how_big() {
     while h.cursor_name() != "big" {
         h.key(KeyCode::Down);
     }
-    h.pump(50);
-    let s = h.screen();
-    assert!(
-        s.contains(&format!("2 items · {}", fmt::size(300_000))),
-        "{s}"
-    );
+    // The pane asks for the count of the folder under the cursor when it is drawn, and hears it a
+    // moment later: draw until the figure is there, not for a fixed time.
+    let want = format!("2 items · {}", fmt::size(300_000));
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        h.pump(20);
+        let s = h.screen();
+        if s.contains(&want) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < end,
+            "timed out waiting for {want}\n{s}"
+        );
+    }
 }
 
 #[test]
