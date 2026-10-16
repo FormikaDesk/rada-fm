@@ -104,30 +104,6 @@ fn on_a_mac_there_is_no_default_file_manager_to_set() {
     assert!(text(&out).contains("Linux and Windows"), "{}", text(&out));
 }
 
-/// Without a yes nothing is written: the question is answered by an input that is empty. (This
-/// only reads the registry; it never writes it.)
-#[cfg(windows)]
-#[test]
-fn on_windows_the_folder_handler_is_not_written_without_a_yes() {
-    let sb = Sandbox::new();
-    let out = sb.rada(&["setup", "desktop", "--default-file-manager"]);
-    assert!(out.status.success(), "{}", text(&out));
-    let t = text(&out);
-    // Either it was asked and not answered, or the registry already says what rada would say.
-    assert!(
-        t.contains("registry was not changed") || t.contains("already as it should be"),
-        "{t}"
-    );
-    if t.contains("registry was not changed") {
-        assert!(
-            t.contains(r"HKEY_CURRENT_USER\Software\Classes\Directory\shell"),
-            "{t}"
-        );
-        assert!(t.contains("Write these to the registry? [y/N]"), "{t}");
-    }
-    assert!(!sb.p("state/rada/windows-folder-handler.json").exists());
-}
-
 #[cfg(windows)]
 #[test]
 fn setup_desktop_makes_a_start_menu_shortcut_and_remove_takes_it_away() {

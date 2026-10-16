@@ -23,6 +23,7 @@ jobs:
   # system is marked #[ignore = "<reason>"] in the source, so the reason shows in the output.
   tests:
     name: tests (${{ matrix.os }})
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -42,6 +43,7 @@ jobs:
   # Lints on the two systems whose code the Linux run does not compile.
   clippy-native:
     name: clippy (${{ matrix.os }})
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -59,6 +61,7 @@ jobs:
   # Formatting, lints and the rest of the workspace (Linux).
   quality:
     name: fmt, clippy, tests
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,6 +77,7 @@ jobs:
   # The declared minimum Rust version must keep building.
   msrv:
     name: minimum Rust version
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,6 +92,7 @@ jobs:
   # point, and the fix is usually `cargo update -p <crate>`.
   audit:
     name: cargo audit and cargo deny
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

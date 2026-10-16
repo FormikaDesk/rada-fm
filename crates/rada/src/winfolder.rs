@@ -292,12 +292,39 @@ impl RegExe {
         shown_key(key)
     }
 
+    /// `reg` with a time limit: a program that does not end is stopped, not waited for.
     fn run(&self, args: &[&str]) -> Result<std::process::Output> {
-        Command::new("reg")
+        use std::process::Stdio;
+        use std::time::{Duration, Instant};
+        let mut child = Command::new("reg")
             .args(args)
-            .stdin(std::process::Stdio::null())
-            .output()
-            .with_context(|| tf(Key::MNotAvailable, &[&"reg"]))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .with_context(|| tf(Key::MNotAvailable, &[&"reg"]))?;
+        // The pipes are read on threads, so that a full pipe cannot keep the program waiting.
+        let (t_out, t_err) = (drain(child.stdout.take()), drain(child.stderr.take()));
+        let end = Instant::now() + Duration::from_secs(20);
+        let status = loop {
+            if let Some(s) = child.try_wait()? {
+                break s;
+            }
+            if Instant::now() >= end {
+                let _ = child.kill();
+                let _ = child.wait();
+                bail!(
+                    "{}",
+                    tf(Key::MProgramFailed, &[&"reg", &"it did not end in 20 s"])
+                );
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        Ok(std::process::Output {
+            status,
+            stdout: t_out.join().unwrap_or_default(),
+            stderr: t_err.join().unwrap_or_default(),
+        })
     }
 
     fn run_ok(&self, args: &[&str]) -> Result<()> {
@@ -367,6 +394,17 @@ impl Hive for RegExe {
     fn delete_key(&self, key: &str) -> Result<()> {
         self.run_ok(&["delete", &Self::path(key), "/f"])
     }
+}
+
+/// Read a pipe to its end on a thread of its own.
+fn drain<R: std::io::Read + Send + 'static>(pipe: Option<R>) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        if let Some(mut p) = pipe {
+            let _ = p.read_to_end(&mut bytes);
+        }
+        bytes
+    })
 }
 
 /// The text of a `.reg` file that `reg export` wrote: UTF-16 with a byte order mark.
