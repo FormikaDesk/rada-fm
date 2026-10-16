@@ -127,3 +127,97 @@ fn setup_desktop_makes_a_start_menu_shortcut_and_remove_takes_it_away() {
     assert!(!lnk.exists());
     assert!(!sb.p("local/rada").exists());
 }
+
+// ---- `rada setup shell`: the shell is taken from $SHELL, $ZDOTDIR is respected, and the home
+// folder is the sandbox's.
+
+impl Sandbox {
+    fn shell_cmd(&self, shell: &str, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_rada"))
+            .args(["setup", "shell"])
+            .args(args)
+            .env("LC_ALL", "en_US.UTF-8")
+            .env("HOME", self.p("home"))
+            .env("USERPROFILE", self.p("home"))
+            .env("XDG_CONFIG_HOME", self.p("config"))
+            .env("XDG_DATA_HOME", self.p("data"))
+            .env("XDG_STATE_HOME", self.p("state"))
+            .env("XDG_CACHE_HOME", self.p("cache"))
+            .env("SHELL", shell)
+            .env_remove("ZDOTDIR")
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap()
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn setup_shell_follows_dollar_shell_and_installs_once() {
+    let sb = Sandbox::new();
+    // Not a Mac: .bashrc.
+    let rc = sb.p("home/.bashrc");
+    let o = sb.shell_cmd("/bin/bash", &["--yes"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let said = text(&o);
+    let macos = cfg!(target_os = "macos");
+    let rc = if macos {
+        sb.p("home/.bash_profile")
+    } else {
+        rc
+    };
+    assert!(said.contains("Use `v` instead of `rada`"), "{said}");
+    assert!(said.contains("new terminal"), "{said}");
+    let first = fs::read_to_string(&rc).unwrap();
+    assert!(first.contains("# >>> rada >>>\neval \"$(rada --init bash)\"\n# <<< rada <<<"));
+    // A second time: it says so and writes nothing.
+    let o = sb.shell_cmd("/bin/bash", &["--yes"]);
+    assert!(text(&o).contains("already set up"), "{}", text(&o));
+    assert_eq!(fs::read_to_string(&rc).unwrap(), first);
+    // Without --yes and with no answer, nothing is written for fish.
+    let o = sb.shell_cmd("/usr/bin/fish", &[]);
+    assert!(text(&o).contains("nothing was written"), "{}", text(&o));
+    assert!(!sb.p("config/fish/conf.d/rada.fish").exists());
+    // --shell wins over $SHELL; the fish file is its own.
+    let o = sb.shell_cmd("/bin/bash", &["--shell", "fish", "--yes"]);
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(sb.p("config/fish/conf.d/rada.fish").exists());
+    // Out again, both.
+    sb.shell_cmd("/bin/bash", &["--remove"]);
+    sb.shell_cmd("/bin/bash", &["--shell", "fish", "--remove"]);
+    assert!(!sb.p("config/fish/conf.d/rada.fish").exists());
+    assert!(!fs::read_to_string(&rc).unwrap().contains("rada"));
+}
+
+#[cfg(unix)]
+#[test]
+fn setup_shell_puts_zsh_in_zdotdir() {
+    let sb = Sandbox::new();
+    let o = Command::new(env!("CARGO_BIN_EXE_rada"))
+        .args(["setup", "shell", "--yes"])
+        .env("LC_ALL", "en_US.UTF-8")
+        .env("HOME", sb.p("home"))
+        .env("XDG_CONFIG_HOME", sb.p("config"))
+        .env("XDG_DATA_HOME", sb.p("data"))
+        .env("XDG_STATE_HOME", sb.p("state"))
+        .env("XDG_CACHE_HOME", sb.p("cache"))
+        .env("SHELL", "/usr/bin/zsh")
+        .env("ZDOTDIR", sb.p("zdot"))
+        .output()
+        .unwrap();
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(
+        fs::read_to_string(sb.p("zdot/.zshrc"))
+            .unwrap()
+            .contains("rada --init zsh")
+    );
+    assert!(!sb.p("home/.zshrc").exists());
+}
+
+#[test]
+fn setup_shell_with_an_unknown_shell_says_what_to_do() {
+    let sb = Sandbox::new();
+    let o = sb.shell_cmd("/bin/tcsh", &["--yes"]);
+    assert!(!o.status.success());
+    assert!(text(&o).contains("--shell bash|zsh|fish"), "{}", text(&o));
+}

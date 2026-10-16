@@ -39,6 +39,9 @@ fn arg_text(command: &str, arg: &str) -> Option<Key> {
         ("font", "remove") => Key::CliArgRemoveFont,
         ("file-picker", "remove") => Key::CliArgRemoveFilePicker,
         ("file-picker", "yes") => Key::CliArgFilePickerYes,
+        ("shell", "shell") => Key::CliArgShellName,
+        ("shell", "remove") => Key::CliArgRemoveShell,
+        ("shell", "yes") => Key::CliArgShellYes,
         (_, "help") => Key::CliHelpFlag,
         (_, "version") => Key::CliVersionFlag,
         _ => return None,
@@ -55,6 +58,7 @@ fn about_text(command: &str) -> Option<Key> {
         "desktop" => Key::CliSetupDesktop,
         "font" => Key::CliSetupFont,
         "file-picker" => Key::CliSetupFilePicker,
+        "shell" => Key::CliSetupShell,
         "help" => Key::CliHelpSubcommand,
         _ => return None,
     })
@@ -72,6 +76,7 @@ fn usage_text(command: &str) -> Option<String> {
         "desktop" => format!("rada setup desktop [{options}]"),
         "font" => format!("rada setup font [{options}]"),
         "file-picker" => format!("rada setup file-picker [{options}]"),
+        "shell" => format!("rada setup shell [{options}]"),
         _ => return None,
     })
 }

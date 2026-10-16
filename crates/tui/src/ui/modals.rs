@@ -878,6 +878,7 @@ fn draw_help(f: &mut Frame, ctx: &Ctx, area: Rect, km: &Keymap, mouse: bool, scr
         tf(Key::HelpEnd3, &[&quit]),
         Key::HelpEnd4.tr().to_string(),
         Key::HelpEnd5.tr().to_string(),
+        Key::HelpEnd6.tr().to_string(),
     ] {
         lines.push(Line::from(Span::styled(l, th.dim())));
     }

@@ -11,6 +11,7 @@ mod icons;
 mod macapp;
 mod setup;
 mod shell;
+mod shellsetup;
 mod update_cmd;
 mod winfolder;
 mod winsetup;
@@ -95,6 +96,19 @@ enum SetupWhat {
     /// files it changes are kept; nothing needs administrator rights and no package is installed.
     FilePicker {
         /// Go back: restore the files that were changed and take away the ones that were made.
+        #[arg(long)]
+        remove: bool,
+        /// Do not ask before writing.
+        #[arg(short, long, conflicts_with = "remove")]
+        yes: bool,
+    },
+    /// Make the shell follow the folder rada was left in (`v` instead of `rada`): writes the
+    /// call of `rada --init` in the right place for your shell, after showing it and asking.
+    Shell {
+        /// The shell: bash, zsh, fish, nushell or powershell (default: `$SHELL`).
+        #[arg(long, value_name = "NAME")]
+        shell: Option<String>,
+        /// Take away exactly what a previous setup wrote.
         #[arg(long)]
         remove: bool,
         /// Do not ask before writing.
@@ -276,6 +290,13 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
                 &mut std::io::BufReader::new(std::io::stdin()),
             )?,
             SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
+            SetupWhat::Shell { shell, remove, yes } => shellsetup::run(
+                &dirs,
+                shell.as_deref(),
+                *remove,
+                *yes,
+                &mut std::io::BufReader::new(std::io::stdin()),
+            )?,
             SetupWhat::FilePicker { remove, yes } => filepicker::run(
                 &dirs,
                 *remove,

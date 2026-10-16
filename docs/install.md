@@ -37,8 +37,20 @@ A [Nerd Font](https://www.nerdfonts.com/) in your terminal is recommended: rada 
 Optional: make your shell follow rada's last folder (`v` instead of `rada`):
 
 ```sh
-eval "$(rada --init bash)"        # also: zsh, fish, nushell, powershell
+rada setup shell                  # shows what it would write and where, then asks
 ```
+
+It finds your shell in `$SHELL` (`--shell bash|zsh|fish|nushell|powershell` to choose; PowerShell on Windows) and writes, for this user only:
+
+| Shell | Where | What |
+|---|---|---|
+| fish | `~/.config/fish/conf.d/rada.fish` | a file of its own: `rada --init fish \| source` |
+| bash | `~/.bashrc` (`~/.bash_profile` on a Mac) | a block with `eval "$(rada --init bash)"` |
+| zsh | `$ZDOTDIR/.zshrc`, else `~/.zshrc` | a block with `eval "$(rada --init zsh)"` |
+| PowerShell | `~/.config/powershell/Microsoft.PowerShell_profile.ps1` (Windows: `Documents\PowerShell\…`) | a block with `rada --init powershell \| Out-String \| Invoke-Expression` |
+| nushell | `vendor/autoload/rada.nu` in nushell's data folder | a file of its own with the function (nushell cannot `source` the output of a command) |
+
+A block is the two lines `# >>> rada >>>` and `# <<< rada <<<` around the call. `--yes` skips the question; run again and it says it is installed and writes nothing; `rada setup shell --remove` takes away exactly that file or block. Then open a new terminal and use `v` instead of `rada`. To do it by hand, `rada --init <shell>` prints the function: `eval "$(rada --init bash)"`.
 
 Optional: add rada to your application menu (Linux), the Applications folder (macOS) or the Start menu (Windows) — see [Desktop integration](desktop.md) — and install a font for the icons with `rada setup font`.
 

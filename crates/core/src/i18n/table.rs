@@ -583,6 +583,7 @@ strings! {
     HelpEnd3 => "Ctrl+C copies; it never quits. Quit with {0}.", "Ctrl+C copia; non chiude mai il programma. Esci con {0}.";
     HelpEnd4 => "Every operation shows a plan first. Every finished operation can be undone.", "Ogni operazione mostra prima un piano. Ogni operazione conclusa si può annullare.";
     HelpEnd5 => "Rebind keys in the [keys] section of the configuration file.", "Cambia i tasti nella sezione [keys] del file di configurazione.";
+    HelpEnd6 => "To have the shell go to the folder you were in when you quit, run `rada setup shell` once, then open a new terminal and start rada with `v`.", "Per far andare la shell nella cartella in cui eri quando esci, esegui una volta `rada setup shell`, poi apri un nuovo terminale e avvia rada con `v`.";
     ChipKeys => "Keys", "Tasti";
     HelpScrollClose => "↑↓ scroll · Esc close", "↑↓ scorri · Esc chiudi";
     HelpClose => "Esc close", "Esc chiudi";
@@ -1231,6 +1232,21 @@ strings! {
     CliSetupFilePicker => "Make rada the system's file chooser (Linux, through xdg-desktop-portal-termfilechooser): shows what it would write and where, and writes only after you say yes. Copies of the files it changes are kept; nothing needs administrator rights and no package is installed.", "Fa di rada la finestra di scelta file del sistema (Linux, tramite xdg-desktop-portal-termfilechooser): mostra che cosa scriverebbe e dove, e scrive solo dopo il tuo sì. Tiene una copia dei file che cambia; non servono diritti di amministratore e non installa pacchetti.";
     CliArgRemoveFilePicker => "Go back: restore the files that were changed and take away the ones that were made.", "Torna indietro: ripristina i file cambiati e toglie quelli creati.";
     CliArgFilePickerYes => "Do not ask before writing.", "Non chiede conferma prima di scrivere.";
+    // ---- `rada setup shell`
+    CliSetupShell => "Make the shell follow the folder rada was left in (`v` instead of `rada`): writes the call of `rada --init` in the right place for your shell, after showing it and asking. Only a file of its own (fish, nushell) or a block between `# >>> rada >>>` and `# <<< rada <<<` is written; nothing needs administrator rights.", "Fa seguire alla shell la cartella in cui hai lasciato rada (`v` al posto di `rada`): scrive la chiamata a `rada --init` nel posto giusto per la tua shell, dopo avertela mostrata e aver chiesto conferma. Si scrive solo un file proprio (fish, nushell) o un blocco tra `# >>> rada >>>` e `# <<< rada <<<`; non servono diritti di amministratore.";
+    CliArgShellName => "The shell: bash, zsh, fish, nushell or powershell (default: the one in $SHELL; PowerShell on Windows).", "La shell: bash, zsh, fish, nushell o powershell (predefinita: quella in $SHELL; PowerShell su Windows).";
+    CliArgRemoveShell => "Take away exactly what a previous setup wrote: the file or the block, nothing else.", "Toglie esattamente ciò che una configurazione precedente ha scritto: il file o il blocco, nient'altro.";
+    CliArgShellYes => "Do not ask before writing.", "Non chiede conferma prima di scrivere.";
+    SsUnknownShell => "cannot tell which shell to set up (\"{0}\"); choose one with --shell bash|zsh|fish|nushell|powershell", "non so per quale shell configurare (\"{0}\"); scegline una con --shell bash|zsh|fish|nushell|powershell";
+    SsIntro => "The {0} shell would follow the folder rada was left in. It would write:", "La shell {0} seguirebbe la cartella in cui hai lasciato rada. Scriverebbe:";
+    SsReplace => "replace {0}", "sostituisce {0}";
+    SsAdd => "add to {0}", "aggiunge a {0}";
+    SsAlready => "already set up in {0}: nothing was written", "già configurato in {0}: non è stato scritto nulla";
+    SsByHand => "{0} already calls rada --init ({1}): nothing was written", "{0} chiama già rada --init ({1}): non è stato scritto nulla";
+    SsDone => "Use `{0}` instead of `rada`: it opens rada and, when you quit, the shell goes to the folder you were in. Open a new terminal first, so that the shell reads it.", "Usa `{0}` al posto di `rada`: apre rada e, quando esci, la shell va nella cartella in cui eri. Apri prima un nuovo terminale, così la shell lo legge.";
+    SsNothingToRemove => "nothing to remove: rada has not set up this shell", "niente da togliere: rada non ha configurato questa shell";
+    SsRemovedFile => "removed {0}", "tolto {0}";
+    SsRemovedBlock => "took the rada block out of {0}", "tolto il blocco di rada da {0}";
     MChooserWithRequest => "--chooser-file cannot be used with --request or --demo", "--chooser-file non si può usare con --request o --demo";
     FpLinuxOnly => "the file chooser setup is for Linux (xdg-desktop-portal); nothing was done", "la configurazione della scelta file è per Linux (xdg-desktop-portal); non è stato fatto nulla";
     FpIntro => "rada will become the file chooser of this user's desktop. It would write:", "rada diventerà la finestra di scelta file del desktop di questo utente. Scriverebbe:";
