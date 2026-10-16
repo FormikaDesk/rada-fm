@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/core", "crates/tui", "crates/rada"]
 
 [workspace.package]
-version = "0.6.0-rc.9"
+version = "0.6.0-rc.10"
 edition = "2024"
 license = "MIT"
 authors = ["Alessandro Formica"]
