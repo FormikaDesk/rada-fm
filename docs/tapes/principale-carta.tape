@@ -3,7 +3,7 @@ Set Width 1584
 Set Height 800
 Source "docs/tapes/ambiente-carta.tape"
 Output "docs/media/.scarto/principale-carta.gif"
-Type "rada --icons nerd --images halfblocks --theme rada-light --demo vetrina ~/projects/demo"
+Type "rada --icons nerd --images halfblocks --theme carta --demo vetrina ~/projects/demo"
 Enter
 Sleep 2s
 Show

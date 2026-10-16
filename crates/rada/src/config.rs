@@ -17,7 +17,7 @@
 //!                           # Finder and Explorer do); false: letter by letter
 //! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:
 //!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
-//!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light
+//!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light | carta
 //! appearance = "auto"        # auto | light | dark: which variant a theme name uses
 //! transparent_background = false  # true: the default dark theme leaves the terminal's own
 //!                            # background instead of painting its night blue

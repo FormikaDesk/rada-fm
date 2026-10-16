@@ -9,7 +9,7 @@ profile = "auto"      # auto | modern | basic: see "Terminals"
 icons = "auto"        # auto | nerd | unicode-icons | unicode-std | none: see "Terminals"
 theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the terminal), or a fixed
                       # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte | tokyo-night-dark | tokyo-night-day
-                      # | nebbia-light
+                      # | nebbia-light | carta
 appearance = "auto"   # auto | light | dark: which variant a theme name takes
 transparent_background = false  # true: the default dark theme leaves your terminal's background
 show_hidden = false

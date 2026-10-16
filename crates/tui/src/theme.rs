@@ -179,6 +179,9 @@ enum Family {
     TokyoNight,
     /// Only a light variant of its own; the dark one is rada's.
     Nebbia,
+    /// The warm parchment that was the light theme of rada before "chalk": a light variant
+    /// of its own, chosen by name; the dark one is rada's.
+    Carta,
 }
 
 impl Family {
@@ -192,13 +195,15 @@ impl Family {
             (Family::TokyoNight, true) => Theme::tokyo_night_day(),
             (Family::Nebbia, false) => Theme::rada(),
             (Family::Nebbia, true) => Theme::nebbia_light(),
+            (Family::Carta, false) => Theme::rada(),
+            (Family::Carta, true) => Theme::carta(),
         }
     }
 }
 
 impl Theme {
     /// Every built-in theme: three for dark terminals, then their light counterparts.
-    pub const NAMES: [&'static str; 7] = [
+    pub const NAMES: [&'static str; 8] = [
         "rada",
         "catppuccin",
         "tokyo-night",
@@ -206,6 +211,7 @@ impl Theme {
         "catppuccin-latte",
         "tokyo-night-day",
         "nebbia-light",
+        "carta",
     ];
 
     /// The family a name belongs to, and whether the name pins a variant: `catppuccin-latte`
@@ -223,6 +229,7 @@ impl Theme {
             "tokyo-night-dark" => (Family::TokyoNight, Exact { light: false }),
             "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, Exact { light: true }),
             "nebbia-light" | "nebbia" | "mist" => (Family::Nebbia, Exact { light: true }),
+            "carta" | "paper" => (Family::Carta, Exact { light: true }),
             _ => return None,
         })
     }
@@ -513,10 +520,34 @@ impl Theme {
         t
     }
 
-    /// The default theme for a light terminal, "paper": warm off-white, a muted blue accent.
+    /// The default theme for a light terminal, "chalk" (Gesso): an almost neutral off-white,
+    /// `#f4f3f0`, with near-black neutral text and the blue of the dark theme's family.
+    ///
+    /// Its tokens are those of [`Theme::carta`] moved to the new background together: each
+    /// one keeps its distance in lightness (CIE L*) from the background, and the warmth of the
+    /// paper (the chroma it has over the background) is taken away in the same proportion as
+    /// the background's own, so the contrasts stay what they were (the text a little higher).
     pub fn rada_light() -> Theme {
         let mut t = Theme::paper(
             "rada-light",
+            [
+                0xf4f3f0, 0xeeedea, 0xe9e8e5, 0xd0cec9, 0x2f2f2f, 0x63615e, 0xa5a39f, 0x3d5b88,
+                0xe6e5e2, 0x6d87ad, 0xe0dfdb, 0xe9e8e5, 0xe9e8e5, 0x3d5b88,
+            ],
+            [0x765513, 0x416433, 0x8f443f, 0x6f5296, 0x2f6573, 0x8f5628],
+            [0x6d87ad, 0x8a78a8],
+        );
+        // The row under the cursor is a light shade: its text is the darkest neutral.
+        t.cursor_text = rgb(0x14, 0x14, 0x14);
+        t.popup_border = rgb(0x8b, 0x8a, 0x86);
+        t
+    }
+
+    /// "Paper" (Carta): the light theme rada had until "chalk", a warm parchment (`#ebe4d5`)
+    /// with brown text and a muted blue accent. Chosen with `theme = "carta"`.
+    pub fn carta() -> Theme {
+        let mut t = Theme::paper(
+            "carta",
             [
                 0xebe4d5, 0xe5decf, 0xe1d9c8, 0xcbbfa6, 0x3a3229, 0x5d5446, 0xa09581, 0x405c84,
                 0xddd6c7, 0x6d87ad, 0xd9d0bc, 0xe1d9c8, 0xe1d9c8, 0x405c84,
@@ -1625,7 +1656,7 @@ mod tests {
             let (r, g, b) = channels(c);
             format!("#{r:02x}{g:02x}{b:02x}")
         };
-        let carta = Theme::named("rada-light", ColorDepth::True).unwrap();
+        let carta = Theme::named("carta", ColorDepth::True).unwrap();
         assert_eq!(hex(carta.canvas), "#ebe4d5");
         assert_eq!(carta.bg, Some(carta.canvas));
         assert_eq!(hex(carta.track), "#cbbfa6");
@@ -1639,6 +1670,25 @@ mod tests {
         );
         assert_eq!(hex(dark.track), "#2c3040");
         assert_eq!(hex(dark.text), "#c8cde0");
+        // Gesso: an almost neutral off-white (no more than a few steps between its channels),
+        // and neutral text.
+        let gesso = Theme::named("rada-light", ColorDepth::True).unwrap();
+        assert_eq!(hex(gesso.canvas), "#f4f3f0");
+        assert_eq!(gesso.bg, Some(gesso.canvas));
+        assert_eq!(hex(gesso.text), "#2f2f2f");
+        for (what, c) in [
+            ("canvas", gesso.canvas),
+            ("track", gesso.track),
+            ("selection", gesso.selection),
+            ("field", gesso.field),
+            ("text_dim", gesso.text_dim),
+            ("muted", gesso.muted),
+            ("popup_border", gesso.popup_border),
+        ] {
+            let (r, g, b) = channels(c);
+            let spread = r.max(g).max(b) - r.min(g).min(b);
+            assert!(spread <= 8, "{what} of Gesso is almost neutral: {}", hex(c));
+        }
         // Nothing white on paper: no token of Carta is a pure white or pale cream.
         for (what, c) in [("canvas", carta.canvas), ("popup", carta.popup)] {
             let (r, g, b) = channels(c);
@@ -1671,6 +1721,7 @@ mod tests {
         for n in [
             "rada-light",
             "nebbia-light",
+            "carta",
             "catppuccin",
             "tokyo-night-day",
         ] {
@@ -1687,7 +1738,7 @@ mod tests {
             let l = luminance(t.canvas);
             assert_eq!(
                 t.light,
-                n.ends_with("-light") || n.ends_with("latte") || n.ends_with("day")
+                n.ends_with("-light") || n.ends_with("latte") || n.ends_with("day") || n == "carta"
             );
             assert!(
                 if t.light { l > 0.6 } else { l < 0.05 },
@@ -1748,6 +1799,13 @@ mod tests {
         // "auto" is the rada family, and `variant` picks its side.
         assert_eq!(Theme::variant("auto", true, d).unwrap().name, "rada-light");
         assert_eq!(Theme::variant("auto", false, d).unwrap().name, "rada");
+        // Carta is chosen by name: it pins the light variant, and its dark side is rada's.
+        assert_eq!(Theme::follows_background("carta"), Some(false));
+        assert_eq!(Theme::follows_background("paper"), Some(false));
+        assert_eq!(Theme::named("carta", d).unwrap().name, "carta");
+        assert_eq!(Theme::named("paper", d).unwrap().name, "carta");
+        assert_eq!(Theme::variant("carta", false, d).unwrap().name, "rada");
+        assert_eq!(Theme::variant("carta", true, d).unwrap().name, "carta");
     }
 
     #[test]

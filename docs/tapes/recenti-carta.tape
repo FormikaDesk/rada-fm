@@ -3,7 +3,7 @@ Set Width 1584
 Set Height 800
 Source "docs/tapes/ambiente-carta.tape"
 Output "docs/media/.scarto/recenti-carta.gif"
-Type "rada --icons nerd --images halfblocks --theme rada-light --demo recenti ~/projects/demo"
+Type "rada --icons nerd --images halfblocks --theme carta --demo recenti ~/projects/demo"
 Enter
 Sleep 2s
 Show

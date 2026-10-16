@@ -427,7 +427,7 @@ fn hex(c: ratatui::style::Color) -> String {
 fn light_theme_tokens() {
     use rada_tui::theme::ColorDepth;
     let mut out = String::new();
-    for name in ["rada-light", "catppuccin-latte", "tokyo-night-day"] {
+    for name in ["rada-light", "carta", "catppuccin-latte", "tokyo-night-day"] {
         let t = Theme::named(name, ColorDepth::True).unwrap();
         out.push_str(&format!("[{name}] canvas {}\n", hex(t.canvas)));
         for (k, v) in [

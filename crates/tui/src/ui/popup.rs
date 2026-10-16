@@ -561,7 +561,7 @@ mod tests {
     fn a_cell_of_the_border_is_never_another_colour_than_the_cells_beside_it() {
         // Over a plain screen, in a dark theme and in Carta: the cell of the border, the cell
         // just outside it and the cell just inside it are one colour, corners included.
-        for name in ["rada", "rada-light"] {
+        for name in ["rada", "rada-light", "carta"] {
             let th = Theme::named(name, ColorDepth::True).unwrap();
             let mut b = painted(&th);
             let r = Rect::new(4, 2, 20, 6);
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn a_window_has_one_tone_for_its_border_and_its_inside() {
-        for name in ["rada", "rada-light"] {
+        for name in ["rada", "rada-light", "carta"] {
             let mut th = Theme::named(name, ColorDepth::True).unwrap();
             let behind = th.dimmed(th.canvas);
             th.popup = th.modal_surface();

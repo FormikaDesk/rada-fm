@@ -2,7 +2,36 @@
 source: crates/tui/tests/snapshots.rs
 expression: out
 ---
-[rada-light] canvas #ebe4d5
+[rada-light] canvas #f4f3f0
+  text          #2f2f2f
+  text_dim      #63615e
+  muted         #a5a39f
+  accent        #3d5b88
+  on_accent     #ffffff
+  selection     #e9e8e5
+  cursor        #6d87ad
+  mark          #eeedea
+  track         #d0cec9
+  success       #416433
+  warn          #765513
+  error         #8f443f
+  kind.code     #8f5628
+  kind.markup   #6f5296
+  kind.text     #63615e
+  kind.doc      #8f443f
+  kind.image    #6f5296
+  kind.vector   #6f5296
+  kind.audio    #8f443f
+  kind.video    #8f443f
+  kind.archive  #765513
+  kind.data     #765513
+  kind.config   #63615e
+  kind.binary   #416433
+  kind.other    #63615e
+  kind.folder   #3d5b88
+  kind.link     #2f6573
+  tint(accent)  #dadde1
+[carta] canvas #ebe4d5
   text          #3a3229
   text_dim      #5d5446
   muted         #a09581

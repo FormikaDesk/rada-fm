@@ -3,7 +3,7 @@ Set Width 1584
 Set Height 800
 Source "docs/tapes/ambiente-carta.tape"
 Output "docs/media/.scarto/tag-menu-carta.gif"
-Type "RADA_DEMO_DEST=$HOME/Documenti rada --icons nerd --images halfblocks --theme rada-light --demo tagmenu ~/projects/demo"
+Type "RADA_DEMO_DEST=$HOME/Documenti rada --icons nerd --images halfblocks --theme carta --demo tagmenu ~/projects/demo"
 Enter
 Sleep 2s
 Show

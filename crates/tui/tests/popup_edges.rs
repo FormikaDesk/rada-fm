@@ -19,7 +19,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-const THEMES: [&str; 2] = ["rada", "rada-light"];
+const THEMES: [&str; 3] = ["rada", "rada-light", "carta"];
 
 fn scene(theme: &str, w: u16, h: u16, files: usize) -> H {
     let sb = rada_core::testutil::Sandbox::new();

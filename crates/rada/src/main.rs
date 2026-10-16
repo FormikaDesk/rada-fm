@@ -134,7 +134,7 @@ struct Cli {
 
     /// Colour theme: `auto` (default), rada, catppuccin or tokyo-night (these follow the
     /// terminal's background), or one fixed variant: rada-dark, rada-light,
-    /// catppuccin-mocha, catppuccin-latte, tokyo-night-dark, tokyo-night-day, nebbia-light.
+    /// catppuccin-mocha, catppuccin-latte, tokyo-night-dark, tokyo-night-day, nebbia-light, carta.
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
 
