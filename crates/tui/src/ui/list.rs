@@ -123,7 +123,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
 
     // Column titles, in a pill of their own; the sorted one carries an arrow.
     let head_bg = Style::default().bg(th.field);
-    let arrow = if app.sort.reverse { "↓" } else { "↑" };
+    let arrow = if app.sort.descending() { "↓" } else { "↑" };
     let label = |text: &str, k: SortKey| {
         let sorted = app.sort.key == k;
         let t = if sorted {

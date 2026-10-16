@@ -19,11 +19,19 @@ pub struct SavedTab {
     /// `details` or `icons`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<String>,
-    /// `name`, `size` or `date`.
+    /// `name`, `size`, `date` or `type`: only when the person chose the order of this tab
+    /// (a click on a column title, the Sort menu, the keys). Otherwise it is left out, and
+    /// the tab follows `config.toml`, whatever that says by then.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
+    /// With `sort`: the `reverse` of the order (for a date, not reversed is newest first).
     #[serde(default)]
     pub reverse: bool,
+    /// `Some(true)`: the order above was chosen. `Some(false)`: it was not, and `sort` is
+    /// empty. `None`: the file comes from a version that wrote the order of every tab whether
+    /// it was chosen or not, and in which a date that was reversed was the newest first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort_chosen: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,11 +71,34 @@ pub fn save(state_dir: &Path, state: &UiState) -> std::io::Result<()> {
     )
 }
 
-/// Write it from a thread of its own.
+/// What the last request to write each state folder's file was, by number.
+static LATEST: std::sync::Mutex<std::collections::BTreeMap<PathBuf, u64>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+/// One write at a time.
+static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Write it from a thread of its own. Each write is a thread, and two close together could land
+/// in either order, leaving the older state in the file: a write that a newer one has
+/// replaced is not made (the newer one is), so that the file ends as the last request said.
 pub fn save_in_background(state_dir: std::path::PathBuf, state: UiState) {
+    let seq = {
+        let mut latest = LATEST.lock().unwrap_or_else(|e| e.into_inner());
+        let n = latest.entry(state_dir.clone()).or_insert(0);
+        *n += 1;
+        *n
+    };
     let _ = std::thread::Builder::new()
         .name("rada-ui-state".into())
         .spawn(move || {
+            let _one_at_a_time = WRITING.lock().unwrap_or_else(|e| e.into_inner());
+            let newer = LATEST
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&state_dir)
+                .is_some_and(|n| *n != seq);
+            if newer {
+                return;
+            }
             if let Err(e) = save(&state_dir, &state) {
                 tracing::warn!("cannot save {}: {e}", state_dir.join(FILE).display());
             }
@@ -109,6 +140,46 @@ mod tests {
     }
 
     #[test]
+    fn writes_made_close_together_leave_the_last_one_in_the_file() {
+        let d = tempfile::tempdir().unwrap();
+        for n in 0..200usize {
+            save_in_background(
+                d.path().to_path_buf(),
+                UiState {
+                    active_tab: n,
+                    ..Default::default()
+                },
+            );
+        }
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            if load(d.path()).active_tab == 199 {
+                break;
+            }
+            assert!(std::time::Instant::now() < end, "{:?}", load(d.path()));
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        // And it stays the last one: no late write follows.
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        assert_eq!(load(d.path()).active_tab, 199);
+    }
+
+    #[test]
+    fn a_file_from_a_version_that_wrote_every_tab_loads_without_a_choice_flag() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::write(
+            d.path().join("ui.json"),
+            br#"{"tabs":[{"path":"/x","view":"details","sort":"name","reverse":false}]}"#,
+        )
+        .unwrap();
+        let t = &load(d.path()).tabs[0];
+        assert_eq!(
+            (t.sort.as_deref(), t.reverse, t.sort_chosen),
+            (Some("name"), false, None)
+        );
+    }
+
+    #[test]
     fn tabs_come_back_with_their_view_and_order() {
         let d = tempfile::tempdir().unwrap();
         let state = UiState {
@@ -119,12 +190,14 @@ mod tests {
                     view: Some("icons".into()),
                     sort: Some("date".into()),
                     reverse: true,
+                    sort_chosen: Some(true),
                 },
                 SavedTab {
                     path: PathBuf::from("/tmp"),
                     view: None,
                     sort: None,
                     reverse: false,
+                    sort_chosen: Some(false),
                 },
             ],
             active_tab: 1,

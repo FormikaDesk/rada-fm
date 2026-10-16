@@ -11,6 +11,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use rada_core::i18n::Key;
+use rada_core::model::{SortKey, SortSpec};
 
 use crate::keymap::Action;
 
@@ -106,6 +107,18 @@ impl Chooser {
             | ExtractToFolder | Compress | Undo | Redo | History | Bookmark | NewFile
             | OpenWith | OpenTerminal | ContextMenu | Update | QuickLook | ShowPackage => false,
         }
+    }
+}
+
+/// The order a chooser starts in, whatever the `sort` setting says: by date of modification,
+/// the most recent first (a date that is not reversed) (what is being looked for is nearly always what was just made or
+/// downloaded). The rest of the setting (folders first, natural names) is the person's, and
+/// the order can be changed as usual while choosing.
+pub fn default_sort(base: SortSpec) -> SortSpec {
+    SortSpec {
+        key: SortKey::Modified,
+        reverse: false,
+        ..base
     }
 }
 
@@ -248,6 +261,25 @@ mod tests {
         assert!(Chooser::folder(false).allows(Action::NewFolder));
         assert!(Chooser::save("x").allows(Action::NewFolder));
         assert!(!Chooser::save("x").allows(Action::ToggleMark));
+    }
+
+    #[test]
+    fn a_chooser_starts_with_the_newest_first_whatever_the_setting() {
+        let base = SortSpec {
+            key: SortKey::Size,
+            reverse: false,
+            dirs_first: false,
+            natural: false,
+        };
+        let s = default_sort(base);
+        assert_eq!((s.key, s.reverse), (SortKey::Modified, false));
+        assert!(
+            s.descending(),
+            "the arrow of a date that runs from the newest"
+        );
+        // The rest is the person's own.
+        assert_eq!((s.dirs_first, s.natural), (false, false));
+        assert_eq!(default_sort(SortSpec::default()).key, SortKey::Modified);
     }
 
     #[test]

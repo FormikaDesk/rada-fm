@@ -357,12 +357,14 @@ fn tabs_are_remembered_between_sessions_and_the_option_turns_it_off() {
                 view: Some("icons".into()),
                 sort: Some("size".into()),
                 reverse: true,
+                sort_chosen: Some(true),
             },
             SavedTab {
                 path: b.clone(),
                 view: None,
                 sort: None,
                 reverse: false,
+                sort_chosen: Some(false),
             },
         ],
         active_tab: 1,
@@ -405,6 +407,7 @@ fn a_folder_given_on_the_command_line_opens_beside_the_restored_tabs() {
             view: None,
             sort: None,
             reverse: false,
+            sort_chosen: Some(false),
         }],
         ..Default::default()
     };

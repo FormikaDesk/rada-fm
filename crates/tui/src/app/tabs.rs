@@ -24,6 +24,8 @@ pub struct TabState {
     pub scroll: usize,
     pub marked: BTreeSet<OsString>,
     pub sort: SortSpec,
+    /// The order was chosen in this tab (see [`App::sort_chosen`]).
+    pub sort_chosen: bool,
     pub remembered: HashMap<PathBuf, OsString>,
     pub nav: crate::nav::NavHistory,
     pub nav_move: Option<NavMove>,
@@ -35,35 +37,58 @@ pub struct TabState {
 
 impl TabState {
     /// A tab that has not been looked at yet: it loads its folder when it comes to the front.
-    pub fn fresh(cwd: PathBuf, view: ViewMode, sort: SortSpec) -> TabState {
+    pub fn fresh(cwd: PathBuf, view: ViewMode, sort: SortSpec, sort_chosen: bool) -> TabState {
         TabState {
             listing: DirListing::new(cwd.clone(), Vec::new(), sort),
             nav: crate::nav::NavHistory::new(cwd.clone()),
             cwd,
             sort,
+            sort_chosen,
             view,
             ..Default::default()
         }
     }
 }
 
-pub(super) fn sort_from_saved(t: &SavedTab, base: SortSpec) -> SortSpec {
+/// The order a saved tab comes back in, and whether it was the person's choice.
+///
+/// Only an order that was chosen in the tab is kept: otherwise the tab follows `base`, the
+/// order of `config.toml` as it is now. A file from a version that wrote the order of every
+/// tab (`sort_chosen` absent) cannot tell: there, a tab sorted by name and not reversed is
+/// taken for one that was never touched, and any other is taken for a choice; since a date
+/// that was reversed used to be the newest first, and is now the one that is not, that
+/// direction is turned round so that the tab looks as it did.
+pub(super) fn sort_from_saved(t: &SavedTab, base: SortSpec) -> (SortSpec, bool) {
     let key = match t.sort.as_deref() {
-        Some("name") => SortKey::Name,
-        Some("size") => SortKey::Size,
-        Some("date") => SortKey::Modified,
-        Some("type") => SortKey::Type,
-        _ => base.key,
+        Some("name") => Some(SortKey::Name),
+        Some("size") => Some(SortKey::Size),
+        Some("date") => Some(SortKey::Modified),
+        Some("type") => Some(SortKey::Type),
+        _ => None,
     };
-    SortSpec {
-        key,
-        reverse: if t.sort.is_some() {
-            t.reverse
-        } else {
-            base.reverse
-        },
-        ..base
+    let Some(key) = key else {
+        return (base, false);
+    };
+    let chosen = match t.sort_chosen {
+        Some(c) => c,
+        None => !(key == SortKey::Name && !t.reverse),
+    };
+    if !chosen {
+        return (base, false);
     }
+    let reverse = if t.sort_chosen.is_none() && key == SortKey::Modified {
+        !t.reverse
+    } else {
+        t.reverse
+    };
+    (
+        SortSpec {
+            key,
+            reverse,
+            ..base
+        },
+        true,
+    )
 }
 
 impl App {
@@ -80,6 +105,7 @@ impl App {
             scroll: std::mem::take(&mut self.scroll),
             marked: std::mem::take(&mut self.marked),
             sort: self.sort,
+            sort_chosen: self.sort_chosen,
             remembered: std::mem::take(&mut self.remembered),
             nav: std::mem::take(&mut self.nav),
             nav_move: None,
@@ -101,6 +127,7 @@ impl App {
         self.scroll = t.scroll;
         self.marked = t.marked;
         self.sort = t.sort;
+        self.sort_chosen = t.sort_chosen;
         self.remembered = t.remembered;
         self.nav = t.nav;
         self.nav_move = t.nav_move;
@@ -205,10 +232,11 @@ impl App {
         if let Some(name) = self.cursor_name() {
             self.remembered.insert(self.cwd.clone(), name);
         }
-        let (cwd, view, sort, remembered) = (
+        let (cwd, view, sort, chosen, remembered) = (
             self.cwd.clone(),
             self.view,
             self.sort,
+            self.sort_chosen,
             self.remembered.clone(),
         );
         let out = self.put_away();
@@ -216,7 +244,7 @@ impl App {
         let at = self.active_tab + 1;
         self.tabs.insert(at, TabState::default());
         self.active_tab = at;
-        let mut fresh = TabState::fresh(cwd, view, sort);
+        let mut fresh = TabState::fresh(cwd, view, sort, chosen);
         fresh.remembered = remembered;
         self.bring_in(fresh);
         self.after_switch();
@@ -265,11 +293,17 @@ impl App {
     pub fn saved_tabs(&self) -> Vec<SavedTab> {
         (0..self.tabs.len())
             .map(|i| {
-                let (cwd, archive, view, sort) = if i == self.active_tab {
-                    (&self.cwd, &self.archive, self.view, self.sort)
+                let (cwd, archive, view, sort, chosen) = if i == self.active_tab {
+                    (
+                        &self.cwd,
+                        &self.archive,
+                        self.view,
+                        self.sort,
+                        self.sort_chosen,
+                    )
                 } else {
                     let t = &self.tabs[i];
-                    (&t.cwd, &t.archive, t.view, t.sort)
+                    (&t.cwd, &t.archive, t.view, t.sort, t.sort_chosen)
                 };
                 // Inside an archive the folder is not on the disk: remember where the archive is.
                 let path = match archive {
@@ -285,8 +319,11 @@ impl App {
                 SavedTab {
                     path,
                     view: Some(view.id().to_string()),
-                    sort: Some(sort.key.label().to_string()),
-                    reverse: sort.reverse,
+                    // The order is remembered only where the person chose it: a tab that was
+                    // never sorted follows the configuration, which may change.
+                    sort: chosen.then(|| sort.key.label().to_string()),
+                    reverse: chosen && sort.reverse,
+                    sort_chosen: Some(chosen),
                 }
             })
             .collect()

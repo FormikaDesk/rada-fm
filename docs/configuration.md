@@ -13,8 +13,8 @@ theme = "auto"        # auto | rada | catppuccin | tokyo-night (follow the termi
 appearance = "auto"   # auto | light | dark: which variant a theme name takes
 transparent_background = false  # true: the default dark theme leaves your terminal's background
 show_hidden = false
-sort = "name"         # name | size | date
-reverse = false
+sort = "name"         # name | size | date (date: the most recent first, as in the Finder and Explorer)
+reverse = false       # true turns the order round (for a date: the oldest first)
 bookmarks = ["~/projects", "/mnt/data"]
 images = "auto"       # auto | halfblocks | kitty | sixel | iterm2 | off
 image_max_megapixels = 50
@@ -59,5 +59,8 @@ copy = ["y", "ctrl+c"]
 trash = ["d", "delete"]
 quit = "ctrl+q"
 ```
+
+**Sorting.** `sort` and `reverse` are the order every tab starts in. A tab keeps its own order only where you chose it (a click on a column title, **Sort ▾**, the keys `s` and `S`): that one is remembered with the tab, and the others follow `config.toml` at every start, so changing the file changes them. `sort = "date"` shows the **most recent first**, with `reverse = false`; `reverse = true` gives the oldest first. The folders stay before the files (`dirs_first`). When rada is used as a [file picker](desktop.md#use-rada-as-the-file-picker) it starts by date, most recent first, whatever `sort` says.
+
 
 State lives in `$XDG_STATE_HOME/rada/` (`journal.jsonl`, `log/`, and `ui.json` with the tabs that were open, whether you hid the navigation pane or the details pane, and the view of each tab); the PDF page cache is in `$XDG_CACHE_HOME/rada/previews`. Set `RADA_LOG=debug` for more logging (written to a file, never to the screen).

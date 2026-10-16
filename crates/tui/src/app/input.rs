@@ -452,10 +452,7 @@ impl App {
 
             Filter => self.start_bar(true),
             Palette => self.start_bar(false),
-            Sort => self.set_sort(SortSpec {
-                key: self.sort.key.next(),
-                ..self.sort
-            }),
+            Sort => self.set_sort(self.sort.with_key(self.sort.key.next())),
             SortReverse => self.set_sort(SortSpec {
                 reverse: !self.sort.reverse,
                 ..self.sort
@@ -954,7 +951,7 @@ impl App {
                         ..self.sort
                     }
                 } else {
-                    SortSpec { key, ..self.sort }
+                    self.sort.with_key(key)
                 };
                 self.set_sort(spec);
             }

@@ -277,6 +277,31 @@ pub struct SortSpec {
     pub natural: bool,
 }
 
+impl SortSpec {
+    /// Whether the list runs "downwards" in the sense of the arrow beside the column title:
+    /// from the biggest, the latest or the last in the alphabet. A date has its newest first
+    /// when it is not reversed (as in the Finder and in Explorer), so for it the arrow and the
+    /// `reverse` setting are opposite; for every other key they are the same.
+    pub fn descending(&self) -> bool {
+        self.reverse != (self.key == SortKey::Modified)
+    }
+
+    /// The same order with the direction chosen: `descending` is what the arrow says.
+    pub fn with_descending(self, descending: bool) -> SortSpec {
+        SortSpec {
+            reverse: descending != (self.key == SortKey::Modified),
+            ..self
+        }
+    }
+
+    /// Another key, in the direction the arrow shows now: changing what the list is sorted by
+    /// does not turn it upside down.
+    pub fn with_key(self, key: SortKey) -> SortSpec {
+        let down = self.descending();
+        SortSpec { key, ..self }.with_descending(down)
+    }
+}
+
 impl Default for SortSpec {
     fn default() -> Self {
         SortSpec {
@@ -381,7 +406,8 @@ pub fn compare(a: &Entry, b: &Entry, spec: &SortSpec) -> Ordering {
     let primary = match spec.key {
         SortKey::Name => by_name(),
         SortKey::Size => size_key(a).cmp(&size_key(b)),
-        SortKey::Modified => a.used.or(a.mtime).cmp(&b.used.or(b.mtime)),
+        // The newest first: what is not reversed is what the Finder and Explorer show.
+        SortKey::Modified => b.used.or(b.mtime).cmp(&a.used.or(a.mtime)),
         SortKey::Type => a
             .type_label
             .to_lowercase()
@@ -612,8 +638,44 @@ mod tests {
         assert_eq!(names(&v), ["small", "mid", "big"]);
         sort_entries(&mut v, &by(SortKey::Size, true));
         assert_eq!(names(&v), ["big", "mid", "small"]);
+        // A date is newest first until it is reversed.
         sort_entries(&mut v, &by(SortKey::Modified, false));
+        assert_eq!(names(&v), ["small", "mid", "big"]);
+        sort_entries(&mut v, &by(SortKey::Modified, true));
         assert_eq!(names(&v), ["big", "mid", "small"]);
+    }
+
+    #[test]
+    fn the_arrow_and_the_direction_of_a_date_are_opposite_to_reverse() {
+        let spec = |key, reverse| SortSpec {
+            key,
+            reverse,
+            ..SortSpec::default()
+        };
+        // For the others, reverse is downwards.
+        assert!(!spec(SortKey::Name, false).descending());
+        assert!(spec(SortKey::Size, true).descending());
+        // A date that is not reversed runs from the newest: downwards.
+        assert!(spec(SortKey::Modified, false).descending());
+        assert!(!spec(SortKey::Modified, true).descending());
+        // Asking for a direction sets reverse to what gives it, for each key.
+        for key in [
+            SortKey::Name,
+            SortKey::Size,
+            SortKey::Modified,
+            SortKey::Type,
+        ] {
+            for down in [false, true] {
+                assert_eq!(spec(key, false).with_descending(down).descending(), down);
+            }
+        }
+        // A new key keeps the direction of the arrow: name ↑ gives a date ↑ (the oldest
+        // first) and a size ↓ a date ↓ (the newest first).
+        let by_date = spec(SortKey::Name, false).with_key(SortKey::Modified);
+        assert!(!by_date.descending() && by_date.reverse);
+        let by_date = spec(SortKey::Size, true).with_key(SortKey::Modified);
+        assert!(by_date.descending() && !by_date.reverse);
+        assert!(by_date.with_key(SortKey::Name).reverse);
     }
 
     #[test]

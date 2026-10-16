@@ -44,13 +44,13 @@ impl App {
                     MenuItem::choice(
                         MenuCmd::SortOrder(false),
                         Key::Ascending.tr(),
-                        !self.sort.reverse,
+                        !self.sort.descending(),
                         true,
                     ),
                     MenuItem::choice(
                         MenuCmd::SortOrder(true),
                         Key::Descending.tr(),
-                        self.sort.reverse,
+                        self.sort.descending(),
                         false,
                     ),
                 ]
@@ -262,15 +262,12 @@ impl App {
             MenuCmd::SortBy(key) => {
                 // Choosing the key that is already used leaves the order alone.
                 if key != self.sort.key {
-                    self.set_sort(SortSpec { key, ..self.sort });
+                    self.set_sort(self.sort.with_key(key));
                 }
             }
-            MenuCmd::SortOrder(reverse) => {
-                if reverse != self.sort.reverse {
-                    self.set_sort(SortSpec {
-                        reverse,
-                        ..self.sort
-                    });
+            MenuCmd::SortOrder(descending) => {
+                if descending != self.sort.descending() {
+                    self.set_sort(self.sort.with_descending(descending));
                 }
             }
             MenuCmd::View(mode) => self.set_view(mode),

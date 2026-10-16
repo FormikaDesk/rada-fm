@@ -22,7 +22,7 @@ Open a file instead of a folder (`rada photo.png`) and rada starts in its folder
 
 ### As a file chooser
 
-`rada --chooser-file ANSWER [FOLDER]` makes rada the window that another program uses to ask for a file: it is the same explorer, with a bar at the top that says what is asked (*Choose a file*, *Choose files*, *Choose a folder*, *Save as*). `Enter` chooses (the paths are written to `ANSWER`, one per line, and rada quits); `Esc` cancels and writes nothing. Nothing can be deleted, moved, renamed, copied or changed in this mode; the only thing that can be made is a new folder, where a folder or a place to save is asked for.
+`rada --chooser-file ANSWER [FOLDER]` makes rada the window that another program uses to ask for a file: it is the same explorer, with a bar at the top that says what is asked (*Choose a file*, *Choose files*, *Choose a folder*, *Save as*). `Enter` chooses (the paths are written to `ANSWER`, one per line, and rada quits); `Esc` cancels and writes nothing. Nothing can be deleted, moved, renamed, copied or changed in this mode; the only thing that can be made is a new folder, where a folder or a place to save is asked for. The list starts sorted by date of modification, the most recent first, whatever `sort` says in the configuration; the usual keys change the order.
 
 | Option | Asks for |
 |---|---|

@@ -377,3 +377,72 @@ fn a_chooser_leaves_the_remembered_state_alone() {
         std::fs::read_dir(&state).map(|d| d.flatten().map(|e| e.file_name()).collect::<Vec<_>>())
     );
 }
+
+fn dated_sandbox() -> (rada_core::testutil::Sandbox, std::path::PathBuf) {
+    use std::time::{Duration, SystemTime};
+    let sb = rada_core::testutil::Sandbox::new();
+    let dir = sb.mkdir("dated");
+    let now = SystemTime::now();
+    // The names go the other way round from the dates, and the sizes another way again.
+    for (name, age_days, size) in [
+        ("a-old.txt", 30u64, 300usize),
+        ("b-mid.txt", 10, 100),
+        ("c-new.txt", 1, 200),
+    ] {
+        let p = sb.write(format!("dated/{name}"), vec![b'x'; size]);
+        rada_core::testutil::set_mtime(&p, now - Duration::from_secs(age_days * 86_400));
+    }
+    (sb, dir)
+}
+
+#[test]
+fn a_chooser_starts_with_the_newest_first_whatever_the_sort_setting() {
+    use rada_core::model::{SortKey, SortSpec};
+    for key in [SortKey::Name, SortKey::Size, SortKey::Type] {
+        let (sb, dir) = dated_sandbox();
+        let mut h = H::with_config(sb, dir, 120, 30, move |c| {
+            c.sort = SortSpec {
+                key,
+                reverse: false,
+                ..SortSpec::default()
+            };
+            c.chooser = Some(Chooser::file(false));
+        });
+        assert_eq!(
+            h.names(),
+            ["c-new.txt", "b-mid.txt", "a-old.txt"],
+            "{key:?}"
+        );
+        assert_eq!(
+            (h.app.sort.key, h.app.sort.reverse),
+            (SortKey::Modified, false)
+        );
+        // The first file is the one made last: Enter on it chooses it.
+        h.key(KeyCode::Enter);
+        assert!(h.app.chosen.as_ref().unwrap()[0].ends_with("c-new.txt"));
+    }
+}
+
+#[test]
+fn the_order_can_be_changed_while_choosing() {
+    let (sb, dir) = dated_sandbox();
+    let mut h = H::with_config(sb, dir, 120, 30, |c| c.chooser = Some(Chooser::file(false)));
+    h.app.dispatch(Action::SortReverse);
+    assert_eq!(h.names(), ["a-old.txt", "b-mid.txt", "c-new.txt"]);
+    h.app.dispatch(Action::SortReverse);
+    h.app.dispatch(Action::Sort); // the next key: type
+    assert_ne!(h.app.sort.key, rada_core::model::SortKey::Modified);
+}
+
+#[test]
+fn without_a_chooser_the_sort_setting_is_left_alone() {
+    use rada_core::model::{SortKey, SortSpec};
+    let (sb, dir) = dated_sandbox();
+    let h = H::with_config(sb, dir, 120, 30, |c| {
+        c.sort = SortSpec {
+            key: SortKey::Size,
+            ..SortSpec::default()
+        }
+    });
+    assert_eq!(h.app.sort.key, SortKey::Size);
+}

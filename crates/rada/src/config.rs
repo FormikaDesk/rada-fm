@@ -11,8 +11,8 @@
 //!                     # the language preferences on macOS, the interface language on Windows)
 //!                     # | it | en
 //! show_hidden = false
-//! sort = "name"       # name | size | date
-//! reverse = false
+//! sort = "name"       # name | size | date (a date is the most recent first)
+//! reverse = false     # true turns it round
 //! natural_sort = true       # file2 before file10, capitals and small letters mixed (as the
 //!                           # Finder and Explorer do); false: letter by letter
 //! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:

@@ -528,6 +528,10 @@ pub struct App {
     pub marked: BTreeSet<OsString>,
     pub show_hidden: bool,
     pub sort: SortSpec,
+    /// The order of this tab was chosen by the person (a click on a column title, the Sort
+    /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
+    /// `config.toml` at every start.
+    pub sort_chosen: bool,
     /// The order of the folders, put away while the list of recent files has its own.
     sort_outside_recents: Option<SortSpec>,
     remembered: HashMap<PathBuf, OsString>,
@@ -674,39 +678,45 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(cfg: Config, svc: Services, image_ui: Option<ImageUi>) -> App {
+    pub fn new(mut cfg: Config, svc: Services, image_ui: Option<ImageUi>) -> App {
+        // A chooser starts with the newest first, whatever the `sort` setting says.
+        if cfg.chooser.is_some() {
+            cfg.sort = crate::chooser::default_sort(cfg.sort);
+        }
         let decode_images = image_ui.is_some();
         // Which folder is in front, and which others were open last time.
-        let mut saved: Vec<(PathBuf, ViewMode, SortSpec)> = Vec::new();
+        let mut saved: Vec<(PathBuf, ViewMode, SortSpec, bool)> = Vec::new();
         let mut active = 0;
         if cfg.remember_tabs && !cfg.saved_ui.tabs.is_empty() {
             for t in &cfg.saved_ui.tabs {
+                let (sort, chosen) = tabs::sort_from_saved(t, cfg.sort);
                 saved.push((
                     t.path.clone(),
                     t.view
                         .as_deref()
                         .and_then(ViewMode::parse)
                         .unwrap_or(cfg.view),
-                    tabs::sort_from_saved(t, cfg.sort),
+                    sort,
+                    chosen,
                 ));
             }
             active = cfg.saved_ui.active_tab.min(saved.len() - 1);
             if cfg.start_explicit {
-                match saved.iter().position(|(p, _, _)| *p == cfg.start_dir) {
+                match saved.iter().position(|(p, _, _, _)| *p == cfg.start_dir) {
                     Some(i) => active = i,
                     None => {
-                        saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort));
+                        saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
                         active = saved.len() - 1;
                     }
                 }
             }
         } else {
-            saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort));
+            saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
         }
-        let (start_dir, view, sort) = saved[active].clone();
+        let (start_dir, view, sort, sort_chosen) = saved[active].clone();
         let mut tab_slots: Vec<TabState> = saved
             .iter()
-            .map(|(p, v, s)| TabState::fresh(p.clone(), *v, *s))
+            .map(|(p, v, s, c)| TabState::fresh(p.clone(), *v, *s, *c))
             .collect();
         tab_slots[active] = TabState::default();
 
@@ -724,6 +734,7 @@ impl App {
             marked: BTreeSet::new(),
             show_hidden: cfg.show_hidden,
             sort,
+            sort_chosen,
             sort_outside_recents: None,
             remembered: HashMap::new(),
             nav: crate::nav::NavHistory::new(start_dir.clone()),
@@ -1166,7 +1177,7 @@ impl App {
     /// folders is. It lasts as long as the list is open.
     const RECENT_SORT: SortSpec = SortSpec {
         key: SortKey::Modified,
-        reverse: true,
+        reverse: false,
         dirs_first: false,
         natural: false,
     };
@@ -2290,10 +2301,13 @@ impl App {
     fn set_sort(&mut self, spec: SortSpec) {
         let keep = self.cursor_name();
         self.sort = spec;
+        // From now on this tab keeps its order, whatever the configuration says.
+        self.sort_chosen = true;
+        self.save_ui_state();
         self.listing.set_sort(spec); // immediate, in memory
         self.rebuild_visible();
         self.restore_cursor(keep);
-        let arrow = if spec.reverse { "↓" } else { "↑" };
+        let arrow = if spec.descending() { "↓" } else { "↑" };
         self.toast(
             ToastKind::Info,
             tf(
@@ -3082,7 +3096,7 @@ impl App {
     // ------------------------------------------------------------------ for the renderer
 
     pub fn sort_label(&self) -> String {
-        let arrow = if self.sort.reverse { "↓" } else { "↑" };
+        let arrow = if self.sort.descending() { "↓" } else { "↑" };
         format!("{} {arrow}", self.sort.key.label())
     }
 
