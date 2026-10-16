@@ -35,6 +35,7 @@ fn arg_text(command: &str, arg: &str) -> Option<Key> {
         ("desktop", "remove") => Key::CliArgRemoveDesktop,
         ("desktop", "default_file_manager") => Key::CliArgDefaultFm,
         ("desktop", "desktop") => Key::CliArgDesktopLauncher,
+        ("desktop", "yes") => Key::CliArgDesktopYes,
         ("font", "remove") => Key::CliArgRemoveFont,
         ("file-picker", "remove") => Key::CliArgRemoveFilePicker,
         ("file-picker", "yes") => Key::CliArgFilePickerYes,

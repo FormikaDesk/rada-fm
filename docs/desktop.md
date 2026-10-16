@@ -5,6 +5,7 @@ Everything is installed for your user, nothing needs administrator rights, and n
 ```sh
 rada setup desktop            # launcher, icon and (where it applies) the window's own identity
 rada setup desktop --desktop  # macOS and Windows: also a launcher on the Desktop
+rada setup desktop --default-file-manager  # Linux, Windows: rada opens the folders other programs ask for
 rada setup font               # download and install JetBrainsMono Nerd Font Mono for this user
 rada setup file-picker        # Linux: make rada the file picker of the desktop (see the end of this page)
 ```
@@ -18,6 +19,30 @@ rada setup file-picker        # Linux: make rada the file picker of the desktop 
 **Windows.** `setup desktop` puts a shortcut with rada's icon in the Start menu (`--desktop`: on the Desktop too). If Windows Terminal is installed it adds a profile "rada" as a *fragment* (`%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\rada\`, the way Windows Terminal asks programs to add profiles, without editing your own settings) with the icon and — once the font is installed — the Nerd Font, and the shortcut opens that profile; otherwise the shortcut starts `rada.exe` itself, whose icon is built into the program, so the taskbar shows it.
 
 **Font.** Icons need a [Nerd Font](https://www.nerdfonts.com/) in the terminal. `rada setup font` downloads **JetBrainsMono Nerd Font Mono** (Nerd Fonts v3.4.0, the four faces and the licence; every file is checked against a SHA-256 written in rada's source, and nothing is installed unless all match) and installs it for your account: `~/.local/share/fonts` and `fc-cache` on Linux, `~/Library/Fonts` on macOS, your own fonts folder and the per-user list in the registry on Windows. Then choose "JetBrainsMono Nerd Font Mono" in your terminal's font setting. The font is under the SIL Open Font License 1.1; the licence is installed beside it. At the first start where the icons would not draw, rada **offers** to do this — once, and only if you say yes. In **Ghostty** nothing is needed: its bundled symbols fallback draws the icons, and rada detects it and does not offer.
+
+## Windows: rada as the program that opens folders
+
+`rada setup desktop --default-file-manager` makes rada the answer when a program asks Windows to open a folder (the Run box, "Open containing folder" in many programs, a folder shortcut), as Total Commander and Directory Opus can be set up to be. It does not touch Explorer.
+
+```sh
+rada setup desktop --default-file-manager        # shows what it writes, asks, then writes
+rada setup desktop --default-file-manager --yes  # without the question
+rada setup desktop --remove                      # puts everything back (the shortcuts too)
+```
+
+What it writes, **only in your own registry** (`HKEY_CURRENT_USER\Software\Classes`; never `HKEY_LOCAL_MACHINE`, never administrator rights):
+
+| Key | Value |
+|---|---|
+| `Directory\shell` | `(Default)` = `open` |
+| `Directory\shell\open\command` | `(Default)` = `"…\rada.exe" "%1"` |
+| `Directory\shell\open` | `DelegateExecute` taken away, **only if** another replacement left one there (it would win over the command) |
+
+It reads each key first and writes down what was there (a value, or that the key was not), in `windows-folder-handler.json` of the state folder. `--remove` puts the values back as they were, takes away the keys it made (deepest first, and only when nothing else is in them) and leaves alone a value that was changed after the setup. If rada cannot run, by hand: `reg delete "HKCU\Software\Classes\Directory\shell\open" /f`, and set the `(Default)` of `Directory\shell` back if you had one.
+
+What it leaves to Explorer, on purpose: the class `Folder` (This PC, the Control Panel and the other virtual folders, which a terminal program cannot show), `Drive`, and `opennewwindow` (*Open in new window* in a folder's right-click menu: there is always a way to Explorer). `rada.exe` is a console program: Windows opens it in a console window, or in Windows Terminal if that is your default terminal.
+
+**Not tried on a real Windows yet.** The keys are the ones other file managers use, and the logic (what is read, written, undone, left alone) is tested against a registry in memory; what Windows does with them has not been seen. If it behaves badly, `--remove` is the way back.
 
 ## Use rada as the file picker
 

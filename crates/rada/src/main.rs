@@ -12,6 +12,7 @@ mod macapp;
 mod setup;
 mod shell;
 mod update_cmd;
+mod winfolder;
 mod winsetup;
 
 use std::path::PathBuf;
@@ -70,13 +71,17 @@ enum SetupWhat {
         /// Take away exactly what a previous setup installed.
         #[arg(long)]
         remove: bool,
-        /// Also make rada the default program for folders (the previous one is
-        /// remembered, and `--remove` restores it).
+        /// Also make rada the default program for folders (Linux: the previous one is
+        /// remembered and `--remove` restores it; Windows: for your account only, shows what
+        /// it writes in the registry and asks first, and `--remove` puts it back).
         #[arg(long)]
         default_file_manager: bool,
         /// Also put a launcher on the Desktop (macOS and Windows).
         #[arg(long)]
         desktop: bool,
+        /// With `--default-file-manager` on Windows: do not ask before writing the registry.
+        #[arg(short, long)]
+        yes: bool,
     },
     /// Download and install JetBrainsMono Nerd Font Mono for this user (a fixed release,
     /// checked against its checksums; nothing needs administrator rights), so that the icons draw.
@@ -234,13 +239,16 @@ fn main() -> Result<()> {
                 remove,
                 default_file_manager,
                 desktop,
+                yes,
             } => setup::desktop(
                 &dirs,
                 &setup::DesktopOptions {
                     remove: *remove,
                     default_file_manager: *default_file_manager,
                     desktop: *desktop,
+                    yes: *yes,
                 },
+                &mut std::io::BufReader::new(std::io::stdin()),
             )?,
             SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
             SetupWhat::FilePicker { remove, yes } => filepicker::run(

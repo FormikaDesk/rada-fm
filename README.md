@@ -109,7 +109,7 @@ How to check a download by hand: [docs/verify.md](docs/verify.md).
 - [Configuration](docs/configuration.md): every setting of `config.toml`
 - [Themes](docs/themes.md) and [terminals](docs/terminals.md): colours, icons, images, profiles
 - [Archives](docs/archives.md), [tags](docs/tags.md), [phones, cameras and sticks](docs/devices.md)
-- [Updates](docs/updates.md), [installing](docs/install.md), [desktop integration](docs/desktop.md)
+- [Updates](docs/updates.md), [installing](docs/install.md), [desktop integration](docs/desktop.md) ([what works on each system](docs/platforms.md#system-integration))
 - [Linux, macOS and Windows](docs/platforms.md): what works on each
 - [Safety: what is guaranteed and what is not](docs/SAFETY.md)
 - [Verifying downloads](docs/verify.md) and [how a release is made](docs/release.md)

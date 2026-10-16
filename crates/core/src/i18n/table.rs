@@ -977,7 +977,8 @@ strings! {
     CliSetupFont => "Download and install JetBrainsMono Nerd Font Mono for this user (a fixed release, checked against its checksums; nothing needs administrator rights), so that the icons draw.", "Scarica e installa JetBrainsMono Nerd Font Mono per questo utente (una versione precisa, controllata con le sue somme di controllo; non servono diritti di amministratore), così le icone si disegnano.";
     CliArgRemoveDesktop => "Take away exactly what a previous setup installed.", "Toglie esattamente ciò che un'installazione precedente ha messo.";
     CliArgRemoveFont => "Take away what a previous setup installed.", "Toglie ciò che un'installazione precedente ha messo.";
-    CliArgDefaultFm => "Also make rada the default program for folders (the previous one is remembered, and `--remove` restores it).", "Rende rada anche il programma predefinito per le cartelle (quello di prima viene ricordato e `--remove` lo rimette).";
+    CliArgDefaultFm => "Also make rada the default program for folders (Linux: the previous one is remembered and `--remove` restores it; Windows: for your account only, shows what it writes in the registry and asks first, and `--remove` puts it back).", "Rende rada anche il programma predefinito per le cartelle (Linux: quello di prima viene ricordato e `--remove` lo rimette; Windows: solo per il tuo account, mostra che cosa scrive nel registro e chiede conferma, e `--remove` rimette tutto).";
+    CliArgDesktopYes => "With --default-file-manager on Windows: do not ask before writing the registry.", "Con --default-file-manager su Windows: non chiede conferma prima di scrivere nel registro.";
     CliArgDesktopLauncher => "Also put a launcher on the Desktop (macOS and Windows).", "Mette anche un collegamento sulla Scrivania (macOS e Windows).";
     CliArgCheck => "Only say whether a newer version exists, and what is in it.", "Dice solo se esiste una versione più nuova e che cosa contiene.";
     CliArgRollback => "Go back to the version that was running before the last update.", "Torna alla versione che girava prima dell'ultimo aggiornamento.";
@@ -1046,8 +1047,7 @@ strings! {
     SayForgotDefault => "removed rada as the default file manager from {0}", "tolto rada come gestore di file predefinito da {0}";
     SayDesktopFlag => "--desktop is for macOS and Windows: on Linux the entry is in the application menu", "--desktop è per macOS e Windows: su Linux la voce è nel menu delle applicazioni";
     MRemoveAndDefault => "--remove and --default-file-manager cannot be used together", "--remove e --default-file-manager non si possono usare insieme";
-    MDefaultFmMac => "--default-file-manager is for Linux desktops: macOS has no setting for it that a program may change", "--default-file-manager è per i desktop Linux: macOS non ha un'impostazione che un programma possa cambiare";
-    MDefaultFmWin => "--default-file-manager is for Linux desktops: Windows keeps Explorer as the folder handler", "--default-file-manager è per i desktop Linux: Windows tiene Esplora file come programma per le cartelle";
+    MDefaultFmMac => "--default-file-manager is for Linux and Windows: macOS has no setting for it that a program may change", "--default-file-manager è per Linux e Windows: macOS non ha un'impostazione che un programma possa cambiare";
     SayMacLink => "made a link to it on the Desktop: {0}", "creato un collegamento sulla Scrivania: {0}";
     SayMacGhostty => "Rada.app opens rada in Ghostty (in iTerm2 or Terminal if that is not installed). While it runs the Dock shows the terminal's icon: a window belongs to the program that draws it.", "Rada.app apre rada in Ghostty (in iTerm2 o Terminale se non è installato). Mentre gira il Dock mostra l'icona del terminale: una finestra appartiene al programma che la disegna.";
     SayMacWindow => "In Ghostty the window is {0}×{1} and Cmd+C, Cmd+V, Cmd+Backspace and the other Mac shortcuts go to rada.", "In Ghostty la finestra è {0}×{1} e Cmd+C, Cmd+V, Cmd+Backspace e le altre scorciatoie del Mac vanno a rada.";
@@ -1247,4 +1247,21 @@ strings! {
     FpNothingToRemove => "nothing to remove: rada has not set up the file chooser", "niente da togliere: rada non ha configurato la scelta file";
     FpChangedSince => "{0} was changed after the setup: left as it is", "{0} è stato cambiato dopo la configurazione: lasciato com'è";
     FpAfterRemove => "Restart the portals with `systemctl --user restart xdg-desktop-portal` to finish.", "Riavvia i portali con `systemctl --user restart xdg-desktop-portal` per finire.";
+
+    // ---- Windows: rada as the program that opens folders (`setup desktop --default-file-manager`)
+    WfIntro => "rada would open the folders that other programs ask to open (the `open` of the Directory class). It would write, in your registry only (HKEY_CURRENT_USER; nothing for the whole machine):", "rada aprirebbe le cartelle che altri programmi chiedono di aprire (l'`open` della classe Directory). Scriverebbe, solo nel tuo registro (HKEY_CURRENT_USER; niente per tutta la macchina):";
+    WfSetNew => "set  {0}\n       {1} = {2}   (new)", "scrive  {0}\n       {1} = {2}   (nuovo)";
+    WfSetWas => "set  {0}\n       {1} = {2}   (was: {3})", "scrive  {0}\n       {1} = {2}   (era: {3})";
+    WfDelete => "delete the value  {1}  of  {0}   (was: {2})", "toglie il valore  {1}  di  {0}   (era: {2})";
+    WfProgram => "The program is {0}, and the folder is what it is given. Windows opens it in a console window (in Windows Terminal, if that is your default terminal).", "Il programma è {0}, e la cartella è quello che riceve. Windows lo apre in una finestra di console (in Windows Terminal, se è il tuo terminale predefinito).";
+    WfExplorerStays => "Explorer is not touched: it still opens its own folders, Win+E and what programs ask of Explorer by name stay as they are, and *Open in new window* in a folder's right-click menu is still Explorer's.", "Explorer non viene toccato: apre ancora le sue cartelle, Win+E e quello che i programmi chiedono a Explorer per nome restano com'erano, e *Apri in una nuova finestra* nel menu del tasto destro di una cartella è ancora di Explorer.";
+    WfAsk => "Write these to the registry? [y/N] ", "Scrivere questo nel registro? [s/N] ";
+    WfDeclined => "the registry was not changed", "il registro non è stato cambiato";
+    WfAlready => "the registry is already as it should be", "il registro è già come deve essere";
+    WfDone => "rada now opens folders for other programs: {0}", "ora rada apre le cartelle per gli altri programmi: {0}";
+    WfByHand => "To undo it: `rada setup desktop --remove`. If rada cannot run, by hand: reg delete \"{0}\" /f (and set the (Default) of Directory\\shell back if you had one).", "Per tornare indietro: `rada setup desktop --remove`. Se rada non parte, a mano: reg delete \"{0}\" /f (e rimetti il (Default) di Directory\\shell se ne avevi uno).";
+    WfNoProgram => "cannot set it up: {0} is not there", "non si può configurare: {0} non c'è";
+    WfRestored => "registry: put back {0}  {1} = {2}", "registro: rimesso {0}  {1} = {2}";
+    WfValueRemoved => "registry: took away the value {1} of {0}", "registro: tolto il valore {1} di {0}";
+    WfChangedSince => "registry: {0}  {1} was changed after the setup: left as it is", "registro: {0}  {1} è stato cambiato dopo la configurazione: lasciato com'è";
 }
