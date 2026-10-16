@@ -64,7 +64,7 @@ Run `rada`, `rada ~/Pictures`, or `rada photo.png`. Press `?` for every key; bot
 <details>
 <summary>More screenshots</summary>
 
-| ![Light theme](docs/screenshots/principale-carta.png) | ![Italian interface](docs/screenshots/principale-scuro.png) |
+| ![Light theme (Gesso)](docs/screenshots/principale-gesso.png) | ![Italian interface](docs/screenshots/principale-scuro.png) |
 |---|---|
 | The light **Carta** theme. | The same screen in Italian: the language follows the system, or `language = "it"` / `"en"`. |
 | ![Icons view](docs/screenshots/icone.png) | ![Columns view](docs/screenshots/colonne.png) |
@@ -75,15 +75,15 @@ Run `rada`, `rada ~/Pictures`, or `rada photo.png`. Press `?` for every key; bot
 | Tags, and everything that carries one. | Cards say what was done, with **Undo** and **Show**. |
 | ![Progress](docs/screenshots/avanzamento.png) | ![Permanent deletion](docs/screenshots/elimina.png) |
 | Progress counted in bytes. | Permanent deletion asks for a typed word. |
-| ![Tag menu](docs/screenshots/tag-menu.png) | ![Tag menu on Carta](docs/screenshots/tag-menu-carta.png) |
+| ![Tag menu](docs/screenshots/tag-menu.png) | ![Tag menu on the light theme](docs/screenshots/tag-menu-gesso.png) |
 | The Tag submenu, dark. | The same on Carta. |
 | ![Basic profile](docs/screenshots/basic.png) | ![Narrow terminal](docs/screenshots/stretta.png) |
 | The basic profile (`TERM=vt100`): ASCII, 16 colours. | A narrow terminal: the sidebar becomes icons. |
 | ![Catppuccin](docs/screenshots/tema-catppuccin.png) | ![Tokyo Night](docs/screenshots/tema-tokyo-night.png) |
 | Catppuccin theme. | Tokyo Night theme. |
-| ![Recent](docs/screenshots/recenti.png) | ![Recent on Carta](docs/screenshots/recenti-carta.png) |
+| ![Recent](docs/screenshots/recenti.png) | ![Recent on the light theme](docs/screenshots/recenti-gesso.png) |
 | **Recent**, from the system's own list. | The same on Carta. |
-| ![Error over a done card](docs/screenshots/notifiche-carta.png) | ![Help](docs/screenshots/aiuto.png) |
+| ![Error over a done card](docs/screenshots/notifiche-gesso.png) | ![Help](docs/screenshots/aiuto.png) |
 | An error stays until you close it. | The help lists vim and classic keys side by side. |
 
 ![Giving a file a tag from the menu, with its plan, and the list of everything that carries it](docs/media/tag.gif)

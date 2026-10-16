@@ -2,7 +2,11 @@
 
 ![The main screen: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](screenshots/principale-scuro.png)
 
-One item is selected, two wait on the clipboard, the cursor is on a picture, and the card at the bottom right says the last copy went through, with **Annulla** and **Mostra** one click away. On a light terminal the same screen is "Carta", the paper theme:
+One item is selected, two wait on the clipboard, the cursor is on a picture, and the card at the bottom right says the last copy went through, with **Annulla** and **Mostra** one click away. On a light terminal the same screen is "Gesso", the default light theme:
+
+![The same screen on the light Gesso theme](screenshots/principale-gesso.png)
+
+And on "Carta", the warm paper theme that was the light one until 0.6.0-rc.10 (`theme = "carta"`):
 
 ![The same screen on the light Carta theme](screenshots/principale-carta.png)
 
@@ -24,7 +28,7 @@ The names of the folders in the sidebar are the ones the system gives them (Ital
 | Every operation shows a **plan** first. | Progress counted in bytes, with throughput and time left. |
 | ![Permanent deletion asks before it happens](screenshots/elimina.png) | ![The window of an undo](screenshots/annulla.png) |
 | **Eliminare definitivamente** says that nothing goes to the trash and still asks for the typed word. | **Annullare la copia** says what comes back or goes away, line by line. |
-| ![The menu of the right button with the Tag submenu, dark](screenshots/tag-menu.png) | ![The same on the light Carta theme](screenshots/tag-menu-carta.png) |
+| ![The menu of the right button with the Tag submenu, dark](screenshots/tag-menu.png) | ![The same on the light Gesso theme](screenshots/tag-menu-gesso.png) |
 | The **Tag** submenu opens beside the menu, which stays in view. | The same on **Carta**, the paper theme. |
 | ![The basic profile](screenshots/basic.png) | ![A narrow terminal](screenshots/stretta.png) |
 | The **basic profile** (`TERM=vt100`): ASCII, 16 colours, `[######----]` for a disk. | A narrow terminal: the sidebar is a column of icons. |
@@ -63,7 +67,7 @@ One pill holds the path and the search. At rest it shows the path as clickable c
 
 When a copy, a move, the trash, a rename, a compression, an extraction or a change of tags is done, a card appears at the bottom right of the list: *✓ 3 elementi copiati in Documenti*, then *Annulla  Ctrl+Z · Mostra*, both clickable (*Mostra* goes to the folder). Up to three are piled, each with its own six seconds and a bottom edge that shortens as they pass; the list is made shorter while they are there, so they never cover its text. The first key you press goes to the list, and the cards go with it. An operation that is running is a card too, with its progress bar, *42% · 12 MB/s · 3 s* and *Interrompi*. An **error** stays, with a red side, until you close it with `Esc` or a click.
 
-![An error over a card that is done, on the light Carta theme](screenshots/notifiche-carta.png)
+![An error over a card that is done, on the light Gesso theme](screenshots/notifiche-gesso.png)
 
 ### Details pane
 
@@ -87,7 +91,7 @@ Hidden folders and the Mac's `Library` are left out.
 
 ![Recent, dark](screenshots/recenti.png)
 
-![Recent on the light Carta theme](screenshots/recenti-carta.png)
+![Recent on the light Gesso theme](screenshots/recenti-gesso.png)
 
 ### Status bar and hints
 

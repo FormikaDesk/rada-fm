@@ -19,6 +19,7 @@ The whole interface has **one background**: the tab bar, the bar of the path, th
 
 ![Catppuccin](screenshots/tema-catppuccin.png)
 ![Tokyo Night](screenshots/tema-tokyo-night.png)
+![The Gesso theme](screenshots/principale-gesso.png)
 ![The Carta theme](screenshots/principale-carta.png)
 
 The light variants use the same tokens, chosen so they read on a pale background: automatic tests check the contrast of every token against the colour it is meant to sit on (7:1 for the main text, 4.5:1 for secondary text, accents, file types and statuses). On Gesso the main text is 12.1:1, the secondary text 5.6:1, the accent 6.2:1, and the border of a menu or window 3.1:1. Catppuccin Latte and Tokyo Night Day are deepened where the original colours are too pale to read as text.
