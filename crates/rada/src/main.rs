@@ -4,6 +4,7 @@ mod cli_text;
 mod config;
 mod demo;
 mod desktop;
+mod filepicker;
 mod fonts;
 mod fontsetup;
 mod icons;
@@ -84,6 +85,17 @@ enum SetupWhat {
         #[arg(long)]
         remove: bool,
     },
+    /// Make rada the system's file chooser (Linux, through xdg-desktop-portal-termfilechooser):
+    /// shows what it would write and where, and writes only after you say yes. Copies of the
+    /// files it changes are kept; nothing needs administrator rights and no package is installed.
+    FilePicker {
+        /// Go back: restore the files that were changed and take away the ones that were made.
+        #[arg(long)]
+        remove: bool,
+        /// Do not ask before writing.
+        #[arg(short, long, conflicts_with = "remove")]
+        yes: bool,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -159,6 +171,32 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     cwd_file: Option<PathBuf>,
 
+    /// Act as a file chooser: write the paths chosen to FILE, one per line, and quit. Enter
+    /// chooses, Esc cancels and writes nothing. Nothing can be deleted, moved or renamed in this
+    /// mode.
+    #[arg(long, value_name = "FILE")]
+    chooser_file: Option<PathBuf>,
+
+    /// With --chooser-file: more than one file (or folder) can be chosen.
+    #[arg(long, requires = "chooser_file", conflicts_with = "chooser_save")]
+    chooser_multiple: bool,
+
+    /// With --chooser-file: choose a folder instead of a file.
+    #[arg(long, requires = "chooser_file", conflicts_with = "chooser_save")]
+    chooser_dir: bool,
+
+    /// With --chooser-file: choose where to save, with the name to suggest
+    /// (`--chooser-save=NAME`; the folder is the path given).
+    #[arg(
+        long,
+        value_name = "NAME",
+        requires = "chooser_file",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = ""
+    )]
+    chooser_save: Option<String>,
+
     /// Print the shell helper that changes directory on exit, then quit.
     #[arg(long, value_name = "SHELL", value_parser = ["bash", "zsh", "fish", "nushell", "powershell"])]
     init: Option<String>,
@@ -205,6 +243,12 @@ fn main() -> Result<()> {
                 },
             )?,
             SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
+            SetupWhat::FilePicker { remove, yes } => filepicker::run(
+                &dirs,
+                *remove,
+                *yes,
+                &mut std::io::BufReader::new(std::io::stdin()),
+            )?,
         };
         for l in lines {
             println!("{l}");
@@ -255,6 +299,9 @@ fn main() -> Result<()> {
         );
         return Ok(());
     }
+    if cli.chooser_file.is_some() && (cli.request.is_some() || cli.demo.is_some()) {
+        anyhow::bail!("{}", Key::MChooserWithRequest.tr());
+    }
     let request = match &cli.request {
         Some(src) => {
             let text = if src == "-" {
@@ -294,15 +341,46 @@ fn main() -> Result<()> {
         Some(p) => p.clone(),
         None => std::env::current_dir().context(Key::MNoCwd.tr())?,
     };
+    // A file chooser may be given a path that is not there yet (where to save, and as what):
+    // it starts in the nearest folder that is, and the name is the one to suggest.
+    let saving = cli.chooser_save.is_some();
+    let chosen_start = cli
+        .chooser_file
+        .is_some()
+        .then(|| rada_tui::chooser::start_from(&start, saving));
+    let start = match &chosen_start {
+        Some(s) => s.dir.clone(),
+        None => start,
+    };
     let start = rada_core::fs::canonical_path(&start)
         .with_context(|| tf(Key::MCannotOpen, &[&start.display()]))?;
     // Given a file, open its folder with the cursor on it.
-    let (start, select) = if start.is_dir() {
-        (start, None)
-    } else {
-        let name = start.file_name().map(|n| n.to_os_string());
-        (start.parent().map(PathBuf::from).unwrap_or(start), name)
+    let (start, select) = match &chosen_start {
+        Some(s) => (start, s.select.clone()),
+        None if start.is_dir() => (start, None),
+        None => {
+            let name = start.file_name().map(|n| n.to_os_string());
+            (start.parent().map(PathBuf::from).unwrap_or(start), name)
+        }
     };
+    let chooser = cli.chooser_file.as_ref().map(|_| {
+        use rada_tui::chooser::Chooser;
+        match &cli.chooser_save {
+            Some(name) => {
+                let suggested = if name.is_empty() {
+                    chosen_start
+                        .as_ref()
+                        .and_then(|s| s.name.clone())
+                        .unwrap_or_default()
+                } else {
+                    name.clone()
+                };
+                Chooser::save(suggested)
+            }
+            None if cli.chooser_dir => Chooser::folder(cli.chooser_multiple),
+            None => Chooser::file(cli.chooser_multiple),
+        }
+    });
 
     let icons_name = cli
         .icons
@@ -357,6 +435,7 @@ fn main() -> Result<()> {
         )
         && request.is_none()
         && cli.demo.is_none()
+        && chooser.is_none()
         && !font_offered(&dirs))
     .then(|| make_font_offer(&dirs));
 
@@ -461,7 +540,7 @@ fn main() -> Result<()> {
         .with_folder_sizes(cfg_file.folder_size_settings()?);
     // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
     // screens must not depend on what GitHub says today.
-    let services = if cli.demo.is_some() {
+    let services = if cli.demo.is_some() || chooser.is_some() {
         services
     } else {
         match update_context(&dirs, cfg_file.update_settings(&dirs.home)?) {
@@ -514,8 +593,10 @@ fn main() -> Result<()> {
         sidebar_density,
         basic,
         tags_column: cfg_file.tags_column,
+        chooser: chooser.clone(),
         date_format: rada_tui::fmt::DateFormat::from_env(),
-        remember_tabs: cfg_file.remember_tabs,
+        // A chooser does not bring back the tabs of the last session, and does not write them.
+        remember_tabs: cfg_file.remember_tabs && chooser.is_none(),
         // What the user chose with Alt+P wins over the file's setting.
         details_pane: saved_ui
             .details
@@ -552,6 +633,12 @@ fn main() -> Result<()> {
     let outcome = rada_tui::run::run(cfg, services, caps).context(Key::MTerminalError.tr())?;
     if let Some(f) = &cli.cwd_file {
         write_cwd(f, &outcome.last_dir).with_context(|| tf(Key::MCannotWrite, &[&f.display()]))?;
+    }
+    // The answer of a file chooser: written once the terminal is given back, and not at all
+    // when the person said no.
+    if let (Some(f), Some(paths)) = (&cli.chooser_file, &outcome.chosen) {
+        std::fs::write(f, rada_tui::chooser::render(paths))
+            .with_context(|| tf(Key::MCannotWrite, &[&f.display()]))?;
     }
     Ok(())
 }

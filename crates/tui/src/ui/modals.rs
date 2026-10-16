@@ -551,6 +551,7 @@ fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
     let (title, hint): (&str, String) = match &iv.kind {
         InputKind::Rename { .. } => (Key::VRename.tr(), Key::InNewName.tr().into()),
         InputKind::NewDir => (Key::VNewFolder.tr(), Key::InName.tr().into()),
+        InputKind::SaveAs => (Key::ChooseTitleSave.tr(), Key::ChooseSaveName.tr().into()),
         InputKind::NewFile => (Key::VNewFile.tr(), Key::InNewFileHint.tr().into()),
         InputKind::NewTag { .. } => (Key::ChipNewTag.tr(), Key::InNewTagHint.tr().into()),
         InputKind::OpenWith { .. } => (Key::ChipOpenWith.tr(), Key::InOpenWithHint.tr().into()),

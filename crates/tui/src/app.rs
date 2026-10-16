@@ -208,6 +208,8 @@ pub enum InputKind {
         from: PathBuf,
     },
     NewDir,
+    /// The name of the file to save, when rada is the system's file chooser.
+    SaveAs,
     BulkRename {
         items: Vec<PathBuf>,
     },
@@ -404,6 +406,8 @@ pub struct Config {
     pub basic: bool,
     /// The Tag column of the list: `None` follows the remembered choice, then shows it.
     pub tags_column: Option<bool>,
+    /// Set when rada was started to choose files for another program (`--chooser-file`).
+    pub chooser: Option<crate::chooser::Chooser>,
 }
 
 /// A theme that follows the terminal's background: which one, and how to show it. Resolved
@@ -458,6 +462,7 @@ pub struct Demo {
 
 mod address;
 mod archives;
+mod chooser;
 mod columns;
 mod eject;
 mod font;
@@ -566,6 +571,10 @@ pub struct App {
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
     pub should_quit: bool,
+    /// Set when this session is a file chooser for another program.
+    pub chooser: Option<crate::chooser::Chooser>,
+    /// What was chosen, when the person chose: the paths to hand over. `None` is a cancel.
+    pub chosen: Option<Vec<PathBuf>>,
     pub dirty: bool,
     /// The whole screen is drawn again from nothing at the next frame (Ctrl+L, and after a
     /// program was started): whatever something else wrote on the terminal is put right.
@@ -756,6 +765,8 @@ impl App {
             watch_note: None,
             viewport: Viewport::default(),
             should_quit: false,
+            chooser: cfg.chooser.clone(),
+            chosen: None,
             dirty: true,
             full_redraw: false,
             redraw_at: Vec::new(),
@@ -978,6 +989,8 @@ impl App {
     fn rebuild_visible(&mut self) {
         self.date_cache.clear();
         let show = self.show_hidden;
+        // Choosing a folder: only folders are listed.
+        let dirs_only = self.chooser.as_ref().is_some_and(|c| c.folders_only());
         let terms: Vec<String> = self
             .filter
             .as_ref()
@@ -994,6 +1007,7 @@ impl App {
             .iter()
             .enumerate()
             .filter(|(_, e)| show || !e.hidden)
+            .filter(|(_, e)| !dirs_only || e.is_dir())
             .filter(|(_, e)| {
                 name_terms.is_empty() || {
                     // The name shown and the name on disk both count: "Scrivania" and
@@ -1261,6 +1275,9 @@ impl App {
     }
 
     fn enter(&mut self) {
+        if self.chooser.is_some() {
+            return self.chooser_enter(false, false);
+        }
         let Some(e) = self.current() else { return };
         if e.is_navigable_dir() {
             let target = e.path.clone();
@@ -2049,6 +2066,11 @@ impl App {
     }
 
     fn run_plan(&mut self, pv: Box<PlanView>) {
+        // A file chooser makes a folder and nothing else, whatever asked for more.
+        if self.chooser.is_some() && pv.plan.kind != OpKind::MakeDir {
+            self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 3);
+            return;
+        }
         let title = pv.plan.title.clone();
         let total = pv.plan.total_bytes();
         let (kind, totals, reversible) = (pv.plan.kind, pv.plan.totals, pv.plan.reversible);
@@ -2084,6 +2106,7 @@ impl App {
                     .plan_rename(from.clone(), iv.text.trim_end_matches('\n').to_string());
                 self.begin_plan(Key::PlanningRename.tr(), h);
             }
+            InputKind::SaveAs => self.submit_save_as(iv),
             InputKind::NewDir => {
                 let h = self.svc.jobs.plan_mkdir(self.cwd.clone(), iv.text.clone());
                 self.begin_plan(Key::PlanningGeneric.tr(), h);

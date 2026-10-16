@@ -215,6 +215,7 @@ impl H {
             sidebar_density: Default::default(),
             basic: false,
             tags_column: None,
+            chooser: None,
         };
         if let Some(t) = tweak {
             t(&mut cfg);

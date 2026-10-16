@@ -94,6 +94,8 @@ fn shutdown_flag() -> std::sync::Arc<std::sync::atomic::AtomicBool> {
 pub struct Outcome {
     /// The folder the user was in (for `cd`-on-quit).
     pub last_dir: std::path::PathBuf,
+    /// When rada was asked to choose files: what the person chose, or `None` if they said no.
+    pub chosen: Option<Vec<std::path::PathBuf>>,
 }
 
 /// Run the interface until the user quits. `caps` is what the terminal can do
@@ -274,6 +276,7 @@ fn event_loop(
     }
     Ok(Outcome {
         last_dir: app.cwd.clone(),
+        chosen: app.chosen.take(),
     })
 }
 

@@ -346,10 +346,14 @@ impl App {
 
     /// The commands and the places that match what is typed, best first.
     fn refresh_bar_hits(&mut self) {
+        let chooser = self.chooser.clone();
         let Some(a) = &mut self.address else { return };
         let q = a.text.trim().to_string();
         let mut commands: Vec<(i64, BarHit)> = Vec::new();
-        for &action in Action::ALL.iter().filter(|a| offered(**a)) {
+        for &action in Action::ALL
+            .iter()
+            .filter(|a| offered(**a) && chooser.as_ref().is_none_or(|c| c.allows(**a)))
+        {
             let label = action.label();
             let english = action.label_key().in_lang(rada_core::i18n::Lang::En);
             let best = match (fuzzy::score(&q, label), fuzzy::score(&q, english)) {

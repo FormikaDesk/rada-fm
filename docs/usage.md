@@ -20,6 +20,19 @@ Icons default to plain Unicode markers. With a [Nerd Font](https://www.nerdfonts
 
 Open a file instead of a folder (`rada photo.png`) and rada starts in its folder with the cursor on it.
 
+### As a file chooser
+
+`rada --chooser-file ANSWER [FOLDER]` makes rada the window that another program uses to ask for a file: it is the same explorer, with a bar at the top that says what is asked (*Choose a file*, *Choose files*, *Choose a folder*, *Save as*). `Enter` chooses (the paths are written to `ANSWER`, one per line, and rada quits); `Esc` cancels and writes nothing. Nothing can be deleted, moved, renamed, copied or changed in this mode; the only thing that can be made is a new folder, where a folder or a place to save is asked for.
+
+| Option | Asks for |
+|---|---|
+| `--chooser-file ANSWER` | one existing file |
+| `--chooser-file ANSWER --chooser-multiple` | one or more files (`Space` marks, `Enter` chooses the marked) |
+| `--chooser-file ANSWER --chooser-dir [--chooser-multiple]` | a folder (only folders are listed; `Enter` chooses the one under the cursor, `Alt+Enter` the one you are in) |
+| `--chooser-file ANSWER --chooser-save=NAME FOLDER` | a place to save: `Ctrl+S` or `Alt+Enter` asks for the name (`NAME` is filled in), and a name that is already taken asks twice |
+
+[Using rada as the desktop's file picker](desktop.md#use-rada-as-the-file-picker) is what this is for.
+
 ### Images
 
 `--images auto` (the default) picks the protocol like this: under tmux, half blocks (graphics queries are only answered with `allow-passthrough`, and waiting for them would be slow); in a terminal that identifies itself (Ghostty, kitty, WezTerm, iTerm2, foot), the matching protocol with no query at all; otherwise the terminal is asked, with a bounded wait. Force a protocol with `--images kitty|sixel|iterm2|halfblocks`, or switch image drawing off with `--images off` (then nothing is decoded). Under tmux with passthrough enabled, `--images kitty` works too.

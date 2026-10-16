@@ -25,6 +25,10 @@ fn arg_text(command: &str, arg: &str) -> Option<Key> {
         ("rada", "hidden") => Key::CliArgHidden,
         ("rada", "cwd_file") => Key::CliArgCwdFile,
         ("rada", "init") => Key::CliArgInit,
+        ("rada", "chooser_file") => Key::CliArgChooserFile,
+        ("rada", "chooser_multiple") => Key::CliArgChooserMultiple,
+        ("rada", "chooser_dir") => Key::CliArgChooserDir,
+        ("rada", "chooser_save") => Key::CliArgChooserSave,
         ("update", "check") => Key::CliArgCheck,
         ("update", "rollback") => Key::CliArgRollback,
         ("update", "yes") => Key::CliArgYes,
@@ -32,6 +36,8 @@ fn arg_text(command: &str, arg: &str) -> Option<Key> {
         ("desktop", "default_file_manager") => Key::CliArgDefaultFm,
         ("desktop", "desktop") => Key::CliArgDesktopLauncher,
         ("font", "remove") => Key::CliArgRemoveFont,
+        ("file-picker", "remove") => Key::CliArgRemoveFilePicker,
+        ("file-picker", "yes") => Key::CliArgFilePickerYes,
         (_, "help") => Key::CliHelpFlag,
         (_, "version") => Key::CliVersionFlag,
         _ => return None,
@@ -47,6 +53,7 @@ fn about_text(command: &str) -> Option<Key> {
         "doctor" => Key::CliCmdDoctor,
         "desktop" => Key::CliSetupDesktop,
         "font" => Key::CliSetupFont,
+        "file-picker" => Key::CliSetupFilePicker,
         "help" => Key::CliHelpSubcommand,
         _ => return None,
     })
@@ -63,6 +70,7 @@ fn usage_text(command: &str) -> Option<String> {
         "update" => format!("rada update [{options}]"),
         "desktop" => format!("rada setup desktop [{options}]"),
         "font" => format!("rada setup font [{options}]"),
+        "file-picker" => format!("rada setup file-picker [{options}]"),
         _ => return None,
     })
 }

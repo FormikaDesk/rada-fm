@@ -286,6 +286,9 @@ impl App {
             self.on_filter_key(key);
             return;
         }
+        if self.chooser.is_some() && self.on_chooser_key(key) {
+            return;
+        }
         // Alt+1 … Alt+9 jump to a tab.
         if key.modifiers.contains(KeyModifiers::ALT)
             && !key.modifiers.contains(KeyModifiers::CONTROL)
@@ -335,6 +338,21 @@ impl App {
     pub fn dispatch(&mut self, action: Action) {
         use Action::*;
         self.dirty = true;
+        // A file chooser does what looks and moves, and nothing that changes a file.
+        if self.chooser.is_some() {
+            if !self.chooser.as_ref().is_some_and(|c| c.allows(action)) {
+                self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 2);
+                return;
+            }
+            match action {
+                Action::Open => {
+                    self.chooser_navigate();
+                    return;
+                }
+                Action::ToggleMark if !self.chooser_may_mark() => return,
+                _ => {}
+            }
+        }
         let page = self.viewport.rows.saturating_sub(1).max(1);
         if matches!(
             action,
@@ -1036,6 +1054,9 @@ impl App {
     }
 
     fn right_click(&mut self, target: Option<Target>, x: u16, y: u16) {
+        if self.chooser.is_some() {
+            return;
+        }
         if self.modal.is_some() {
             if matches!(self.modal, Some(Modal::Menu(_))) {
                 self.modal = None;

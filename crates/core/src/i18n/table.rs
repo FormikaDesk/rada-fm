@@ -1200,4 +1200,51 @@ strings! {
     UpHttpBroke => "the download of {0} broke off: {1}", "lo scaricamento di {0} si è interrotto: {1}";
     UpHttpEarly => "the download of {0} ended early ({1} of {2} bytes)", "lo scaricamento di {0} è finito troppo presto ({1} byte su {2})";
     UpNotReleases => "not a list of releases: {0}", "non è un elenco di versioni: {0}";
+
+    // ---- rada as the system's file chooser (`--chooser-file`)
+    ChooseTitleFile => "Choose a file", "Scegli un file";
+    ChooseTitleFiles => "Choose files", "Scegli uno o più file";
+    ChooseTitleFolder => "Choose a folder", "Scegli una cartella";
+    ChooseTitleFolders => "Choose folders", "Scegli una o più cartelle";
+    ChooseTitleSave => "Save as", "Salva come";
+    ChooseHintFile => "Enter choose · → open folder · ← up · Esc cancel", "Invio scegli · → apri cartella · ← su · Esc annulla";
+    ChooseHintFiles => "Space mark · Enter choose the marked · → open folder · ← up · Esc cancel", "Spazio segna · Invio scegli i segnati · → apri cartella · ← su · Esc annulla";
+    ChooseHintFolder => "Enter choose the folder under the cursor · Alt+Enter the one you are in · → open · ← up · Esc cancel", "Invio scegli la cartella sotto il cursore · Alt+Invio quella in cui sei · → apri · ← su · Esc annulla";
+    ChooseHintFolders => "Space mark · Enter choose the marked · Alt+Enter the folder you are in · → open · Esc cancel", "Spazio segna · Invio scegli i segnati · Alt+Invio la cartella in cui sei · → apri · Esc annulla";
+    ChooseHintSave => "Ctrl+S or Alt+Enter save in this folder · Enter on a file: replace it · → open folder · ← up · Esc cancel", "Ctrl+S o Alt+Invio salva in questa cartella · Invio su un file: lo sostituisce · → apri cartella · ← su · Esc annulla";
+    ChooseSaveName => "File name", "Nome del file";
+    ChooseNameBad => "a name cannot contain / and cannot be . or ..", "un nome non può contenere / e non può essere . o ..";
+    ChooseIsFolder => "{0} is a folder", "{0} è una cartella";
+    ChooseExists => "{0} already exists: press Enter again to replace it", "{0} esiste già: premi di nuovo Invio per sostituirlo";
+    ChooseLineBreak => "that name has a line break and cannot be handed over", "quel nome contiene un a capo e non si può consegnare";
+    ChooseOnlyFiles => "only files can be chosen here", "qui si possono scegliere solo file";
+    ChooseNothingMarked => "nothing marked: mark files with Space or press Enter on one", "niente di segnato: segna dei file con Spazio o premi Invio su uno";
+    ChooseRefused => "not available while choosing", "non disponibile mentre si sceglie";
+    ChooseNoParent => "the folder to save in is not there", "la cartella in cui salvare non c'è";
+
+    // ---- `rada --chooser-file` and `rada setup file-picker`
+    CliArgChooserFile => "Act as a file chooser: write the paths chosen to FILE, one per line, and quit. Enter chooses, Esc cancels and writes nothing. Nothing can be deleted, moved or renamed in this mode.", "Fa da finestra di scelta file: scrive in FILE i percorsi scelti, uno per riga, ed esce. Invio sceglie, Esc annulla e non scrive nulla. In questa modalità non si può eliminare, spostare né rinominare niente.";
+    CliArgChooserMultiple => "With --chooser-file: more than one file (or folder) can be chosen.", "Con --chooser-file: si può scegliere più di un file (o più di una cartella).";
+    CliArgChooserDir => "With --chooser-file: choose a folder instead of a file.", "Con --chooser-file: si sceglie una cartella invece di un file.";
+    CliArgChooserSave => "With --chooser-file: choose where to save, with the name to suggest (`--chooser-save=NAME`; the folder is the path given).", "Con --chooser-file: si sceglie dove salvare, con il nome da suggerire (`--chooser-save=NOME`; la cartella è il percorso dato).";
+    CliSetupFilePicker => "Make rada the system's file chooser (Linux, through xdg-desktop-portal-termfilechooser): shows what it would write and where, and writes only after you say yes. Copies of the files it changes are kept; nothing needs administrator rights and no package is installed.", "Fa di rada la finestra di scelta file del sistema (Linux, tramite xdg-desktop-portal-termfilechooser): mostra che cosa scriverebbe e dove, e scrive solo dopo il tuo sì. Tiene una copia dei file che cambia; non servono diritti di amministratore e non installa pacchetti.";
+    CliArgRemoveFilePicker => "Go back: restore the files that were changed and take away the ones that were made.", "Torna indietro: ripristina i file cambiati e toglie quelli creati.";
+    CliArgFilePickerYes => "Do not ask before writing.", "Non chiede conferma prima di scrivere.";
+    MChooserWithRequest => "--chooser-file cannot be used with --request or --demo", "--chooser-file non si può usare con --request o --demo";
+    FpLinuxOnly => "the file chooser setup is for Linux (xdg-desktop-portal); nothing was done", "la configurazione della scelta file è per Linux (xdg-desktop-portal); non è stato fatto nulla";
+    FpIntro => "rada will become the file chooser of this user's desktop. It would write:", "rada diventerà la finestra di scelta file del desktop di questo utente. Scriverebbe:";
+    FpCreate => "create {0}", "crea {0}";
+    FpChange => "change {0}  (a copy is kept as {1})", "cambia {0}  (una copia resta in {1})";
+    FpUnchanged => "{0} is already as it should be", "{0} è già come deve essere";
+    FpNoSudo => "Nothing needs administrator rights, and no package is installed.", "Non servono diritti di amministratore e non viene installato nessun pacchetto.";
+    FpPortalMissing => "The portal itself is not installed (no termfilechooser.portal found). On Arch Linux install it from the AUR: yay -S xdg-desktop-portal-termfilechooser-hunkyburrito-git", "Il portale non è installato (nessun termfilechooser.portal trovato). Su Arch Linux installalo dall'AUR: yay -S xdg-desktop-portal-termfilechooser-hunkyburrito-git";
+    FpAsk => "Write these files? [y/N] ", "Scrivere questi file? [s/N] ";
+    FpAborted => "nothing was written", "non è stato scritto nulla";
+    FpWrote => "wrote {0}", "scritto {0}";
+    FpKeptCopy => "copy kept: {0}", "copia tenuta: {0}";
+    FpNext => "Next: restart the portals with `systemctl --user restart xdg-desktop-portal`. In Firefox or Zen set widget.use-xdg-desktop-portal.file-picker to 1 in about:config.", "Poi: riavvia i portali con `systemctl --user restart xdg-desktop-portal`. In Firefox o Zen imposta widget.use-xdg-desktop-portal.file-picker a 1 in about:config.";
+    FpRestored => "restored {0} from {1}", "ripristinato {0} da {1}";
+    FpNothingToRemove => "nothing to remove: rada has not set up the file chooser", "niente da togliere: rada non ha configurato la scelta file";
+    FpChangedSince => "{0} was changed after the setup: left as it is", "{0} è stato cambiato dopo la configurazione: lasciato com'è";
+    FpAfterRemove => "Restart the portals with `systemctl --user restart xdg-desktop-portal` to finish.", "Riavvia i portali con `systemctl --user restart xdg-desktop-portal` per finire.";
 }

@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod caps;
+pub mod chooser;
 pub mod clipboard;
 pub mod compat;
 pub mod fmt;

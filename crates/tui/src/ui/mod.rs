@@ -127,6 +127,29 @@ pub fn hints_height(wanted: bool, height: u16) -> u16 {
     }
 }
 
+/// The bar of a file chooser: what is being asked, and the keys that answer.
+fn draw_chooser_bar(f: &mut Frame, app: &App, area: Rect) {
+    let Some(ch) = &app.chooser else { return };
+    let th = &app.th;
+    let band = th.band();
+    f.render_widget(Block::default().style(band), area);
+    let title = format!(" {} ", ch.title());
+    let room = (area.width as usize).saturating_sub(display::width(&title) + 2);
+    let hint = display::truncate(ch.hint(), room);
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                title,
+                th.accent_style()
+                    .add_modifier(ratatui::style::Modifier::BOLD)
+                    .patch(band),
+            ),
+            Span::styled(format!(" {hint}"), th.dim().patch(band)),
+        ])),
+        area,
+    );
+}
+
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
     if area.width < 24 || area.height < 8 {
@@ -154,11 +177,23 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         top_gap_height(explorer, area.height)
     };
     let address_h = u16::from(explorer);
-    let commands_h = commands_height(explorer, area.height);
-    let hints_h = hints_height(explorer && app.show_hints, area.height);
+    // A file chooser has a bar of its own at the top, and none of the buttons or key hints
+    // for what it does not do.
+    let chooser_h = u16::from(app.chooser.is_some());
+    let commands_h = if app.chooser.is_some() {
+        0
+    } else {
+        commands_height(explorer, area.height)
+    };
+    let hints_h = if app.chooser.is_some() {
+        0
+    } else {
+        hints_height(explorer && app.show_hints, area.height)
+    };
     let notice = size_notice_shown(app, area.width, area.height);
     app.size_notice_visible = notice;
     let [
+        chooser_row,
         tabs_row,
         gap_row,
         address_row,
@@ -168,6 +203,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         status,
         hints_row,
     ] = Layout::vertical([
+        Constraint::Length(chooser_h),
         Constraint::Length(tabs_h),
         Constraint::Length(gap_h),
         Constraint::Length(address_h),
@@ -179,6 +215,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     ])
     .areas(area);
 
+    if chooser_h > 0 {
+        draw_chooser_bar(f, app, chooser_row);
+    }
     tabs::draw_tabs(f, app, tabs_row);
     if let (true, Some(band)) = (gap_h > 0, th.band().bg) {
         // The tabs' colour on the upper half, the window's below: half a row of air.
