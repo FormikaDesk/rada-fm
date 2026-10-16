@@ -619,8 +619,9 @@ mod tests {
                 .join("config/xdg-desktop-portal-termfilechooser/config"),
         )
         .unwrap();
+        // The path as the setup writes it (Windows would show `/` and `\\` mixed otherwise).
         assert!(
-            config.contains(&format!("cmd={}", wrapper.display())),
+            config.contains(&format!("cmd={}", s.wrapper_path().display())),
             "{config}"
         );
         assert!(config.contains("create_help_file=0"));
