@@ -37,6 +37,7 @@ embed-resource = "3"
 
 [dev-dependencies]
 crossterm = "0.29"
+libc = "0.2"
 image = { version = "0.25", default-features = false, features = ["png"] }
 tempfile = "3.27.0"
 rada-core = { workspace = true, features = ["testutil"] }

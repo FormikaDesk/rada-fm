@@ -1029,6 +1029,7 @@ strings! {
     MRequestStdin => "cannot read the request from stdin", "impossibile leggere la richiesta dallo standard input";
     MRequestBad => "the request is not valid (see `rada --schema request`)", "la richiesta non è valida (vedi `rada --schema request`)";
     MTerminalError => "terminal error", "errore del terminale";
+    MPressAnyKey => "Press any key to close this window.", "Premi un tasto per chiudere questa finestra.";
     MFontInstalled => "{0} is installed: choose it as the font of your terminal, then start rada again", "{0} è installato: sceglilo come carattere del terminale, poi riavvia rada";
     SayInstalled => "installed {0}", "installato {0}";
     SayRemoved => "removed {0}", "tolto {0}";

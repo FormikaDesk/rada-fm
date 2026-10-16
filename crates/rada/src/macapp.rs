@@ -313,7 +313,7 @@ fi
 
 /// What iTerm2 and Terminal run: they are given this file to open.
 pub fn command_script(exe: &Path) -> String {
-    format!("#!/bin/sh\nexec {}\n", sh_quote(exe))
+    format!("#!/bin/sh\nRADA_FROM_APP=1 exec {}\n", sh_quote(exe))
 }
 
 /// The settings of the Ghostty window Rada.app opens (and of no other window).
@@ -325,13 +325,15 @@ pub fn command_script(exe: &Path) -> String {
 /// Keys Ghostty does not bind (Cmd+X, Cmd+I, Cmd+O, Cmd+Y, Cmd+Shift+N, Cmd+.) need nothing.
 ///
 /// The window's one command is `initial-command` (only the first terminal Ghostty opens runs
-/// it, once), written as `shell:` and a quoted path so that any folder name works. Ghostty
+/// it, once), written as `shell:` and a quoted path so that any folder name works. The program
+/// is started with `RADA_FROM_APP=1`, which tells it that the window is its own and closes
+/// with it: an error is shown and waits for a key instead of vanishing. Ghostty
 /// restores the windows of its last run on macOS unless told not to (`window-save-state`):
 /// a restored tab would stand beside the one that runs rada, so it is told not to.
 pub fn ghostty_config(exe: &Path) -> String {
     let mut out = format!(
         "# Written by `rada setup desktop`. Ghostty reads it only for the window Rada.app opens.\n\
-         initial-command = shell:{}\n\
+         initial-command = shell:env RADA_FROM_APP=1 {}\n\
          window-save-state = never\n\
          window-width = {WINDOW_COLUMNS}\n\
          window-height = {WINDOW_ROWS}\n\
@@ -429,7 +431,9 @@ mod tests {
             "{c}"
         );
         assert!(
-            c.contains(r"initial-command = shell:'/Users/Jo O'\''Neil/bin/rada'"),
+            c.contains(
+                r"initial-command = shell:env RADA_FROM_APP=1 '/Users/Jo O'\''Neil/bin/rada'"
+            ),
             "{c}"
         );
         let launcher = launcher_script(exe);
@@ -660,13 +664,43 @@ for a in \"$@\"; do printf '%s\\n' \"$a\" >> '{}'; done\n",
         assert_eq!(launch(&[]), ["-a", "Terminal", "<Resources>/rada.command"]);
     }
 
+    /// Both ways rada is started from the application tell it so, whatever the path looks like.
+    #[cfg(unix)]
+    #[test]
+    fn the_program_is_told_it_was_started_from_the_application() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let exe = d.path().join("it's a rada");
+        std::fs::write(&exe, "#!/bin/sh\nprintf '%s' \"$RADA_FROM_APP\"\n").unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let run = |args: &[&str]| {
+            let out = std::process::Command::new("/bin/sh")
+                .args(args)
+                .env_remove("RADA_FROM_APP")
+                .output()
+                .unwrap();
+            String::from_utf8(out.stdout).unwrap()
+        };
+        // iTerm2 and Terminal: the file is run.
+        let command = d.path().join("rada.command");
+        std::fs::write(&command, command_script(&exe)).unwrap();
+        assert_eq!(run(&[command.to_str().unwrap()]), "1");
+        // Ghostty: the line after `shell:` is run by a shell.
+        let conf = ghostty_config(&exe);
+        let line = conf
+            .lines()
+            .find_map(|l| l.strip_prefix("initial-command = shell:"))
+            .unwrap();
+        assert_eq!(run(&["-c", line]), "1");
+    }
+
     #[test]
     fn paths_with_spaces_and_quotes_are_one_word_for_the_shell() {
         let s = launcher_script(Path::new("/Users/Jo O'Neil/bin/rada"));
         assert!(s.contains(r"RADA='/Users/Jo O'\''Neil/bin/rada'"), "{s}");
         assert_eq!(
             command_script(Path::new("/a b/rada")),
-            "#!/bin/sh\nexec '/a b/rada'\n"
+            "#!/bin/sh\nRADA_FROM_APP=1 exec '/a b/rada'\n"
         );
     }
 }

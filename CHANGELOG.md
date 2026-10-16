@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **rada ended with "terminal error: The cursor position could not be read within a normal duration" after opening a file with another program** (reported on a Mac, in Ghostty; the same on Linux in a pseudo-terminal). Starting a program makes rada draw the screen again from nothing (now, and again after 0.3, 1.5 and 4 seconds, because some programs write on the terminal they were started from), and clearing the screen asked the terminal where the cursor is. The thread that reads the keyboard was waiting in `crossterm::event::read()`, which keeps the only reader of the terminal's answer locked for as long as it waits: the question could not be answered, and after two seconds it failed and ended rada. Now the keyboard thread waits for at most 50 ms at a time and is stopped, and waited for, before the terminal is asked anything; what is typed meanwhile waits in the terminal and is read right after, so no key is lost.
+- **A terminal that does not answer, or a screen that could not be drawn, no longer ends rada.** The failure goes to the log as a warning and the screen is drawn again from nothing at the next turn. A terminal that did not answer the cursor question is not asked again (the screen is cleared without it). Only a terminal that is gone (closed, hung up) or that fails 50 frames in a row ends rada.
+- **Every error that ends rada is written to the log** (`rada.log`, as `ERROR`) with all its causes in one line, before it leaves; before, a terminal error left only the start-up lines there.
+- **macOS: a window of `Rada.app` no longer vanishes with the error in it.** When rada ends with an error and was started by `Rada.app`, it shows the message and waits for a key before the window closes. The launchers set `RADA_FROM_APP=1` for this; make `Rada.app` again with `rada setup desktop` to get it (the old one keeps working, but its window still closes at once).
+
 ## [0.6.0-rc.10] - 2026-10-16
 
 rada can now be the **file picker of the Linux desktop** (the window a browser opens for "upload a file"), the light theme is a more neutral off-white, tabs respect your sorting settings, and on Windows rada can open folders for other programs. This is also the **first update you can verify with the signature**: if you have rc.9, `rada update` checks `SHA256SUMS.minisig` before it installs this one. Still a **pre-release**.

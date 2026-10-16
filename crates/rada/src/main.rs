@@ -221,7 +221,32 @@ fn early_language() {
     }
 }
 
+/// Set by the launchers of Rada.app: the window belongs to rada and closes with it.
+const FROM_APP: &str = "RADA_FROM_APP";
+
 fn main() -> Result<()> {
+    let mut log_guard = None;
+    let result = run(&mut log_guard);
+    if let Err(e) = &result {
+        // The log is the only place left to look at when the window is gone.
+        log_fatal(e);
+        drop(log_guard);
+        if std::env::var_os(FROM_APP).is_some_and(|v| v == "1") {
+            // Started from Rada.app: the window closes with rada, and with it the message.
+            eprintln!("\nError: {e:?}\n\n{}", Key::MPressAnyKey.tr());
+            rada_tui::run::wait_for_key();
+            std::process::exit(1);
+        }
+    }
+    result
+}
+
+/// An error that ends rada, in the log with every cause in the chain (`a: b: c`).
+fn log_fatal(e: &anyhow::Error) {
+    tracing::error!("rada ends with an error: {e:#}");
+}
+
+fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> Result<()> {
     // Started by rada itself to call the shell from a process with no console (see
     // `rada_core::platform::launch`): it does that one thing and ends, before anything of the
     // interface or of the command line is touched.
@@ -327,7 +352,7 @@ fn main() -> Result<()> {
     let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
     // A state folder from an earlier version may be open to other users: close it first.
     rada_core::statefile::tighten(&dirs.rada_state());
-    let _log_guard = init_logging(&dirs);
+    *log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
     cfg_file.apply_language();
 
@@ -720,4 +745,48 @@ fn init_logging(dirs: &Dirs) -> Option<tracing_appender::non_blocking::WorkerGua
         .with_env_filter(filter)
         .init();
     Some(guard)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[derive(Clone, Default)]
+    struct Buffer(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Buffer {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(b);
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_fatal_error_is_logged_with_every_cause_in_its_chain() {
+        let buf = Buffer::default();
+        let b = buf.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || b.clone())
+            .with_ansi(false)
+            .finish();
+        let err = Err::<(), _>(std::io::Error::other(
+            "The cursor position could not be read within a normal duration",
+        ))
+        .context("terminal error")
+        .context("rada cannot go on")
+        .unwrap_err();
+        tracing::subscriber::with_default(subscriber, || log_fatal(&err));
+        let text = String::from_utf8(buf.0.lock().unwrap().clone()).unwrap();
+        assert!(text.contains("ERROR"), "{text}");
+        assert!(
+            text.contains(
+                "rada cannot go on: terminal error: The cursor position could not be read within a normal duration"
+            ),
+            "{text}"
+        );
+    }
 }

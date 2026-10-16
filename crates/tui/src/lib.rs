@@ -13,6 +13,7 @@ pub mod fuzzy;
 pub mod hits;
 pub mod icons;
 pub mod images;
+pub mod input;
 pub mod keymap;
 pub mod nav;
 pub mod palette;
