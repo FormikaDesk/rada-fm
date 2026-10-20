@@ -24,7 +24,9 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
 
 1. Make `main` what you want to ship: the version in `Cargo.toml` (`[workspace.package]`), a
    `## [x.y.z] - date` section in `CHANGELOG.md` (the notes of the release are taken from it),
-   the tests green.
+   the tests green. `scripts/set-version.sh x.y.z` moves the version everywhere it is written
+   (`Cargo.toml`, `Cargo.lock`, and the download example and version numbers in `docs/`); the
+   changelog is yours to write.
 2. Tag it and push the tag. The tag must be `v` + the version in `Cargo.toml`; the workflow stops
    if they differ. Only tags that start with `v` and a digit start a release.
 
