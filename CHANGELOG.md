@@ -5,11 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.12] - 2026-10-20
+
+rada can now be installed from crates.io (`cargo install rada --locked`, from the moment the crates are published), and `rada update` leaves a copy installed that way to cargo. The pictures of the README and the docs are drawn again, so that they show the centred icons of the narrow sidebar and the Tag column as it is now. Still a **pre-release**.
+
 ### Added
-- **The crates can be published on crates.io**, so that `cargo install rada --locked` builds rada from there (it works from the moment the crates are published; while only pre-releases exist, add `--version 0.6.0-rc.11`). `rada-core`, `rada-tui` and `rada` carry the data crates.io asks for (description, licence, repository, keywords, categories, a README each, the minimum Rust version) and depend on each other by path and by exact version; each package holds only what compiling needs (no tests, screenshots or media: 380, 285 and 204 KB). `docs/install.md` and the README tell how to install it, `docs/release.md` has the steps to publish a version (`rada-core`, then `rada-tui`, then `rada`), and `scripts/set-version.sh` moves the versions the crates ask of each other along with the workspace.
+- **The crates can be published on crates.io**, so that `cargo install rada --locked` builds rada from there (it works from the moment the crates are published; while only pre-releases exist, add `--version 0.6.0-rc.12`). `rada-core`, `rada-tui` and `rada` carry the data crates.io asks for (description, licence, repository, keywords, categories, a README each, the minimum Rust version) and depend on each other by path and by exact version; each package holds only what compiling needs (no tests, screenshots or media: 380, 285 and 204 KB). `docs/install.md` and the README tell how to install it, `docs/release.md` has the steps to publish a version (`rada-core`, then `rada-tui`, then `rada`), and `scripts/set-version.sh` moves the versions the crates ask of each other along with the workspace.
 
 ### Changed
+- **The screenshots and the GIFs of the README and the docs are drawn again** (`docs/screenshots`, `docs/media`; the 29 pictures and the two GIFs) with the program of this version, from the tapes and on the made-up home folder of `scripts/demo-home`: they showed the Tag column empty and the icons of the narrow sidebar off centre, which rc.11 fixed. The status bar in them says `v0.6.0-rc.12`.
 - **`rada update` leaves a program installed with `cargo install rada` to cargo.** It reads cargo's `.crates.toml` next to the `bin` folder, and when `rada` from crates.io is listed there it replaces nothing and says to run `cargo install rada --locked` (in Italian too). A program put in `~/.cargo/bin` by `cargo install --path`, or only copied there, is updated as before.
+- **`scripts/set-version.sh` also moves the install line in the README of the `rada` crate** (`crates/rada/README.md`).
 - `contrib/rada-wrapper.sh`, the script `rada setup file-picker` installs, now lives in `crates/rada/assets/linux/` with the other files the program carries inside itself, so that the crate can be built from crates.io.
 
 ## [0.6.0-rc.11] - 2026-10-20

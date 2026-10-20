@@ -5,10 +5,10 @@
 #
 # Rewrites the version of the workspace (Cargo.toml, which also holds the exact versions the
 # crates ask of each other in [workspace.dependencies] for crates.io, and the three workspace
-# crates in Cargo.lock) and every place in the docs that names the version that is current (the download example in
-# docs/install.md, the version in docs/platforms.md and docs/updates.md). The CHANGELOG is not
-# touched: its sections are written by hand. Run it from anywhere; it works on the repository the
-# script lives in.
+# crates in Cargo.lock) and every place that names the version that is current (the download
+# example in docs/install.md, the version in docs/platforms.md and docs/updates.md, the install
+# line in the README of the rada crate). The CHANGELOG is not touched: its sections are written
+# by hand. Run it from anywhere; it works on the repository the script lives in.
 set -euo pipefail
 
 new="${1:-}"
@@ -30,10 +30,10 @@ fi
 
 # Dots in the old version are literal.
 esc="${old//./\\.}"
-for f in Cargo.toml Cargo.lock docs/install.md docs/platforms.md docs/updates.md; do
+for f in Cargo.toml Cargo.lock docs/install.md docs/platforms.md docs/updates.md crates/rada/README.md; do
     sed -i "s/$esc/$new/g" "$root/$f"
 done
 echo "$old -> $new"
 grep -rnF "$old" "$root/Cargo.toml" "$root/Cargo.lock" "$root/docs/install.md" \
-    "$root/docs/platforms.md" "$root/docs/updates.md" && exit 1
+    "$root/docs/platforms.md" "$root/docs/updates.md" "$root/crates/rada/README.md" && exit 1
 exit 0

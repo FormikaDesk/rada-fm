@@ -16,7 +16,7 @@ You need Rust 1.90 or newer ([rustup](https://rustup.rs)). The program is put in
 `~/.cargo/bin`; update it with the same command. Prebuilt binaries for Linux, macOS and
 Windows are on the [releases page](https://github.com/formikadesk/rada-fm/releases).
 
-While only pre-releases are published, name the version: `cargo install rada --locked --version 0.6.0-rc.11`.
+While only pre-releases are published, name the version: `cargo install rada --locked --version 0.6.0-rc.12`.
 
 ## More
 
