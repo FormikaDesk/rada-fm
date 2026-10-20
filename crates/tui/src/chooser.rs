@@ -10,6 +10,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use rada_core::display;
 use rada_core::i18n::Key;
 use rada_core::model::{SortKey, SortSpec};
 
@@ -67,14 +68,20 @@ impl Chooser {
         }
     }
 
-    /// The keys that matter here, for the bar.
-    pub fn hint(&self) -> &'static str {
-        match (&self.kind, self.multiple) {
-            (Kind::File, false) => Key::ChooseHintFile.tr(),
-            (Kind::File, true) => Key::ChooseHintFiles.tr(),
-            (Kind::Folder, false) => Key::ChooseHintFolder.tr(),
-            (Kind::Folder, true) => Key::ChooseHintFolders.tr(),
-            (Kind::Save { .. }, _) => Key::ChooseHintSave.tr(),
+    /// The keys that matter here, for the bar: the full line when it fits in `room` cells, the
+    /// short one when it does not.
+    pub fn hint(&self, room: usize) -> &'static str {
+        let (long, short) = match (&self.kind, self.multiple) {
+            (Kind::File, false) => (Key::ChooseHintFile, Key::ChooseHintFileShort),
+            (Kind::File, true) => (Key::ChooseHintFiles, Key::ChooseHintFilesShort),
+            (Kind::Folder, false) => (Key::ChooseHintFolder, Key::ChooseHintFolderShort),
+            (Kind::Folder, true) => (Key::ChooseHintFolders, Key::ChooseHintFoldersShort),
+            (Kind::Save { .. }, _) => (Key::ChooseHintSave, Key::ChooseHintSaveShort),
+        };
+        if display::width(long.tr()) <= room {
+            long.tr()
+        } else {
+            short.tr()
         }
     }
 

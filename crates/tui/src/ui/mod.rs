@@ -135,7 +135,7 @@ fn draw_chooser_bar(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Block::default().style(band), area);
     let title = format!(" {} ", ch.title());
     let room = (area.width as usize).saturating_sub(display::width(&title) + 2);
-    let hint = display::truncate(ch.hint(), room);
+    let hint = display::truncate(ch.hint(room), room);
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(

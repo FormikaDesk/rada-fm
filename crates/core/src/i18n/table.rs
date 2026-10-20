@@ -1214,6 +1214,12 @@ strings! {
     ChooseHintFolder => "Enter choose the folder under the cursor · Alt+Enter the one you are in · → open · ← up · Esc cancel", "Invio scegli la cartella sotto il cursore · Alt+Invio quella in cui sei · → apri · ← su · Esc annulla";
     ChooseHintFolders => "Space mark · Enter choose the marked · Alt+Enter the folder you are in · → open · Esc cancel", "Spazio segna · Invio scegli i segnati · Alt+Invio la cartella in cui sei · → apri · Esc annulla";
     ChooseHintSave => "Ctrl+S or Alt+Enter save in this folder · Enter on a file: replace it · → open folder · ← up · Esc cancel", "Ctrl+S o Alt+Invio salva in questa cartella · Invio su un file: lo sostituisce · → apri cartella · ← su · Esc annulla";
+    // The same, for a window too narrow for the long ones.
+    ChooseHintFileShort => "Enter choose · Esc cancel", "Invio scegli · Esc annulla";
+    ChooseHintFilesShort => "Space mark · Enter choose", "Spazio segna · Invio scegli";
+    ChooseHintFolderShort => "Enter choose · Alt+Enter here", "Invio scegli · Alt+Invio qui";
+    ChooseHintFoldersShort => "Space mark · Enter choose · Alt+Enter here", "Spazio segna · Invio scegli · Alt+Invio qui";
+    ChooseHintSaveShort => "Ctrl+S save · Esc cancel", "Ctrl+S salva · Esc annulla";
     ChooseSaveName => "File name", "Nome del file";
     ChooseNameBad => "a name cannot contain / and cannot be . or ..", "un nome non può contenere / e non può essere . o ..";
     ChooseIsFolder => "{0} is a folder", "{0} è una cartella";

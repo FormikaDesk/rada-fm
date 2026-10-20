@@ -446,3 +446,66 @@ fn without_a_chooser_the_sort_setting_is_left_alone() {
     });
     assert_eq!(h.app.sort.key, SortKey::Size);
 }
+
+#[test]
+fn in_a_narrow_window_the_bar_gives_the_short_line_instead_of_a_cut_one() {
+    // What the bar says at 78 columns, and the start of the full line a wide window has. The
+    // line for one file fits even there.
+    for (ch, narrow, wide) in [
+        (
+            Chooser::file(false),
+            "Enter choose · → open folder · ← up · Esc cancel",
+            "Enter choose · → open folder",
+        ),
+        (
+            Chooser::file(true),
+            "Space mark · Enter choose",
+            "Space mark · Enter choose the marked",
+        ),
+        (
+            Chooser::folder(false),
+            "Enter choose · Alt+Enter here",
+            "Enter choose the folder under the cursor",
+        ),
+        (
+            Chooser::folder(true),
+            "Space mark · Enter choose · Alt+Enter here",
+            "Space mark · Enter choose the marked",
+        ),
+        (
+            Chooser::save("x.txt"),
+            "Ctrl+S save · Esc cancel",
+            "Ctrl+S or Alt+Enter save in this folder",
+        ),
+    ] {
+        let (sb, dir) = sandbox_with_files();
+        let want = ch.clone();
+        let mut h = H::with_config(sb, dir, 78, 30, move |c| c.chooser = Some(want));
+        let screen = h.screen();
+        let bar = screen.lines().next().unwrap();
+        assert!(bar.contains(narrow), "{bar:?}");
+        assert!(!bar.contains('…'), "nothing is cut: {bar:?}");
+
+        let (sb, dir) = sandbox_with_files();
+        let mut h = H::with_config(sb, dir, 140, 30, move |c| c.chooser = Some(ch));
+        let screen = h.screen();
+        let bar = screen.lines().next().unwrap();
+        assert!(bar.contains(wide), "{bar:?}");
+    }
+}
+
+#[test]
+fn the_short_lines_are_in_italian_too() {
+    use rada_core::i18n::{Key, Lang, with_lang};
+    for key in [
+        Key::ChooseHintFileShort,
+        Key::ChooseHintFilesShort,
+        Key::ChooseHintFolderShort,
+        Key::ChooseHintFoldersShort,
+        Key::ChooseHintSaveShort,
+    ] {
+        let it = with_lang(Lang::It, || key.tr());
+        let en = with_lang(Lang::En, || key.tr());
+        assert_ne!(it, en, "{key:?}");
+    }
+}
