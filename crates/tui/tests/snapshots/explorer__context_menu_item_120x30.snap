@@ -9,27 +9,27 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│   ⌂  Home                │ │ ☐   Name ↑                            Date modified    Type                        Size │
 │                          │ │                                                                                         │
-│ PINNED                   │ │ ☐ ▸ assets                  3 days ago     ╭───────────────────────────────────────╮    │
-│   ▭  Desktop           ⚲ │ │ ☐ ▸ docs                    Yesterday      │  · photo.jpg  ·  JPEG image           │    │
-│   ▤  Documents         ⚲ │ │ ☐ ▸ scripts                 9 days ago     │ ───────────────────────────────────── │    │
-│   ↓  Downloads         ⚲ │ │ ☐ ▸ src                     Today 09:30    │  ▸ Open                        Enter  │    │
-│   ▣  Pictures          ⚲ │ │ ☐ ▸ tests                   2 days ago     │  ▦ Open with…                      ›  │    │
-│   ♪  Music             ⚲ │ │ ☐ · archive.tar.gz          8 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│   ▶  Videos            ⚲ │ │ ☐ · backup.zip              05/07/2026     │  ✂ Cut                        Ctrl+X  │    │
-│                          │ │ ☐ · Cargo.toml              3 days ago     │  ⧉ Copy                       Ctrl+C  │    │
-│ DEVICES                  │ │ ☐ · data.json               6 days ago     │  ⎘ Paste                      Ctrl+V  │    │
-│   ▥  System              │ │ ☐ · demo.mp4                2 weeks ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│      ■■■■■■□□□□   183 GB │ │ ☐ · logo.svg                5 days ago     │  ✎ Rename                         F2  │    │
-│   ▥  Data                │ │ ☐ · main.rs                 Today 14:10    │  ▣ Compress…                   Alt+Z  │    │
-│      ■■■■□□□□□□   555 GB │ │ ☐ · notes.txt               Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│   ⏏  USB drive           │ │▌☐ · photo.jpg               Today 13:30    │  ◆ Tags                            ›  │    │
-│      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md               Today 13:28    │  ⚲ Copy the path        Ctrl+Shift+C  │    │
-│                          │ │ ☐ · report.pdf              4 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │  ≣ Properties              Alt+Enter  │    │
-│   ●  Red                 │ │ ☐ · setup.sh                12 days ago    │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│   ●  Orange              │ │ ☐ · song.mp3                30/07/2026     │  ✗ Move to trash                 Del  │    │
+│ PINNED                   │ │ ☐ ▸ assets                            3 day╭───────────────────────────────────────╮    │
+│   ▭  Desktop           ⚲ │ │ ☐ ▸ docs                              Yeste│  · photo.jpg  ·  JPEG image           │    │
+│   ▤  Documents         ⚲ │ │ ☐ ▸ scripts                           9 day│ ───────────────────────────────────── │    │
+│   ↓  Downloads         ⚲ │ │ ☐ ▸ src                               Today│  ▸ Open                        Enter  │    │
+│   ▣  Pictures          ⚲ │ │ ☐ ▸ tests                             2 day│  ▦ Open with…                      ›  │    │
+│   ♪  Music             ⚲ │ │ ☐ · archive.tar.gz                    8 day│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │ MB │
+│   ▶  Videos            ⚲ │ │ ☐ · backup.zip                        05/07│  ✂ Cut                        Ctrl+X  │ MB │
+│                          │ │ ☐ · Cargo.toml                        3 day│  ⧉ Copy                       Ctrl+C  │2 B │
+│ DEVICES                  │ │ ☐ · data.json                         6 day│  ⎘ Paste                      Ctrl+V  │9 B │
+│   ▥  System              │ │ ☐ · demo.mp4                          2 wee│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │ MB │
+│      ■■■■■■□□□□   183 GB │ │ ☐ · logo.svg                          5 day│  ✎ Rename                         F2  │7 B │
+│   ▥  Data                │ │ ☐ · main.rs                           Today│  ▣ Compress…                   Alt+Z  │0 B │
+│      ■■■■□□□□□□   555 GB │ │ ☐ · notes.txt                         Yeste│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │8 B │
+│   ⏏  USB drive           │ │▌☐ · photo.jpg                         Today│  ◆ Tags                            ›  │ KB │
+│      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md                         Today│  ⚲ Copy the path        Ctrl+Shift+C  │5 B │
+│                          │ │ ☐ · report.pdf                        4 day│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │ MB │
+│ TAGS                     │ │ ☐ · screenshot.png                    Yeste│  ≣ Properties              Alt+Enter  │ KB │
+│   ●  Red                 │ │ ☐ · setup.sh                          12 da│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │1 B │
+│   ●  Orange              │ │ ☐ · song.mp3                          30/07│  ✗ Move to trash                 Del  │ MB │
 │   ●  Yellow              │ │                                            │  ✗ Delete permanently      Shift+Del  │    │
 │   ●  Green               │ │                                            ╰───────────────────────────────────────╯    │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯

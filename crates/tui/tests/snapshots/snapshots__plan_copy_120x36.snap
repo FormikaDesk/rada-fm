@@ -9,9 +9,9 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│   ⌂  Home                │ │ ☐   Name ↑                            Date modified    Type                        Size │
 │                          │ │                                                                                         │
-│ TAGS                     │ │▌☐ · README.md               10/10/2026       Markdown                     3 B           │
+│ TAGS                     │ │▌☐ · README.md                         10/10/2026       Markdown                     3 B │
 │   ●  Red            ╭──────────────────────────────────────────────────────────────────────────╮                     │
 │   ●  Orange         │                                                                          │                     │
 │   ●  Yellow         │    ⧉    Copy 2 items to backup                                           │                     │

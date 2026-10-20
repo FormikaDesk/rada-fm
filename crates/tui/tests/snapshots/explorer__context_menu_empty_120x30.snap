@@ -9,27 +9,27 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│   ⌂  Home                │ │ ☐   Name ↑                            Date modified    Type                        Size │
 │                          │ │                                                                                         │
-│ PINNED                   │ │ ☐ ▸ assets                  3 days ago       Folder                                     │
-│   ▭  Desktop           ⚲ │ │ ☐ ▸ docs                    Yesterday        Folder                                     │
-│   ▤  Documents         ⚲ │ │ ☐ ▸ scripts                 9 days ago       Folder                                     │
-│   ↓  Downloads         ⚲ │ │ ☐ ▸ src                     Today 09:30      Folder                                     │
-│   ▣  Pictures          ⚲ │ │ ☐ ▸ tests                   2 days ago       Folder                                     │
-│   ♪  Music             ⚲ │ │ ☐ · archive.tar.gz          8 days ago       Archive (tar.gz)         17.6 MB           │
-│   ▶  Videos            ⚲ │ │ ☐ · backup.zip              05/07/2026       Archive (ZIP)            39.0 MB           │
-│                          │ │ ☐ · Cargo.toml              3 days ago       Settings file               82 B           │
-│ DEVICES                  │ │ ☐ · data.json               6 days ago       JSON data                   49 B           │
-│   ▥  System              │ │ ☐ · demo.mp4                2 weeks ago    ╭───────────────────────────────────────╮    │
-│      ■■■■■■□□□□   183 GB │ │ ☐ · logo.svg                5 days ago     │  + New                             ›  │    │
-│   ▥  Data                │ │ ☐ · main.rs                 Today 14:10    │  ⎘ Paste                      Ctrl+V  │    │
-│      ■■■■□□□□□□   555 GB │ │ ☐ · notes.txt               Yesterday      │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│   ⏏  USB drive           │ │▌☐ · photo.jpg               Today 13:30    │  ⇅ Sort by                         ›  │    │
-│      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md               Today 13:28    │  ≣ View                            ›  │    │
-│                          │ │ ☐ · report.pdf              4 days ago     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
-│ TAGS                     │ │ ☐ · screenshot.png          Yesterday      │  ⟳ Refresh the folder             F5  │    │
-│   ●  Red                 │ │ ☐ · setup.sh                12 days ago    │  ☑ Select all                 Ctrl+A  │    │
-│   ●  Orange              │ │ ☐ · song.mp3                30/07/2026     │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │    │
+│ PINNED                   │ │ ☐ ▸ assets                            3 days ago       Folder                           │
+│   ▭  Desktop           ⚲ │ │ ☐ ▸ docs                              Yesterday        Folder                           │
+│   ▤  Documents         ⚲ │ │ ☐ ▸ scripts                           9 days ago       Folder                           │
+│   ↓  Downloads         ⚲ │ │ ☐ ▸ src                               Today 09:30      Folder                           │
+│   ▣  Pictures          ⚲ │ │ ☐ ▸ tests                             2 days ago       Folder                           │
+│   ♪  Music             ⚲ │ │ ☐ · archive.tar.gz                    8 days ago       Archive (tar.gz)         17.6 MB │
+│   ▶  Videos            ⚲ │ │ ☐ · backup.zip                        05/07/2026       Archive (ZIP)            39.0 MB │
+│                          │ │ ☐ · Cargo.toml                        3 days ago       Settings file               82 B │
+│ DEVICES                  │ │ ☐ · data.json                         6 days ago       JSON data                   49 B │
+│   ▥  System              │ │ ☐ · demo.mp4                          2 wee╭───────────────────────────────────────╮ MB │
+│      ■■■■■■□□□□   183 GB │ │ ☐ · logo.svg                          5 day│  + New                             ›  │7 B │
+│   ▥  Data                │ │ ☐ · main.rs                           Today│  ⎘ Paste                      Ctrl+V  │0 B │
+│      ■■■■□□□□□□   555 GB │ │ ☐ · notes.txt                         Yeste│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │8 B │
+│   ⏏  USB drive           │ │▌☐ · photo.jpg                         Today│  ⇅ Sort by                         ›  │ KB │
+│      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md                         Today│  ≣ View                            ›  │5 B │
+│                          │ │ ☐ · report.pdf                        4 day│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │ MB │
+│ TAGS                     │ │ ☐ · screenshot.png                    Yeste│  ⟳ Refresh the folder             F5  │ KB │
+│   ●  Red                 │ │ ☐ · setup.sh                          12 da│  ☑ Select all                 Ctrl+A  │1 B │
+│   ●  Orange              │ │ ☐ · song.mp3                          30/07│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │ MB │
 │   ●  Yellow              │ │                                            │  › Open a terminal here   Ctrl+Alt+T  │    │
 │   ●  Green               │ │                                            ╰───────────────────────────────────────╯    │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────────────────────────╯

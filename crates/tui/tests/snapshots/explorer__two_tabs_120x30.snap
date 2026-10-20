@@ -8,7 +8,7 @@ expression: shot(&mut h)
   + New ▾  │  ✂ Cut   ⧉ Copy   ⎘ Paste   ✎ Rename   ▣ Compress   ✗ Delete  │  ⇅ Sort ▾   ◆ Tags ▾  │  ↶ Undo           ⋯
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│   ⌂  Home                │ │ ☐   Name ↑                  Date modified    Type                        Size  Tags     │
+│   ⌂  Home                │ │ ☐   Name ↑                            Date modified    Type                        Size │
 │                          │ │                                                                                         │
 │ PINNED                   │ │                                                                                         │
 │   ▭  Desktop           ⚲ │ │                                                                                         │
