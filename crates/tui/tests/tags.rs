@@ -527,3 +527,69 @@ fn up_to_three_dots_then_plus_n_and_a_tag_with_no_colour_is_a_dim_dot() {
         "a tag of its own, with no colour, is a dim dot"
     );
 }
+
+/// How wide the Name column is on the title line, and whether the line has a Tags title.
+fn name_width_and_tags(h: &mut H) -> (usize, bool) {
+    let line = titles(h);
+    let cells: Vec<char> = line.chars().collect();
+    let at = |what: &str| {
+        let byte = line
+            .find(what)
+            .unwrap_or_else(|| panic!("{what:?} in {line:?}"));
+        line[..byte].chars().count()
+    };
+    let _ = cells;
+    // The name starts at its title and runs up to the gap before the date.
+    (at("Date modified") - at("Name") - 2, line.contains("Tags"))
+}
+
+#[test]
+fn a_folder_without_tags_gives_the_tag_column_to_the_names() {
+    use rada_tui::ui::{ListOpts, list_columns};
+
+    // No file here carries a tag, and the window is as narrow as the file chooser's.
+    let (sb, dir) = sandbox_with_files();
+    let mut h = H::with_config(sb, dir.clone(), 78, 24, |c| c.details_pane = Some(false));
+    assert!(h.app.tags_supported() && h.app.show_tags);
+    let (name, tags) = name_width_and_tags(&mut h);
+    assert!(!tags, "{}", titles(&mut h));
+    // What the name had before: the table of the same width with the Tag column let in.
+    let area = 78 - rada_tui::sidebar::Mode::Rail.columns() as usize - 2;
+    let opts = |show_tags| ListOpts {
+        show_type: false,
+        show_date: true,
+        show_tags,
+    };
+    let rel = rada_tui::fmt::DateStyle::Relative;
+    let icons = h.app.icons.width();
+    assert_eq!(name, list_columns(area, opts(false), icons, rel).name);
+    let before = list_columns(area, opts(true), icons, rel);
+    assert!(
+        before.tags > 0 && name > before.name,
+        "{name} vs {}",
+        before.name
+    );
+
+    // Wide enough, and still nothing to show: no column.
+    let (sb, dir) = sandbox_with_files();
+    let mut h = H::with_config(sb, dir, 140, 30, |c| c.details_pane = Some(false));
+    let (bare, has) = name_width_and_tags(&mut h);
+    assert!(!has, "{}", titles(&mut h));
+    drop(h);
+
+    // The same folder with one tag in it has the column (wide), and the names pay for it.
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
+        return;
+    };
+    let mut h = H::with_config(sb, dir, 140, 30, |c| c.details_pane = Some(false));
+    let (with_tags, has) = name_width_and_tags(&mut h);
+    assert!(has, "{}", titles(&mut h));
+    assert!(with_tags < bare, "{with_tags} vs {bare}");
+    // Narrow, the same tagged folder has none.
+    let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
+        return;
+    };
+    let mut h = H::with_config(sb, dir, 78, 24, |c| c.details_pane = Some(false));
+    let (_, has) = name_width_and_tags(&mut h);
+    assert!(!has, "{}", titles(&mut h));
+}

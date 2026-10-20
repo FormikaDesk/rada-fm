@@ -36,6 +36,8 @@ const CHECK: usize = 3;
 const TAG_W: usize = 8;
 /// The name keeps at least this much room before the Tag column is let in.
 const NAME_MIN_WITH_TAGS: usize = 18;
+/// Narrower terminals do without the Tag column: the room is the name's.
+const TAGS_FROM: usize = 80;
 
 /// Which columns fit, and how wide each is.
 pub struct Columns {
@@ -61,13 +63,13 @@ pub struct ListOpts {
 }
 
 impl ListOpts {
-    /// Below 100 columns the type goes, below 60 the date goes too. `tags` is whether the
-    /// person wants the Tag column (and the system has tags).
+    /// Below 100 columns the type goes, below 60 the date goes too, and below 80 the tags go.
+    /// `tags` is whether the Tag column has something to show (see `App::tags_column_wanted`).
     pub fn for_terminal(term_width: usize, tags: bool) -> ListOpts {
         ListOpts {
             show_type: term_width >= 100,
             show_date: term_width >= 60,
-            show_tags: tags,
+            show_tags: tags && term_width >= TAGS_FROM,
         }
     }
 }
@@ -517,6 +519,15 @@ mod tests {
             }
         }
         assert_eq!(with(60).tags, 0);
+        // A narrow terminal does without it, even where the area would have the room.
+        assert_eq!(
+            columns(120, ListOpts::for_terminal(79, true), 2, rel).tags,
+            0
+        );
+        assert_eq!(
+            columns(120, ListOpts::for_terminal(80, true), 2, rel).tags,
+            TAG_W
+        );
         // Off, it is never there.
         assert_eq!(without(160).tags, 0);
         // The columns still add up to the width with it.

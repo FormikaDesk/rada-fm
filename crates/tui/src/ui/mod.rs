@@ -324,10 +324,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             f,
             app,
             main,
-            list::ListOpts::for_terminal(
-                area.width as usize,
-                app.show_tags && app.tags_supported(),
-            ),
+            list::ListOpts::for_terminal(area.width as usize, app.tags_column_wanted()),
         ),
         ViewMode::Icons => grid::draw_grid(f, app, main),
     }

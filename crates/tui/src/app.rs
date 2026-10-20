@@ -1187,6 +1187,15 @@ impl App {
         self.svc.platform.tags().is_some()
     }
 
+    /// Whether the table has a Tag column to offer: the person wants it, the system has tags
+    /// and at least one item of the folder carries one. A folder with none has nothing to put
+    /// in it, and the room goes to the names.
+    pub fn tags_column_wanted(&self) -> bool {
+        self.show_tags
+            && self.tags_supported()
+            && self.listing.all().iter().any(|e| !e.tags.is_empty())
+    }
+
     /// Remember the tags of the user's own that these items carry, for the sidebar.
     fn note_tags<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
         use rada_core::platform::TagColor as Hue;

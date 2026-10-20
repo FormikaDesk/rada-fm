@@ -35,10 +35,8 @@ pub fn draw_columns(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     if area.width < MIN_WIDTH || area.height < 3 {
         // Too narrow: the table does what it can.
-        let opts = super::list::ListOpts::for_terminal(
-            area.width as usize,
-            app.show_tags && app.tags_supported(),
-        );
+        let opts =
+            super::list::ListOpts::for_terminal(area.width as usize, app.tags_column_wanted());
         return super::list::draw_list(f, app, area, opts);
     }
     app.want_parent_column();
