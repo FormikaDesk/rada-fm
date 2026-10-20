@@ -12,8 +12,29 @@ pub enum Mode {
     Binary,
     /// A program built from a git checkout in this folder: pull, build, copy.
     Source { dir: PathBuf },
-    /// Installed by a package manager: rada touches nothing and says which tool to use.
+    /// Installed by a package manager (or `cargo install rada`): rada touches nothing and says
+    /// which tool to use.
     Package { hint: String },
+}
+
+/// Whether `cargo install rada` put this program where it is. Cargo writes what it installed
+/// in `.crates.toml` next to the `bin` folder (`~/.cargo`, or the `--root` that was given), one
+/// line per package: `"rada 0.6.0 (registry+https://...)" = ["rada"]`. A `registry+` source is
+/// the crate from crates.io; `path+` and `git+` (an install from a checkout) are not, and a
+/// program that was only copied into `~/.cargo/bin` has no line at all: those go on as before.
+fn installed_by_cargo(exe: &Path) -> bool {
+    let Some(root) = exe.parent().and_then(Path::parent) else {
+        return false;
+    };
+    if exe.parent().and_then(Path::file_name) != Some(std::ffi::OsStr::new("bin")) {
+        return false;
+    }
+    let Ok(text) = std::fs::read_to_string(root.join(".crates.toml")) else {
+        return false;
+    };
+    text.lines()
+        .map(str::trim_start)
+        .any(|l| l.starts_with("\"rada ") && l.contains(" (registry+"))
 }
 
 /// Folders that belong to a package manager or to the system. A program there is not ours to
@@ -39,6 +60,9 @@ fn package_hint(exe: &Path, os_id: Option<&str>) -> Option<String> {
     }
     if has("/snap/") || has("/flatpak/") {
         return Some(Key::UpHintSnap.tr().to_string());
+    }
+    if installed_by_cargo(exe) {
+        return Some(Key::UpHintCargo.tr().to_string());
     }
     let system = p.starts_with("/usr/bin/")
         || p.starts_with("/bin/")
@@ -152,6 +176,73 @@ mod tests {
                 other => panic!("{exe}: {other:?}"),
             }
         }
+    }
+
+    /// A cargo home in a temporary folder with `.crates.toml` saying `lines`, and the path of
+    /// the `rada` in its `bin`.
+    fn cargo_home(lines: &str) -> (tempfile::TempDir, PathBuf) {
+        let d = tempfile::tempdir().unwrap();
+        let bin = d.path().join(".cargo/bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(
+            d.path().join(".cargo/.crates.toml"),
+            format!("[v1]\n{lines}"),
+        )
+        .unwrap();
+        let exe = bin.join("rada");
+        (d, exe)
+    }
+
+    #[test]
+    fn a_program_installed_with_cargo_is_left_to_cargo() {
+        let (_d, exe) = cargo_home(
+            "\"rada 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)\" = [\"rada\"]\n",
+        );
+        match auto(exe.to_str().unwrap(), None) {
+            Mode::Package { hint } => {
+                assert!(hint.contains("cargo install rada --locked"), "{hint}")
+            }
+            other => panic!("{other:?}"),
+        }
+        // Chosen by hand as a package, it says the same.
+        match detect(Method::Package, &exe, None, None).unwrap() {
+            Mode::Package { hint } => assert!(hint.contains("cargo install"), "{hint}"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_program_cargo_did_not_get_from_crates_io_is_not_cargos() {
+        // Built from a checkout (`cargo install --path`), from git, another crate with a name
+        // that starts the same, and a program only copied there: all go on as downloaded ones.
+        for lines in [
+            "\"rada 0.6.0 (path+file:///home/u/rada/crates/rada)\" = [\"rada\"]\n",
+            "\"rada 0.6.0 (git+https://example.org/rada#abc)\" = [\"rada\"]\n",
+            "\"rada-tools 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)\" = [\"rada-tools\"]\n",
+            "",
+        ] {
+            let (_d, exe) = cargo_home(lines);
+            assert_eq!(auto(exe.to_str().unwrap(), None), Mode::Binary, "{lines}");
+        }
+        // No `.crates.toml` at all.
+        let d = tempfile::tempdir().unwrap();
+        let bin = d.path().join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        assert_eq!(auto(bin.join("rada").to_str().unwrap(), None), Mode::Binary);
+    }
+
+    #[test]
+    fn the_cargo_line_counts_only_beside_a_bin_folder() {
+        // The file is there, but the program is not in `<root>/bin`.
+        let (d, _) = cargo_home(
+            "\"rada 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)\" = [\"rada\"]\n",
+        );
+        let elsewhere = d.path().join(".cargo/other");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        assert_eq!(
+            auto(elsewhere.join("rada").to_str().unwrap(), None),
+            Mode::Binary
+        );
     }
 
     #[test]

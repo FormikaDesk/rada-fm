@@ -251,6 +251,46 @@ fn without_a_terminal_it_will_not_install_unless_told_to() {
     );
 }
 
+/// A program that `cargo install rada` put in a cargo home (a made-up one, in the sandbox) is
+/// left to cargo: `rada update` names the command and downloads and replaces nothing.
+#[test]
+fn a_program_installed_with_cargo_is_left_to_cargo() {
+    let w = World::new();
+    w.publish(NEW, b"whatever");
+    // Back to the automatic method: the copy is not in a place that gives it away but for
+    // the line cargo wrote.
+    fs::write(
+        w.p("xdg/config/rada/config.toml"),
+        "[update]\nmethod = \"auto\"\n",
+    )
+    .unwrap();
+    let bin = w.p("cargo-home/bin");
+    fs::create_dir_all(&bin).unwrap();
+    let exe = bin.join(w.exe.file_name().unwrap());
+    fs::rename(&w.exe, &exe).unwrap();
+    fs::write(
+        w.p("cargo-home/.crates.toml"),
+        format!(
+            "[v1]\n\"rada {THIS} (registry+https://github.com/rust-lang/crates.io-index)\" = [\"rada\"]\n"
+        ),
+    )
+    .unwrap();
+    let before = fs::read(&exe).unwrap();
+    let w = World { exe, ..w };
+    for args in [&["update", "--yes"][..], &["update", "--check"][..]] {
+        let out = w.run(args);
+        let t = text(&out);
+        assert!(out.status.success(), "{args:?}: {t}");
+        assert!(t.contains("cargo install rada --locked"), "{args:?}: {t}");
+    }
+    assert_eq!(fs::read(&w.exe).unwrap(), before, "the file is untouched");
+    assert_eq!(
+        w.server.count("/files/SHA256SUMS"),
+        0,
+        "nothing was downloaded"
+    );
+}
+
 #[test]
 fn there_is_nothing_to_go_back_to_at_first() {
     let w = World::new();

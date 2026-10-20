@@ -1187,6 +1187,7 @@ strings! {
     UpHintScoop => "Scoop installed it: run `scoop update rada`.", "L'ha installata Scoop: esegui `scoop update rada`.";
     UpHintStore => "It was installed from the Microsoft Store or winget: update it there.", "È stata installata dal Microsoft Store o da winget: aggiornala da lì.";
     UpHintChoco => "Chocolatey installed it: run `choco upgrade rada`.", "L'ha installata Chocolatey: esegui `choco upgrade rada`.";
+    UpHintCargo => "It was installed with cargo: run `cargo install rada --locked` to update it.", "È stata installata con cargo: esegui `cargo install rada --locked` per aggiornarla.";
     UpHintNix => "Nix installed it: update your profile or flake.", "L'ha installata Nix: aggiorna il tuo profilo o il tuo flake.";
     UpHintSnap => "It was installed as a snap or flatpak: update it with that tool.", "È stata installata come snap o flatpak: aggiornala con quello strumento.";
     UpHintSystem => "It is in {0}, which a package manager looks after: update it with {1}.", "Si trova in {0}, di cui si occupa un gestore di pacchetti: aggiornala con {1}.";
