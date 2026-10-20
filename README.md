@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml/badge.svg)](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/formikadesk/rada-fm?include_prereleases)](https://github.com/formikadesk/rada-fm/releases)
+[![crates.io](https://img.shields.io/crates/v/rada?include_prereleases)](https://crates.io/crates/rada)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![rada: look around, select three items, copy them with a plan first, see the card, take it back with Ctrl+Z](docs/media/demo.gif)
@@ -31,11 +32,13 @@ rada is young and written by one person. Read [what is guaranteed and what is no
 
 Prebuilt binaries (Linux x86_64 and aarch64, static; macOS Intel and Apple silicon; Windows x86_64) are on the [releases page](https://github.com/formikadesk/rada-fm/releases). Unpack the archive and put `rada` (`rada.exe`) on your `PATH`; commands for each system are in [docs/install.md](docs/install.md).
 
-With Rust 1.90 or newer ([rustup](https://rustup.rs)), from crates.io (this works from the moment the crate is published; while only pre-releases exist, add `--version` and the number, see [docs/install.md](docs/install.md)):
+With Rust 1.90 or newer ([rustup](https://rustup.rs)), from crates.io:
 
 ```sh
-cargo install rada --locked
+cargo install rada --locked --version 0.6.0-rc.12
 ```
+
+Only pre-releases are published so far, and cargo does not pick a pre-release by itself, so the version has to be named. With 0.6.0 `cargo install rada --locked` will be enough. More in [docs/install.md](docs/install.md).
 
 Or from source:
 
