@@ -10,18 +10,13 @@ authors = ["Alessandro Formica"]
 rust-version = "1.90"
 repository = "https://github.com/formikadesk/rada-fm"
 homepage = "https://github.com/formikadesk/rada-fm"
-readme = "README.md"
-# Released as binaries and built from source; never published to crates.io (the workspace
-# crates depend on each other by path alone).
-publish = false
-keywords = ["file-manager", "tui", "terminal", "undo", "rust"]
-categories = ["command-line-utilities", "filesystem"]
 
-# The crates of the workspace, by path: the version follows [workspace.package] and is not
-# written twice.
+# The crates of the workspace, by path and by version: crates.io wants both. The version is
+# exact because the three crates are released together and only fit each other;
+# scripts/set-version.sh moves it with the workspace version.
 [workspace.dependencies]
-rada-core = { path = "crates/core" }
-rada-tui = { path = "crates/tui" }
+rada-core = { path = "crates/core", version = "=0.6.0-rc.11" }
+rada-tui = { path = "crates/tui", version = "=0.6.0-rc.11" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

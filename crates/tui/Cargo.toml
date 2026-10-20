@@ -1,6 +1,6 @@
 [package]
 name = "rada-tui"
-description = "Terminal user interface for rada (ratatui + crossterm)"
+description = "The terminal interface of rada, a terminal file manager, built on ratatui and crossterm (no stable API)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,10 +8,10 @@ authors.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-readme.workspace = true
-publish.workspace = true
-keywords.workspace = true
-categories.workspace = true
+readme = "README.md"
+keywords = ["tui", "terminal", "file-manager", "ratatui", "crossterm"]
+categories = ["command-line-interface", "filesystem"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [lints]
 workspace = true

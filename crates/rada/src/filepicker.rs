@@ -16,8 +16,8 @@ use rada_core::i18n::{Key, tf};
 use rada_core::platform::Dirs;
 use serde::{Deserialize, Serialize};
 
-/// The script the portal runs: `contrib/rada-wrapper.sh` of the source.
-const WRAPPER: &str = include_str!("../../../contrib/rada-wrapper.sh");
+/// The script the portal runs: `assets/linux/rada-wrapper.sh` of the `rada` crate.
+const WRAPPER: &str = include_str!("../assets/linux/rada-wrapper.sh");
 const WRAPPER_NAME: &str = "rada-wrapper.sh";
 const PORTAL_DIR: &str = "xdg-desktop-portal-termfilechooser";
 const FILE_CHOOSER: &str = "org.freedesktop.impl.portal.FileChooser";

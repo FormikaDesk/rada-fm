@@ -59,7 +59,7 @@ On Linux, programs ask the desktop for a file through **xdg-desktop-portal** ("u
 
    | File | What it gets |
    |---|---|
-   | `~/.config/xdg-desktop-portal-termfilechooser/rada-wrapper.sh` | the script the portal runs (it is [`contrib/rada-wrapper.sh`](https://github.com/formikadesk/rada-fm/blob/main/contrib/rada-wrapper.sh) of the source) |
+   | `~/.config/xdg-desktop-portal-termfilechooser/rada-wrapper.sh` | the script the portal runs (it is [`crates/rada/assets/linux/rada-wrapper.sh`](https://github.com/formikadesk/rada-fm/blob/main/crates/rada/assets/linux/rada-wrapper.sh) of the source) |
    | `~/.config/xdg-desktop-portal-termfilechooser/config` | `cmd=` that script, `create_help_file=0` (so that a name that does not exist yet can be saved) and `env=RADA_BIN=` the rada that ran the setup |
    | `~/.config/xdg-desktop-portal/<desktop>-portals.conf` | `org.freedesktop.impl.portal.FileChooser=termfilechooser` in `[preferred]`; `<desktop>` is the first name in `$XDG_CURRENT_DESKTOP`, in lower case (`hyprland-portals.conf`). If you have none of your own, it starts from the one the system ships, so the other portals keep their backends. |
 

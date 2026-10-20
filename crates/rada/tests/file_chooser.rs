@@ -398,8 +398,7 @@ exit $status
 
         /// Run the script of the source as the portal does: six arguments.
         fn run(&self, args: [&str; 6], env: &[(&str, &str)]) -> Output {
-            let script =
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contrib/rada-wrapper.sh");
+            let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/linux/rada-wrapper.sh");
             let mut c = Command::new("/bin/sh");
             c.arg(script)
                 .args(args)
@@ -681,7 +680,7 @@ exit $status
 
     #[test]
     fn the_script_is_valid_and_is_the_one_the_setup_installs() {
-        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contrib/rada-wrapper.sh");
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/linux/rada-wrapper.sh");
         let check = Command::new("/bin/sh")
             .arg("-n")
             .arg(&script)

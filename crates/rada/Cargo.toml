@@ -8,10 +8,10 @@ authors.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-readme.workspace = true
-publish.workspace = true
-keywords.workspace = true
-categories.workspace = true
+readme = "README.md"
+keywords = ["file-manager", "tui", "terminal", "undo", "filesystem"]
+categories = ["command-line-utilities", "filesystem"]
+include = ["/src/**", "/assets/**", "/build.rs", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [lints]
 workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "rada-core"
-description = "Filesystem model, plan/execute/undo engine, journal and platform layer for rada"
+description = "The engine of rada, a terminal file manager: filesystem model, plan/execute/undo, journal and platform layer (no stable API)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,10 +8,10 @@ authors.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-readme.workspace = true
-publish.workspace = true
-keywords.workspace = true
-categories.workspace = true
+readme = "README.md"
+keywords = ["filesystem", "undo", "file-manager", "journal", "copy"]
+categories = ["filesystem"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [lints]
 workspace = true
