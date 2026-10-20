@@ -237,10 +237,10 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     glyph.to_string()
                 };
                 if rail {
-                    spans.push(Span::styled(
-                        format!(" {mark} "),
-                        th.fg(icon_color).patch(row_style),
-                    ));
+                    // The pane inside the border is three cells wide: the edge, the icon, one
+                    // of air. The icon sits in the middle one, which the half circle at the
+                    // right end of the pill must not cover.
+                    spans.push(Span::styled(mark, th.fg(icon_color).patch(row_style)));
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), row_style));
                 } else {

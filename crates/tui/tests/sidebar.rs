@@ -623,3 +623,88 @@ fn on_a_short_terminal_no_entry_is_cut_off_whatever_the_density() {
         }
     }
 }
+
+/// Every theme, with and without the half circles of the Nerd Font, with and without the
+/// keyboard on the entry.
+fn every_look() -> Vec<(rada_tui::icons::IconSet, &'static str, bool)> {
+    use rada_tui::icons::IconSet;
+    let mut v = Vec::new();
+    for icons in [IconSet::UnicodeIcons, IconSet::Nerd] {
+        for name in ["rada", "rada-light", "carta"] {
+            for focus in [false, true] {
+                v.push((icons, name, focus));
+            }
+        }
+    }
+    v
+}
+
+/// In the icon-only column, the icon of the place you are in is drawn, and in a colour that
+/// can be told from the pill behind it, in every theme and with and without the half circles.
+#[test]
+fn in_the_icon_column_the_icon_of_the_current_place_is_there_and_shows_against_the_pill() {
+    use rada_tui::theme::{ColorDepth, Theme};
+    use unicode_width::UnicodeWidthStr;
+
+    for (icons, name, focus) in every_look() {
+        {
+            let mut h = italian(78, 24);
+            h.app.th = Theme::named(name, ColorDepth::True).unwrap();
+            h.app.icons = icons;
+            let want = place(&h, "Scaricati");
+            assert_eq!(h.app.cwd, want);
+            let item = h
+                .app
+                .side_items()
+                .into_iter()
+                .find(|i| i.path == want)
+                .unwrap();
+            let glyph = item.glyph(icons).to_string();
+            assert!(!glyph.is_empty(), "{icons:?}: the place has an icon");
+            if focus {
+                // The keyboard is on it too: the stronger tint.
+                let at = h
+                    .app
+                    .side_items()
+                    .iter()
+                    .position(|i| i.path == want)
+                    .unwrap();
+                h.app.side_focus = true;
+                h.app.side_cursor = at;
+            }
+
+            let y = row_of(&mut h, want.clone());
+            let buf = h.redrawn_buffer();
+            assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Rail);
+            let cells: Vec<_> = (0..rada_tui::sidebar::RAIL_WIDTH)
+                .map(|x| buf[(x, y)].clone())
+                .collect();
+            let shown = cells
+                .iter()
+                .find(|c| c.symbol() == glyph)
+                .unwrap_or_else(|| {
+                    let row: Vec<_> = cells.iter().map(|c| c.symbol().to_string()).collect();
+                    panic!("{icons:?} {name} focus={focus}: the icon {glyph:?} is not in the row {row:?}")
+                });
+            assert!(glyph.width() > 0);
+            assert_ne!(
+                shown.fg, shown.bg,
+                "{icons:?} {name} focus={focus}: the icon is the colour of the pill ({:?})",
+                shown.fg
+            );
+            // Not just different: a colour that reads on the pill.
+            let lum = |c: ratatui::style::Color| match c {
+                ratatui::style::Color::Rgb(r, g, b) => {
+                    0.2126 * r as f64 + 0.7152 * g as f64 + 0.0722 * b as f64
+                }
+                other => panic!("{other:?} is not a true colour"),
+            };
+            assert!(
+                (lum(shown.fg) - lum(shown.bg)).abs() > 40.0,
+                "{icons:?} {name} focus={focus}: {:?} on {:?} is too faint",
+                shown.fg,
+                shown.bg
+            );
+        }
+    }
+}

@@ -6,7 +6,7 @@ expression: shot(&mut h)
   ←   →   ↑   ⟳     ⌂ Home › demo › projects │ ⌕ Search file…             Ctrl+P
   +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                     ⋯
 ╭───╮ ╭────────────────────────────────────────────────────────────────────────────╮
-│  ⌂│ │ ☐   Name ↑                           Date modified          Size  Tags     │
+│ ⌂ │ │ ☐   Name ↑                           Date modified          Size  Tags     │
 │   │ │                                                                            │
 │   │ │ ☐ ▸ data                             6 days ago                            │
 │   │ │ ☐ ▸ src                              6 days ago                            │
