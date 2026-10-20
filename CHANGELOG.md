@@ -5,6 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- **The crates can be published on crates.io**, so that `cargo install rada --locked` builds rada from there (it works from the moment the crates are published; while only pre-releases exist, add `--version 0.6.0-rc.11`). `rada-core`, `rada-tui` and `rada` carry the data crates.io asks for (description, licence, repository, keywords, categories, a README each, the minimum Rust version) and depend on each other by path and by exact version; each package holds only what compiling needs (no tests, screenshots or media: 380, 285 and 204 KB). `docs/install.md` and the README tell how to install it, `docs/release.md` has the steps to publish a version (`rada-core`, then `rada-tui`, then `rada`), and `scripts/set-version.sh` moves the versions the crates ask of each other along with the workspace.
+
+### Changed
+- **`rada update` leaves a program installed with `cargo install rada` to cargo.** It reads cargo's `.crates.toml` next to the `bin` folder, and when `rada` from crates.io is listed there it replaces nothing and says to run `cargo install rada --locked` (in Italian too). A program put in `~/.cargo/bin` by `cargo install --path`, or only copied there, is updated as before.
+- `contrib/rada-wrapper.sh`, the script `rada setup file-picker` installs, now lives in `crates/rada/assets/linux/` with the other files the program carries inside itself, so that the crate can be built from crates.io.
+
 ## [0.6.0-rc.11] - 2026-10-20
 
 `rada setup shell` puts the "cd on exit" in your shell's file for you, rada no longer ends with a terminal error after opening a file with another program (found on a Mac), and a narrow window is better used: the icon of the current place is back in the icon-only sidebar, the Tag column and the file chooser's help line give their room back. **On macOS, make `Rada.app` again with `rada setup desktop`**: the launcher that keeps the window open on an error is in the new one (the old one keeps working). Still a **pre-release**.

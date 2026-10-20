@@ -31,7 +31,13 @@ rada is young and written by one person. Read [what is guaranteed and what is no
 
 Prebuilt binaries (Linux x86_64 and aarch64, static; macOS Intel and Apple silicon; Windows x86_64) are on the [releases page](https://github.com/formikadesk/rada-fm/releases). Unpack the archive and put `rada` (`rada.exe`) on your `PATH`; commands for each system are in [docs/install.md](docs/install.md).
 
-From source, with Rust 1.90 or newer ([rustup](https://rustup.rs)):
+With Rust 1.90 or newer ([rustup](https://rustup.rs)), from crates.io (this works from the moment the crate is published; while only pre-releases exist, add `--version` and the number, see [docs/install.md](docs/install.md)):
+
+```sh
+cargo install rada --locked
+```
+
+Or from source:
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada

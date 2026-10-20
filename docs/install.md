@@ -20,6 +20,16 @@ Check the signature first when the release has one: [verify.md](verify.md).
 
 Not published yet. Until it is, use the binary or build from source.
 
+## With cargo (crates.io)
+
+From the moment the crate is published, this builds rada from crates.io (it needs a Rust toolchain of version 1.90 or newer, [rustup](https://rustup.rs)) and puts it in `~/.cargo/bin`:
+
+```sh
+cargo install rada --locked
+```
+
+`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself: name it, for example `cargo install rada --locked --version 0.6.0-rc.11`. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it. This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
+
 ## From source
 
 You need a Rust toolchain of version 1.90 or newer ([rustup](https://rustup.rs)).
