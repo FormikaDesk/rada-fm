@@ -270,13 +270,23 @@ pub fn month_name(month: i8) -> &'static str {
     MONTHS[(month.clamp(1, 12) - 1) as usize].tr()
 }
 
-/// The text with its first letter in capitals ("impossibile…" → "Impossibile…").
+/// The text with its first letter in capitals ("impossibile…" → "Impossibile…"). The program's
+/// name stays as it is: it is always written in lower case, also at the start of a sentence.
 pub fn capitalised(s: &str) -> String {
+    if starts_with_program_name(s) {
+        return s.to_string();
+    }
     let mut c = s.chars();
     match c.next() {
         Some(first) => first.to_uppercase().chain(c).collect(),
         None => String::new(),
     }
+}
+
+/// Whether the text opens with the word `rada`, not a longer word that begins with it.
+fn starts_with_program_name(s: &str) -> bool {
+    s.strip_prefix("rada")
+        .is_some_and(|rest| !rest.starts_with(|c: char| c.is_alphanumeric()))
 }
 
 /// A time left or taken, with its units apart from the numbers: `7 s`, `1 min 05 s`,
@@ -369,6 +379,19 @@ mod tests {
         assert_eq!(capitalised("3 items"), "3 items");
         assert_eq!(capitalised(""), "");
         assert_eq!(capitalised("època"), "Època");
+    }
+
+    #[test]
+    fn the_program_name_keeps_its_lower_case() {
+        for lang in [i18n::Lang::It, i18n::Lang::En] {
+            let text = i18n::with_lang(lang, || {
+                capitalised(&tf(Key::UpDoneRestart, &[&"0.6.0-rc.12"]))
+            });
+            assert!(text.starts_with("rada 0.6.0-rc.12 "), "{text}");
+        }
+        assert_eq!(capitalised("rada è pronto"), "rada è pronto");
+        assert_eq!(capitalised("rada"), "rada");
+        assert_eq!(capitalised("radar trovato"), "Radar trovato");
     }
 
     use std::time::Duration;

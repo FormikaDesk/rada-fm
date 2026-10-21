@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+- **The program's name keeps its lower case at the start of a notice.** The message that closes an update said "Rada 0.6.0-rc.12 è installato…" (seen on Windows): the notice title puts its first letter in capitals, and it did so to the name too. A text that begins with the word `rada` is now left as it is, in Italian and in English.
+
 ## [0.6.0-rc.12] - 2026-10-20
 
 rada can now be installed from crates.io (`cargo install rada --locked`, from the moment the crates are published), and `rada update` leaves a copy installed that way to cargo. The pictures of the README and the docs are drawn again, so that they show the centred icons of the narrow sidebar and the Tag column as it is now. Still a **pre-release**.
