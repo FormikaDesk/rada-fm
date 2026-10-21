@@ -1345,10 +1345,22 @@ fn nav_lists_the_places_on_top_as_the_classic_sidebar_does() {
         assert!(at(p) >= last, "{p} is in the order of the sidebar");
         last = at(p);
     }
-    assert!(
-        at("USB drive") < at("TAGS") && at("TAGS") < title,
-        "{rows:?}"
-    );
+    assert!(at("USB drive") < title, "{rows:?}");
+    // The tags are not on every system (Windows has none): then there is no row, and no
+    // second blank row in its place.
+    if h.app.tags_supported() {
+        assert!(
+            at("USB drive") < at("TAGS") && at("TAGS") < title,
+            "{rows:?}"
+        );
+    } else {
+        assert_eq!(at("TAGS"), usize::MAX);
+        assert!(
+            !rows
+                .windows(2)
+                .any(|w| { w[0].kind == rada_tui::panels::NavKind::Gap && w[1].kind == w[0].kind })
+        );
+    }
     let text = nav_text(&mut h);
     assert!(
         text.contains("PATH") && text.contains("Documents"),

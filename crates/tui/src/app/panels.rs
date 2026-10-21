@@ -232,7 +232,11 @@ impl App {
             rows.push(heading(Key::SecDevices.tr()));
             rows.extend(devices.into_iter().map(favorite));
         }
-        rows.push(gap());
+        let trash = items.iter().find(|i| i.section == Section::Trash);
+        // No blank row for a system with neither tags nor a trash.
+        if self.tags_supported() || trash.is_some() {
+            rows.push(gap());
+        }
         if self.tags_supported() {
             rows.push(row(
                 NavKind::Tags,
@@ -240,7 +244,7 @@ impl App {
                 PathBuf::new(),
             ));
         }
-        if let Some(t) = items.iter().find(|i| i.section == Section::Trash) {
+        if let Some(t) = trash {
             rows.push(row(NavKind::Trash, t.name.clone(), t.path.clone()));
         }
         // A tag, the recent files or the like is not a place in a tree of folders.
