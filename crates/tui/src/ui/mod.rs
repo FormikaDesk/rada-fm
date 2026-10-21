@@ -165,7 +165,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.term_width = area.width;
     app.screen = (area.width, area.height);
     app.popup_covers = popup_rects(app, area);
-    app.panels_shown = app.panels_wanted(area.width, area.height);
+    let columns = app.panels_wanted(area.width, area.height);
+    app.panels_shown = columns.is_some();
+    app.panels_two = columns == Some(crate::panels::Columns::Two);
     if app.panels_shown {
         // The panels view has its own arrangement of everything; the overlays are the same.
         app.size_notice_visible = false;

@@ -75,14 +75,21 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     commands::draw_commands(f, app, buttons_row);
 
     // The columns.
-    let (left_w, right_w) = side_widths(area.width);
+    let two = app.panels_two;
+    let (left_w, right_w) = if two {
+        let (min, max) = crate::panels::TWO_LEFT_WIDTH;
+        ((area.width / 3).clamp(min, max), 0)
+    } else {
+        side_widths(area.width)
+    };
     // Ctrl+B takes the left column away.
     let (left_w, left_gap) = if app.side_on { (left_w, 1) } else { (0, 0) };
+    let right_gap = u16::from(!two);
     let [left, _, middle, _, right] = Layout::horizontal([
         Constraint::Length(left_w),
         Constraint::Length(left_gap),
         Constraint::Min(30),
-        Constraint::Length(1),
+        Constraint::Length(right_gap),
         Constraint::Length(right_w),
     ])
     .areas(body);
@@ -90,12 +97,25 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     app.want_tree();
     app.want_git();
     if left.width > 0 {
-        draw_left(f, app, left);
+        if two && app.left_preview {
+            draw_right(f, app, left);
+        } else {
+            draw_left(f, app, left);
+        }
     } else {
+        app.side_focus = false;
+        app.preview_focus = false;
+    }
+    if two && !app.left_preview {
+        app.preview_focus = false;
+    }
+    if two && app.left_preview {
         app.side_focus = false;
     }
     let main = draw_middle(f, app, middle);
-    draw_right(f, app, right);
+    if !two {
+        draw_right(f, app, right);
+    }
 
     bars::draw_status(f, app, status_row);
     if hints_h > 0 {
@@ -119,7 +139,11 @@ fn is_airy(f: &Frame) -> bool {
 fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let airy = is_airy(f);
-    let others = space::volumes(app).map(|(_, o)| o.len());
+    // The two columns have SPAZIO only in a tall window.
+    let with_space = !app.panels_two || f.area().height >= crate::panels::TWO_SPACE_FROM_ROWS;
+    let others = space::volumes(app)
+        .filter(|_| with_space)
+        .map(|(_, o)| o.len());
     let (nav_area, space_area) = match others {
         None => (area, None),
         Some(others) => {

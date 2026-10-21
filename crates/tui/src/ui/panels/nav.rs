@@ -240,12 +240,18 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             spans.push(Span::styled(format!("{glyph} "), icon_style.patch(bg)));
         }
         let head: usize = spans.iter().map(|s| s.content.width()).sum();
-        let count = row.count.map(|n| format!("({n})")).unwrap_or_default();
+        let mut count = row.count.map(|n| format!("({n})")).unwrap_or_default();
         let bookmark = match row.kind {
             NavKind::Favorite(n) => matches!(items[n].origin, Origin::Bookmark { .. }),
             _ => false,
         };
         let pin_w = if bookmark && !pin.is_empty() { 2 } else { 0 };
+        // In a narrow box the numbers go when the name does not fit with them.
+        if !count.is_empty()
+            && row.name.width() > w.saturating_sub(head + 2 + count.width() + pin_w)
+        {
+            count.clear();
+        }
         let room = w.saturating_sub(head + 2 + count.width() + pin_w);
         let name = rada_core::display::truncate(&row.name, room.max(1));
         let name_style = if is_focus || is_current {

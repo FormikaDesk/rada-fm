@@ -575,6 +575,9 @@ impl App {
     }
 
     pub fn toggle_details(&mut self) {
+        if self.panels_shown && self.panels_two {
+            return self.toggle_left_preview();
+        }
         let want = !self.details_visible();
         self.details = Some(want);
         self.saved_ui.details = Some(want);

@@ -32,7 +32,7 @@
 //! cmd_keys = true            # macOS: ask the terminal to report Cmd, for Cmd+C/V/X… (classic keys)
 //! show_hints = true          # false: no row of key hints at the bottom (`hints` also works)
 //! sidebar = true             # the navigation pane; shown by default; Ctrl+B toggles and remembers
-//! layout = "auto"            # auto (panels from 140x36, classic below) | panels | classic |
+//! layout = "auto"            # auto (panels: three columns from 140x36, two from 70x24, classic below) | panels | classic |
 //!                            # compact (no address bar, command bar or hints); explorer = classic
 //! show_details_pane = true   # false: never show the details pane on its own (Alt+P still does)
 //! view = "details"           # details | icons | columns: how a new tab shows a folder

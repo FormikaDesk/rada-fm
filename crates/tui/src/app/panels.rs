@@ -20,8 +20,8 @@ const GIT_WAIT: Duration = Duration::from_secs(6);
 
 impl App {
     /// Whether a window `width` × `height` is drawn as panels.
-    pub fn panels_wanted(&self, width: u16, height: u16) -> bool {
-        crate::panels::use_panels(
+    pub fn panels_wanted(&self, width: u16, height: u16) -> Option<crate::panels::Columns> {
+        crate::panels::columns_for(
             self.layout_pref,
             self.layout,
             self.chooser.is_some(),
@@ -420,13 +420,52 @@ impl App {
         rows.iter()
             .position(|r| matches!(r.kind, NavKind::Folder { .. }) && r.path == cwd)
             .or_else(|| {
-                rows.iter()
-                    .position(|r| matches!(r.kind, NavKind::Favorite(_)) && r.path == cwd)
+                rows.iter().position(|r| {
+                    matches!(r.kind, NavKind::Favorite(_) | NavKind::Trash) && r.path == cwd
+                })
             })
     }
 
-    /// Tab in the panels view: the folder, NAV, ANTEPRIMA, the folder.
+    /// The command that shows or hides the details (Alt+P, F6, the button at the top right): in
+    /// the view of two columns it puts ANTEPRIMA in the place of NAV, and NAV back. The
+    /// keyboard follows the box it was in.
+    pub(super) fn toggle_left_preview(&mut self) {
+        if !self.side_on {
+            self.toggle_sidebar();
+            self.left_preview = true;
+            self.dirty = true;
+            return;
+        }
+        let had_focus = self.side_focus || self.preview_focus;
+        self.left_preview = !self.left_preview;
+        if had_focus {
+            self.side_focus = !self.left_preview;
+            self.preview_focus = self.left_preview;
+        }
+        self.dirty = true;
+    }
+
+    /// Tab in the panels view: the folder, NAV, ANTEPRIMA, the folder. With two columns the
+    /// box on the left is the only one after the folder, whichever of the two it is.
     pub(super) fn switch_pane_panels(&mut self) {
+        if self.panels_two {
+            if self.side_focus || self.preview_focus {
+                self.side_focus = false;
+                self.preview_focus = false;
+                return;
+            }
+            if !self.side_on {
+                self.toggle_sidebar();
+            }
+            if self.left_preview {
+                self.preview_focus = true;
+            } else {
+                let rows = self.nav_rows();
+                self.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+                self.side_focus = true;
+            }
+            return;
+        }
         if self.side_focus {
             self.side_focus = false;
             self.preview_focus = self.details_shown != crate::ui::DetailsMode::Hidden;

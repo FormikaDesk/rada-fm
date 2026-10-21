@@ -8,7 +8,7 @@ mod common;
 
 use common::*;
 use rada_tui::app::App;
-use rada_tui::panels::NavMode;
+use rada_tui::panels::{NavMode, TWO_SPACE_FROM_ROWS};
 use rada_tui::theme::ColorDepth;
 use rada_tui::{IconSet, LayoutPref, Theme};
 use ratatui::style::Color;
@@ -178,7 +178,10 @@ fn assert_fits(h: &mut H, w: u16, hh: u16) {
 fn the_panels_at_160_by_46_in_each_theme() {
     for name in THEMES {
         let mut h = scene(160, 46, name, false);
-        assert!(h.app.panels_shown, "{name}: panels at 160x46");
+        assert!(
+            h.app.panels_shown && !h.app.panels_two,
+            "{name}: three columns at 160x46"
+        );
         let th = h.app.th.clone();
         let tag = name.replace('-', "_");
         insta::assert_snapshot!(format!("panels_160x46_{tag}"), shot(&mut h));
@@ -207,14 +210,138 @@ fn the_panels_at_the_smallest_window_that_gets_them() {
     windows,
     ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
 )]
-fn a_window_below_140_by_36_gets_the_classic_layout() {
-    let mut h = scene(120, 40, "rada", false);
-    assert!(!h.app.panels_shown, "120x40 is classic");
-    insta::assert_snapshot!("panels_classic_120x40", shot(&mut h));
-    for (w, hh) in [(139, 46), (160, 35)] {
+#[cfg_attr(
+    windows,
+    ignore = "the sidebar of a system with no tags has no TAGS section, which the Linux snapshot has"
+)]
+fn a_window_below_70_by_24_gets_the_classic_layout_and_the_advice_to_enlarge_it() {
+    let mut h = scene(69, 30, "rada", false);
+    assert!(!h.app.panels_shown, "69x30 is classic");
+    let s = shot(&mut h);
+    assert!(
+        s.contains("Enlarge the window for the full layout (now 69×30)"),
+        "{s}"
+    );
+    insta::assert_snapshot!("panels_classic_69x30", s);
+    for (w, hh) in [(69, 46), (100, 23), (160, 23)] {
         h.term.backend_mut().resize(w, hh);
         let _ = h.screen();
         assert!(!h.app.panels_shown, "{w}x{hh} is classic");
+    }
+}
+
+// ---------------------------------------------------------------------------- two columns
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAG row, which the Linux snapshot has"
+)]
+fn the_two_columns_at_78_by_45_and_at_100_by_30() {
+    for (w, hh) in [(78, 45), (100, 30)] {
+        let mut h = scene(w, hh, "rada", false);
+        assert!(h.app.panels_shown && h.app.panels_two, "{w}x{hh}");
+        let s = shot(&mut h);
+        assert!(
+            !s.contains("Enlarge"),
+            "{w}x{hh}: no advice to enlarge\n{s}"
+        );
+        assert!(
+            s.contains("[ NAV ]") && s.contains("[ ~/projects/demo ]"),
+            "{s}"
+        );
+        assert!(
+            !s.contains("[ PREVIEW ]"),
+            "{w}x{hh}: the preview is not there\n{s}"
+        );
+        // SPAZIO only where there are rows for it.
+        assert_eq!(
+            s.contains("[ SPACE ]"),
+            hh >= TWO_SPACE_FROM_ROWS,
+            "{w}x{hh}\n{s}"
+        );
+        insta::assert_snapshot!(format!("panels_{w}x{hh}"), s);
+        assert_fits(&mut h, w, hh);
+    }
+}
+
+#[test]
+fn the_preview_command_puts_the_preview_in_the_place_of_nav_and_back() {
+    let mut h = scene(78, 45, "rada", false);
+    let on_screen = |h: &mut H| {
+        let s = h.screen();
+        (s.contains("[ NAV ]"), s.contains("[ PREVIEW ]"))
+    };
+    assert_eq!(on_screen(&mut h), (true, false));
+    h.press("alt+p");
+    assert_eq!(
+        on_screen(&mut h),
+        (false, true),
+        "the preview is where NAV was"
+    );
+    assert!(
+        h.screen().contains("photo.jpg"),
+        "it shows the file under the cursor"
+    );
+    h.press("alt+p");
+    assert_eq!(
+        on_screen(&mut h),
+        (true, false),
+        "the same command goes back"
+    );
+    // So does the item of the View menu, "Details pane".
+    choose_in_view_menu(&mut h, "Details pane");
+    assert_eq!(on_screen(&mut h), (false, true));
+    // Tab takes the keyboard to the box on the left, whichever it is, and back.
+    h.press("tab");
+    assert!(h.app.preview_focus && !h.app.side_focus);
+    h.press("alt+p");
+    assert!(
+        h.app.side_focus && !h.app.preview_focus,
+        "the keyboard follows the box"
+    );
+    h.press("tab");
+    assert!(!h.app.side_focus && !h.app.preview_focus);
+    // Where there are three columns the command is left as it was: both boxes are there.
+    h.term.backend_mut().resize(160, 46);
+    assert!(h.screen().contains("[ NAV ]") && h.screen().contains("[ PREVIEW ]"));
+}
+
+#[test]
+fn ctrl_b_takes_the_left_column_away_in_two_columns_too() {
+    let mut h = scene(78, 45, "rada", false);
+    assert!(h.screen().contains("[ NAV ]"));
+    h.press("ctrl+b");
+    let s = h.screen();
+    assert!(!s.contains("[ NAV ]") && !s.contains("[ PREVIEW ]"), "{s}");
+    assert!(
+        s.contains("[ ~/projects/demo ]"),
+        "the folder takes the room\n{s}"
+    );
+    h.press("ctrl+b");
+    assert!(h.screen().contains("[ NAV ]"));
+}
+
+#[test]
+fn the_pills_are_whole_in_two_columns_down_to_70() {
+    for (w, hh) in [(70, 30), (78, 45), (100, 30)] {
+        let mut h = scene(w, hh, "rada", true);
+        let what = format!("{w}x{hh}");
+        let behind = [h.app.th.inner, h.app.th.canvas];
+        let pills = assert_pills(&h.redrawn_buffer(), &what, &behind);
+        assert!(pills > 5, "{what}: only {pills} pills");
+        h.press("alt+p");
+        assert_pills(
+            &h.redrawn_buffer(),
+            &format!("{what}, the preview"),
+            &behind,
+        );
+        h.press("tab");
+        assert_pills(
+            &h.redrawn_buffer(),
+            &format!("{what}, keyboard in it"),
+            &behind,
+        );
     }
 }
 
@@ -816,7 +943,10 @@ fn choose_in_view_menu(h: &mut H, label: &str) {
 fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     use rada_tui::app::{MenuKind, Modal};
     let mut h = scene(120, 40, "rada", false);
-    assert!(!h.app.panels_shown, "auto at 120x40 is classic");
+    assert!(
+        h.app.panels_shown && h.app.panels_two,
+        "auto at 120x40 is two columns"
+    );
     // The three layouts are in the menu, the one in use ticked.
     h.app.open_menu(MenuKind::View, (60, 4));
     let Some(Modal::Menu(m)) = &h.app.modal else {
@@ -839,9 +969,15 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     choose_in_view_menu(&mut h, "panels");
     assert_eq!(h.app.layout_pref, LayoutPref::Panels);
     let _ = h.screen();
-    assert!(h.app.panels_shown, "panels at 120x40 when asked for");
-    // Not in a window with no room for them.
+    assert!(
+        h.app.panels_shown && !h.app.panels_two,
+        "three columns at 120x40 when asked for"
+    );
+    // Two in a window with room for two only, and none where there is no room.
     h.term.backend_mut().resize(90, 40);
+    let _ = h.screen();
+    assert!(h.app.panels_shown && h.app.panels_two);
+    h.term.backend_mut().resize(65, 40);
     let _ = h.screen();
     assert!(!h.app.panels_shown);
     h.term.backend_mut().resize(160, 46);
@@ -851,16 +987,19 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     assert!(!h.app.panels_shown, "classic at 160x46 when asked for");
     // Automatic again: the size decides, by itself, as the window is made larger and smaller.
     choose_in_view_menu(&mut h, "automatic");
-    for (w, hh, panels) in [
-        (160, 46, true),
-        (139, 46, false),
-        (140, 36, true),
-        (140, 35, false),
-        (200, 60, true),
+    for (w, hh, panels, two) in [
+        (160, 46, true, false),
+        (139, 46, true, true),
+        (140, 36, true, false),
+        (140, 35, true, true),
+        (70, 24, true, true),
+        (69, 24, false, false),
+        (200, 60, true, false),
     ] {
         h.term.backend_mut().resize(w, hh);
         let _ = h.screen();
         assert_eq!(h.app.panels_shown, panels, "{w}x{hh}");
+        assert_eq!(h.app.panels_two, two, "{w}x{hh}");
     }
 }
 
@@ -1689,4 +1828,50 @@ fn the_folders_of_the_way_have_the_colour_of_the_folders_of_the_middle_box() {
         in_nav.is_subset(&in_list),
         "{in_nav:?} in NAV, {in_list:?} in the list"
     );
+}
+
+/// The row of a screen that has `label` in it, and the background of the cell at `x` there.
+fn row_bg(h: &mut H, label: &str, x: u16) -> ratatui::style::Color {
+    let buf = h.redrawn_buffer();
+    let y = (0..buf.area.height)
+        .find(|y| {
+            let line: String = (0..buf.area.width).map(|x| buf[(x, *y)].symbol()).collect();
+            line.contains(label)
+        })
+        .unwrap_or_else(|| panic!("no row with {label}"));
+    buf[(x, y)].bg
+}
+
+#[test]
+fn in_the_trash_folder_only_the_trash_is_the_current_place() {
+    // The classic sidebar and the NAV box of the panels view: the trash is highlighted,
+    // and no other place (Downloads, say) is.
+    let mut h = demo_scene(120, 44);
+    with_trash(&mut h);
+    let trash = h.app.paths.places.last().unwrap().path.clone();
+    std::fs::create_dir_all(&trash).unwrap();
+    go_and_wait(&mut h, &trash);
+    // (The places are read again now and then: the demo's trash with them.)
+    with_trash(&mut h);
+    let items = h.app.side_items();
+    let at = rada_tui::sidebar::current_index(&items, &h.app.cwd).expect("a current place");
+    assert_eq!(items[at].name, "Trash", "{:?}", items[at]);
+    let _ = h.screen();
+    let (t, d) = (row_bg(&mut h, "Trash", 4), row_bg(&mut h, "Downloads", 4));
+    assert_ne!(t, d, "the trash row is highlighted, Downloads is not");
+    let quiet = row_bg(&mut h, "Pictures", 4);
+    assert_eq!(
+        d, quiet,
+        "Downloads is as quiet as the places that are not here"
+    );
+
+    let mut h = scene(160, 46, "rada", false);
+    with_trash(&mut h);
+    let trash = h.app.paths.places.last().unwrap().path.clone();
+    std::fs::create_dir_all(&trash).unwrap();
+    go_and_wait(&mut h, &trash);
+    with_trash(&mut h);
+    let rows = h.app.nav_rows();
+    let at = App::nav_current(&rows, &trash).expect("a current row");
+    assert_eq!(rows[at].kind, rada_tui::panels::NavKind::Trash);
 }

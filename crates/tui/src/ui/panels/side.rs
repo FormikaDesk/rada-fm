@@ -19,6 +19,7 @@ use crate::fmt;
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::Action;
+use crate::theme::Theme;
 use crate::ui::preview;
 use crate::ui::soft::{self, Look};
 use crate::ui::widgets::Bar;
@@ -170,8 +171,14 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     if foot_h >= 3 {
         // Rounded labels: type, size, resolution.
         let mut bar = Bar::default();
+        // A label that does not fit whole is left out: half a pill is a broken one.
         let push = |bar: &mut Bar, text: String, hue: Color| {
-            for s in chip(app, &text, hue) {
+            let chip = chip(app, &text, hue);
+            let chip_w: usize = chip.iter().map(|s| s.content.width()).sum();
+            if bar.width() + chip_w > w {
+                return;
+            }
+            for s in chip {
                 bar.push(s);
             }
             bar.push(Span::styled(" ", th.base()));
@@ -223,25 +230,30 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
         );
         // One space between the buttons when the box is narrow, so that the last is not cut.
         let between = if w < 36 { " " } else { "  " };
-        bar.push(Span::styled(between, th.base()));
+        // The words that do not fit whole are left out (the keys do the same).
+        let open_with = Key::BtnOpenWith.tr();
+        let preview = format!("{} {}", icons::ui(set, Glyph::Eye), Key::BtnPreview.tr())
+            .trim()
+            .to_string();
+        let mut words = Vec::new();
         if !e.is_navigable_dir() {
-            bar.push_hit(
-                Span::styled(
-                    Key::BtnOpenWith.tr(),
-                    th.fg(th.hues.cyan).add_modifier(Modifier::BOLD),
-                ),
+            words.push((
+                open_with.to_string(),
+                th.hues.cyan,
                 Target::Act(Action::OpenWith),
-            );
-            bar.push(Span::styled(between, th.base()));
+            ));
         }
-        let eye = icons::ui(set, Glyph::Eye);
-        bar.push_hit(
-            Span::styled(
-                format!("{eye} {}", Key::BtnPreview.tr()).trim().to_string(),
-                th.fg(th.hues.pink).add_modifier(Modifier::BOLD),
-            ),
-            Target::FullPreview,
-        );
+        words.push((preview, th.hues.pink, Target::FullPreview));
+        for (text, hue, target) in words {
+            if bar.width() + between.width() + text.width() > w {
+                break;
+            }
+            bar.push(Span::styled(between, th.base()));
+            bar.push_hit(
+                Span::styled(text, th.fg(hue).add_modifier(Modifier::BOLD)),
+                target,
+            );
+        }
         bar.clip(w);
         bar.render(f, &mut app.hits, row(foot_h - 1));
     }
@@ -345,6 +357,56 @@ fn details_rows(app: &App) -> Vec<Detail> {
     rows
 }
 
+/// What of a value of DETTAGLI fits in `room` cells: text is cut with an ellipsis, but a rounded
+/// label that does not fit whole goes (with the ones after it), and if none is left its words
+/// are written as plain text: half a pill is a broken one.
+fn fit_value(spans: Vec<Span<'static>>, room: usize, th: &Theme) -> Vec<Span<'static>> {
+    let total: usize = spans.iter().map(|s| s.content.width()).sum();
+    if total <= room {
+        return spans;
+    }
+    // The parts of a label carry a background of their own; the text of a value does not.
+    let chip_part = |s: &Span| s.style.bg.is_some() && s.style.bg != th.base().bg;
+    let words: String = spans
+        .iter()
+        .filter(|s| chip_part(s))
+        // (Without the round ends of a pill, which are glyphs of a Nerd Font.)
+        .map(|s| {
+            s.content
+                .trim_matches(|c: char| c.is_whitespace() || ('\u{e0b0}'..='\u{e0bf}').contains(&c))
+        })
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut out: Vec<Span<'static>> = Vec::new();
+    // Up to the last whole label.
+    let (mut used, mut safe) = (0, 0);
+    for s in spans {
+        let w = s.content.width();
+        if used + w <= room {
+            used += w;
+            let boundary = s.content.as_ref() == " ";
+            out.push(s);
+            if boundary {
+                safe = out.len();
+            }
+            continue;
+        }
+        if chip_part(&s) || out.last().is_some_and(chip_part) {
+            out.truncate(safe);
+        } else if room > used {
+            let text = display::truncate(&s.content, room - used);
+            out.push(Span::styled(text, s.style));
+        }
+        break;
+    }
+    if out.is_empty() && !words.is_empty() {
+        let text = display::truncate(&words, room);
+        return vec![Span::styled(text, th.base())];
+    }
+    out
+}
+
 fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let label_w = 12;
@@ -365,13 +427,12 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         bar.push(Span::styled(format!("{:<label_w$}", d.label), th.dim()));
         let room = (inner.width as usize).saturating_sub(label_w);
         let mut value = Bar::default();
-        for s in d.value {
+        for s in fit_value(d.value, room, &th) {
             match &click {
                 Some(t) => value.push_hit(s, t.clone()),
                 None => value.push(s),
             }
         }
-        value.clip(room);
         bar.append(value);
         bar.render(f, &mut app.hits, r);
     }

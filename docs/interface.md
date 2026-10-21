@@ -37,7 +37,7 @@ The names of the folders in the sidebar are the ones the system gives them (Ital
 
 ![The panels view on the Neon theme: boxes for the tree of folders, the disks, the folder, the preview and the details](screenshots/principale-pannelli.png)
 
-On a window of **140 columns by 36 rows** or more rada draws the screen as **rounded boxes**: NAV and SPAZIO on the left, the folder in the middle, ANTEPRIMA and DETTAGLI on the right, under three rows of bars and over a status bar and the key hints. The same screen on Gesso, the default light theme:
+On a window of **140 columns by 36 rows** or more rada draws the screen as **rounded boxes**: NAV and SPAZIO on the left, the folder in the middle, ANTEPRIMA and DETTAGLI on the right, under three rows of bars and over a status bar and the key hints. From **70 columns by 24 rows** to that size the screen has **two columns**: NAV on the left (24 to 28 columns wide, with SPAZIO under it from 36 rows) and the folder; the command that shows the details (`Alt+P`, `F6`, *Details pane* in View ▾) puts ANTEPRIMA and DETTAGLI in the place of NAV, and the same command puts NAV back. Below 70×24 the classic layout is drawn, with the advice to enlarge the window. The same screen on Gesso, the default light theme:
 
 ![The panels view on the light Gesso theme](screenshots/principale-pannelli-gesso.png)
 

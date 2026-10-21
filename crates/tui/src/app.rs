@@ -639,6 +639,10 @@ pub struct App {
     pub layout_pref: crate::panels::LayoutPref,
     /// The last frame was drawn as panels.
     pub panels_shown: bool,
+    /// ...with two columns (NAV or the preview, and the folder).
+    pub panels_two: bool,
+    /// In the two columns, the left one shows ANTEPRIMA in the place of NAV.
+    pub left_preview: bool,
     /// The folders of the NAV box of the panels view.
     pub tree: crate::panels::Tree,
     /// The row of the NAV box the keyboard is on, and which of the seven tag dots of its row.
@@ -841,6 +845,8 @@ impl App {
             details: cfg.details_pane,
             layout_pref: cfg.layout_pref,
             panels_shown: false,
+            panels_two: false,
+            left_preview: false,
             tree: Default::default(),
             nav_cursor: 0,
             nav_tag: 0,

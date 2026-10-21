@@ -3,9 +3,10 @@
 //! rows that box lists.
 //!
 //! The view is one screen of rounded boxes — NAV and SPAZIO on the left, the folder in the
-//! middle, ANTEPRIMA and DETTAGLI on the right — under three rows of bars. It needs room: below
-//! [`AUTO_FROM`] the classic layout is drawn, and it comes back by itself when the window is
-//! made larger.
+//! middle, ANTEPRIMA and DETTAGLI on the right — under three rows of bars. It needs room: from
+//! [`AUTO_FROM`] it has the three columns, from [`TWO_FROM`] two (NAV on the left and the folder,
+//! the preview taking the place of NAV when asked), and below that the classic layout is drawn;
+//! it all changes by itself when the window is made larger or smaller.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -95,16 +96,59 @@ impl NavMode {
     }
 }
 
-/// The smallest window (columns, rows) in which `auto` draws the panels.
+/// The smallest window (columns, rows) in which `auto` draws the three columns of the panels.
 pub const AUTO_FROM: (u16, u16) = (140, 36);
-/// The smallest window in which the panels can be drawn at all, when they are asked for.
-pub const PANELS_MIN: (u16, u16) = (100, 24);
+/// The smallest window in which `auto` draws the panels at all, as two columns (NAV or the
+/// preview, and the folder) while it is smaller than [`AUTO_FROM`].
+pub const TWO_FROM: (u16, u16) = (70, 24);
+/// The smallest window in which the three columns are drawn when the panels are asked for
+/// (`layout = "panels"`); below it, down to [`TWO_FROM`], they are two.
+pub const PANELS_THREE_MIN: (u16, u16) = (100, 24);
+/// Rows from which the two columns have SPAZIO under NAV.
+pub const TWO_SPACE_FROM_ROWS: u16 = 36;
+/// Width of the left column of the two-column view: a third of the window, between these.
+pub const TWO_LEFT_WIDTH: (u16, u16) = (24, 28);
 /// Below this many rows the blank rows between the bars at the top and at the bottom go, so
 /// that more files are seen.
 pub const AIRY_FROM: u16 = 42;
 
-/// Whether a window `width` × `height` is drawn as panels, given the person's choice, the
-/// arrangement of the classic layout and whether this is a file chooser (which never is).
+/// How many columns of boxes the panels view has.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Columns {
+    /// NAV, the folder, ANTEPRIMA.
+    Three,
+    /// NAV (or ANTEPRIMA in its place) and the folder.
+    Two,
+}
+
+/// The columns a window `width` × `height` is drawn with, given the person's choice, the
+/// arrangement of the classic layout and whether this is a file chooser (which never has
+/// panels); `None`: the classic layout.
+pub fn columns_for(
+    pref: LayoutPref,
+    layout: LayoutKind,
+    chooser: bool,
+    width: u16,
+    height: u16,
+) -> Option<Columns> {
+    if chooser || layout != LayoutKind::Explorer {
+        return None;
+    }
+    let three = match pref {
+        LayoutPref::Classic => return None,
+        LayoutPref::Panels => PANELS_THREE_MIN,
+        LayoutPref::Auto => AUTO_FROM,
+    };
+    if width >= three.0 && height >= three.1 {
+        Some(Columns::Three)
+    } else if width >= TWO_FROM.0 && height >= TWO_FROM.1 {
+        Some(Columns::Two)
+    } else {
+        None
+    }
+}
+
+/// Whether a window `width` × `height` is drawn as panels (see [`columns_for`]).
 pub fn use_panels(
     pref: LayoutPref,
     layout: LayoutKind,
@@ -112,15 +156,7 @@ pub fn use_panels(
     width: u16,
     height: u16,
 ) -> bool {
-    if chooser || layout != LayoutKind::Explorer {
-        return false;
-    }
-    let (need_w, need_h) = match pref {
-        LayoutPref::Classic => return false,
-        LayoutPref::Panels => PANELS_MIN,
-        LayoutPref::Auto => AUTO_FROM,
-    };
-    width >= need_w && height >= need_h
+    columns_for(pref, layout, chooser, width, height).is_some()
 }
 
 /// The tree of folders of the NAV box: Home at the top, the folders that are open below it, and
@@ -307,22 +343,35 @@ mod tests {
     }
 
     #[test]
-    fn auto_draws_panels_from_140_by_36_and_never_in_a_chooser() {
+    fn auto_draws_three_columns_from_140_by_36_two_from_70_by_24_and_never_in_a_chooser() {
         use LayoutKind::*;
+        let cols = |c: bool, w, h| columns_for(LayoutPref::Auto, Explorer, c, w, h);
+        assert_eq!(cols(false, 140, 36), Some(Columns::Three));
+        assert_eq!(cols(false, 200, 60), Some(Columns::Three));
+        assert_eq!(cols(false, 139, 36), Some(Columns::Two));
+        assert_eq!(cols(false, 140, 35), Some(Columns::Two));
+        assert_eq!(cols(false, 120, 40), Some(Columns::Two));
+        assert_eq!(cols(false, 70, 24), Some(Columns::Two));
+        assert_eq!(cols(false, 69, 40), None, "too narrow");
+        assert_eq!(cols(false, 100, 23), None, "too short");
+        assert_eq!(
+            cols(true, 200, 60),
+            None,
+            "a file chooser is always classic"
+        );
         let auto = |c: bool, w, h| use_panels(LayoutPref::Auto, Explorer, c, w, h);
-        assert!(auto(false, 140, 36));
-        assert!(auto(false, 200, 60));
-        assert!(!auto(false, 139, 36));
-        assert!(!auto(false, 140, 35));
-        assert!(!auto(false, 120, 40));
-        assert!(!auto(true, 200, 60), "a file chooser is always classic");
+        assert!(auto(false, 140, 36) && !auto(false, 69, 36));
         // The compact arrangement is a choice of no panels.
         assert!(!use_panels(LayoutPref::Auto, Compact, false, 200, 60));
         assert!(!use_panels(LayoutPref::Classic, Explorer, false, 200, 60));
-        // Asked for, they are drawn in a smaller window too, but not in a tiny one.
-        let asked = |w, h| use_panels(LayoutPref::Panels, Explorer, false, w, h);
-        assert!(asked(100, 24) && asked(120, 40));
-        assert!(!asked(99, 40) && !asked(120, 23));
+        // Asked for, the choice is between three columns and two, and never the classic layout
+        // while two fit.
+        let asked = |w, h| columns_for(LayoutPref::Panels, Explorer, false, w, h);
+        assert_eq!(asked(100, 24), Some(Columns::Three));
+        assert_eq!(asked(120, 40), Some(Columns::Three));
+        assert_eq!(asked(99, 40), Some(Columns::Two));
+        assert_eq!(asked(69, 40), None);
+        assert_eq!(asked(120, 23), None);
         assert!(!use_panels(LayoutPref::Panels, Explorer, true, 200, 60));
     }
 
