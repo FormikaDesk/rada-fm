@@ -38,7 +38,7 @@ The result will be shown by `rada doctor` when that command exists; until then i
 
 Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. `catppuccin` and `tokyo-night` leave the terminal's own background alone, so transparency and your wallpaper keep working there; they too use one tone for every zone.
 
-**Neon** (`theme = "neon"`) is a dark theme made for the [panels view](interface.md#the-panels-view): canvas `#0e1022`, the inside of the boxes `#13152b`, text `#d9ddf2`, dim text `#7b82a9`, a violet accent `#8b7cf6` and a violet selection `#7058f0` that white reads on, and bright cyan, pink, yellow, green, orange and blue. It meets the same contrast minimums as every other theme.
+**Neon** (`theme = "neon"`) is a dark theme made for the [panels view](interface.md#the-panels-view): canvas `#0e1022`, the inside of the boxes `#13152b`, text `#d9ddf2`, dim text `#7b82a9`, a violet accent `#8b7cf6` and a violet selection `#7058f0` that white reads on, and cyan `#5fe1e6`, pink `#f472b6`, yellow `#fbbf24`, green `#34d399`, orange `#fb923c` and blue `#60a5fa`, sampled from the [reference screens](design/rada-pannelli-code.png) of the panels view. It meets the same contrast minimums as every other theme.
 
 ![The panels view on Neon](screenshots/principale-pannelli.png)
 

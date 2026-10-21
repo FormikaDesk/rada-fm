@@ -614,6 +614,8 @@ impl Theme {
     /// accent and selection and six bright hues, made for the panels view. Chosen with
     /// `theme = "neon"`; it is a dark theme only.
     pub fn neon() -> Theme {
+        // The colours are those of the design's reference images (`docs/design/`), sampled from
+        // them: the night, the inside of a box, the violet of the selection, six hues.
         let accent = rgb(0x8b, 0x7c, 0xf6);
         let mut t = Theme::rada_base("neon", accent, rgb(0x1e, 0x21, 0x42), rgb(0x18, 0x1a, 0x33));
         t.canvas = rgb(0x0e, 0x10, 0x22);
@@ -624,7 +626,7 @@ impl Theme {
         t.inner = rgb(0x13, 0x15, 0x2b);
         t.text = rgb(0xd9, 0xdd, 0xf2);
         t.text_dim = rgb(0x7b, 0x82, 0xa9);
-        t.muted = rgb(0x4a, 0x50, 0x78);
+        t.muted = rgb(0x4b, 0x51, 0x80);
         t.on_accent = t.canvas;
         // The selection is a violet that white reads on, solid in the panels view and a shade
         // to a warmer violet in the classic one.
@@ -632,34 +634,34 @@ impl Theme {
         t.grad_row_start = t.cursor;
         t.grad_row_end = rgb(0x8a, 0x4f, 0xe0);
         t.cursor_text = rgb(255, 255, 255);
-        t.track = rgb(0x23, 0x26, 0x48);
+        t.track = rgb(0x26, 0x2a, 0x52);
         t.sel = rgb(0x18, 0x1a, 0x34);
         t.field = rgb(0x16, 0x18, 0x31);
         t.button = rgb(0x1c, 0x1f, 0x3d);
-        t.key_bg = rgb(0x27, 0x2a, 0x50);
+        t.key_bg = rgb(0x26, 0x2a, 0x52);
         t.key_text = t.text;
         t.popup_border = rgb(0x74, 0x7b, 0xa5);
         t.check = accent;
         t.disk = accent;
-        t.success = rgb(0x5f, 0xe3, 0xa1);
-        t.warn = rgb(0xff, 0xd8, 0x66);
-        t.error = rgb(0xff, 0x6b, 0x8a);
+        t.success = rgb(0x34, 0xd3, 0x99);
+        t.warn = rgb(0xfb, 0xbf, 0x24);
+        t.error = rgb(0xf8, 0x71, 0x71);
         t.hues = Hues {
-            cyan: rgb(0x4f, 0xe0, 0xf0),
-            pink: rgb(0xff, 0x6b, 0xd6),
+            cyan: rgb(0x5f, 0xe1, 0xe6),
+            pink: rgb(0xf4, 0x72, 0xb6),
             yellow: t.warn,
             green: t.success,
-            orange: rgb(0xff, 0xa0, 0x5a),
-            blue: rgb(0x6f, 0xa8, 0xff),
+            orange: rgb(0xfb, 0x92, 0x3c),
+            blue: rgb(0x60, 0xa5, 0xfa),
         };
         t.kinds = KindColors {
             code: t.hues.yellow,
-            markup: rgb(0xb6, 0x9c, 0xff),
+            markup: rgb(0xa7, 0x8b, 0xfa),
             text: rgb(0xaa, 0xb0, 0xd6),
             doc: rgb(0xff, 0x8a, 0x80),
             image: t.hues.pink,
             vector: t.hues.cyan,
-            audio: rgb(0xff, 0x8f, 0xe0),
+            audio: rgb(0xf4, 0x72, 0xb6),
             video: t.hues.orange,
             archive: rgb(0xff, 0xbe, 0x64),
             data: t.hues.green,
@@ -1846,6 +1848,15 @@ mod tests {
         assert_eq!(hex(t.accent), "#8b7cf6");
         assert_eq!(hex(t.text), "#d9ddf2");
         assert_eq!(hex(t.text_dim), "#7b82a9");
+        assert_eq!(hex(t.muted), "#4b5180");
+        assert_eq!(hex(t.track), "#262a52");
+        assert_eq!(hex(t.hues.cyan), "#5fe1e6");
+        assert_eq!(hex(t.hues.pink), "#f472b6");
+        assert_eq!(hex(t.hues.yellow), "#fbbf24");
+        assert_eq!(hex(t.hues.green), "#34d399");
+        assert_eq!(hex(t.hues.orange), "#fb923c");
+        assert_eq!(hex(t.hues.blue), "#60a5fa");
+        assert_eq!(hex(t.error), "#f87171");
         // The selection is solid in the panels view and the same colour starts the shade of
         // the classic one.
         assert_eq!(t.cursor, t.grad_row_start);
