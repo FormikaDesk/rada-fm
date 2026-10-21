@@ -1536,3 +1536,157 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     );
     assert!(in_view(&h), "the folder shown is in view");
 }
+
+/// A trash in the places of the demo, which has none.
+fn with_trash(h: &mut H) {
+    let t = h.app.home().join(".trash");
+    let kind = rada_core::platform::PlaceKind::Trash;
+    h.app.paths.places.retain(|p| p.kind != kind);
+    h.app
+        .paths
+        .places
+        .push(rada_core::places::Place { kind, path: t });
+    h.app.dirty = true;
+}
+
+/// What is listed under the title of the way, as paths.
+fn way_paths(h: &H) -> Vec<std::path::PathBuf> {
+    let rows = h.app.nav_rows();
+    match rows
+        .iter()
+        .position(|r| r.kind == rada_tui::panels::NavKind::Heading && r.name == "PATH")
+    {
+        Some(t) => rows[t + 1..]
+            .iter()
+            .filter(|r| r.kind != rada_tui::panels::NavKind::Trash)
+            .map(|r| r.path.clone())
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
+#[test]
+fn in_a_place_there_is_no_way_and_the_place_is_the_highlighted_row() {
+    let mut h = scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    for place in [
+        home.clone(),
+        home.join("Documents"),
+        h.app.volumes[0].mount_point.clone(),
+    ] {
+        go_and_wait(&mut h, &place);
+        h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+        h.settle();
+        let rows = h.app.nav_rows();
+        assert!(
+            rows.iter()
+                .all(|r| !(r.kind == rada_tui::panels::NavKind::Heading && r.name == "PATH")),
+            "no title of the way in {place:?}"
+        );
+        let at = App::nav_current(&rows, &place).expect("the place is highlighted");
+        assert!(matches!(
+            rows[at].kind,
+            rada_tui::panels::NavKind::Favorite(_)
+        ));
+        assert!(!nav_text(&mut h).contains("PATH"));
+    }
+}
+
+#[test]
+fn the_way_starts_at_the_nearest_place_that_holds_the_folder() {
+    let mut h = scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    let deep = home.join("Documents/x/y");
+    std::fs::create_dir_all(&deep).unwrap();
+    go_and_wait(&mut h, &deep);
+    h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+    h.settle();
+    let docs = home.join("Documents");
+    assert_eq!(
+        way_paths(&h),
+        vec![docs.clone(), docs.join("x"), deep.clone()],
+        "Documents, x, y"
+    );
+    // The first row is the place, with its icon.
+    let rows = h.app.nav_rows();
+    let t = rows.iter().position(|r| r.name == "PATH").unwrap();
+    assert!(matches!(
+        rows[t + 1].kind,
+        rada_tui::panels::NavKind::Favorite(_)
+    ));
+    // Under Home, and not in a place of its own, it starts at Home.
+    let abc = home.join("a/b/c");
+    std::fs::create_dir_all(&abc).unwrap();
+    go_and_wait(&mut h, &abc);
+    h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+    let way = way_paths(&h);
+    assert_eq!(way[0], home);
+    assert_eq!(&way[1..], [home.join("a"), home.join("a/b"), abc.clone()]);
+}
+
+#[test]
+fn the_trash_is_the_last_row_of_nav_in_every_view() {
+    let mut h = scene(160, 46, "rada", false);
+    with_trash(&mut h);
+    let home = h.app.home().to_path_buf();
+    let deep =
+        home.join("t1/t2/t3/t4/t5/t6/t7/t8/t9/t10/t11/t12/t13/t14/t15/t16/t17/t18/t19/t20/t21");
+    std::fs::create_dir_all(&deep).unwrap();
+    for (w, hh, dir) in [
+        (160, 46, home.clone()),
+        (160, 46, deep.clone()),
+        (160, 36, deep.clone()),
+        (160, 36, home.join("Documents")),
+    ] {
+        h.term.backend_mut().resize(w, hh);
+        go_and_wait(&mut h, &dir);
+        h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+        h.settle();
+        // The places are read again now and then: the demo's trash with them.
+        with_trash(&mut h);
+        let rows = h.app.nav_rows();
+        assert_eq!(
+            rows.last().map(|r| &r.kind),
+            Some(&rada_tui::panels::NavKind::Trash),
+            "{dir:?}"
+        );
+        let text = nav_text(&mut h);
+        let last = text.lines().last().unwrap();
+        assert!(last.contains("Trash"), "{dir:?}: {text}");
+    }
+    // A tag's list is a view too, with no way of folders.
+    let view = rada_core::tagsearch::view_path("Red");
+    h.app.open_dir(view.clone());
+    h.wait("the view", |a| a.cwd == view);
+    h.settle();
+    with_trash(&mut h);
+    let text = nav_text(&mut h);
+    assert!(text.lines().last().unwrap().contains("Trash"), "{text}");
+}
+
+#[test]
+fn the_folders_of_the_way_have_the_colour_of_the_folders_of_the_middle_box() {
+    let (mut h, _) = path_scene();
+    let buf = h.redrawn_buffer();
+    let nav = h.app.nav_area;
+    let mut in_nav = std::collections::BTreeSet::new();
+    let mut in_list = std::collections::BTreeSet::new();
+    for y in nav.top()..nav.bottom() {
+        for x in 0..buf.area.width {
+            let c = &buf[(x, y)];
+            if c.symbol() == "▸" {
+                if x < nav.right() {
+                    in_nav.insert(format!("{:?}", c.fg));
+                } else {
+                    in_list.insert(format!("{:?}", c.fg));
+                }
+            }
+        }
+    }
+    assert!(!in_nav.is_empty() && !in_list.is_empty());
+    // (The list also has the row under the cursor, in the colour of the highlight.)
+    assert!(
+        in_nav.is_subset(&in_list),
+        "{in_nav:?} in NAV, {in_list:?} in the list"
+    );
+}

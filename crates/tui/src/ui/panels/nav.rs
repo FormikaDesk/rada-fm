@@ -49,14 +49,14 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let items = crate::sidebar::items(app, false);
     let current = App::nav_current(&rows, &app.cwd);
     let cursor = app.side_focus.then_some(app.nav_cursor.min(rows.len() - 1));
-    let height = area.height as usize;
 
-    // The trash sits at the bottom of the box when there is room to spare above it.
+    // The trash is always the last row of the box: the rest scrolls above it.
     let mut body: Vec<usize> = (0..rows.len()).collect();
     let mut trash = None;
-    if rows.len() < height && rows.last().is_some_and(|r| r.kind == NavKind::Trash) {
+    if area.height >= 2 && rows.last().is_some_and(|r| r.kind == NavKind::Trash) {
         trash = body.pop();
     }
+    let height = area.height as usize - usize::from(trash.is_some());
     // Scroll to the row the keyboard is on, or else to the folder shown, when either moves (or
     // the tree grows): not on every frame, or the wheel could not take the box anywhere else.
     let max_skip = body.len().saturating_sub(height);
@@ -210,11 +210,12 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                     .iter()
                     .find(|p| p.path == row.path)
                     .map(|p| p.kind);
+                // The glyph and the colour of a folder in the list of the middle box.
+                let (glyph, folder) =
+                    icons::icon_for(&row.name, rada_core::fs::FileKind::Dir, app.icons, &th);
                 (
-                    icons::icon_for(&row.name, rada_core::fs::FileKind::Dir, app.icons, &th)
-                        .0
-                        .to_string(),
-                    kind.map_or(th.hues.yellow, |k| place_hue(&th, k)),
+                    glyph.to_string(),
+                    kind.map_or(folder, |k| place_hue(&th, k)),
                 )
             }
         };
