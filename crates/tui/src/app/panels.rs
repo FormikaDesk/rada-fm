@@ -318,6 +318,7 @@ impl App {
             c
         };
         let last = chain.len().saturating_sub(1);
+        let indent = |depth: usize| depth.min(crate::panels::NAV_INDENT_MAX);
         for (depth, dir) in chain.iter().enumerate() {
             if depth == 0
                 && let Some(n) = place
@@ -338,7 +339,7 @@ impl App {
                 .unwrap_or_else(|| rada_core::display::path(dir));
             rows.push(nav_row(
                 NavKind::Folder { open: None },
-                depth,
+                indent(depth),
                 self.shown_name(dir, on_disk),
                 dir.to_path_buf(),
                 (depth == last).then(|| self.listing.all().len()),
@@ -359,7 +360,7 @@ impl App {
         for k in &kids[..shown] {
             rows.push(nav_row(
                 NavKind::Folder { open: None },
-                chain.len(),
+                indent(chain.len()),
                 self.shown_name(&k.path, k.name.clone()),
                 k.path.clone(),
                 Some(k.items),
@@ -368,7 +369,7 @@ impl App {
         if shown < kids.len() && room > 0 {
             rows.push(nav_row(
                 NavKind::More,
-                chain.len(),
+                indent(chain.len()),
                 tf(Key::NavMore, &[&(kids.len() - shown)]),
                 PathBuf::new(),
                 None,

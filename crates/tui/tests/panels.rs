@@ -208,10 +208,6 @@ fn the_panels_at_the_smallest_window_that_gets_them() {
 #[test]
 #[cfg_attr(
     windows,
-    ignore = "the navigation pane of a system with no tags has no TAGS section, which the Linux snapshot has"
-)]
-#[cfg_attr(
-    windows,
     ignore = "the sidebar of a system with no tags has no TAGS section, which the Linux snapshot has"
 )]
 fn a_window_below_70_by_24_gets_the_classic_layout_and_the_advice_to_enlarge_it() {
@@ -1520,14 +1516,15 @@ fn nav_lists_only_the_ancestors_and_the_subfolders_of_the_folder_shown() {
         .iter()
         .map(|r| (r.path.clone(), r.depth))
         .collect();
+    // (Three levels of indent at most: the subfolders of c, the fourth, stay at the third.)
     let want: Vec<_> = [
         (home.clone(), 0),
         (home.join("a"), 1),
         (home.join("a/b"), 2),
         (c.clone(), 3),
-        (c.join("d"), 4),
-        (c.join("kid-1"), 4),
-        (c.join("kid-2"), 4),
+        (c.join("d"), 3),
+        (c.join("kid-1"), 3),
+        (c.join("kid-2"), 3),
     ]
     .into();
     assert_eq!(
@@ -1599,7 +1596,9 @@ fn what_does_not_fit_under_the_way_is_counted_in_a_row_of_more() {
     assert_eq!(more.kind, rada_tui::panels::NavKind::More);
     let shown = rows
         .iter()
-        .filter(|r| r.depth == 4 && r.kind != rada_tui::panels::NavKind::More)
+        .filter(|r| {
+            r.path.parent() == Some(c.as_path()) && r.kind != rada_tui::panels::NavKind::More
+        })
         .count();
     assert_eq!(more.name, format!("… {} more", 43 - shown));
     assert!(!more.selectable());
@@ -1874,4 +1873,27 @@ fn in_the_trash_folder_only_the_trash_is_the_current_place() {
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &trash).expect("a current row");
     assert_eq!(rows[at].kind, rada_tui::panels::NavKind::Trash);
+}
+
+#[test]
+fn a_deep_way_keeps_the_name_of_the_folder_shown_whole() {
+    let mut h = scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    let deep = home.join("uno/due/tre/quattro/cinque/sei/sette/cartella8");
+    std::fs::create_dir_all(&deep).unwrap();
+    go_and_wait(&mut h, &deep);
+    h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+    h.settle();
+    let rows = h.app.nav_rows();
+    let at = App::nav_current(&rows, &deep).unwrap();
+    assert_eq!(rows[at].name, "cartella8");
+    // Every row of the way is indented by three levels at most.
+    let t = rows.iter().position(|r| r.name == "PATH").unwrap();
+    let most = rows[t + 1..].iter().map(|r| r.depth).max().unwrap();
+    assert_eq!(most, rada_tui::panels::NAV_INDENT_MAX);
+    let text = nav_text(&mut h);
+    assert!(
+        text.contains("cartella8"),
+        "the name is there whole:\n{text}"
+    );
 }

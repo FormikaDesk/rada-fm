@@ -96,6 +96,9 @@ impl NavMode {
     }
 }
 
+/// How far the folders of the way in NAV are indented: deeper ones stay at this level, so that
+/// the names keep their room.
+pub const NAV_INDENT_MAX: usize = 3;
 /// The smallest window (columns, rows) in which `auto` draws the three columns of the panels.
 pub const AUTO_FROM: (u16, u16) = (140, 36);
 /// The smallest window in which `auto` draws the panels at all, as two columns (NAV or the
