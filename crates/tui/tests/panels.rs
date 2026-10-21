@@ -990,9 +990,15 @@ fn a_deep_folder_is_opened_highlighted_and_scrolled_into_view_in_a_long_tree() {
         let d = deep.clone();
         move |a| a.cwd == d && !a.is_loading()
     });
+    // Every folder on the way is listed, whatever the order the answers come in.
     h.wait("the way down", {
         let d = deep.clone();
-        move |a| a.tree.kids(d.parent().unwrap()).is_some()
+        move |a| {
+            d.ancestors()
+                .skip(1)
+                .take_while(|p| p.starts_with(a.home()))
+                .all(|p| a.tree.kids(p).is_some())
+        }
     });
     h.settle();
     let rows = h.app.nav_rows();
@@ -1196,14 +1202,9 @@ fn the_ring_is_made_again_only_when_the_percentage_changes() {
     );
     // Another percentage: another picture.
     let total = 512_000_000_000u64;
-    let ring_vol = h
-        .app
-        .volumes
-        .iter()
-        .position(|v| v.mount_point == std::path::Path::new("/"));
-    if let Some(i) = ring_vol {
-        h.app.volumes[i].available = Some(total / 10);
-    }
+    // The first volume of the demo is the main disk (its mount point is the root of the
+    // system, which is not `/` everywhere).
+    h.app.volumes[0].available = Some(total / 10);
     let _ = h.screen();
     assert_eq!(h.app.ring.as_ref().unwrap().made, 2);
 }
@@ -1221,4 +1222,55 @@ fn without_pictures_or_true_colours_the_main_disk_stays_a_bar() {
     let s = h.screen();
     assert!(h.app.ring.is_none());
     assert!(s.contains("■"), "a bar");
+}
+
+#[test]
+fn a_click_and_enter_on_scaricati_in_the_tree_show_its_files_in_the_middle_box() {
+    let mut h = scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    let dl = home.join("Scaricati");
+    std::fs::create_dir_all(&dl).unwrap();
+    std::fs::write(dl.join("fattura.pdf"), "x").unwrap();
+    go_and_wait(&mut h, &home);
+    h.wait("Scaricati in the tree", |a| {
+        a.tree
+            .kids(a.home())
+            .is_some_and(|k| k.iter().any(|k| k.name == "Scaricati"))
+    });
+    // A click on the name, found on the screen and not by what the hit map says.
+    let text = nav_text(&mut h);
+    let (dy, line) = text
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.contains("Scaricati"))
+        .expect("the row is in NAV");
+    let a = h.app.nav_area;
+    h.mouse(
+        ratatui::crossterm::event::MouseEventKind::Down(
+            ratatui::crossterm::event::MouseButton::Left,
+        ),
+        a.x + line.find("Scaricati").unwrap() as u16 + 2,
+        a.y + dy as u16,
+        ratatui::crossterm::event::KeyModifiers::NONE,
+    );
+    h.wait("Scaricati", {
+        let d = dl.clone();
+        move |a| a.cwd == d && !a.is_loading()
+    });
+    assert!(
+        h.screen().contains("fattura.pdf"),
+        "its files are in the middle box"
+    );
+    let rows = h.app.nav_rows();
+    assert_eq!(
+        App::nav_current(&rows, &dl).map(|i| &rows[i].path),
+        Some(&dl)
+    );
+    // The same with Enter, from NAV.
+    go_and_wait(&mut h, &home);
+    h.press("tab");
+    h.app.nav_cursor = h.app.nav_rows().iter().position(|r| r.path == dl).unwrap();
+    h.press("enter");
+    h.wait("Scaricati again", move |a| a.cwd == dl && !a.is_loading());
+    assert!(h.screen().contains("fattura.pdf"));
 }
