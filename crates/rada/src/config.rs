@@ -46,6 +46,8 @@
 //!                            # (only how many items each holds, no walk below) | off
 //! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"
 //! folder_size_entries = 200000   # ...or after this many files and folders
+//! syntax_highlight = true    # colour the preview of source files and the like (the first 64 KB;
+//!                            # a language that is not known stays plain)
 //! zoxide = true              # use zoxide, when it is installed: the command bar offers its
 //!                            # folders and every folder rada enters is added to it. false: rada
 //!                            # never calls it
@@ -117,6 +119,7 @@ pub struct FileConfig {
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
+    pub syntax_highlight: bool,
     pub zoxide: bool,
     pub zoxide_path: Option<String>,
     pub hide_devices: Option<Vec<String>>,
@@ -261,6 +264,7 @@ struct Raw {
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
+    syntax_highlight: Option<bool>,
     zoxide: Option<bool>,
     zoxide_path: Option<String>,
     devices: Option<DevicesRaw>,
@@ -342,6 +346,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         folder_sizes: raw.folder_sizes,
         folder_size_seconds: raw.folder_size_seconds,
         folder_size_entries: raw.folder_size_entries,
+        syntax_highlight: raw.syntax_highlight.unwrap_or(true),
         zoxide: raw.zoxide.unwrap_or(true),
         zoxide_path: raw.zoxide_path.filter(|p| !p.trim().is_empty()),
         hide_devices: raw.devices.and_then(|d| d.hide),
@@ -428,6 +433,8 @@ mod tests {
     fn zoxide_is_on_unless_the_file_says_otherwise() {
         let d = with_config("sidebar = true\n");
         assert!(d.zoxide && d.zoxide_path.is_none());
+        assert!(d.syntax_highlight);
+        assert!(!with_config("syntax_highlight = false\n").syntax_highlight);
         let c = with_config("zoxide = false\nzoxide_path = \"/opt/z/zoxide\"\n");
         assert!(!c.zoxide);
         assert_eq!(c.zoxide_path.as_deref(), Some("/opt/z/zoxide"));

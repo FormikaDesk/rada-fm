@@ -857,6 +857,21 @@ impl Theme {
         self.on(Style::default().fg(self.text_dim))
     }
 
+    /// The style of a part of a text file in its preview. No colours of its own: each kind
+    /// takes one the theme already has (all of them read against its background).
+    pub fn syntax(&self, kind: rada_core::preview::syntax::Kind) -> Style {
+        use rada_core::preview::syntax::Kind;
+        match kind {
+            Kind::Comment => self.fg(self.text_dim).add_modifier(Modifier::ITALIC),
+            Kind::String => self.fg(self.success),
+            Kind::Number => self.fg(self.warn),
+            Kind::Keyword => self.fg(self.kinds.markup),
+            Kind::Type => self.fg(self.kinds.data),
+            Kind::Function => self.fg(self.accent),
+            Kind::Attribute => self.fg(self.kinds.doc),
+        }
+    }
+
     pub fn faint(&self) -> Style {
         self.on(Style::default().fg(self.muted))
     }

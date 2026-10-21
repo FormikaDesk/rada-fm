@@ -688,6 +688,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             image: cfg_file.image_limits.clone(),
             archive_entries: cfg_file.archive_preview_entries,
             archive_seconds: cfg_file.archive_preview_seconds,
+            syntax_highlight: cfg_file.syntax_highlight,
             ..Default::default()
         },
     };

@@ -144,10 +144,15 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
             let gw = t.lines.len().max(1).to_string().len();
             app.preview.scroll = app.preview.scroll.min(t.lines.len().saturating_sub(1));
             for (i, l) in t.lines.iter().enumerate().skip(app.preview.scroll).take(h) {
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{:>gw$}  ", i + 1), th.faint()),
-                    Span::styled(display::truncate(l, w.saturating_sub(gw + 2)), th.base()),
-                ]));
+                let mut spans = vec![Span::styled(format!("{:>gw$}  ", i + 1), th.faint())];
+                let room = w.saturating_sub(gw + 2);
+                match t.syntax.as_ref().and_then(|s| s.get(i)) {
+                    Some(tokens) if !tokens.is_empty() => {
+                        spans.extend(highlighted(&th, &display::truncate(l, room), tokens));
+                    }
+                    _ => spans.push(Span::styled(display::truncate(l, room), th.base())),
+                }
+                lines.push(Line::from(spans));
             }
         }
         Some(Preview::Binary(b)) if app.preview.hex => {
@@ -676,4 +681,32 @@ fn message(f: &mut Frame, th: &Theme, area: Rect, head: &str, text: &str, color:
         lines.push(Line::from(Span::styled(l, th.fg(color))));
     }
     f.render_widget(Paragraph::new(lines), area);
+}
+
+/// A line of a text file as spans, each coloured part in the style of its kind. `shown` is the
+/// line as far as it fits (it may end in an ellipsis that no token covers).
+fn highlighted<'a>(
+    th: &Theme,
+    shown: &str,
+    tokens: &[rada_core::preview::syntax::Token],
+) -> Vec<Span<'a>> {
+    let mut spans = Vec::new();
+    let chars: Vec<char> = shown.chars().collect();
+    let mut at = 0;
+    let text = |from: usize, to: usize| chars[from..to].iter().collect::<String>();
+    for t in tokens {
+        let (start, end) = (t.start.min(chars.len()), t.end.min(chars.len()));
+        if start < at || start >= end {
+            continue;
+        }
+        if start > at {
+            spans.push(Span::styled(text(at, start), th.base()));
+        }
+        spans.push(Span::styled(text(start, end), th.syntax(t.kind)));
+        at = end;
+    }
+    if at < chars.len() {
+        spans.push(Span::styled(text(at, chars.len()), th.base()));
+    }
+    spans
 }

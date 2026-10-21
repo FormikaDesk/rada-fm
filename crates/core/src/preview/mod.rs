@@ -6,6 +6,7 @@ pub mod archive;
 pub mod card;
 pub mod image;
 pub mod pdf;
+pub mod syntax;
 pub mod system;
 
 use std::fs::File;
@@ -35,6 +36,8 @@ pub struct Limits {
     pub archive_entries: usize,
     /// How long counting an archive's members may take before the preview gives a lower bound.
     pub archive_seconds: f32,
+    /// Find the parts of a text file's lines that are comments, strings, keywords…
+    pub syntax_highlight: bool,
     pub image: ImageLimits,
 }
 
@@ -49,6 +52,7 @@ impl Default for Limits {
             show_hidden: false,
             archive_entries: 200,
             archive_seconds: 1.5,
+            syntax_highlight: true,
             image: ImageLimits::default(),
         }
     }
@@ -81,6 +85,9 @@ pub struct TextPreview {
     /// How many lines were cut at the width limit.
     pub long_lines: usize,
     pub size: u64,
+    /// For each line, its coloured parts, when the language is known and the option is on
+    /// (`None` leaves the text plain). Lines past the first 64 KB have none.
+    pub syntax: Option<Vec<Vec<syntax::Token>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -267,14 +274,17 @@ fn file_preview(path: &Path, meta: &FsMeta, limits: &Limits, cancel: &dyn Fn() -
         return archive::summarize(path, size, limits, cancel);
     }
     let (modified, accessed, created, mode) = (meta.mtime, meta.atime, meta.btime, meta.mode);
-    bytes_preview(&buf, size, limits, move |kind, exec| FileCard {
-        kind,
-        size,
-        modified,
-        accessed,
-        created,
-        mode,
-        exec,
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+    bytes_preview(&buf, size, limits, name.as_deref(), move |kind, exec| {
+        FileCard {
+            kind,
+            size,
+            modified,
+            accessed,
+            created,
+            mode,
+            exec,
+        }
     })
 }
 
@@ -283,11 +293,14 @@ fn bytes_preview(
     buf: &[u8],
     size: u64,
     limits: &Limits,
+    name: Option<&str>,
     card: impl FnOnce(&'static str, Option<ExecInfo>) -> FileCard,
 ) -> Preview {
     let truncated = (buf.len() as u64) < size || size > limits.max_bytes as u64;
     match decode(buf, truncated) {
-        Some((text, encoding)) => Preview::Text(to_lines(&text, encoding, truncated, size, limits)),
+        Some((text, encoding)) => {
+            Preview::Text(to_lines(&text, encoding, truncated, size, limits, name))
+        }
         None => Preview::Binary(BinaryPreview {
             size,
             kind: sniff(buf),
@@ -303,7 +316,12 @@ fn to_lines(
     truncated: bool,
     size: u64,
     limits: &Limits,
+    name: Option<&str>,
 ) -> TextPreview {
+    let mut highlighter = name
+        .filter(|_| limits.syntax_highlight)
+        .and_then(|n| syntax::Highlighter::new(n, text.lines().next().unwrap_or("")));
+    let mut tokens = Vec::new();
     let mut lines = Vec::new();
     let mut long_lines = 0;
     let mut cut = truncated;
@@ -321,6 +339,10 @@ fn to_lines(
         } else {
             display::line(&head, 4)
         };
+        if let Some(h) = &mut highlighter {
+            // The head only: what the line was cut to.
+            tokens.push(h.line(raw_head(raw, limits.max_line_chars)));
+        }
         lines.push(shown);
     }
     // A trailing newline produces one empty last element.
@@ -333,6 +355,18 @@ fn to_lines(
         truncated: cut,
         long_lines,
         size,
+        syntax: highlighter
+            .map(|_| tokens)
+            .filter(|t| t.iter().any(|l| !l.is_empty())),
+    }
+}
+
+/// The first `max` characters of a line, as far as the line goes.
+fn raw_head(raw: &str, max: usize) -> &str {
+    let raw = raw.trim_end_matches('\r');
+    match raw.char_indices().nth(max) {
+        Some((i, _)) => &raw[..i],
+        None => raw,
     }
 }
 

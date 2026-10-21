@@ -249,14 +249,20 @@ pub fn member(loc: &Location, limits: &Limits, cancel: &dyn Fn() -> bool) -> Pre
             }
             let card_time = e.mtime;
             let mode = e.mode;
-            super::bytes_preview(&head, e.size, limits, move |kind, exec| FileCard {
-                kind,
-                size: e.size,
-                modified: card_time,
-                accessed: None,
-                created: None,
-                mode,
-                exec,
+            let name = loc
+                .inner
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned());
+            super::bytes_preview(&head, e.size, limits, name.as_deref(), move |kind, exec| {
+                FileCard {
+                    kind,
+                    size: e.size,
+                    modified: card_time,
+                    accessed: None,
+                    created: None,
+                    mode,
+                    exec,
+                }
             })
         }
     }

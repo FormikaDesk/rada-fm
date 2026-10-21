@@ -16,7 +16,9 @@ targets = [
 yanked = "deny"
 unmaintained = "all"
 unsound = "all"
-ignore = []
+ignore = [
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1.3.3 is declared complete by its authors, not vulnerable; syntect uses it only to read its own bundled syntax definitions, never data from a file or the network" },
+]
 
 [licenses]
 # Permissive licences only. Anything else (a copyleft one, or none) fails until it is looked at.
