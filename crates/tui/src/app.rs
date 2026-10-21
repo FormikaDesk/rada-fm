@@ -647,6 +647,8 @@ pub struct App {
     /// are): the box scrolls to the folder only when one of those changes, so that the wheel
     /// can move it away.
     pub nav_scroll: usize,
+    /// The ring of the SPAZIO box, as it was last made.
+    pub ring: Option<crate::ring::Cache>,
     pub nav_area: ratatui::layout::Rect,
     pub nav_seen: Option<(PathBuf, Option<usize>, usize)>,
     /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
@@ -839,6 +841,7 @@ impl App {
             nav_cursor: 0,
             nav_tag: 0,
             nav_scroll: 0,
+            ring: None,
             nav_area: Default::default(),
             nav_seen: None,
             preview_focus: false,

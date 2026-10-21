@@ -718,6 +718,7 @@ strings! {
     HiddenShown => "hidden files shown", "file nascosti visibili";
     FreeSpace => "{0} free", "{0} liberi";
     SpaceUsedOf => "{0} of {1}", "{0} di {1}";
+    SpaceUsedWord => "used", "usato";
     // ---- the boxes of the panels view (the names on their top edge)
     PanelNav => "NAV", "NAV";
     PanelSpace => "SPACE", "SPAZIO";

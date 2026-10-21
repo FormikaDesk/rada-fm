@@ -128,7 +128,8 @@ impl ImageUi {
         ))
     }
 
-    fn sized(proto: ProtocolType, cell: (u16, u16)) -> ImageUi {
+    /// A protocol with a cell of a given size in pixels, as a terminal that told it would give.
+    pub fn sized(proto: ProtocolType, cell: (u16, u16)) -> ImageUi {
         #[allow(deprecated)]
         let mut picker = Picker::from_fontsize(FontSize::new(cell.0, cell.1));
         picker.set_protocol_type(proto);
@@ -219,6 +220,27 @@ impl ImageUi {
     /// popup is drawn.
     pub fn is_graphics(&self) -> bool {
         self.picker.protocol_type() != ProtocolType::Halfblocks
+    }
+
+    /// The size of a cell in pixels.
+    pub fn cell_px(&self) -> (u16, u16) {
+        let f = self.picker.font_size();
+        (f.width, f.height)
+    }
+
+    /// A picture that is drawn as it is, in `size` cells (the picture is made for that size).
+    /// `None` where the terminal draws no pictures of its own.
+    pub fn protocol(
+        &self,
+        img: DynamicImage,
+        size: ratatui::layout::Size,
+    ) -> Option<ratatui_image::protocol::Protocol> {
+        if !self.is_graphics() {
+            return None;
+        }
+        self.picker
+            .new_protocol(img, size, ratatui_image::Resize::Fit(None))
+            .ok()
     }
 
     pub fn clear(&mut self) {

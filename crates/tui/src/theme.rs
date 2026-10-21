@@ -248,6 +248,14 @@ impl Family {
 }
 
 impl Theme {
+    /// The channels of a true colour; `None` for an indexed or a named one.
+    pub fn channels(c: Color) -> Option<[u8; 3]> {
+        match c {
+            Color::Rgb(r, g, b) => Some([r, g, b]),
+            _ => None,
+        }
+    }
+
     /// Every built-in theme: three for dark terminals, then their light counterparts.
     pub const NAMES: [&'static str; 9] = [
         "rada",

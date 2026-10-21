@@ -19,6 +19,7 @@ pub mod nav;
 pub mod palette;
 pub mod panels;
 pub mod progicons;
+pub mod ring;
 pub mod run;
 pub mod services;
 pub mod sidebar;

@@ -119,11 +119,16 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
         Some(others) => {
             // As much of SPAZIO as leaves NAV its rows: the full box, then without the used
             // and free lines of the main disk.
-            let want = |compact| space::rows_needed(others, compact) + 2;
-            let h = [want(false), want(true)]
+            let ring = space::ring_colors(app).is_some();
+            let want = |compact, ring| space::rows_needed(others, compact, ring) + 2;
+            let mut sizes = vec![want(false, false), want(true, false)];
+            if ring {
+                sizes.insert(0, want(false, true));
+            }
+            let h = sizes
                 .into_iter()
                 .find(|h| area.height.saturating_sub(*h) >= NAV_MIN_ROWS)
-                .unwrap_or(want(true).min(area.height / 2));
+                .unwrap_or(want(true, false).min(area.height / 2));
             let [top, bottom] =
                 Layout::vertical([Constraint::Min(3), Constraint::Length(h)]).areas(area);
             (top, Some(bottom))
