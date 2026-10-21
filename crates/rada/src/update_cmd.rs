@@ -67,7 +67,7 @@ pub fn run(ctx: Ctx, check_only: bool, rollback: bool, yes: bool) -> Result<()> 
         Check::Failed(e) => bail!("{e}"),
         Check::Newer(n) => n,
     };
-    let how = ctx.mode();
+    let how = ctx.mode_for(Some(&notice.version));
     println!(
         "{}",
         tf(

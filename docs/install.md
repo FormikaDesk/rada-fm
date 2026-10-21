@@ -28,7 +28,7 @@ This builds rada from crates.io (it needs a Rust toolchain of version 1.90 or ne
 cargo install rada --locked --version 0.6.0-rc.12
 ```
 
-`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself, so the version has to be named; with 0.6.0 `cargo install rada --locked` will be enough. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it. This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
+`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself, so the version has to be named; with 0.6.0 `cargo install rada --locked` will be enough. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it (while the newer version is a pre-release, the command it gives names it: `cargo install rada --locked --version 0.6.0-rc.13`). This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
 
 ## From source
 

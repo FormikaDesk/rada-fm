@@ -188,11 +188,18 @@ impl Ctx {
 
     /// How this copy is updated.
     pub fn mode(&self) -> Result<Mode, String> {
+        self.mode_for(None)
+    }
+
+    /// How this copy is updated to `newer`, a version found: a copy installed with cargo is
+    /// told to name it in the command while it is a pre-release.
+    pub fn mode_for(&self, newer: Option<&str>) -> Result<Mode, String> {
         mode::detect(
             self.settings.method,
             &self.exe,
             self.settings.source_dir.as_deref(),
             self.os_id.as_deref(),
+            newer,
         )
     }
 
@@ -396,7 +403,7 @@ pub fn apply(
         "rada {} -> {} ({})",
         ctx.current, release.version, release.tag
     ));
-    let result = match ctx.mode()? {
+    let result = match ctx.mode_for(Some(&release.version.to_string()))? {
         Mode::Package { hint } => Err(hint),
         Mode::Source { dir } => source::run(ctx, &dir, &mut log, report),
         Mode::Binary => apply_binary(ctx, release, &mut log, report),
@@ -661,10 +668,8 @@ fn worker(ctx: std::sync::Arc<Ctx>, rx: Receiver<Req>, out: Sender<CoreEvent>) {
         match req {
             Req::Check { force } => match check(&ctx, force, now_secs()) {
                 Check::Newer(notice) => {
-                    send(UpdateEvent::Available {
-                        notice,
-                        how: ctx.mode(),
-                    });
+                    let how = ctx.mode_for(Some(&notice.version));
+                    send(UpdateEvent::Available { notice, how });
                 }
                 Check::UpToDate if force => {
                     send(UpdateEvent::UpToDate);

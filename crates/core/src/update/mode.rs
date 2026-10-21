@@ -37,9 +37,19 @@ fn installed_by_cargo(exe: &Path) -> bool {
         .any(|l| l.starts_with("\"rada ") && l.contains(" (registry+"))
 }
 
+/// The command that updates a program installed with cargo. Cargo does not pick a pre-release
+/// by itself, so while the newer version is one (it has a `-`) the command names it; a stable
+/// version, or none known, needs no `--version`.
+fn cargo_command(newer: Option<&str>) -> String {
+    match newer {
+        Some(v) if v.contains('-') => format!("cargo install rada --locked --version {v}"),
+        _ => "cargo install rada --locked".to_string(),
+    }
+}
+
 /// Folders that belong to a package manager or to the system. A program there is not ours to
-/// replace.
-fn package_hint(exe: &Path, os_id: Option<&str>) -> Option<String> {
+/// replace. `newer` is the version the update is about, when one is known.
+fn package_hint(exe: &Path, os_id: Option<&str>, newer: Option<&str>) -> Option<String> {
     let p = exe.to_string_lossy().replace('\\', "/");
     let p = p.as_str();
     let has = |s: &str| p.contains(s);
@@ -62,7 +72,7 @@ fn package_hint(exe: &Path, os_id: Option<&str>) -> Option<String> {
         return Some(Key::UpHintSnap.tr().to_string());
     }
     if installed_by_cargo(exe) {
-        return Some(Key::UpHintCargo.tr().to_string());
+        return Some(tf(Key::UpHintCargo, &[&cargo_command(newer)]));
     }
     let system = p.starts_with("/usr/bin/")
         || p.starts_with("/bin/")
@@ -111,12 +121,14 @@ pub fn os_release_id(text: &str) -> Option<String> {
 }
 
 /// Settle the mode. `exe` is where the running program is (already followed through links);
-/// `source_dir` is the folder the user named.
+/// `source_dir` is the folder the user named; `newer` is the version being updated to, when
+/// one is known (a copy installed with cargo is told to name it while it is a pre-release).
 pub fn detect(
     method: Method,
     exe: &Path,
     source_dir: Option<&Path>,
     os_id: Option<&str>,
+    newer: Option<&str>,
 ) -> Result<Mode, String> {
     let source =
         || -> Result<Mode, String> {
@@ -133,10 +145,11 @@ pub fn detect(
         Method::Binary => Ok(Mode::Binary),
         Method::Source => source(),
         Method::Package => Ok(Mode::Package {
-            hint: package_hint(exe, os_id).unwrap_or_else(|| Key::UpHintDefault.tr().to_string()),
+            hint: package_hint(exe, os_id, newer)
+                .unwrap_or_else(|| Key::UpHintDefault.tr().to_string()),
         }),
         Method::Auto => {
-            if let Some(hint) = package_hint(exe, os_id) {
+            if let Some(hint) = package_hint(exe, os_id, newer) {
                 return Ok(Mode::Package { hint });
             }
             if source_dir.is_some() || checkout_of(exe).is_some() {
@@ -152,7 +165,7 @@ mod tests {
     use super::*;
 
     fn auto(exe: &str, os: Option<&str>) -> Mode {
-        detect(Method::Auto, Path::new(exe), None, os).unwrap()
+        detect(Method::Auto, Path::new(exe), None, os, None).unwrap()
     }
 
     #[test]
@@ -205,9 +218,35 @@ mod tests {
             other => panic!("{other:?}"),
         }
         // Chosen by hand as a package, it says the same.
-        match detect(Method::Package, &exe, None, None).unwrap() {
+        match detect(Method::Package, &exe, None, None, None).unwrap() {
             Mode::Package { hint } => assert!(hint.contains("cargo install"), "{hint}"),
             other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn cargo_is_told_the_version_only_while_it_is_a_pre_release() {
+        let (_d, exe) = cargo_home(
+            "\"rada 0.6.0-rc.12 (registry+https://github.com/rust-lang/crates.io-index)\" = [\"rada\"]\n",
+        );
+        let hint =
+            |newer: Option<&str>| match detect(Method::Auto, &exe, None, None, newer).unwrap() {
+                Mode::Package { hint } => hint,
+                other => panic!("{other:?}"),
+            };
+        // A pre-release: the command names it, in both languages.
+        for lang in [crate::i18n::Lang::En, crate::i18n::Lang::It] {
+            let h = crate::i18n::with_lang(lang, || hint(Some("0.6.0-rc.13")));
+            assert!(
+                h.contains("`cargo install rada --locked --version 0.6.0-rc.13`"),
+                "{h}"
+            );
+        }
+        // A stable version, or none known: the plain command.
+        for newer in [Some("0.6.0"), Some("1.2.3"), None] {
+            let h = hint(newer);
+            assert!(h.contains("`cargo install rada --locked`"), "{h}");
+            assert!(!h.contains("--version"), "{h}");
         }
     }
 
@@ -275,7 +314,7 @@ mod tests {
         let exe = root.join("target/release/rada");
         assert_eq!(checkout_of(&exe), Some(root.clone()));
         assert_eq!(
-            detect(Method::Auto, &exe, None, None).unwrap(),
+            detect(Method::Auto, &exe, None, None, None).unwrap(),
             Mode::Source { dir: root.clone() }
         );
         // The folder the user names wins, wherever the program is.
@@ -285,6 +324,7 @@ mod tests {
                 Method::Auto,
                 Path::new("/home/u/bin/rada"),
                 Some(&other),
+                None,
                 None
             )
             .unwrap(),
@@ -296,14 +336,21 @@ mod tests {
     fn a_method_chosen_by_hand_is_followed() {
         let exe = Path::new("/usr/bin/rada");
         assert_eq!(
-            detect(Method::Binary, exe, None, None).unwrap(),
+            detect(Method::Binary, exe, None, None, None).unwrap(),
             Mode::Binary
         );
         assert!(matches!(
-            detect(Method::Package, Path::new("/home/u/rada"), None, None).unwrap(),
+            detect(Method::Package, Path::new("/home/u/rada"), None, None, None).unwrap(),
             Mode::Package { .. }
         ));
-        let e = detect(Method::Source, Path::new("/home/u/bin/rada"), None, None).unwrap_err();
+        let e = detect(
+            Method::Source,
+            Path::new("/home/u/bin/rada"),
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
         assert!(e.contains("source_dir"), "{e}");
     }
 
