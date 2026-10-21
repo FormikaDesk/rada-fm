@@ -768,3 +768,107 @@ fn the_git_labels_are_pills_and_every_colour_of_them_is_the_themes() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------- the choice of layout
+
+/// Open the View menu and walk to the entry whose label contains `label`, then choose it.
+fn choose_in_view_menu(h: &mut H, label: &str) {
+    use rada_tui::app::{MenuKind, Modal};
+    h.app.open_menu(MenuKind::View, (60, 4));
+    let selected = |h: &H| match &h.app.modal {
+        Some(Modal::Menu(m)) => m
+            .items
+            .get(m.selected)
+            .map(|i| i.label.clone())
+            .unwrap_or_default(),
+        _ => String::new(),
+    };
+    for _ in 0..30 {
+        if selected(h).contains(label) {
+            break;
+        }
+        h.press("down");
+    }
+    assert!(selected(h).contains(label), "{label}: {}", h.screen());
+    h.press("enter");
+}
+
+#[test]
+fn the_view_menu_chooses_the_layout_and_the_window_follows() {
+    use rada_tui::app::{MenuKind, Modal};
+    let mut h = scene(120, 40, "rada", false);
+    assert!(!h.app.panels_shown, "auto at 120x40 is classic");
+    // The three layouts are in the menu, the one in use ticked.
+    h.app.open_menu(MenuKind::View, (60, 4));
+    let Some(Modal::Menu(m)) = &h.app.modal else {
+        panic!("a menu");
+    };
+    let ticked: Vec<&str> = m
+        .items
+        .iter()
+        .filter(|i| i.label.starts_with("Layout") && i.checked == Some(true))
+        .map(|i| i.label.as_str())
+        .collect();
+    assert_eq!(ticked, ["Layout: automatic"]);
+    let s = h.screen();
+    for l in ["Layout: automatic", "Layout: panels", "Layout: classic"] {
+        assert!(s.contains(l), "{l}:\n{s}");
+    }
+    h.press("esc");
+
+    // Panels asked for: drawn in a window that auto would give the classic layout.
+    choose_in_view_menu(&mut h, "panels");
+    assert_eq!(h.app.layout_pref, LayoutPref::Panels);
+    let _ = h.screen();
+    assert!(h.app.panels_shown, "panels at 120x40 when asked for");
+    // Not in a window with no room for them.
+    h.term.backend_mut().resize(90, 40);
+    let _ = h.screen();
+    assert!(!h.app.panels_shown);
+    h.term.backend_mut().resize(160, 46);
+    // Classic asked for: never panels.
+    choose_in_view_menu(&mut h, "classic");
+    let _ = h.screen();
+    assert!(!h.app.panels_shown, "classic at 160x46 when asked for");
+    // Automatic again: the size decides, by itself, as the window is made larger and smaller.
+    choose_in_view_menu(&mut h, "automatic");
+    for (w, hh, panels) in [
+        (160, 46, true),
+        (139, 46, false),
+        (140, 36, true),
+        (140, 35, false),
+        (200, 60, true),
+    ] {
+        h.term.backend_mut().resize(w, hh);
+        let _ = h.screen();
+        assert_eq!(h.app.panels_shown, panels, "{w}x{hh}");
+    }
+}
+
+#[test]
+fn a_file_chooser_always_draws_the_classic_layout() {
+    for pref in [LayoutPref::Auto, LayoutPref::Panels] {
+        let sb = rada_core::testutil::Sandbox::new();
+        sb.write("w/a.txt", "a");
+        let dir = sb.path("w");
+        let mut h = H::with_config(sb, dir, 200, 60, move |c| {
+            c.chooser = Some(rada_tui::chooser::Chooser::file(false));
+            c.layout_pref = pref;
+        });
+        let s = h.screen();
+        assert!(!h.app.panels_shown, "{pref:?}: a chooser is classic");
+        assert!(!s.contains("[ NAV ]") && s.contains("a.txt"), "{s}");
+    }
+}
+
+#[test]
+fn the_compact_arrangement_never_has_panels() {
+    let sb = rada_core::testutil::Sandbox::new();
+    let dir = sb.mkdir("w");
+    let mut h = H::with_config(sb, dir, 200, 60, |c| {
+        c.layout = rada_tui::LayoutKind::Compact;
+        c.layout_pref = LayoutPref::Panels;
+    });
+    let _ = h.screen();
+    assert!(!h.app.panels_shown);
+}

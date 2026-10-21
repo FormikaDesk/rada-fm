@@ -36,6 +36,8 @@ pub enum MenuCmd {
     /// `true`: descending.
     SortOrder(bool),
     View(ViewMode),
+    /// Panels, the classic layout, or whichever fits the window.
+    Layout(crate::panels::LayoutPref),
     /// Ask the network for a newer version, now.
     CheckUpdates,
     /// The version, channel and way of updating.

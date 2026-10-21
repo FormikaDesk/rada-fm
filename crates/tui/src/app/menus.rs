@@ -3,6 +3,7 @@
 use rada_core::i18n::Key;
 
 use super::*;
+use crate::panels::LayoutPref;
 
 /// Which dropdown a button of the command bar opens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,6 +89,24 @@ impl App {
                 ),
                 MenuItem::toggle(ToggleSidebar, Key::MenuNavPane.tr(), self.side_on, false),
                 MenuItem::toggle(ToggleTags, Key::MenuTagColumn.tr(), self.show_tags, false),
+                MenuItem::choice(
+                    MenuCmd::Layout(LayoutPref::Auto),
+                    Key::MenuLayoutAuto.tr(),
+                    self.layout_pref == LayoutPref::Auto,
+                    true,
+                ),
+                MenuItem::choice(
+                    MenuCmd::Layout(LayoutPref::Panels),
+                    Key::MenuLayoutPanels.tr(),
+                    self.layout_pref == LayoutPref::Panels,
+                    false,
+                ),
+                MenuItem::choice(
+                    MenuCmd::Layout(LayoutPref::Classic),
+                    Key::MenuLayoutClassic.tr(),
+                    self.layout_pref == LayoutPref::Classic,
+                    false,
+                ),
             ],
             MenuKind::Tags => self.tag_menu_items(),
             MenuKind::Help => vec![
@@ -271,6 +290,7 @@ impl App {
                 }
             }
             MenuCmd::View(mode) => self.set_view(mode),
+            MenuCmd::Layout(pref) => self.set_layout_pref(pref),
             MenuCmd::Eject(mount) => self.start_eject(&mount),
             MenuCmd::Mount(id) => self.start_mount(&id),
             MenuCmd::Tag(cmd) => self.run_tag_cmd(cmd),

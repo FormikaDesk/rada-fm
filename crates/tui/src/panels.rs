@@ -60,6 +60,18 @@ pub fn resolve_layout(word: &str) -> Option<(LayoutKind, LayoutPref)> {
     LayoutPref::parse(word).map(|pref| (LayoutKind::Explorer, pref))
 }
 
+/// The layout to start with: what was chosen in the View menu (`saved`, from the remembered
+/// state) in place of the configuration's, as for the panes; a remembered word that is not a
+/// layout is ignored. `None` when the configuration itself names no layout.
+pub fn start_layout(config: Option<&str>, saved: Option<&str>) -> Option<(LayoutKind, LayoutPref)> {
+    let (layout, pref) = match config {
+        None => (LayoutKind::Explorer, LayoutPref::Auto),
+        Some(word) => resolve_layout(word)?,
+    };
+    let pref = saved.and_then(LayoutPref::parse).unwrap_or(pref);
+    Some((layout, pref))
+}
+
 /// The smallest window (columns, rows) in which `auto` draws the panels.
 pub const AUTO_FROM: (u16, u16) = (140, 36);
 /// The smallest window in which the panels can be drawn at all, when they are asked for.
@@ -243,6 +255,30 @@ mod tests {
             Some((Explorer, LayoutPref::Classic))
         );
         assert_eq!(resolve_layout("wide"), None);
+    }
+
+    #[test]
+    fn the_menu_choice_is_used_in_place_of_the_configuration() {
+        use LayoutKind::*;
+        // Nothing written, nothing chosen: auto.
+        assert_eq!(start_layout(None, None), Some((Explorer, LayoutPref::Auto)));
+        // The file says classic; the menu was used to choose panels.
+        assert_eq!(
+            start_layout(Some("classic"), Some("panels")),
+            Some((Explorer, LayoutPref::Panels))
+        );
+        // A remembered word that means nothing leaves the file's choice.
+        assert_eq!(
+            start_layout(Some("panels"), Some("sideways")),
+            Some((Explorer, LayoutPref::Panels))
+        );
+        // The compact arrangement stays, whatever the menu said.
+        assert_eq!(
+            start_layout(Some("compact"), Some("auto")),
+            Some((Compact, LayoutPref::Auto))
+        );
+        // A configuration that names no layout is the only thing that is refused.
+        assert_eq!(start_layout(Some("wide"), Some("auto")), None);
     }
 
     #[test]

@@ -30,6 +30,22 @@ impl App {
         )
     }
 
+    /// Choose the layout (the View menu): it is remembered, and the window decides what is drawn
+    /// when the choice is `auto`.
+    pub fn set_layout_pref(&mut self, pref: crate::panels::LayoutPref) {
+        if self.layout_pref == pref {
+            return;
+        }
+        self.layout_pref = pref;
+        if pref == crate::panels::LayoutPref::Classic {
+            self.side_focus = false;
+            self.preview_focus = false;
+        }
+        self.saved_ui.layout = Some(pref.id().to_string());
+        self.save_ui_state();
+        self.dirty = true;
+    }
+
     /// The folder the NAV tree starts at.
     pub fn tree_root(&self) -> &Path {
         self.home()

@@ -624,6 +624,9 @@ strings! {
     MenuHiddenFiles => "Hidden files", "File nascosti";
     MenuNavPane => "Navigation pane", "Barra laterale";
     MenuTagColumn => "Tags column", "Colonna dei tag";
+    MenuLayoutAuto => "Layout: automatic", "Disposizione: automatica";
+    MenuLayoutPanels => "Layout: panels", "Disposizione: pannelli";
+    MenuLayoutClassic => "Layout: classic", "Disposizione: classica";
     MenuCheckUpdates => "Check for updates", "Cerca aggiornamenti";
     MenuAbout => "About rada", "Informazioni su rada";
     MenuNew => "New", "Nuovo";

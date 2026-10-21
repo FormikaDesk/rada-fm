@@ -617,12 +617,6 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             }
         }
     };
-    let (layout, layout_pref) = match cfg_file.layout.as_deref() {
-        None => (rada_tui::LayoutKind::Explorer, rada_tui::LayoutPref::Auto),
-        Some(n) => {
-            rada_tui::panels::resolve_layout(n).with_context(|| tf(Key::MBadLayout, &[&n]))?
-        }
-    };
     let view = match cfg_file.view.as_deref() {
         None => rada_tui::ViewMode::Details,
         Some(n) => rada_tui::ViewMode::parse(n).with_context(|| tf(Key::MBadView, &[&n]))?,
@@ -653,6 +647,16 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             .and_then(|p| saved_ui.tabs.iter().position(|t| t.path == p))
             .unwrap_or(0);
     }
+    // What was chosen in the View menu is used in place of the configuration's layout, as for
+    // the panes.
+    let (layout, layout_pref) =
+        rada_tui::panels::start_layout(cfg_file.layout.as_deref(), saved_ui.layout.as_deref())
+            .with_context(|| {
+                tf(
+                    Key::MBadLayout,
+                    &[&cfg_file.layout.as_deref().unwrap_or_default()],
+                )
+            })?;
     let cfg = Config {
         start_explicit: !cli.path.is_empty(),
         layout,

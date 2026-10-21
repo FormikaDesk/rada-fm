@@ -45,6 +45,10 @@ pub struct UiState {
     /// The Tag column of the list (View ▾); `None` until toggled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags_column: Option<bool>,
+    /// The layout chosen in the View menu (`auto`, `panels` or `classic`); `None` until
+    /// chosen: the configuration's value then applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<String>,
     /// The tabs that were open when rada last ended, and which one was in front.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tabs: Vec<SavedTab>,
@@ -137,6 +141,27 @@ mod tests {
         )
         .unwrap();
         assert_eq!(load(d.path()).sidebar, Some(true));
+    }
+
+    #[test]
+    fn the_layout_chosen_in_the_view_menu_comes_back_and_an_older_file_has_none() {
+        let d = tempfile::tempdir().unwrap();
+        save(
+            d.path(),
+            &UiState {
+                layout: Some("panels".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(load(d.path()).layout.as_deref(), Some("panels"));
+        // A file written before there was a layout to choose.
+        std::fs::write(d.path().join("ui.json"), br#"{"sidebar":true}"#).unwrap();
+        assert_eq!(load(d.path()).layout, None);
+        // And a state with no choice does not write the key at all.
+        save(d.path(), &UiState::default()).unwrap();
+        let text = std::fs::read_to_string(d.path().join("ui.json")).unwrap();
+        assert!(!text.contains("layout"), "{text}");
     }
 
     #[test]
