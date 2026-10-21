@@ -127,7 +127,10 @@ impl App {
         let favorites: Vec<usize> = items
             .iter()
             .enumerate()
-            .filter(|(_, i)| i.section == Section::Pinned && !matches!(i.origin, Origin::Device(_)))
+            // The standard folders are in the tree under Home: only what was added is here.
+            .filter(|(_, i)| {
+                i.section == Section::Pinned && matches!(i.origin, Origin::Bookmark { .. })
+            })
             .map(|(n, _)| n)
             .collect();
         let gap = || NavRow {

@@ -216,10 +216,11 @@ fn the_boxes_have_their_names_on_their_top_edge() {
     ] {
         assert!(s.contains(title), "{title}:\n{s}");
     }
-    // Rounded corners, and the tree, the favourites and the disks inside.
+    // Rounded corners, and the tree and the disks inside; the favourites only when the person
+    // added some.
     assert!(s.contains("╭─[ NAV ]") && s.contains('╯'), "{s}");
     assert!(
-        s.contains("PINNED") && s.contains("System") && s.contains("Data"),
+        !s.contains("PINNED") && s.contains("System") && s.contains("Data"),
         "{s}"
     );
     // The size column is the number alone: no bars of any kind.
@@ -1091,4 +1092,39 @@ fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
     );
     let want = h.app.home().join(&name);
     h.wait("the folder", move |a| a.cwd == want && !a.is_loading());
+}
+
+#[test]
+fn the_favourites_are_only_the_folders_the_person_added() {
+    let mut h = scene(160, 46, "rada", false);
+    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    let is_favorite = |a: &App| {
+        a.nav_rows()
+            .iter()
+            .any(|r| matches!(r.kind, rada_tui::panels::NavKind::Favorite(_)))
+    };
+    assert!(!is_favorite(&h.app), "the standard folders are in the tree");
+    assert!(
+        !h.screen().contains("PINNED"),
+        "no title without favourites"
+    );
+    let added = h.app.home().join("projects");
+    // B in NAV, on the folder.
+    h.press("tab");
+    h.app.nav_cursor = h
+        .app
+        .nav_rows()
+        .iter()
+        .position(|r| r.path == added)
+        .unwrap();
+    h.press("B");
+    h.wait("the bookmark", |a| a.paths.bookmarks.contains(&added));
+    let rows = h.app.nav_rows();
+    let favs: Vec<_> = rows
+        .iter()
+        .filter(|r| matches!(r.kind, rada_tui::panels::NavKind::Favorite(_)))
+        .map(|r| r.path.clone())
+        .collect();
+    assert_eq!(favs, vec![added]);
+    assert!(h.screen().contains("PINNED"));
 }

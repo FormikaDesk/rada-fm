@@ -16,15 +16,15 @@ expression: shot(&mut h)
 │     › ▸ demo        (19) │ │   · archive.tar.gz                            17.6 MB  8 days ago     │ │                                   │
 │     ▸ Videos         (0) │ │ ☑ · backup.zip                                39.0 MB  05/07/2026     │ │                                   │
 │                          │ │   · Cargo.toml                                  82 B  3 days ago      │ │                                   │
-│ PINNED                   │ │   · data.json                                   49 B  6 days ago      │ │                                   │
-│   ▭ Desktop           ⚲  │ │   · demo.mp4                                  91.0 MB  2 weeks ago    │ │                                   │
-│   ▤ Documents         ⚲  │ │   · logo.svg                                   197 B  5 days ago      │ │                                   │
-│   ↓ Downloads         ⚲  │ │   · main.rs                                     80 B  Today 14:10     │ │                                   │
-│   ▣ Pictures          ⚲  │ │   · notes.txt                                   28 B  Yesterday       │ │                                   │
-│   ♪ Music             ⚲  │ │   · photo.jpg                                 70.7 KB  Today 13:30    │ │                                   │
-│   ▶ Videos            ⚲  │ │   · README.md                                  145 B  Today 13:28     │ │                                   │
+│ TAGS ● ● ● ● ● ● ●       │ │   · data.json                                   49 B  6 days ago      │ │                                   │
+│                          │ │   · demo.mp4                                  91.0 MB  2 weeks ago    │ │                                   │
+│                          │ │   · logo.svg                                   197 B  5 days ago      │ │                                   │
+│                          │ │   · main.rs                                     80 B  Today 14:10     │ │                                   │
+│                          │ │   · notes.txt                                   28 B  Yesterday       │ │                                   │
+│                          │ │   · photo.jpg                                 70.7 KB  Today 13:30    │ │                                   │
+│                          │ │   · README.md                                  145 B  Today 13:28     │ │                                   │
 │                          │ │   · report.pdf                                2.29 MB  4 days ago     │ │ photo.jpg              JPEG image │
-│ TAGS ● ● ● ● ● ● ●       │ │   · screenshot.png                            5.34 KB  Yesterday      │ │  JPG   70.7 KB                    │
+│                          │ │   · screenshot.png                            5.34 KB  Yesterday      │ │  JPG   70.7 KB                    │
 │                          │ │   · setup.sh                                    21 B  12 days ago     │ │                                   │
 ╰──────────────────────────╯ │   · song.mp3                                  7.44 MB  30/07/2026     │ │                                   │
 ╭─[ SPACE ]────────────────╮ │                                                                       │ │   ▸ Open    Open with…  ◉ Preview │
