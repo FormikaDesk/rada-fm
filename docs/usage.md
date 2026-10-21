@@ -98,6 +98,10 @@ Checked in Ghostty by sending each combination to a real window and reading what
 
 Everything else rada uses (`Ctrl+C/X/V/Z/Y/A/F/L/P/N/Q/B`, `Shift+Del`, `F1`–`F3`, `F7`, `Alt+←/→/↑`, `Tab`, `Ctrl+Shift+Z`, …) arrived intact. The window manager's own bindings (Hyprland here) all use the Super key, except `Alt+Space`, `Ctrl+Alt+Del` and `Ctrl+Shift+R`, which rada does not use. Terminals that implement the kitty keyboard protocol can tell more combinations apart; rada works with what every terminal sends.
 
+### Jumping with zoxide
+
+If [zoxide](https://github.com/ajeetdsouza/zoxide) is installed, the bar (`Ctrl+P`) uses it. When what you type is no command, no place and no name in the folder you are in, the bar offers the folders `zoxide query --list` gives for it (at most five, marked *zoxide*): pick one with `↓` or `Tab` and press `Enter` (or click it), or press `Enter` at once for the first. Besides that, every folder rada enters is told to zoxide (`zoxide add`, in the background), so that the two share what you visit. If zoxide is not installed nothing happens and no error is shown; `zoxide = false` in `config.toml` makes rada never call it (see [configuration](configuration.md)).
+
 ## Requests as data
 
 Every operation can be described as data and handed to the engine, with no interface involved. The request is a JSON document (`schema/request.schema.json`, generated from the Rust types and kept current by a test); the answer is a plan (`schema/plan.schema.json`). A plan produced this way goes through exactly the same confirmation window, the same executor and the same undo journal as one built with the keyboard.

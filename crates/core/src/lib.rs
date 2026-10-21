@@ -25,6 +25,7 @@ pub mod uistate;
 pub mod update;
 pub mod watch;
 pub mod workers;
+pub mod zoxide;
 
 pub use error::{Error, Result};
 

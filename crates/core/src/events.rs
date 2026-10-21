@@ -144,6 +144,11 @@ pub enum CoreEvent {
         /// Names of the subfolders, sorted; empty when the folder cannot be read.
         names: Vec<String>,
     },
+    /// The folders zoxide knows that match what is typed in the command bar (at most five).
+    Zoxide {
+        query: String,
+        dirs: Vec<PathBuf>,
+    },
     /// Something a background thread wants the user to know (a program that would not start).
     Note {
         text: String,

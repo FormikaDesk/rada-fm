@@ -591,7 +591,15 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         None => Arc::new(LocalFs),
     };
     let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits)
-        .with_folder_sizes(cfg_file.folder_size_settings()?);
+        .with_folder_sizes(cfg_file.folder_size_settings()?)
+        // A demo scene must not depend on, or change, the folders the person goes to.
+        .with_zoxide(rada_core::zoxide::Zoxide::new(
+            cfg_file.zoxide && cli.demo.is_none(),
+            cfg_file
+                .zoxide_path
+                .as_deref()
+                .map(std::path::PathBuf::from),
+        ));
     // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
     // screens must not depend on what GitHub says today.
     let services = if cli.demo.is_some() || chooser.is_some() {

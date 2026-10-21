@@ -1143,6 +1143,12 @@ impl App {
 
     // ------------------------------------------------------------------ navigation
 
+    /// Change how zoxide is called (the program starts with the configuration's choice; the
+    /// tests give it a made-up one).
+    pub fn use_zoxide(&mut self, zoxide: rada_core::zoxide::Zoxide) {
+        self.svc.zoxide = zoxide;
+    }
+
     pub fn open_dir(&mut self, path: PathBuf) {
         // A device that is plugged in and not mounted is not a folder yet: opening it mounts it.
         if let Some(id) = self.unmounted_id(&path) {
@@ -1422,6 +1428,7 @@ impl App {
             }
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
             CoreEvent::Update(u) => self.on_update_event(u),
             CoreEvent::Ejected {
@@ -1511,6 +1518,7 @@ impl App {
                             // not a place to come back to.
                             if !virtual_dir {
                                 self.svc.places.visit(path.clone());
+                                self.svc.zoxide_add(&path);
                                 self.svc.watcher.watch(path);
                             }
                             self.previewed = None;

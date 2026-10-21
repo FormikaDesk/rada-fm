@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- **Jump with zoxide.** In the bar (`Ctrl+P`), when what you type matches no command, no place and no name in the folder, rada also offers the folders `zoxide query --list <text>` gives (at most five, marked *zoxide*); `Enter` opens the one picked, or the first. Every folder rada enters is told to zoxide with `zoxide add`, in the background. If zoxide is not installed nothing happens and no error is shown. `zoxide = false` in `config.toml` makes rada never call it; `zoxide_path` names the program (the tests use a made-up one). Documented in `docs/usage.md` and `docs/configuration.md`.
+
 ### Changed
 - **`rada update` names the version to a copy installed with cargo while the new one is a pre-release.** Cargo does not pick a pre-release by itself, so `cargo install rada --locked` would find nothing: the advice is now `cargo install rada --locked --version <new version>` (in Italian too). With a stable version it stays `cargo install rada --locked`. `docs/install.md` and `docs/updates.md` say the same.
 

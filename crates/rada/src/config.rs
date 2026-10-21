@@ -46,6 +46,10 @@
 //!                            # (only how many items each holds, no walk below) | off
 //! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"
 //! folder_size_entries = 200000   # ...or after this many files and folders
+//! zoxide = true              # use zoxide, when it is installed: the command bar offers its
+//!                            # folders and every folder rada enters is added to it. false: rada
+//!                            # never calls it
+//! zoxide_path = ""           # the zoxide program; empty looks for `zoxide` in the PATH
 //!
 //! [archives]
 //! max_extract_gb = 8         # an extraction that would write more asks for a typed "yes"
@@ -113,6 +117,8 @@ pub struct FileConfig {
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
+    pub zoxide: bool,
+    pub zoxide_path: Option<String>,
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     /// macOS: ask the terminal to report the Cmd key.
@@ -255,6 +261,8 @@ struct Raw {
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
+    zoxide: Option<bool>,
+    zoxide_path: Option<String>,
     devices: Option<DevicesRaw>,
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
@@ -334,6 +342,8 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         folder_sizes: raw.folder_sizes,
         folder_size_seconds: raw.folder_size_seconds,
         folder_size_entries: raw.folder_size_entries,
+        zoxide: raw.zoxide.unwrap_or(true),
+        zoxide_path: raw.zoxide_path.filter(|p| !p.trim().is_empty()),
         hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
         cmd_keys: raw.cmd_keys.unwrap_or(true),
@@ -412,6 +422,16 @@ mod tests {
         assert!(!with_config("sidebar = true\n").transparent_background);
         assert!(with_config("transparent_background = true\n").transparent_background);
         assert!(!with_config("transparent_background = false\n").transparent_background);
+    }
+
+    #[test]
+    fn zoxide_is_on_unless_the_file_says_otherwise() {
+        let d = with_config("sidebar = true\n");
+        assert!(d.zoxide && d.zoxide_path.is_none());
+        let c = with_config("zoxide = false\nzoxide_path = \"/opt/z/zoxide\"\n");
+        assert!(!c.zoxide);
+        assert_eq!(c.zoxide_path.as_deref(), Some("/opt/z/zoxide"));
+        assert!(with_config("zoxide_path = \"\"\n").zoxide_path.is_none());
     }
 
     #[test]

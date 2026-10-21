@@ -42,6 +42,8 @@ pub enum BarItem {
     Command(Action),
     /// Go to a folder.
     Place(PaletteItem),
+    /// Go to a folder zoxide knows.
+    Zoxide(PathBuf),
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +100,10 @@ pub struct AddressEdit {
     pub hit_selected: Option<usize>,
     /// The bar put the filter on the folder (and takes it off when it is left empty).
     pub filtering: bool,
+    /// The folders zoxide gave for the text it was asked about (empty until it answers).
+    zoxide: Vec<PathBuf>,
+    /// The text zoxide was last asked about, so that typing does not ask again and again.
+    zoxide_asked: String,
 }
 
 impl AddressEdit {
@@ -115,6 +121,8 @@ impl AddressEdit {
             hits: Vec::new(),
             hit_selected: None,
             filtering: false,
+            zoxide: Vec::new(),
+            zoxide_asked: String::new(),
         }
     }
 
@@ -349,6 +357,9 @@ impl App {
         let chooser = self.chooser.clone();
         let Some(a) = &mut self.address else { return };
         let q = a.text.trim().to_string();
+        let q_text = q.clone();
+        // An entry of the folder with exactly that name is a path that exists.
+        let named_here = self.listing.all().iter().any(|e| e.name == q_text.as_str());
         let mut commands: Vec<(i64, BarHit)> = Vec::new();
         for &action in Action::ALL
             .iter()
@@ -399,8 +410,35 @@ impl App {
                 .collect();
             hits.extend(places);
         }
+        // Nothing among the commands and places, and no entry of this folder by that name:
+        // the folders zoxide knows.
+        if hits.is_empty() && !named_here {
+            if a.zoxide_asked != q_text {
+                a.zoxide_asked = q_text.clone();
+                a.zoxide.clear();
+                self.svc.zoxide_query(&q_text);
+            }
+            hits.extend(a.zoxide.iter().map(|p| BarHit {
+                item: BarItem::Zoxide(p.clone()),
+                label_pos: Vec::new(),
+            }));
+        } else {
+            a.zoxide.clear();
+            a.zoxide_asked.clear();
+        }
         a.hit_selected = a.hit_selected.filter(|i| *i < hits.len());
         a.hits = hits;
+    }
+
+    /// zoxide answered: the folders count if they are for the text still in the bar.
+    pub(super) fn on_zoxide(&mut self, query: String, dirs: Vec<PathBuf>) {
+        let Some(a) = &mut self.address else { return };
+        if a.mode() != BarMode::Search || a.text.trim() != query || a.zoxide_asked != query {
+            return;
+        }
+        a.zoxide = dirs;
+        self.refresh_bar_hits();
+        self.dirty = true;
     }
 
     /// Run the `i`-th suggestion of the search mode: the bar closes, the filter it made goes.
@@ -415,6 +453,7 @@ impl App {
         match hit.item {
             BarItem::Command(action) => self.dispatch(action),
             BarItem::Place(item) => self.open_dir(item.path),
+            BarItem::Zoxide(path) => self.open_dir(path),
         }
     }
 

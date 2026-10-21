@@ -16,6 +16,7 @@ use rada_core::places::{PlacesStore, standard_places, with_extra_places};
 use rada_core::platform::Platform;
 use rada_core::watch::DirWatcher;
 use rada_core::workers::{DirLoader, PreviewWorker, VolumesWorker};
+use rada_core::zoxide::Zoxide;
 
 pub struct Services {
     pub jobs: Jobs,
@@ -41,10 +42,22 @@ pub struct Services {
     pub notes: crossbeam_channel::Sender<CoreEvent>,
     /// Looks for newer versions and installs them; `None` where updating makes no sense (tests).
     pub updater: Option<rada_core::update::Updater>,
+    /// How zoxide is called: never, until [`with_zoxide`](Services::with_zoxide) says.
+    pub zoxide: Zoxide,
     fs: Arc<dyn FsEngine>,
 }
 
 impl Services {
+    /// Ask zoxide for the folders that match `text`; the answer arrives as `CoreEvent::Zoxide`.
+    pub fn zoxide_query(&self, text: &str) {
+        self.zoxide.query(text, self.notes.clone());
+    }
+
+    /// Tell zoxide that `dir` was entered.
+    pub fn zoxide_add(&self, dir: &std::path::Path) {
+        self.zoxide.add(dir);
+    }
+
     /// Ask for the subfolders of `dir`; the answer arrives as `CoreEvent::Complete`.
     pub fn complete_dirs(&self, dir: PathBuf) {
         rada_core::workers::complete_dirs(self.fs.clone(), dir, self.notes.clone());
@@ -115,8 +128,15 @@ impl Services {
             journal_ok,
             notes: tx,
             updater: None,
+            zoxide: Zoxide::off(),
             fs,
         }
+    }
+
+    /// Use zoxide as the configuration says.
+    pub fn with_zoxide(mut self, zoxide: Zoxide) -> Services {
+        self.zoxide = zoxide;
+        self
     }
 
     /// Count the size of folders as the configuration says.

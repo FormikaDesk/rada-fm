@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 
+use crate::fmt;
 use rada_core::display;
 use rada_core::i18n::Key;
 use ratatui::Frame;
@@ -532,6 +533,12 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
                 action.label().to_string(),
                 app.keymap.hint(*action).unwrap_or_default(),
                 Key::BarCommand.tr().to_string(),
+                h.label_pos.clone(),
+            ),
+            BarItem::Zoxide(path) => (
+                display::name(path.file_name().unwrap_or(path.as_os_str())),
+                fmt::short_path(path, app.home()),
+                Key::BarZoxide.tr().to_string(),
                 h.label_pos.clone(),
             ),
             BarItem::Place(item) => (
