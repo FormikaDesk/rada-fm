@@ -5,7 +5,7 @@ Set FontSize 14
 Set Padding 14
 # The size of the terminal (170x42 cells at this font) is set by each tape, before Source:
 # Set Width 1584 / Set Height 800.
-Set Theme { "name": "Neon", "black": "#0e1022", "red": "#ff6b8a", "green": "#5fe3a1", "yellow": "#ffd866", "blue": "#6fa8ff", "magenta": "#8b7cf6", "cyan": "#4fe0f0", "white": "#d9ddf2", "brightBlack": "#7b82a9", "brightRed": "#ff6b8a", "brightGreen": "#5fe3a1", "brightYellow": "#ffd866", "brightBlue": "#6fa8ff", "brightMagenta": "#8b7cf6", "brightCyan": "#4fe0f0", "brightWhite": "#ffffff", "background": "#0e1022", "foreground": "#d9ddf2", "selection": "#2a2d52", "cursor": "#8b7cf6" }
+Set Theme { "name": "Neon", "black": "#0e1022", "red": "#f87171", "green": "#34d399", "yellow": "#fbbf24", "blue": "#60a5fa", "magenta": "#8b7cf6", "cyan": "#5fe1e6", "white": "#d9ddf2", "brightBlack": "#7b82a9", "brightRed": "#f87171", "brightGreen": "#34d399", "brightYellow": "#fbbf24", "brightBlue": "#60a5fa", "brightMagenta": "#8b7cf6", "brightCyan": "#5fe1e6", "brightWhite": "#ffffff", "background": "#0e1022", "foreground": "#d9ddf2", "selection": "#2a2d52", "cursor": "#8b7cf6" }
 Set TypingSpeed 70ms
 Set Framerate 24
 
