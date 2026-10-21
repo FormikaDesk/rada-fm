@@ -642,6 +642,13 @@ pub struct App {
     /// The row of the NAV box the keyboard is on, and which of the seven tag dots of its row.
     pub nav_cursor: usize,
     pub nav_tag: usize,
+    /// The first row of the NAV box that is shown, where the box was last drawn, and what the
+    /// scrolling was last made to show (the folder, the keyboard's row, how many rows there
+    /// are): the box scrolls to the folder only when one of those changes, so that the wheel
+    /// can move it away.
+    pub nav_scroll: usize,
+    pub nav_area: ratatui::layout::Rect,
+    pub nav_seen: Option<(PathBuf, Option<usize>, usize)>,
     /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
     pub preview_focus: bool,
     /// What git said about the folder shown (panels view), with the folder it was about.
@@ -831,6 +838,9 @@ impl App {
             tree: Default::default(),
             nav_cursor: 0,
             nav_tag: 0,
+            nav_scroll: 0,
+            nav_area: Default::default(),
+            nav_seen: None,
             preview_focus: false,
             git: None,
             git_asked: None,

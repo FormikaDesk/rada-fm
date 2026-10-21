@@ -805,6 +805,18 @@ impl App {
         }
         self.dirty = true;
         let target = self.hits.at(m.column, m.row).cloned();
+        if self.panels_shown
+            && self.modal.is_none()
+            && matches!(
+                m.kind,
+                MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+            )
+            && self
+                .nav_area
+                .contains(ratatui::layout::Position::new(m.column, m.row))
+        {
+            return self.scroll_nav(m.kind == MouseEventKind::ScrollDown);
+        }
         match m.kind {
             MouseEventKind::ScrollUp => self.wheel(target, false),
             MouseEventKind::ScrollDown => self.wheel(target, true),

@@ -232,6 +232,17 @@ impl App {
         self.side_focus = true;
     }
 
+    /// The wheel over the NAV box: it scrolls the rows, three at a time, and not the cursor.
+    pub(super) fn scroll_nav(&mut self, down: bool) {
+        const STEP: usize = 3;
+        self.nav_scroll = if down {
+            self.nav_scroll + STEP
+        } else {
+            self.nav_scroll.saturating_sub(STEP)
+        };
+        self.dirty = true;
+    }
+
     /// An arrow clicked or pressed on a folder of the tree: open or close it.
     pub fn toggle_tree(&mut self, dir: &Path) {
         self.tree.toggle(dir);

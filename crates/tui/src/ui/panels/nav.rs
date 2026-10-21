@@ -55,9 +55,26 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     if rows.len() < height && rows.last().is_some_and(|r| r.kind == NavKind::Trash) {
         trash = body.pop();
     }
-    let anchor = cursor.or(current).unwrap_or(0);
-    let anchor_at = body.iter().position(|i| *i == anchor).unwrap_or(0);
-    let skip = (anchor_at + 1).saturating_sub(height);
+    // Scroll to the row the keyboard is on, or else to the folder shown, when either moves (or
+    // the tree grows): not on every frame, or the wheel could not take the box anywhere else.
+    app.nav_area = area;
+    let max_skip = body.len().saturating_sub(height);
+    if let Some(anchor_at) = cursor
+        .or(current)
+        .and_then(|a| body.iter().position(|i| *i == a))
+    {
+        let seen = (app.cwd.clone(), cursor, body.len());
+        if app.nav_seen.as_ref() != Some(&seen) {
+            app.nav_seen = Some(seen);
+            if anchor_at < app.nav_scroll {
+                app.nav_scroll = anchor_at;
+            } else if anchor_at >= app.nav_scroll + height {
+                app.nav_scroll = anchor_at + 1 - height;
+            }
+        }
+    }
+    app.nav_scroll = app.nav_scroll.min(max_skip);
+    let skip = app.nav_scroll;
 
     let mut placed: Vec<(u16, usize)> = body
         .iter()
@@ -264,6 +281,22 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 },
                 Target::TreeToggle(row.path.clone()),
             );
+        }
+    }
+
+    // A thumb on the right edge when the tree does not fit.
+    if body.len() > height && height >= 2 {
+        let x = area.x + area.width.saturating_sub(1);
+        let thumb = (height * height / body.len()).clamp(1, height);
+        let top = (skip * (height - thumb)).checked_div(max_skip).unwrap_or(0);
+        for y in 0..height {
+            let on = y >= top && y < top + thumb;
+            let (ch, style) = if on {
+                ("┃", th.dim())
+            } else {
+                ("│", th.faint())
+            };
+            f.buffer_mut().set_string(x, area.y + y as u16, ch, style);
         }
     }
 }
