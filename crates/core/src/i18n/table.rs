@@ -52,6 +52,7 @@ pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::ScanTotals,
     Key::DocMouse,
     Key::DocNo,
+    Key::BarZoxide,
 ];
 
 strings! {
