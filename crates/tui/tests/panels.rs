@@ -1495,17 +1495,23 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     // The disks arrive after the first frames: SPAZIO appears and NAV loses rows. Here the
     // window gets shorter instead, with the same effect on the box.
     let mut h = scene(160, 46, "rada", false);
-    let deep = h.app.home().join("a/b/c/d/e");
+    let deep = h.app.home().join("a/b/c/d/e/f/g");
     std::fs::create_dir_all(&deep).unwrap();
     go_and_wait(&mut h, &deep);
     h.wait("the way", |a| a.tree.kids(&a.cwd).is_some());
     h.settle();
-    assert!(nav_text(&mut h).contains(" e "), "in view at first");
+    assert!(nav_text(&mut h).contains(" g "), "in view at first");
     h.term.backend_mut().resize(160, 36);
     h.settle();
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).unwrap();
-    assert!(at >= 20, "the folder is far down the rows: {at}");
+    // Deep enough to be below the rows of the box on any system (one without tags has fewer
+    // rows above the way).
+    let shown = h.app.nav_area.height as usize;
+    assert!(
+        at >= shown,
+        "the folder is below the box's rows: {at} of {shown}"
+    );
     let text = nav_text(&mut h);
-    assert!(text.contains(" e "), "the folder shown is in view: {text}");
+    assert!(text.contains(" g "), "the folder shown is in view: {text}");
 }
