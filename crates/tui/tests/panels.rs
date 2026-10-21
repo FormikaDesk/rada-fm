@@ -1494,24 +1494,45 @@ fn with_nav_set_to_albero_the_box_keeps_the_whole_tree() {
 fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     // The disks arrive after the first frames: SPAZIO appears and NAV loses rows. Here the
     // window gets shorter instead, with the same effect on the box.
-    let mut h = scene(160, 46, "rada", false);
-    let deep = h.app.home().join("a/b/c/d/e/f/g");
+    let mut h = scene(160, 56, "rada", false);
+    let home = h.app.home().to_path_buf();
+    // How far down the rows the first folder under Home is depends on the system (tags, disks),
+    // and so does the height of the box: the chain is made as deep as the last row of the tall
+    // box needs.
+    std::fs::create_dir_all(home.join("d0")).unwrap();
+    go_and_wait(&mut h, &home.join("d0"));
+    h.wait("the way", |a| a.tree.kids(&a.cwd).is_some());
+    h.settle();
+    let tall = h.app.nav_area.height as usize;
+    let rows = h.app.nav_rows();
+    let first = App::nav_current(&rows, &home.join("d0")).unwrap();
+    let levels = tall - first;
+    let mut deep = home.join("d0");
+    for n in 1..levels {
+        deep.push(format!("d{n}"));
+    }
     std::fs::create_dir_all(&deep).unwrap();
     go_and_wait(&mut h, &deep);
     h.wait("the way", |a| a.tree.kids(&a.cwd).is_some());
     h.settle();
-    assert!(nav_text(&mut h).contains(" g "), "in view at first");
+    // (Indented as deep as that the name does not fit, so the row is looked for by its place.)
+    let in_view = |h: &H| {
+        let rows = h.app.nav_rows();
+        let at = App::nav_current(&rows, &h.app.cwd).unwrap();
+        let (from, height) = (h.app.nav_scroll, h.app.nav_area.height as usize);
+        (from..from + height).contains(&at)
+    };
+    let tall_box = tall;
+    assert!(in_view(&h), "in view at first");
     h.term.backend_mut().resize(160, 36);
-    h.settle();
+    let _ = h.screen();
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).unwrap();
-    // Deep enough to be below the rows of the box on any system (one without tags has fewer
-    // rows above the way).
     let shown = h.app.nav_area.height as usize;
+    assert!(shown < tall_box, "the box is shorter: {shown} < {tall_box}");
     assert!(
         at >= shown,
         "the folder is below the box's rows: {at} of {shown}"
     );
-    let text = nav_text(&mut h);
-    assert!(text.contains(" g "), "the folder shown is in view: {text}");
+    assert!(in_view(&h), "the folder shown is in view");
 }
