@@ -1868,14 +1868,17 @@ fn the_trash_is_the_last_row_of_nav_in_every_view() {
         let last = text.lines().last().unwrap();
         assert!(last.contains("Trash"), "{dir:?}: {text}");
     }
-    // A tag's list is a view too, with no way of folders.
-    let view = rada_core::tagsearch::view_path("Red");
-    h.app.open_dir(view.clone());
-    h.wait("the view", |a| a.cwd == view);
-    h.settle();
-    with_trash(&mut h);
-    let text = nav_text(&mut h);
-    assert!(text.lines().last().unwrap().contains("Trash"), "{text}");
+    // A tag's list is a view too, with no way of folders (a system without tags, Windows, has
+    // no such list to open).
+    if h.app.tags_supported() {
+        let view = rada_core::tagsearch::view_path("Red");
+        h.app.open_dir(view.clone());
+        h.wait("the view", |a| a.cwd == view);
+        h.settle();
+        with_trash(&mut h);
+        let text = nav_text(&mut h);
+        assert!(text.lines().last().unwrap().contains("Trash"), "{text}");
+    }
 }
 
 #[test]
