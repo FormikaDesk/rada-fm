@@ -33,6 +33,28 @@ The names of the folders in the sidebar are the ones the system gives them (Ital
 | ![The basic profile](screenshots/basic.png) | ![A narrow terminal](screenshots/stretta.png) |
 | The **basic profile** (`TERM=vt100`): ASCII, 16 colours, `[######----]` for a disk. | A narrow terminal: the sidebar is a column of icons. |
 
+## The panels view
+
+![The panels view on the Neon theme: boxes for the tree of folders, the disks, the folder, the preview and the details](screenshots/principale-pannelli.png)
+
+On a window of **140 columns by 36 rows** or more rada draws the screen as **rounded boxes**: NAV and SPAZIO on the left, the folder in the middle, ANTEPRIMA and DETTAGLI on the right, under three rows of bars and over a status bar and the key hints. The same screen on Gesso, the default light theme:
+
+![The panels view on the light Gesso theme](screenshots/principale-pannelli-gesso.png)
+
+It is the layout of `layout = "auto"` (the default); a smaller window, a tiled one, and the file chooser (always) get the classic layout described above, and the change happens by itself as the window is made larger or smaller. **View ▾** has *Layout: automatic*, *panels* and *classic* to choose by hand (the choice is remembered and replaces `layout` from `config.toml`, as the choice of the panes does); `panels` draws the view down to 100 × 24. See [Configuration](configuration.md).
+
+**From the top**, each bar on a row of its own and, from 42 rows up, a blank row between one and the next (below 42 the blank rows go, so that more files are seen): the tabs, with `rada` as a pill and *? Aiuto* at the right; the row of navigation (back, forward, up, refresh, the path with `›` between its parts and the last in bold, and at the right *Cerca file o digita un comando…* with **Ctrl+P**); the buttons. Then:
+
+- **NAV**: the tree of folders from Home, with an arrow (`›` closed, `⌄` open) for each folder that has folders in it, a coloured icon and, on the right, the number of items in brackets. The folders that lead to the folder you are in are open, and the folder you are in is a pill; a click on an arrow (or `→` and `←` with the keyboard in NAV) opens and closes a folder, a click on the name goes there. Under the tree, **PREFERITI** (the standard folders and the ones you pinned), a row of the seven tag colours as dots (a click on one lists what carries it) and the trash. The tree is listed in the background (hidden folders only when hidden files are on); nothing is read by the drawing.
+- **SPAZIO**: the main disk with how full it is as a percentage, a bar across the box, used of total and what is free; under it the other volumes, a row each with a bar of twelve cells (`■■■■■□□□□□□□`) and a percentage.
+- **The folder** (the box with the path on its edge, `[ ~/projects/demo ]`): Name ↑, Size (the number alone), Modified and Tag. The row under the cursor is filled with the selection colour with rounded ends, selected rows have a quiet tone and a tick. The card of the last operation (*3 elementi copiati in Documenti · Annulla Ctrl+Z · Mostra*) sits at the bottom right of this box, with its edge that shortens as its time runs out. In a folder that is in a **git repository** the right of the top edge says so: the branch with an icon, how far it is from its upstream, the number of changed files (`●`) and of new ones (`?`); an `M` in yellow follows the name of a changed file and a `?` in green the name of a new one, and the status bar and DETTAGLI say the same. The Icons and Columns views are drawn in this box too.
+- **ANTEPRIMA**: the preview (a picture, drawn for real where the terminal can, a PDF's first page, the colour-coded code of a source file with its line numbers, an archive's contents), then the name in bold with the type at its right, rounded labels for type, size and resolution, and **Apri** as a short full button with *Apri con…* and *Anteprima* as coloured words beside it.
+- **DETTAGLI**: modified, created, location, the permissions as a label, the tags as coloured labels, what git says of the file and the link to the history with the key it really has (`F3`, or `U` with the vim keys). The box is chosen in one place in the code, so that a later version can put an assistant there.
+
+**Tab** takes the keyboard from the folder to NAV, from NAV to ANTEPRIMA and back to the folder: the border of the box the keyboard is in is the accent colour, the others a quiet one. In NAV the arrows move, `Enter` opens, `B` pins; in ANTEPRIMA `↑` and `↓` scroll the preview. `Ctrl+B` takes the left column away.
+
+**Colours.** The border of a box and the space between boxes keep the background of the theme, the inside of a box is the theme's `inner` tone, a little away from it; the pills (buttons, labels, keys, the selected row) are drawn with the round ends of the Nerd Fonts, in the colour of the pill on whatever lies behind it, and as plain rectangles of the same width where the font has none. A test checks every pill of the screen, in every theme: both ends, on the same row as the text, one colour from end to end. Nothing is coloured by hand: the six hues of the icons and the labels, and the inner tone, are entries of every theme (see [Themes](themes.md)); on Gesso the text on the selection is the darkest neutral, never white.
+
 ## The screen
 
 From the top: a row of **tabs**, the **bar**, the **command bar**, then the body — three rounded cards: the **navigation pane**, the folder, the **details pane** — a **status bar** and a row of **key hints**. Everything drawn as a button does what its key does, through the same path: a plan first, then your confirmation, then the operation.

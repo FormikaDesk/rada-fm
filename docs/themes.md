@@ -10,6 +10,7 @@ Three looks, each with a dark and a light variant, and two more light themes of 
 | `catppuccin` | `catppuccin-mocha` | `catppuccin-latte` |
 | `tokyo-night` | `tokyo-night-dark` | `tokyo-night-day` |
 | (only light) | | `nebbia-light`, `carta` |
+| `neon` (only dark): an indigo night with a violet selection | `neon` | (a light terminal gets Gesso) |
 
 `rada-light` is **Gesso** (chalk): an almost neutral off-white (`#f4f3f0`), near-black neutral text (`#2f2f2f`) and a blue accent a little cooler than before (`#3d5b88`). Its other tokens (the row under the mouse, fields, borders, selection, key caps, buttons, tabs) are those of Carta moved to the new background together: each keeps its distance in lightness from it, and the warmth of the paper is taken away in the same proportion, so the theme is as coherent as it was, only neutral. `carta` ("paper") is the warm parchment (`#ebe4d5`, brown text) that was `rada-light` until this version: **choose it with `theme = "carta"`** to keep it. `rada` is a night blue (`#1b1d27`). `nebbia-light` ("mist") is the paper idea with a cool grey-blue paper. `carta` and `nebbia-light` are light themes that do not follow the terminal: naming them pins them. These paint their own background; on a 16-colour terminal the terminal's background is kept.
 
@@ -36,3 +37,10 @@ How rada finds out, cheapest and safest first, without ever taking a key from yo
 The result will be shown by `rada doctor` when that command exists; until then it is written to the log (`RADA_LOG=info`). The Windows console is not asked in this version (it falls back to dark unless you set `appearance`).
 
 Colours are true colour when the terminal supports it (`COLORTERM=truecolor`), fall back to the 256-colour palette, and to the 16 ANSI colours (with reverse video for the selection) on a basic terminal. `catppuccin` and `tokyo-night` leave the terminal's own background alone, so transparency and your wallpaper keep working there; they too use one tone for every zone.
+
+**Neon** (`theme = "neon"`) is a dark theme made for the [panels view](interface.md#the-panels-view): canvas `#0e1022`, the inside of the boxes `#13152b`, text `#d9ddf2`, dim text `#7b82a9`, a violet accent `#8b7cf6` and a violet selection `#7058f0` that white reads on, and bright cyan, pink, yellow, green, orange and blue. It meets the same contrast minimums as every other theme.
+
+![The panels view on Neon](screenshots/principale-pannelli.png)
+
+**Entries for the panels view.** Every theme has two more kinds of entry, so that the panels view works with each of them: `inner`, the tone the inside of a box is filled with (a little away from the canvas: lighter on a dark theme, paler on a light one), and six hues (cyan, pink, yellow, green, orange, blue) for the icons and the rounded labels. A test checks that the text, the accent and each hue read on both the canvas and the inside of a box (4.5:1, the main text 7:1), and that the text on a pale selection is dark: on Gesso and Carta the text on the selected row is the darkest tone of the theme, never white. A theme that leaves the terminal's own background alone (`catppuccin`, `tokyo-night`) still fills the inside of the boxes.
+

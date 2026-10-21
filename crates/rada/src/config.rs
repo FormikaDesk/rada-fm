@@ -17,7 +17,7 @@
 //!                           # Finder and Explorer do); false: letter by letter
 //! theme = "auto"            # auto | rada | catppuccin | tokyo-night, or a fixed variant:
 //!                            # rada-dark | rada-light | catppuccin-mocha | catppuccin-latte
-//!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light | carta
+//!                            # | tokyo-night-dark | tokyo-night-day | nebbia-light | carta | neon
 //! appearance = "auto"        # auto | light | dark: which variant a theme name uses
 //! transparent_background = false  # true: the default dark theme leaves the terminal's own
 //!                            # background instead of painting its night blue
@@ -32,7 +32,8 @@
 //! cmd_keys = true            # macOS: ask the terminal to report Cmd, for Cmd+C/V/X… (classic keys)
 //! show_hints = true          # false: no row of key hints at the bottom (`hints` also works)
 //! sidebar = true             # the navigation pane; shown by default; Ctrl+B toggles and remembers
-//! layout = "explorer"        # explorer | compact (no address bar, command bar or hints)
+//! layout = "auto"            # auto (panels from 140x36, classic below) | panels | classic |
+//!                            # compact (no address bar, command bar or hints); explorer = classic
 //! show_details_pane = true   # false: never show the details pane on its own (Alt+P still does)
 //! view = "details"           # details | icons | columns: how a new tab shows a folder
 //! tags_column = true         # the Tag column of the list (View ▾ switches it too)
