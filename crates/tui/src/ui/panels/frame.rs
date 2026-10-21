@@ -118,7 +118,9 @@ fn text_at(buf: &mut Buffer, x: u16, y: u16, text: &str, style: Style) -> u16 {
 /// background; this puts it right once the box is done. Cells with a colour of their own (the
 /// selected row, a pill, the pixels of a picture) are left alone.
 pub fn settle(buf: &mut Buffer, area: Rect, th: &Theme) {
-    let Some(outer) = th.bg else { return };
+    // A theme that leaves the terminal's background alone has none of its own around the
+    // boxes: what is on the terminal's (the end of a pill) is what the inside replaces.
+    let outer = th.bg.unwrap_or(ratatui::style::Color::Reset);
     if th.depth == ColorDepth::Ansi16 || th.inner == outer {
         return;
     }

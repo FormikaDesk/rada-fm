@@ -98,9 +98,11 @@ pub fn pill_width(text_width: usize) -> usize {
     text_width + 2
 }
 
-/// The theme's own background (or none, for the terminal's).
+/// The theme's own background, or the terminal's where the theme leaves it alone: set, not
+/// left unsaid, so that the end of a pill or of a row stands on it and not on whatever the
+/// cell had before.
 pub fn outer(th: &Theme) -> Style {
-    th.on(Style::default())
+    Style::default().bg(th.bg.unwrap_or(Color::Reset))
 }
 
 /// What kind of highlight a row gets.
