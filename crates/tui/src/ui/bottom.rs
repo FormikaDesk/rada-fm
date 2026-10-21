@@ -201,7 +201,7 @@ fn hints(app: &App) -> Vec<Hint> {
 }
 
 /// "19 items", "3 of 19 items".
-fn count_text(app: &App) -> String {
+pub(super) fn count_text(app: &App) -> String {
     let total = app.listing.all().len();
     if app.filter.is_some() {
         tf(
@@ -299,7 +299,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
 
 /// The update notice, in the longest wording that fits in `room` beside `left_width` cells of
 /// the rest of the status (which gives way, down to a few cells).
-fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Bar<'a>> {
+pub(super) fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Bar<'a>> {
     let (variants, clickable) = app.update_notice()?;
     let th = &app.th;
     let band = th.band();
@@ -329,7 +329,7 @@ fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Ba
 
 /// The free space of the disk the current folder is on, with a bar of ten segments for how
 /// full it is.
-fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
+pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     let th = &app.th;
     let band = th.band();
     let mut b = Bar::default();

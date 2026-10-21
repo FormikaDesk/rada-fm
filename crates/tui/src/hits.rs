@@ -26,6 +26,8 @@ pub enum Target {
     CrumbMore(Vec<PathBuf>),
     /// An item of the sidebar: the folder it leads to.
     Place(PathBuf),
+    /// The arrow of a folder of the NAV tree (panels view): opens or closes it.
+    TreeToggle(PathBuf),
     /// The button of a plan window that runs it, and the one that cancels it.
     PlanRun,
     PlanCancel,

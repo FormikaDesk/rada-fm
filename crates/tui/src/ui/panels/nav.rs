@@ -1,0 +1,269 @@
+//! The NAV box: the tree of folders from Home (an arrow for each folder that has folders in
+//! it, a coloured icon, the number of items on the right), the favourites, the seven tag
+//! colours as dots in a row, and the trash.
+//!
+//! The folder you are in is a pill; the row the keyboard is on is a stronger one.
+
+use rada_core::platform::{PlaceKind, TagColor as Hue};
+use ratatui::Frame;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::Paragraph;
+use unicode_width::UnicodeWidthStr;
+
+use crate::app::App;
+use crate::hits::Target;
+use crate::icons::{self, Glyph};
+use crate::panels::NavKind;
+use crate::sidebar::Origin;
+use crate::theme::Theme;
+use crate::ui::soft::{self, Look, RowTone};
+use crate::ui::widgets::pad;
+
+/// The arrow of a folder that has folders in it: closed, open.
+const CLOSED: &str = "›";
+const OPEN: &str = "⌄";
+
+/// The colour of the icon of a standard place: each has its own hue.
+fn place_hue(th: &Theme, kind: PlaceKind) -> Color {
+    match kind {
+        PlaceKind::Home | PlaceKind::Documents => th.hues.blue,
+        PlaceKind::Desktop => th.hues.cyan,
+        PlaceKind::Downloads => th.hues.green,
+        PlaceKind::Pictures | PlaceKind::Videos => th.hues.pink,
+        PlaceKind::Music => th.hues.orange,
+        _ => th.hues.yellow,
+    }
+}
+
+pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
+    let th = app.th.clone();
+    let look = Look::of(app);
+    let rows = app.nav_rows();
+    if rows.is_empty() || area.height == 0 {
+        return;
+    }
+    let items = crate::sidebar::items(app, false);
+    let current = App::nav_current(&rows, &app.cwd);
+    let cursor = app.side_focus.then_some(app.nav_cursor.min(rows.len() - 1));
+    let height = area.height as usize;
+
+    // The trash sits at the bottom of the box when there is room to spare above it.
+    let mut body: Vec<usize> = (0..rows.len()).collect();
+    let mut trash = None;
+    if rows.len() < height && rows.last().is_some_and(|r| r.kind == NavKind::Trash) {
+        trash = body.pop();
+    }
+    let anchor = cursor.or(current).unwrap_or(0);
+    let anchor_at = body.iter().position(|i| *i == anchor).unwrap_or(0);
+    let skip = (anchor_at + 1).saturating_sub(height);
+
+    let mut placed: Vec<(u16, usize)> = body
+        .iter()
+        .skip(skip)
+        .take(height)
+        .enumerate()
+        .map(|(y, i)| (y as u16, *i))
+        .collect();
+    if let Some(t) = trash {
+        placed.push((area.height - 1, t));
+    }
+    let w = area.width as usize;
+    let pin = icons::ui(app.icons, Glyph::Pin);
+    for (y, i) in placed {
+        let r = Rect {
+            y: area.y + y,
+            height: 1,
+            ..area
+        };
+        let row = &rows[i];
+        let is_current = current == Some(i);
+        let is_focus = cursor == Some(i);
+        let hover = !row.path.as_os_str().is_empty() && app.hover.as_ref() == Some(&row.path);
+        let bg = if is_focus {
+            Style::default().bg(th.cursor)
+        } else if is_current {
+            th.current_place()
+        } else if hover {
+            Style::default().bg(th.mark)
+        } else {
+            Style::default()
+        };
+        // On the row the keyboard is on the text is the one of the highlight, whatever the
+        // theme: dark on a light one.
+        let text_style = if is_focus {
+            Style::default().fg(th.cursor_text)
+        } else {
+            th.base()
+        };
+        match &row.kind {
+            NavKind::Gap => continue,
+            NavKind::Heading => {
+                f.render_widget(
+                    Paragraph::new(Span::styled(
+                        format!(" {}", row.name),
+                        th.faint().add_modifier(Modifier::BOLD),
+                    )),
+                    r,
+                );
+                continue;
+            }
+            NavKind::Tags => {
+                let mut spans = vec![Span::styled(
+                    pad(&format!(" {}", row.name), 6),
+                    if is_focus {
+                        text_style.add_modifier(Modifier::BOLD).patch(bg)
+                    } else {
+                        th.faint().add_modifier(Modifier::BOLD).patch(bg)
+                    },
+                )];
+                let mut x = r.x + 6;
+                for (n, hue) in Hue::ALL.iter().enumerate() {
+                    let on = is_focus && app.nav_tag == n;
+                    spans.push(Span::styled(
+                        if on { "◉ " } else { "● " },
+                        Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
+                    ));
+                    let path = rada_core::tagsearch::view_path(hue.label(&app.tag_lang));
+                    app.hits.add(
+                        Rect {
+                            x,
+                            y: r.y,
+                            width: 2,
+                            height: 1,
+                        },
+                        Target::Place(path),
+                    );
+                    x += 2;
+                }
+                let used: usize = spans.iter().map(|s| s.content.width()).sum();
+                spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), bg));
+                f.render_widget(Paragraph::new(Line::from(spans)), r);
+                if is_focus {
+                    soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
+                }
+                continue;
+            }
+            _ => {}
+        }
+
+        // The arrow, the icon, the name, and the number of items on the right.
+        let indent = "  ".repeat(row.depth);
+        let (arrow, toggles) = match row.kind {
+            NavKind::Folder { open: Some(true) } => (OPEN, true),
+            NavKind::Folder { open: Some(false) } => (CLOSED, true),
+            _ => (" ", false),
+        };
+        let (glyph, hue) = match &row.kind {
+            NavKind::Favorite(n) => {
+                let item = &items[*n];
+                let hue = match &item.origin {
+                    Origin::Place(k) => place_hue(&th, *k),
+                    _ => th.hues.yellow,
+                };
+                (item.glyph(app.icons).to_string(), hue)
+            }
+            NavKind::Trash => (
+                items
+                    .iter()
+                    .find(|it| it.path == row.path)
+                    .map(|it| it.glyph(app.icons).to_string())
+                    .unwrap_or_default(),
+                th.text_dim,
+            ),
+            _ if row.depth == 0 => (icons::ui(app.icons, Glyph::Home).to_string(), th.hues.blue),
+            _ => {
+                let kind = app
+                    .paths
+                    .places
+                    .iter()
+                    .find(|p| p.path == row.path)
+                    .map(|p| p.kind);
+                (
+                    icons::icon_for(&row.name, rada_core::fs::FileKind::Dir, app.icons, &th)
+                        .0
+                        .to_string(),
+                    kind.map_or(th.hues.yellow, |k| place_hue(&th, k)),
+                )
+            }
+        };
+        let mut spans: Vec<Span> = vec![
+            Span::styled(" ", bg),
+            Span::styled(indent.clone(), bg),
+            Span::styled(
+                format!("{arrow} "),
+                if is_focus {
+                    text_style.patch(bg)
+                } else {
+                    th.dim().patch(bg)
+                },
+            ),
+        ];
+        if !glyph.is_empty() {
+            let icon_style = if is_focus {
+                text_style
+            } else {
+                Style::default().fg(hue)
+            };
+            spans.push(Span::styled(format!("{glyph} "), icon_style.patch(bg)));
+        }
+        let head: usize = spans.iter().map(|s| s.content.width()).sum();
+        let count = row.count.map(|n| format!("({n})")).unwrap_or_default();
+        let pin_w = if matches!(row.kind, NavKind::Favorite(_)) && !pin.is_empty() {
+            2
+        } else {
+            0
+        };
+        let room = w.saturating_sub(head + 2 + count.width() + pin_w);
+        let name = rada_core::display::truncate(&row.name, room.max(1));
+        let name_style = if is_focus || is_current {
+            text_style.add_modifier(Modifier::BOLD)
+        } else {
+            text_style
+        };
+        let name_w = name.width();
+        spans.push(Span::styled(name, name_style.patch(bg)));
+        let fill = w.saturating_sub(head + name_w + count.width() + pin_w + 1);
+        spans.push(Span::styled(" ".repeat(fill), bg));
+        let quiet = if is_focus {
+            text_style.patch(bg)
+        } else {
+            th.faint().patch(bg)
+        };
+        if pin_w > 0 {
+            spans.push(Span::styled(format!("{pin} "), quiet));
+        }
+        if !count.is_empty() {
+            spans.push(Span::styled(
+                count,
+                if is_focus {
+                    text_style.patch(bg)
+                } else {
+                    th.dim().patch(bg)
+                },
+            ));
+        }
+        spans.push(Span::styled(" ", bg));
+        f.render_widget(Paragraph::new(Line::from(spans)), r);
+        if is_focus {
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
+        } else if is_current {
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Place);
+        }
+        if !row.path.as_os_str().is_empty() {
+            app.hits.add(r, Target::Place(row.path.clone()));
+        }
+        if toggles {
+            // The arrow and the cell after it: a click there opens or closes the folder.
+            app.hits.add(
+                Rect {
+                    x: r.x + 1 + indent.len() as u16,
+                    width: 2,
+                    ..r
+                },
+                Target::TreeToggle(row.path.clone()),
+            );
+        }
+    }
+}

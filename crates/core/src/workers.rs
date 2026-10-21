@@ -44,6 +44,58 @@ pub fn complete_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, out: Sender<CoreEvent>
         });
 }
 
+/// One subfolder in the navigation tree of the panels view: how many items it holds and whether
+/// any of them is a folder (it can then be opened in the tree).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeKid {
+    pub path: PathBuf,
+    /// The name on disk.
+    pub name: String,
+    pub items: usize,
+    pub has_dirs: bool,
+}
+
+/// List the subfolders of `dir` with the number of items each holds, on a thread of its own, and
+/// send them as a [`CoreEvent::Tree`]. `hidden` says whether names that start with a dot are
+/// listed. Nothing here follows a link out of the folder: a link to a folder is a leaf.
+pub fn tree_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, hidden: bool, out: Sender<CoreEvent>) {
+    let _ = std::thread::Builder::new()
+        .name("rada-tree".into())
+        .spawn(move || {
+            const LIMIT: usize = 400;
+            let shown = |n: &std::ffi::OsStr| hidden || !n.to_string_lossy().starts_with('.');
+            let mut kids: Vec<TreeKid> = fs
+                .read_dir(&dir)
+                .map(|items| {
+                    items
+                        .into_iter()
+                        .filter(|it| shown(&it.name) && it.meta.as_ref().is_ok_and(|m| m.is_dir()))
+                        .take(LIMIT)
+                        .map(|it| {
+                            let (items, has_dirs) = match fs.read_dir(&it.path) {
+                                Ok(inside) => (
+                                    inside.iter().filter(|i| shown(&i.name)).count(),
+                                    inside.iter().any(|i| {
+                                        shown(&i.name) && i.meta.as_ref().is_ok_and(|m| m.is_dir())
+                                    }),
+                                ),
+                                Err(_) => (0, false),
+                            };
+                            TreeKid {
+                                name: crate::display::name(&it.name),
+                                path: it.path,
+                                items,
+                                has_dirs,
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            kids.sort_by_key(|k| k.name.to_lowercase());
+            let _ = out.send(CoreEvent::Tree { dir, hidden, kids });
+        });
+}
+
 enum DirReq {
     Load {
         path: PathBuf,

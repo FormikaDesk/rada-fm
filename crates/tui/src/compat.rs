@@ -147,7 +147,7 @@ pub fn ascii_for(ch: char) -> Option<char> {
         // triangles
         '▲' | '△' => '^',
         '▶' | '▸' | '▷' | '▹' => '>',
-        '▼' | '▽' | '▾' | '▿' => 'v',
+        '▼' | '▽' | '▾' | '▿' | '⌄' => 'v',
         '◀' | '◂' | '◁' | '◃' => '<',
         // squares
         '■' | '▣' | '▤' | '▥' | '▦' => '#',
@@ -217,6 +217,7 @@ pub fn std_for(ch: char) -> Option<char> {
         '▭' => '▬',
         '▶' => '►',
         '▽' => '▼',
+        '⌄' => '▾',
         '◆' => '♦',
         '◉' => '●',
         // the eighths of a progress bar round to the half, the thin edges become a line

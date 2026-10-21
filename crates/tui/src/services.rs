@@ -58,6 +58,12 @@ impl Services {
         self.zoxide.add(dir);
     }
 
+    /// Ask for the subfolders of `dir` with the number of items in each; the answer arrives as
+    /// `CoreEvent::Tree` (the NAV box of the panels view).
+    pub fn tree_dirs(&self, dir: PathBuf, hidden: bool) {
+        rada_core::workers::tree_dirs(self.fs.clone(), dir, hidden, self.notes.clone());
+    }
+
     /// Ask for the subfolders of `dir`; the answer arrives as `CoreEvent::Complete`.
     pub fn complete_dirs(&self, dir: PathBuf) {
         rada_core::workers::complete_dirs(self.fs.clone(), dir, self.notes.clone());

@@ -18,6 +18,7 @@ mod menu;
 mod modals;
 mod notice;
 mod openwith;
+mod panels;
 mod plan;
 pub mod popup;
 mod preview;
@@ -164,6 +165,19 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.term_width = area.width;
     app.screen = (area.width, area.height);
     app.popup_covers = popup_rects(app, area);
+    app.panels_shown = app.panels_wanted(area.width, area.height);
+    if app.panels_shown {
+        // The panels view has its own arrangement of everything; the overlays are the same.
+        app.size_notice_visible = false;
+        app.side_mode = Mode::Full;
+        app.details_shown = DetailsMode::Column;
+        let address_row = panels::draw(f, app, area);
+        finish(f, app, area, Some(address_row));
+        return;
+    }
+    if app.preview_focus {
+        app.preview_focus = false;
+    }
 
     // Top to bottom: tabs, address, commands, the body, the progress of a running operation,
     // the status bar and the key hints. The hints go first when the terminal is short, the
@@ -357,10 +371,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if app.modal.is_none() {
         notice::draw(f, app, notice_area, now);
     }
-    if app.address.is_some() && address_h > 0 {
-        address::draw_suggestions(f, app, address_row, area);
-    }
+    finish(f, app, area, (address_h > 0).then_some(address_row));
+}
 
+/// What is drawn over everything else, in either layout: the suggestions under the bar and the
+/// window in front.
+fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
+    let th = app.th.clone();
+    if let (Some(row), true) = (address_row, app.address.is_some()) {
+        address::draw_suggestions(f, app, row, area);
+    }
     if app.modal.is_some() {
         // Only the window is clickable while it is open.
         app.hits.clear();

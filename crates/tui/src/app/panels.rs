@@ -1,0 +1,326 @@
+//! What the panels view needs besides drawing: which layout the window gets, the tree of
+//! folders of the NAV box and the keys of NAV and ANTEPRIMA.
+//!
+//! Tab takes the keyboard from the folder to NAV, from NAV to ANTEPRIMA and back to the folder.
+
+use rada_core::platform::{PlaceKind, TagColor as Hue};
+
+use super::*;
+use crate::panels::{NavKind, NavRow};
+use crate::sidebar::{self, Origin, Section};
+
+impl App {
+    /// Whether a window `width` × `height` is drawn as panels.
+    pub fn panels_wanted(&self, width: u16, height: u16) -> bool {
+        crate::panels::use_panels(
+            self.layout_pref,
+            self.layout,
+            self.chooser.is_some(),
+            width,
+            height,
+        )
+    }
+
+    /// The folder the NAV tree starts at.
+    pub fn tree_root(&self) -> &Path {
+        self.home()
+    }
+
+    /// Make the tree lead to the current folder and ask for what it still lacks. Called by the
+    /// drawing: it only sends requests, the answers arrive as events.
+    pub fn want_tree(&mut self) {
+        let root = self.svc.home.clone();
+        self.tree.follow(&root, &self.cwd);
+        for dir in self.tree.wanted(self.show_hidden, self.dir_gen) {
+            self.svc.tree_dirs(dir, self.show_hidden);
+        }
+    }
+
+    /// The rows of the NAV box: the tree from Home, the favourites, the tags and the trash.
+    pub fn nav_rows(&self) -> Vec<NavRow> {
+        let mut rows = Vec::new();
+        let home = self.home().to_path_buf();
+        let home_name = self
+            .paths
+            .places
+            .iter()
+            .find(|p| p.kind == PlaceKind::Home)
+            .map(|p| p.name())
+            .unwrap_or_else(|| Key::HomeLabel.tr().to_string());
+        let open = self.tree.is_open(&home);
+        rows.push(NavRow {
+            kind: NavKind::Folder { open: Some(open) },
+            depth: 0,
+            path: home.clone(),
+            name: home_name,
+            count: None,
+        });
+        if open {
+            self.tree_rows(&mut rows, &home, 1);
+        }
+        let items = sidebar::items(self, false);
+        let favorites: Vec<usize> = items
+            .iter()
+            .enumerate()
+            .filter(|(_, i)| i.section == Section::Pinned && !matches!(i.origin, Origin::Device(_)))
+            .map(|(n, _)| n)
+            .collect();
+        let gap = || NavRow {
+            kind: NavKind::Gap,
+            depth: 0,
+            path: PathBuf::new(),
+            name: String::new(),
+            count: None,
+        };
+        if !favorites.is_empty() {
+            rows.push(gap());
+            rows.push(NavRow {
+                kind: NavKind::Heading,
+                depth: 0,
+                path: PathBuf::new(),
+                name: Key::SecPinned.tr().to_string(),
+                count: None,
+            });
+            for n in favorites {
+                rows.push(NavRow {
+                    kind: NavKind::Favorite(n),
+                    depth: 0,
+                    path: items[n].path.clone(),
+                    name: items[n].name.clone(),
+                    count: None,
+                });
+            }
+        }
+        if self.tags_supported() {
+            rows.push(gap());
+            rows.push(NavRow {
+                kind: NavKind::Tags,
+                depth: 0,
+                path: PathBuf::new(),
+                name: Key::SecTags.tr().to_string(),
+                count: None,
+            });
+        }
+        if let Some(t) = items.iter().find(|i| i.section == Section::Trash) {
+            rows.push(gap());
+            rows.push(NavRow {
+                kind: NavKind::Trash,
+                depth: 0,
+                path: t.path.clone(),
+                name: t.name.clone(),
+                count: None,
+            });
+        }
+        rows
+    }
+
+    fn tree_rows(&self, rows: &mut Vec<NavRow>, dir: &Path, depth: usize) {
+        // A path that loops back (a link) must not make the tree endless.
+        if depth > 24 {
+            return;
+        }
+        let Some(kids) = self.tree.kids(dir) else {
+            return;
+        };
+        for k in kids {
+            let open = k.has_dirs.then(|| self.tree.is_open(&k.path));
+            rows.push(NavRow {
+                kind: NavKind::Folder { open },
+                depth,
+                path: k.path.clone(),
+                name: self.shown_name(&k.path, k.name.clone()),
+                count: Some(k.items),
+            });
+            if open == Some(true) {
+                self.tree_rows(rows, &k.path, depth + 1);
+            }
+        }
+    }
+
+    /// The row of the NAV box that is the folder shown, for the highlight.
+    pub fn nav_current(rows: &[NavRow], cwd: &Path) -> Option<usize> {
+        // The deepest tree row wins over a favourite of the same folder.
+        rows.iter()
+            .position(|r| matches!(r.kind, NavKind::Folder { .. }) && r.path == cwd)
+            .or_else(|| {
+                rows.iter()
+                    .position(|r| matches!(r.kind, NavKind::Favorite(_)) && r.path == cwd)
+            })
+    }
+
+    /// Tab in the panels view: the folder, NAV, ANTEPRIMA, the folder.
+    pub(super) fn switch_pane_panels(&mut self) {
+        if self.side_focus {
+            self.side_focus = false;
+            self.preview_focus = self.details_shown != crate::ui::DetailsMode::Hidden;
+            return;
+        }
+        if self.preview_focus {
+            self.preview_focus = false;
+            return;
+        }
+        if !self.side_on {
+            self.toggle_sidebar();
+        }
+        let rows = self.nav_rows();
+        self.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+        self.side_focus = true;
+    }
+
+    /// An arrow clicked or pressed on a folder of the tree: open or close it.
+    pub fn toggle_tree(&mut self, dir: &Path) {
+        self.tree.toggle(dir);
+        self.dirty = true;
+    }
+
+    /// Left and right in NAV: they open and close the folders of the tree and move between
+    /// the dots of the tags. `true`: dealt with.
+    pub(super) fn on_nav_arrow(&mut self, right: bool) -> bool {
+        let rows = self.nav_rows();
+        let Some(row) = rows.get(self.nav_cursor).cloned() else {
+            return false;
+        };
+        match row.kind {
+            NavKind::Folder { open } => {
+                match (right, open) {
+                    (true, Some(false)) => self.tree.toggle(&row.path),
+                    (true, Some(true)) => {
+                        // Into the folder: its first child.
+                        if rows
+                            .get(self.nav_cursor + 1)
+                            .is_some_and(|r| r.depth > row.depth)
+                        {
+                            self.nav_cursor += 1;
+                        }
+                    }
+                    (false, Some(true)) => self.tree.toggle(&row.path),
+                    (false, _) => {
+                        // To the folder this one is in.
+                        if let Some(up) = rows[..self.nav_cursor]
+                            .iter()
+                            .rposition(|r| r.depth < row.depth)
+                        {
+                            self.nav_cursor = up;
+                        }
+                    }
+                    (true, None) => {}
+                }
+                true
+            }
+            NavKind::Tags => {
+                let last = Hue::ALL.len() - 1;
+                self.nav_tag = if right {
+                    (self.nav_tag + 1).min(last)
+                } else {
+                    self.nav_tag.saturating_sub(1)
+                };
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// A key while the NAV box has the focus (the classic pane's keys, on the rows of this
+    /// one). `true`: dealt with here.
+    pub(super) fn on_nav_action(&mut self, action: Action) -> bool {
+        use Action::*;
+        let rows = self.nav_rows();
+        let last = rows.len().saturating_sub(1);
+        self.nav_cursor = self.nav_cursor.min(last);
+        let step = |from: usize, down: bool| -> usize {
+            let mut i = from;
+            loop {
+                let next = if down {
+                    (i + 1).min(last)
+                } else {
+                    i.saturating_sub(1)
+                };
+                if next == i {
+                    return from;
+                }
+                i = next;
+                if rows[i].selectable() {
+                    return i;
+                }
+            }
+        };
+        let here = rows.get(self.nav_cursor).cloned();
+        match action {
+            Up => self.nav_cursor = step(self.nav_cursor, false),
+            Down => self.nav_cursor = step(self.nav_cursor, true),
+            First => self.nav_cursor = 0,
+            Last => self.nav_cursor = last,
+            Open => {
+                if let Some(row) = here {
+                    let path = match row.kind {
+                        NavKind::Tags => {
+                            let c = Hue::ALL[self.nav_tag.min(Hue::ALL.len() - 1)];
+                            rada_core::tagsearch::view_path(c.label(&self.tag_lang))
+                        }
+                        NavKind::Heading | NavKind::Gap => return true,
+                        _ => row.path,
+                    };
+                    self.side_focus = false;
+                    self.open_dir(path);
+                }
+            }
+            Parent | ClearSelection | SwitchPane => {
+                if action == SwitchPane {
+                    self.switch_pane_panels();
+                } else {
+                    self.side_focus = false;
+                }
+            }
+            Bookmark => {
+                if let Some(row) = here
+                    && matches!(row.kind, NavKind::Folder { .. } | NavKind::Favorite(_))
+                {
+                    let add = !self.paths.bookmarks.contains(&row.path);
+                    self.set_bookmark(row.path, add);
+                }
+            }
+            Trash | DeletePermanently => {
+                let items = sidebar::items(self, false);
+                match here.map(|r| r.kind) {
+                    Some(NavKind::Favorite(n))
+                        if matches!(items[n].origin, Origin::Bookmark { removable: true }) =>
+                    {
+                        let path = items[n].path.clone();
+                        self.set_bookmark(path, false);
+                    }
+                    _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
+                }
+            }
+            Filter => {
+                self.side_focus = false;
+                return false;
+            }
+            a if super::side::PASS_THROUGH.contains(&a) => return false,
+            _ => {
+                let back = self.key_for(SwitchPane).unwrap_or_else(|| "Tab".into());
+                self.toast(ToastKind::Info, tf(Key::TSidebarFocus, &[&back]), 3);
+            }
+        }
+        true
+    }
+
+    /// A key while ANTEPRIMA has the focus: the arrows scroll the preview. `true`: dealt with.
+    pub(super) fn on_preview_action(&mut self, action: Action) -> bool {
+        use Action::*;
+        match action {
+            Up => self.preview.scroll = self.preview.scroll.saturating_sub(1),
+            Down => self.preview.scroll = self.preview.scroll.saturating_add(1),
+            First => self.preview.scroll = 0,
+            PageUp | PreviewUp => self.preview.scroll = self.preview.scroll.saturating_sub(10),
+            PageDown | PreviewDown => self.preview.scroll = self.preview.scroll.saturating_add(10),
+            // Tab goes on round: back to the folder.
+            Parent | ClearSelection | SwitchPane => self.preview_focus = false,
+            Filter => {
+                self.preview_focus = false;
+                return false;
+            }
+            _ => return false,
+        }
+        true
+    }
+}

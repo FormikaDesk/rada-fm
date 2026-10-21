@@ -53,6 +53,7 @@ pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::DocMouse,
     Key::DocNo,
     Key::BarZoxide,
+    Key::PanelNav,
 ];
 
 strings! {
@@ -712,6 +713,12 @@ strings! {
     ReadyMove => "{0} ready to move", "{0} da spostare";
     HiddenShown => "hidden files shown", "file nascosti visibili";
     FreeSpace => "{0} free", "{0} liberi";
+    SpaceUsedOf => "{0} of {1}", "{0} di {1}";
+    // ---- the boxes of the panels view (the names on their top edge)
+    PanelNav => "NAV", "NAV";
+    PanelSpace => "SPACE", "SPAZIO";
+    PanelPreview => "PREVIEW", "ANTEPRIMA";
+    PanelDetails => "DETAILS", "DETTAGLI";
 
     // ---- the frame
     TooSmall => "terminal too small", "terminale troppo piccolo";
@@ -1023,7 +1030,7 @@ strings! {
     MBadAppearance => "unknown appearance \"{0}\" (use auto, light or dark)", "aspetto sconosciuto \"{0}\" (usa auto, light o dark)";
     MBadImages => "unknown image mode \"{0}\" (use auto, halfblocks, kitty, sixel, iterm2 or off)", "modo immagini sconosciuto \"{0}\" (usa auto, halfblocks, kitty, sixel, iterm2 oppure off)";
     MBadKeymap => "unknown keymap \"{0}\" (use {1})", "scorciatoie sconosciute \"{0}\" (usa {1})";
-    MBadLayout => "unknown layout \"{0}\" (use explorer or compact)", "disposizione sconosciuta \"{0}\" (usa explorer o compact)";
+    MBadLayout => "unknown layout \"{0}\" (use auto, panels, classic or compact)", "disposizione sconosciuta \"{0}\" (usa auto, pannelli, classico o compact)";
     MBadView => "unknown view \"{0}\" (use details, icons or columns)", "vista sconosciuta \"{0}\" (usa details, icons o columns)";
     MBadDensity => "unknown sidebar_density \"{0}\" (use {1})", "sidebar_density sconosciuta \"{0}\" (usa {1})";
     MBadDates => "unknown dates \"{0}\" (use relative or absolute)", "formato delle date sconosciuto \"{0}\" (usa relative o absolute)";

@@ -387,6 +387,8 @@ pub struct Config {
     pub request: Option<rada_core::ops::OpRequest>,
     /// `explorer` (default) or `compact`.
     pub layout: LayoutKind,
+    /// Panels, the classic layout, or whichever fits the window.
+    pub layout_pref: crate::panels::LayoutPref,
     /// The details pane: `None` shows it when the terminal is wide enough.
     pub details_pane: Option<bool>,
     /// How folders are shown in a new tab.
@@ -471,6 +473,7 @@ mod menus;
 mod mount;
 mod notice;
 mod openwith;
+mod panels;
 mod props;
 mod side;
 mod sizes;
@@ -629,6 +632,17 @@ pub struct App {
     pub layout: LayoutKind,
     /// The details pane: `None` follows the width of the terminal.
     pub details: Option<bool>,
+    /// Panels, the classic layout, or whichever fits the window (the View menu sets it).
+    pub layout_pref: crate::panels::LayoutPref,
+    /// The last frame was drawn as panels.
+    pub panels_shown: bool,
+    /// The folders of the NAV box of the panels view.
+    pub tree: crate::panels::Tree,
+    /// The row of the NAV box the keyboard is on, and which of the seven tag dots of its row.
+    pub nav_cursor: usize,
+    pub nav_tag: usize,
+    /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
+    pub preview_focus: bool,
     pub dates: DateStyle,
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
@@ -806,6 +820,12 @@ impl App {
             view,
             layout: cfg.layout,
             details: cfg.details_pane,
+            layout_pref: cfg.layout_pref,
+            panels_shown: false,
+            tree: Default::default(),
+            nav_cursor: 0,
+            nav_tag: 0,
+            preview_focus: false,
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
@@ -1428,6 +1448,10 @@ impl App {
             }
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Tree { dir, hidden, kids } => {
+                self.tree.answer(dir, hidden, kids);
+                self.dirty = true;
+            }
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
             CoreEvent::Update(u) => self.on_update_event(u),

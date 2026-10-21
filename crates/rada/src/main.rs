@@ -613,9 +613,11 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             }
         }
     };
-    let layout = match cfg_file.layout.as_deref() {
-        None => rada_tui::LayoutKind::Explorer,
-        Some(n) => rada_tui::LayoutKind::parse(n).with_context(|| tf(Key::MBadLayout, &[&n]))?,
+    let (layout, layout_pref) = match cfg_file.layout.as_deref() {
+        None => (rada_tui::LayoutKind::Explorer, rada_tui::LayoutPref::Auto),
+        Some(n) => {
+            rada_tui::panels::resolve_layout(n).with_context(|| tf(Key::MBadLayout, &[&n]))?
+        }
     };
     let view = match cfg_file.view.as_deref() {
         None => rada_tui::ViewMode::Details,
@@ -650,6 +652,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
     let cfg = Config {
         start_explicit: !cli.path.is_empty(),
         layout,
+        layout_pref,
         view,
         dates,
         sidebar_density,

@@ -1,0 +1,50 @@
+---
+source: crates/tui/tests/panels.rs
+expression: shot(&mut h)
+---
+  rada   ▸ demo  ✕   +                                                                                                                                  ? Help
+
+  ←   →   ↑   ⟳     ⌂ Home › projects › demo │ ⌕ Search files or type a command…                                                          Ctrl+P     ≣ Details
+
+  + New ▾   │   ✂ Cut    ⧉ Copy    ⎘ Paste    ✎ Rename    ▣ Compress    ✗ Delete   │   ⇅ Sort ▾    ◆ Tags ▾   │   ↶ Undo                                       ⋯
+
+╭─[ NAV ]────────────────────╮ ╭─[ ~/projects/demo ]───────────────────────────────────────────────────────────────╮ ╭─[ PREVIEW ]─────────────────────────────╮
+│ ⌄ ⌂ Home                   │ │     Name ↑                                                  Size  Date modified   │ │ H  show the hex dump                    │
+│     ▸ Desktop          (0) │ │                                                                                   │ │                                         │
+│     ▸ Documents        (0) │ │   ▸ assets                                                        3 days ago      │ │                                         │
+│     ▸ Downloads        (0) │ │   ▸ docs                                                          Yesterday       │ │                                         │
+│     ▸ Music            (0) │ │   ▸ scripts                                                       9 days ago      │ │                                         │
+│     ▸ Pictures         (0) │ │   ▸ src                                                           Today 09:30     │ │                                         │
+│   ⌄ ▸ projects         (1) │ │   ▸ tests                                                         2 days ago      │ │                                         │
+│     › ▸ demo          (19) │ │   · archive.tar.gz                                        17.6 MB  8 days ago     │ │                                         │
+│     ▸ Videos           (0) │ │ ☑ · backup.zip                                            39.0 MB  05/07/2026     │ │                                         │
+│                            │ │   · Cargo.toml                                              82 B  3 days ago      │ │                                         │
+│ PINNED                     │ │   · data.json                                               49 B  6 days ago      │ │                                         │
+│   ▭ Desktop             ⚲  │ │   · demo.mp4                                              91.0 MB  2 weeks ago    │ │                                         │
+│   ▤ Documents           ⚲  │ │   · logo.svg                                               197 B  5 days ago      │ │                                         │
+│   ↓ Downloads           ⚲  │ │   · main.rs                                                 80 B  Today 14:10     │ │                                         │
+│   ▣ Pictures            ⚲  │ │   · notes.txt                                               28 B  Yesterday       │ │                                         │
+│   ♪ Music               ⚲  │ │   · photo.jpg                                             70.7 KB  Today 13:30    │ │                                         │
+│   ▶ Videos              ⚲  │ │   · README.md                                              145 B  Today 13:28     │ │                                         │
+│                            │ │   · report.pdf                                            2.29 MB  4 days ago     │ │                                         │
+│ TAGS ● ● ● ● ● ● ●         │ │   · screenshot.png                                        5.34 KB  Yesterday      │ │                                         │
+│                            │ │   · setup.sh                                                21 B  12 days ago     │ │                                         │
+│                            │ │   · song.mp3                                              7.44 MB  30/07/2026     │ │                                         │
+│                            │ │                                                                                   │ │                                         │
+│                            │ │                                                                                   │ │ photo.jpg                    JPEG image │
+│                            │ │                                                                                   │ │  JPG   70.7 KB                          │
+│                            │ │                                                                                   │ │                                         │
+╰────────────────────────────╯ │                                                                                   │ │                                         │
+╭─[ SPACE ]──────────────────╮ │                                                                                   │ │   ▸ Open    Open with…  ◉ Preview       │
+│ System                 62% │ │                                                                                   │ ╰─────────────────────────────────────────╯
+│ ■■■■■■■■■■■■■■■■□□□□□□□□□□ │ │                                                                                   │ ╭─[ DETAILS ]─────────────────────────────╮
+│ 293 GB of 477 GB           │ │                                                                                   │ │ Modified    Today, 13:30                │
+│ 183 GB free                │ │                                            ╭────────────────────────────────────╮ │ │ Location    ~/projects/demo             │
+│                            │ │                                            ┃ ✓ 3 items copied to Documents      │ │ │ Permissions  -rw-r--r--                 │
+│ Data     ■■■■■□□□□□□□  40% │ │                                            ┃   Undo  Ctrl+Z  ·  Show            │ │ │ Tags        —                           │
+│ USB dri… ■■■■■□□□□□□□  41% │ │                                            ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │ │             History  F3                 │
+╰────────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────╯ ╰─────────────────────────────────────────╯
+
+  19 items   │  ☑ 1 selected · 39.0 MB  │  ⎘ 2 items ready to paste                                                                       v0.6.0 ⟳  183 GB free
+
+   Ctrl+C  copy     Ctrl+X  cut     Del  trash     Shift+Del  delete     R  rename all     Alt+Z  compress     Ctrl+V  paste     Esc  clear

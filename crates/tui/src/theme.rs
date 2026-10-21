@@ -154,10 +154,51 @@ pub struct Theme {
     pub warn: Color,
     pub error: Color,
     pub kinds: KindColors,
+    /// The inside of the boxes of the panels view: a step away from the canvas, which is what
+    /// the borders and the space between the boxes are painted with.
+    pub inner: Color,
+    /// The colours of the panels view's icons and labels.
+    pub hues: Hues,
     pub density: Density,
     pub bar: BarStyle,
     pub badge: BadgeStyle,
     pub depth: ColorDepth,
+}
+
+/// Six hues for the icons and labels of the panels view, each one readable on the canvas and
+/// on the inside of a box.
+#[derive(Clone, Debug)]
+pub struct Hues {
+    pub cyan: Color,
+    pub pink: Color,
+    pub yellow: Color,
+    pub green: Color,
+    pub orange: Color,
+    pub blue: Color,
+}
+
+impl Hues {
+    fn all(&self) -> [Color; 6] {
+        [
+            self.cyan,
+            self.pink,
+            self.yellow,
+            self.green,
+            self.orange,
+            self.blue,
+        ]
+    }
+
+    fn map(&self, f: impl Fn(Color) -> Color) -> Hues {
+        Hues {
+            cyan: f(self.cyan),
+            pink: f(self.pink),
+            yellow: f(self.yellow),
+            green: f(self.green),
+            orange: f(self.orange),
+            blue: f(self.blue),
+        }
+    }
 }
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color {
@@ -313,8 +354,40 @@ impl Theme {
             density: Density::Airy,
             bar: BarStyle::Thin,
             badge: BadgeStyle::Plain,
+            inner: rgb(26, 27, 38),
+            hues: Hues {
+                cyan: rgb(110, 220, 220),
+                pink: rgb(250, 140, 200),
+                yellow: rgb(240, 200, 110),
+                green: rgb(120, 220, 160),
+                orange: rgb(255, 170, 90),
+                blue: rgb(110, 165, 255),
+            },
             depth: ColorDepth::True,
         }
+    }
+
+    /// Derive the colours of the panels view from the tokens a theme has ended up with: the
+    /// inside of the boxes (a little lighter than the canvas, on a light theme a little
+    /// paler) and, unless the theme chose its own, the hues of the kinds of file.
+    fn with_panel_tokens(mut self, own_hues: bool) -> Theme {
+        self.inner = if self.light {
+            self.tint_share(self.canvas, rgb(255, 255, 255), 0.55)
+        } else {
+            self.tint_share(self.canvas, self.text, 0.045)
+        };
+        if !own_hues {
+            let k = &self.kinds;
+            self.hues = Hues {
+                cyan: k.link,
+                pink: k.audio,
+                yellow: self.warn,
+                green: self.success,
+                orange: k.doc,
+                blue: k.folder,
+            };
+        }
+        self
     }
 
     /// The default: an azure accent, an airy layout, thin size bars, coloured dots for types.
@@ -342,7 +415,8 @@ impl Theme {
         t.key_bg = rgb(0x2e, 0x33, 0x43);
         t.key_text = t.text;
         t.kinds.folder = accent;
-        t
+        t.hues.blue = accent;
+        t.with_panel_tokens(true)
     }
 
     pub fn catppuccin() -> Theme {
@@ -381,7 +455,7 @@ impl Theme {
             folder: rgb(137, 180, 250),
             link: rgb(148, 226, 213),
         };
-        t
+        t.with_panel_tokens(false)
     }
 
     pub fn tokyo_night() -> Theme {
@@ -417,7 +491,7 @@ impl Theme {
             folder: rgb(122, 162, 247),
             link: rgb(125, 207, 255),
         };
-        t
+        t.with_panel_tokens(false)
     }
 
     /// Light themes share the structure of the dark ones; every token is chosen to read on
@@ -517,7 +591,16 @@ impl Theme {
             folder: accent,
             link: cyan,
         };
-        t
+        // No pink among the colours of the file types: halfway between its red and its purple.
+        t.hues = Hues {
+            cyan,
+            pink: mix(red, purple, 1, 2),
+            yellow,
+            green,
+            orange,
+            blue: accent,
+        };
+        t.with_panel_tokens(true)
     }
 
     /// The default theme for a light terminal, "chalk" (Gesso): an almost neutral off-white,
@@ -616,7 +699,7 @@ impl Theme {
             folder: rgb(27, 93, 224),
             link: rgb(15, 114, 122),
         };
-        t
+        t.with_panel_tokens(false)
     }
 
     /// Tokyo Night Day, with the text and accents deepened for contrast.
@@ -658,7 +741,7 @@ impl Theme {
             folder: rgb(34, 92, 172),
             link: rgb(14, 107, 114),
         };
-        t
+        t.with_panel_tokens(false)
     }
 
     /// The default dark theme without its paint: the terminal's own background stays, as with
@@ -721,6 +804,16 @@ impl Theme {
             folder: Color::Blue,
             link: Color::Cyan,
         };
+        // Sixteen colours have no second tone: the boxes are not filled.
+        self.inner = Color::Reset;
+        self.hues = Hues {
+            cyan: Color::Cyan,
+            pink: Color::Magenta,
+            yellow: Color::Yellow,
+            green: Color::Green,
+            orange: Color::LightRed,
+            blue: Color::LightBlue,
+        };
         if self.light {
             // Pale greys vanish on a light background.
             self.text_dim = Color::DarkGray;
@@ -769,6 +862,8 @@ impl Theme {
                 t.error = f(t.error);
                 t.bg = t.bg.map(f);
                 t.canvas = f(t.canvas);
+                t.inner = f(t.inner);
+                t.hues = t.hues.map(f);
                 let k = &mut t.kinds;
                 for c in [
                     &mut k.code,
@@ -1038,6 +1133,17 @@ impl Theme {
             k.link,
         ];
         v.extend(self.bg);
+        v.push(self.inner);
+        v.extend(self.hues.all());
+        // The fills of the rounded labels: the six hues, the text (permissions) and the
+        // tags' colours, each over the inside of a box.
+        for c in self.hues.all() {
+            v.push(self.chip_fill(c));
+        }
+        v.push(self.chip_fill(self.text));
+        for c in rada_core::platform::TagColor::ALL {
+            v.push(self.chip_fill(self.tag_color(Some(c))));
+        }
         for c in [self.accent, self.success, self.warn, self.error] {
             v.push(self.tint(c));
         }
@@ -1047,6 +1153,12 @@ impl Theme {
         }
         v.push(self.tag_color(None));
         v
+    }
+
+    /// What a rounded label of colour `hue` is filled with on the inside of a box of the panels
+    /// view: a light touch of the colour over it.
+    pub fn chip_fill(&self, hue: Color) -> Color {
+        self.tint_share(self.inner, hue, if self.light { 0.16 } else { 0.2 })
     }
 
     /// A tinted background for a badge of colour `c`.
@@ -1644,6 +1756,104 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn every_theme_has_panel_tokens_that_read_on_the_inside_of_a_box() {
+        // The panels view fills its boxes with `inner`, a step away from the canvas, and draws
+        // its icons and labels in six hues: all of them read on both, and on the light touch
+        // of their own colour that a rounded label is filled with.
+        let mut failures = Vec::new();
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            let mut need = |what: &str, ratio: f64, min: f64| {
+                if ratio < min {
+                    failures.push(format!("{n}: {what} is {ratio:.2}:1, needs {min}:1"));
+                }
+            };
+            assert_ne!(t.inner, t.canvas, "{n}: the inside is not the canvas");
+            need("inner against canvas", contrast(t.inner, t.canvas), 1.02);
+            need("text on inner", contrast(t.text, t.inner), 7.0);
+            need("text_dim on inner", contrast(t.text_dim, t.inner), 4.5);
+            need("accent on inner", contrast(t.accent, t.inner), 4.5);
+            need("muted on inner", contrast(t.muted, t.inner), 1.5);
+            need("sel on inner", contrast(t.text, t.sel), 7.0);
+            need("cursor against inner", contrast(t.cursor, t.inner), 1.4);
+            for (what, col) in [("success", t.success), ("warn", t.warn), ("error", t.error)] {
+                need(&format!("{what} on inner"), contrast(col, t.inner), 4.5);
+            }
+            let h = &t.hues;
+            for (what, hue) in [
+                ("cyan", h.cyan),
+                ("pink", h.pink),
+                ("yellow", h.yellow),
+                ("green", h.green),
+                ("orange", h.orange),
+                ("blue", h.blue),
+            ] {
+                need(&format!("{what} on canvas"), contrast(hue, t.canvas), 4.5);
+                need(&format!("{what} on inner"), contrast(hue, t.inner), 4.5);
+                need(
+                    &format!("{what} on its label"),
+                    contrast(hue, t.chip_fill(hue)),
+                    3.5,
+                );
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn on_a_light_theme_the_text_on_a_highlight_is_dark_and_never_white() {
+        // The selected row, a full button and the pill of the status bar: the text on each is
+        // the theme's own colour for it, and it reads (4.5:1); on a light theme it is darker
+        // than what it is on, white only where the highlight is dark.
+        for n in Theme::NAMES {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            for (what, text, on) in [
+                ("selected row", t.cursor_text, t.cursor),
+                ("full button", t.on_accent, t.accent),
+            ] {
+                assert!(contrast(text, on) >= 4.5, "{n}: {what}");
+                if luminance(on) > 0.18 {
+                    assert!(
+                        luminance(text) < luminance(on),
+                        "{n}: {what} is {text:?} on {on:?}, a pale highlight takes dark text"
+                    );
+                }
+            }
+        }
+        // Gesso and Carta have a pale selection: the text on it is the darkest of their tones.
+        for n in ["rada-light", "carta"] {
+            let t = Theme::named(n, ColorDepth::True).unwrap();
+            assert!(
+                luminance(t.cursor_text) < 0.02,
+                "{n}: the text of the selected row is dark"
+            );
+        }
+    }
+
+    #[test]
+    fn the_panel_tokens_follow_the_colour_depth() {
+        for n in Theme::NAMES {
+            let t256 = Theme::named(n, ColorDepth::Ansi256).unwrap();
+            for c in [t256.inner].into_iter().chain(t256.hues.all()) {
+                assert!(matches!(c, Color::Indexed(_)), "{n}: {c:?}");
+            }
+            let t16 = Theme::named(n, ColorDepth::Ansi16).unwrap();
+            assert_eq!(
+                t16.inner,
+                Color::Reset,
+                "{n}: sixteen colours leave the boxes unfilled"
+            );
+            assert!(
+                t16.hues
+                    .all()
+                    .iter()
+                    .all(|c| !matches!(c, Color::Rgb(..) | Color::Indexed(_))),
+                "{n}"
+            );
+        }
     }
 
     #[test]

@@ -6,7 +6,7 @@ use crate::sidebar::{self, Item, Mode, Origin};
 
 /// Actions that mean the same wherever the keyboard focus is; everything else is about
 /// the list, and the sidebar does not pretend to do it.
-const PASS_THROUGH: &[Action] = &[
+pub(super) const PASS_THROUGH: &[Action] = &[
     Action::Help,
     Action::Palette,
     Action::Quit,
@@ -106,6 +106,9 @@ impl App {
 
     /// Tab: the keyboard goes to the sidebar, or back to the list.
     pub(super) fn switch_pane(&mut self) {
+        if self.panels_shown {
+            return self.switch_pane_panels();
+        }
         if self.side_focus {
             self.side_focus = false;
             return;
@@ -130,6 +133,9 @@ impl App {
     /// A key while the sidebar has the focus. `true`: dealt with here.
     pub(super) fn on_side_action(&mut self, action: Action) -> bool {
         use Action::*;
+        if self.panels_shown {
+            return self.on_nav_action(action);
+        }
         let items = self.side_items();
         let last = items.len().saturating_sub(1);
         self.side_cursor = self.side_cursor.min(last);

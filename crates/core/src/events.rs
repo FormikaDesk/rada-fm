@@ -144,6 +144,13 @@ pub enum CoreEvent {
         /// Names of the subfolders, sorted; empty when the folder cannot be read.
         names: Vec<String>,
     },
+    /// The subfolders of a folder with their item counts, for the navigation tree.
+    Tree {
+        dir: PathBuf,
+        /// Whether hidden names were listed.
+        hidden: bool,
+        kids: Vec<crate::workers::TreeKid>,
+    },
     /// The folders zoxide knows that match what is typed in the command bar (at most five).
     Zoxide {
         query: String,

@@ -204,6 +204,9 @@ impl H {
             show_hints: true,
             sidebar: true,
             layout: rada_tui::LayoutKind::Explorer,
+            // The older tests draw the classic layout at every size; the ones of the panels
+            // ask for them.
+            layout_pref: rada_tui::LayoutPref::Classic,
             // Previews stay visible at the widths the older tests use.
             details_pane: Some(true),
             view: rada_tui::ViewMode::Details,

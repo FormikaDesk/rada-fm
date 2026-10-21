@@ -310,6 +310,24 @@ impl App {
             return;
         }
         if let Some(action) = self.keymap.action_for(&key) {
+            // In NAV of the panels view the sideways arrows open and close the folders.
+            if self.panels_shown
+                && self.side_focus
+                && key.modifiers.is_empty()
+                && let Some(right) = match (action, key.code) {
+                    (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(true),
+                    (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(false),
+                    _ => None,
+                }
+                && self.on_nav_arrow(right)
+            {
+                self.dirty = true;
+                return;
+            }
+            if self.panels_shown && self.preview_focus && self.on_preview_action(action) {
+                self.dirty = true;
+                return;
+            }
             if self.side_focus && self.on_side_action(action) {
                 self.dirty = true;
                 return;
@@ -886,7 +904,10 @@ impl App {
                 _ => self.cancel_address_edit(),
             }
         }
+        // The keyboard follows the click: into the preview box when that is what was clicked.
+        self.preview_focus = self.panels_shown && matches!(target, Some(Target::Preview));
         match target {
+            Some(Target::TreeToggle(dir)) => self.toggle_tree(&dir),
             Some(Target::Row(i)) => {
                 self.side_focus = false;
                 self.click_row(i, mods)

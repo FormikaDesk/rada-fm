@@ -80,10 +80,19 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
 
     let mut left = Bar::default();
     if w >= 30 {
-        left.push(Span::styled(
-            " rada ",
-            th.accent_style().add_modifier(Modifier::BOLD).patch(band),
-        ));
+        if app.panels_shown {
+            // In the panels view the name of the program is a pill.
+            left.push(Span::styled(" ", band));
+            for s in soft::pill(&th, look, "rada", th.accent, th.pill(), band) {
+                left.push(s);
+            }
+            left.push(Span::styled(" ", band));
+        } else {
+            left.push(Span::styled(
+                " rada ",
+                th.accent_style().add_modifier(Modifier::BOLD).patch(band),
+            ));
+        }
     }
 
     let budget = w.saturating_sub(left.width() + right.width());
