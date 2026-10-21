@@ -52,6 +52,10 @@
 //!                            # folders and every folder rada enters is added to it. false: rada
 //!                            # never calls it
 //! zoxide_path = ""           # the zoxide program; empty looks for `zoxide` in the PATH
+//! git = true                 # the panels view asks git, when it is installed, for the branch and
+//!                            # the changed and new files of the folder shown (`git status`, in
+//!                            # the background, read only). false: rada never calls it
+//! git_path = ""              # the git program; empty looks for `git` in the PATH
 //!
 //! [archives]
 //! max_extract_gb = 8         # an extraction that would write more asks for a typed "yes"
@@ -122,6 +126,8 @@ pub struct FileConfig {
     pub syntax_highlight: bool,
     pub zoxide: bool,
     pub zoxide_path: Option<String>,
+    pub git: bool,
+    pub git_path: Option<String>,
     pub hide_devices: Option<Vec<String>>,
     pub keymap: Option<String>,
     /// macOS: ask the terminal to report the Cmd key.
@@ -267,6 +273,8 @@ struct Raw {
     syntax_highlight: Option<bool>,
     zoxide: Option<bool>,
     zoxide_path: Option<String>,
+    git: Option<bool>,
+    git_path: Option<String>,
     devices: Option<DevicesRaw>,
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
@@ -349,6 +357,8 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         syntax_highlight: raw.syntax_highlight.unwrap_or(true),
         zoxide: raw.zoxide.unwrap_or(true),
         zoxide_path: raw.zoxide_path.filter(|p| !p.trim().is_empty()),
+        git: raw.git.unwrap_or(true),
+        git_path: raw.git_path.filter(|p| !p.trim().is_empty()),
         hide_devices: raw.devices.and_then(|d| d.hide),
         keymap: raw.keymap,
         cmd_keys: raw.cmd_keys.unwrap_or(true),
@@ -439,6 +449,16 @@ mod tests {
         assert!(!c.zoxide);
         assert_eq!(c.zoxide_path.as_deref(), Some("/opt/z/zoxide"));
         assert!(with_config("zoxide_path = \"\"\n").zoxide_path.is_none());
+    }
+
+    #[test]
+    fn git_is_on_unless_the_file_says_otherwise() {
+        let d = with_config("sidebar = true\n");
+        assert!(d.git && d.git_path.is_none());
+        let c = with_config("git = false\ngit_path = \"/opt/git/bin/git\"\n");
+        assert!(!c.git);
+        assert_eq!(c.git_path.as_deref(), Some("/opt/git/bin/git"));
+        assert!(with_config("git_path = \"\"\n").git_path.is_none());
     }
 
     #[test]

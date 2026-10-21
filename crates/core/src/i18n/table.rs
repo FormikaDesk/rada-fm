@@ -54,6 +54,7 @@ pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::DocNo,
     Key::BarZoxide,
     Key::PanelNav,
+    Key::GitLabel,
 ];
 
 strings! {
@@ -719,6 +720,11 @@ strings! {
     PanelSpace => "SPACE", "SPAZIO";
     PanelPreview => "PREVIEW", "ANTEPRIMA";
     PanelDetails => "DETAILS", "DETTAGLI";
+    // ---- git, in the panels view
+    GitLabel => "Git", "Git";
+    GitModified => "modified", "modificato";
+    GitNew => "new", "nuovo";
+    GitClean => "no changes", "nessuna modifica";
 
     // ---- the frame
     TooSmall => "terminal too small", "terminale troppo piccolo";

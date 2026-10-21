@@ -488,6 +488,7 @@ pub use input::{FilterState, MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, T
 pub use menus::MenuKind;
 pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
+pub use panels::GitView;
 pub use props::PropsView;
 pub use tabs::TabState;
 pub use update::{UpdateStatus, UpdateView};
@@ -643,6 +644,11 @@ pub struct App {
     pub nav_tag: usize,
     /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
     pub preview_focus: bool,
+    /// What git said about the folder shown (panels view), with the folder it was about.
+    pub git: Option<GitView>,
+    /// The folder and the generation of its listing git was last asked about, and when.
+    git_asked: Option<(PathBuf, u64)>,
+    git_busy: Option<Instant>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
@@ -826,6 +832,9 @@ impl App {
             nav_cursor: 0,
             nav_tag: 0,
             preview_focus: false,
+            git: None,
+            git_asked: None,
+            git_busy: None,
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
@@ -1169,6 +1178,15 @@ impl App {
         self.svc.zoxide = zoxide;
     }
 
+    /// Change how git is called (the program starts with the configuration's choice; the tests
+    /// give it a repository of their own to look at and a git kept from the person's settings).
+    pub fn use_git(&mut self, git: rada_core::git::Git) {
+        self.svc.git = git;
+        self.git = None;
+        self.git_asked = None;
+        self.git_busy = None;
+    }
+
     pub fn open_dir(&mut self, path: PathBuf) {
         // A device that is plugged in and not mounted is not a folder yet: opening it mounts it.
         if let Some(id) = self.unmounted_id(&path) {
@@ -1448,6 +1466,7 @@ impl App {
             }
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Git { dir, status } => self.on_git(dir, status),
             CoreEvent::Tree { dir, hidden, kids } => {
                 self.tree.answer(dir, hidden, kids);
                 self.dirty = true;

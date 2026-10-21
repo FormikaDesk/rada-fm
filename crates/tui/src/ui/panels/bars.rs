@@ -2,6 +2,7 @@
 //! (the number of items as a pill, what is selected, what waits on the clipboard, and on the
 //! right the version and the free space) and what goes on the top edge of the folder's box.
 
+use rada_core::git::GitStatus;
 use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -18,9 +19,48 @@ use crate::ui::bottom;
 use crate::ui::soft::{self, Look};
 use crate::ui::widgets::Bar;
 
-/// What goes on the right of the top edge of the folder's box.
-pub fn folder_edge(_app: &App) -> Edge {
-    Edge::NONE
+/// The branch with its icon, and how far it is from its upstream: `⎇ main ↑2 ↓1`.
+pub fn branch_text(app: &App, git: &GitStatus) -> String {
+    let icon = icons::ui(app.icons, Glyph::Branch);
+    let mut s = String::new();
+    if !icon.is_empty() {
+        s.push_str(icon);
+        s.push(' ');
+    }
+    s.push_str(&git.branch);
+    if git.ahead > 0 {
+        s.push_str(&format!(" ↑{}", git.ahead));
+    }
+    if git.behind > 0 {
+        s.push_str(&format!(" ↓{}", git.behind));
+    }
+    s
+}
+
+/// What goes on the right of the top edge of the folder's box: when the folder is in a git
+/// repository, its branch with an icon and the number of changed files (●) and new ones (?).
+pub fn folder_edge(app: &App) -> Edge {
+    let Some(git) = app.git_here() else {
+        return Edge::NONE;
+    };
+    let th = &app.th;
+    let mut right = vec![Span::styled(
+        branch_text(app, git),
+        th.fg(th.hues.pink).add_modifier(Modifier::BOLD),
+    )];
+    if git.modified > 0 {
+        right.push(Span::styled(
+            format!(" ●{}", git.modified),
+            th.fg(th.warn).add_modifier(Modifier::BOLD),
+        ));
+    }
+    if git.new > 0 {
+        right.push(Span::styled(
+            format!(" ?{}", git.new),
+            th.fg(th.success).add_modifier(Modifier::BOLD),
+        ));
+    }
+    Edge { right }
 }
 
 pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
@@ -104,6 +144,13 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
                 )
             ),
             th.fg(th.hues.cyan).patch(band),
+        ));
+    }
+    if let Some(git) = app.git_here() {
+        left.push(sep());
+        left.push(Span::styled(
+            branch_text(app, git),
+            th.fg(th.hues.pink).patch(band),
         ));
     }
     if app.show_hidden {

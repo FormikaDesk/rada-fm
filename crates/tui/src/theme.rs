@@ -1210,6 +1210,9 @@ impl Theme {
             v.push(self.chip_fill(c));
         }
         v.push(self.chip_fill(self.text));
+        // The state of a file in git: changed, new.
+        v.push(self.chip_fill(self.warn));
+        v.push(self.chip_fill(self.success));
         for c in rada_core::platform::TagColor::ALL {
             v.push(self.chip_fill(self.tag_color(Some(c))));
         }

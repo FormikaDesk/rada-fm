@@ -88,6 +88,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     .areas(body);
 
     app.want_tree();
+    app.want_git();
     if left.width > 0 {
         draw_left(f, app, left);
     } else {

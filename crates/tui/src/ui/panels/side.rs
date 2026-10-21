@@ -4,6 +4,7 @@
 //! box in its place (see [`Lower`]).
 
 use rada_core::display;
+use rada_core::git::FileState;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::Entry;
 use ratatui::Frame;
@@ -312,6 +313,20 @@ fn details_rows(app: &App) -> Vec<Detail> {
         value: tags,
         click: None,
     });
+    // In a git repository: what git says of it.
+    if let Some(git) = app.git_here() {
+        let word = |letter: &str, what: Key| format!("{letter} {}", what.tr());
+        let value = match git.items.get(&e.display) {
+            Some(FileState::Modified) => chip(app, &word("M", Key::GitModified), th.warn),
+            Some(FileState::New) => chip(app, &word("?", Key::GitNew), th.success),
+            None => vec![Span::styled(Key::GitClean.tr(), th.dim())],
+        };
+        rows.push(Detail {
+            label: Key::GitLabel.tr(),
+            value,
+            click: None,
+        });
+    }
     // The link to the history, with the key the keymap really gives it.
     let key = app.keymap.hint(Action::History).unwrap_or_default();
     rows.push(Detail {

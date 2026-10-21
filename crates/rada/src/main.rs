@@ -599,6 +599,10 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
                 .zoxide_path
                 .as_deref()
                 .map(std::path::PathBuf::from),
+        ))
+        .with_git(rada_core::git::Git::new(
+            cfg_file.git,
+            cfg_file.git_path.as_deref().map(std::path::PathBuf::from),
         ));
     // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
     // screens must not depend on what GitHub says today.

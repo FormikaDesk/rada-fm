@@ -144,6 +144,12 @@ pub enum CoreEvent {
         /// Names of the subfolders, sorted; empty when the folder cannot be read.
         names: Vec<String>,
     },
+    /// What git says about a folder (the panels view): `None` for a folder that is not in a
+    /// repository.
+    Git {
+        dir: PathBuf,
+        status: Option<crate::git::GitStatus>,
+    },
     /// The subfolders of a folder with their item counts, for the navigation tree.
     Tree {
         dir: PathBuf,

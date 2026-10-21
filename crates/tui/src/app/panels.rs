@@ -9,6 +9,15 @@ use super::*;
 use crate::panels::{NavKind, NavRow};
 use crate::sidebar::{self, Origin, Section};
 
+/// What git said about the folder shown: the answer, and the folder it is about.
+pub struct GitView {
+    pub dir: PathBuf,
+    pub status: rada_core::git::GitStatus,
+}
+
+/// A question to git that has had no answer after this long is not waited for.
+const GIT_WAIT: Duration = Duration::from_secs(6);
+
 impl App {
     /// Whether a window `width` × `height` is drawn as panels.
     pub fn panels_wanted(&self, width: u16, height: u16) -> bool {
@@ -34,6 +43,46 @@ impl App {
         for dir in self.tree.wanted(self.show_hidden, self.dir_gen) {
             self.svc.tree_dirs(dir, self.show_hidden);
         }
+    }
+
+    /// Ask git about the folder shown if it was not asked yet, and not while another question
+    /// is still out. Called by the drawing: it only sends a request, the answer arrives as an
+    /// event. A virtual folder (a tag, the recent files, an archive) is not in a repository.
+    pub fn want_git(&mut self) {
+        if !self.svc.git.enabled() || self.archive.is_some() || self.view_title().is_some() {
+            if self.git.take().is_some() {
+                self.dirty = true;
+            }
+            return;
+        }
+        let key = (self.cwd.clone(), self.dir_gen);
+        if self.git_asked.as_ref() == Some(&key) {
+            return;
+        }
+        if self.git_busy.is_some_and(|t| t.elapsed() < GIT_WAIT) {
+            return;
+        }
+        self.git_asked = Some(key);
+        self.git_busy = Some(Instant::now());
+        self.svc.git_status(&self.cwd);
+    }
+
+    /// What git said about a folder.
+    pub(super) fn on_git(&mut self, dir: PathBuf, status: Option<rada_core::git::GitStatus>) {
+        self.git_busy = None;
+        if dir == self.cwd {
+            self.git = status.map(|status| GitView { dir, status });
+        }
+        // The folder may have changed while git was thinking: the next frame asks again.
+        self.dirty = true;
+    }
+
+    /// What git says about the folder shown, when it is the one it was asked about.
+    pub fn git_here(&self) -> Option<&rada_core::git::GitStatus> {
+        self.git
+            .as_ref()
+            .filter(|g| g.dir == self.cwd)
+            .map(|g| &g.status)
     }
 
     /// The rows of the NAV box: the tree from Home, the favourites, the tags and the trash.

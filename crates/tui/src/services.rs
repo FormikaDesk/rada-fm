@@ -9,6 +9,7 @@ use rada_core::archive::ArchiveLimits;
 use rada_core::events::CoreEvent;
 use rada_core::foldersize::{SizeMode, SizeSettings, SizeWorker};
 use rada_core::fs::FsEngine;
+use rada_core::git::Git;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
 use rada_core::ops::Engine;
@@ -44,6 +45,9 @@ pub struct Services {
     pub updater: Option<rada_core::update::Updater>,
     /// How zoxide is called: never, until [`with_zoxide`](Services::with_zoxide) says.
     pub zoxide: Zoxide,
+    /// How git is called, for the state of a folder in the panels view: never, until
+    /// [`with_git`](Services::with_git) says.
+    pub git: Git,
     fs: Arc<dyn FsEngine>,
 }
 
@@ -51,6 +55,11 @@ impl Services {
     /// Ask zoxide for the folders that match `text`; the answer arrives as `CoreEvent::Zoxide`.
     pub fn zoxide_query(&self, text: &str) {
         self.zoxide.query(text, self.notes.clone());
+    }
+
+    /// Ask git about `dir`; the answer arrives as `CoreEvent::Git`.
+    pub fn git_status(&self, dir: &std::path::Path) {
+        self.git.status(dir, self.notes.clone());
     }
 
     /// Tell zoxide that `dir` was entered.
@@ -135,8 +144,15 @@ impl Services {
             notes: tx,
             updater: None,
             zoxide: Zoxide::off(),
+            git: Git::off(),
             fs,
         }
+    }
+
+    /// Use git as the configuration says.
+    pub fn with_git(mut self, git: Git) -> Services {
+        self.git = git;
+        self
     }
 
     /// Use zoxide as the configuration says.

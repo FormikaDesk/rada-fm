@@ -4,6 +4,7 @@
 
 use rada_core::display;
 use rada_core::fs::FileKind;
+use rada_core::git::FileState;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{Entry, SortKey};
 use rada_core::ops::LinkState;
@@ -250,9 +251,27 @@ fn row<'a>(
             with(Style::default().fg(gcolor)),
         ));
     }
-    let name_txt = display::truncate(&e.display, cols.name);
+    // What git says of it, after the name: M for a change, ? for a file that is new.
+    let git = app
+        .git_here()
+        .and_then(|g| g.items.get(&e.display))
+        .copied();
+    let mark_w = if git.is_some() { 2 } else { 0 };
+    let name_txt = display::truncate(&e.display, cols.name.saturating_sub(mark_w));
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
+    if let Some(state) = git {
+        let (letter, hue) = match state {
+            FileState::Modified => ("M", th.warn),
+            FileState::New => ("?", th.success),
+        };
+        // On the selected row the one colour that reads is the row's own.
+        spans.push(Span::styled(
+            format!(" {letter}"),
+            with(Style::default().fg(hue).add_modifier(Modifier::BOLD)),
+        ));
+        used += 2;
+    }
     if let Some(l) = &e.link {
         let room = cols.name.saturating_sub(used);
         if room > 5 {

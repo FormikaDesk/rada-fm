@@ -9,8 +9,10 @@ remembering tabs, and a few tags. Nothing in it comes from the machine it is mad
 files are generated here, the dates are relative to the moment of the run (so "Today 15:21"
 and "3 days ago" read the same whenever the images are made).
 
-Needs python3, Pillow (the picture and the PDF), tar and zip. The tags are extended
-attributes (`user.xdg.tags`); on a filesystem without them the files simply have no tags.
+Needs python3, Pillow (the picture and the PDF), tar and zip, and git if the panels view is to
+show a branch (`projects/demo` is made a repository with one file changed and one new). The tags
+are extended attributes (`user.xdg.tags`); on a filesystem without them the files simply have no
+tags.
 """
 
 import gzip
@@ -20,6 +22,7 @@ import math
 import random
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 import time
@@ -182,10 +185,12 @@ def main():
     for v in names.values():
         os.makedirs(os.path.join(home, v), exist_ok=True)
     with open(os.path.join(home, ".config/rada/config.toml"), "w") as f:
-        # No tabs remembered, nothing asked of the network, and a key for the context menu
-        # that a recording can press (a tape has no mouse).
+        # No tabs remembered, the classic layout (the window of a recording is wide enough
+        # for the panels, which the tapes of the panels ask for themselves), nothing asked of
+        # the network, and a key for the context menu that a recording can press (a tape has
+        # no mouse).
         f.write(
-            'remember_tabs = false\n\n[update]\ncheck = false\n\n'
+            'remember_tabs = false\nlayout = "classic"\n\n[update]\ncheck = false\n\n'
             '[keys]\ncontext_menu = ["ctrl+k"]\n'
         )
     # A few programs that "Open with…" can list: made up, and harmless to start.
@@ -282,7 +287,34 @@ def main():
     write(os.path.join(home, "Download/istruzioni.txt"), "Istruzioni.\n", 3 * DAY)
     shutil.copyfile(photo, os.path.join(home, "Immagini/paesaggio.jpg"))
     age(os.path.join(home, "Immagini/paesaggio.jpg"), 5 * DAY)
+    make_repository(demo)
     print(home)
+
+
+def make_repository(demo):
+    """Make `projects/demo` a git repository on `main`, for the panels view: everything is
+    committed but setup.sh (which is new) and main.rs is changed, one letter, so that nothing
+    about its size or date moves. Skipped where git is not installed."""
+    if shutil.which("git") is None:
+        print("git is not installed: the panels view will show no branch", file=sys.stderr)
+        return
+    env = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
+               GIT_AUTHOR_NAME="Demo", GIT_AUTHOR_EMAIL="demo@example.invalid",
+               GIT_COMMITTER_NAME="Demo", GIT_COMMITTER_EMAIL="demo@example.invalid")
+
+    def git(*args):
+        subprocess.run(["git", "-C", demo, "-c", "commit.gpgsign=false", *args], env=env,
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    git("init", "-q", "-b", "main")
+    git("add", "-A", "--", ".", ":!setup.sh")
+    git("commit", "-q", "-m", "prima versione")
+    main_rs = os.path.join(demo, "main.rs")
+    with open(main_rs) as f:
+        text = f.read()
+    with open(main_rs, "w") as f:
+        f.write(text.replace("mondo", "mundo"))
+    age(main_rs, 55 * 60)
 
 
 if __name__ == "__main__":

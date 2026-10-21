@@ -369,10 +369,12 @@ pub enum Glyph {
     Tag,
     Columns,
     Done,
+    /// A git branch.
+    Branch,
 }
 
 impl Glyph {
-    pub const ALL: [Glyph; 32] = [
+    pub const ALL: [Glyph; 33] = [
         Glyph::Back,
         Glyph::Forward,
         Glyph::Up,
@@ -405,6 +407,7 @@ impl Glyph {
         Glyph::Tag,
         Glyph::Columns,
         Glyph::Done,
+        Glyph::Branch,
     ];
 }
 
@@ -445,6 +448,7 @@ pub fn ui(set: IconSet, g: Glyph) -> &'static str {
         Glyph::Tag => ("\u{f02b}", "◆", ""),
         Glyph::Columns => ("\u{f0db}", "▥", ""),
         Glyph::Done => ("\u{f00c}", "✓", "+"),
+        Glyph::Branch => ("\u{e0a0}", "⎇", ""),
     };
     match set {
         IconSet::Nerd => nerd,

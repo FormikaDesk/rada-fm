@@ -131,7 +131,7 @@ pub fn ascii_for(ch: char) -> Option<char> {
         '⇅' => ':',
         '\u{2190}'..='\u{21FF}' => '>',
         // symbols
-        '⌂' => '~',
+        '⌂' | '⎇' => '~',
         '⌕' | '⚲' => '?',
         '⊘' => '!',
         '☁' => '@',
@@ -218,7 +218,7 @@ pub fn std_for(ch: char) -> Option<char> {
         '▶' => '►',
         '▽' => '▼',
         '⌄' => '▾',
-        '◆' => '♦',
+        '◆' | '⎇' => '♦',
         '◉' => '●',
         // the eighths of a progress bar round to the half, the thin edges become a line
         '▉' | '▊' => '█',
