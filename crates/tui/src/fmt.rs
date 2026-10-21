@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use rada_core::i18n::{self, Key, tf};
 
 pub use rada_core::display::bytes as size;
+pub use rada_core::display::bytes_short as size_short;
 
 /// A time that says something: the very start of 1970 is what a filesystem (a phone's, say) gives
 /// when it has no date, not a date, so it is no time at all.

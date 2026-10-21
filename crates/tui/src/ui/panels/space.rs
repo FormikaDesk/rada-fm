@@ -18,6 +18,8 @@ use crate::ui::widgets::{pad, pad_left};
 
 /// Cells of the bar of a volume that is not the main one.
 const BAR: usize = 12;
+/// The least cells of the bar of a disk in a narrow box.
+const MIN_BAR: usize = 4;
 
 /// The volumes the box is about: the main disk (the one of the system: the root of the file
 /// system, or the first fixed disk) and the others, in the order the list gave them.
@@ -95,6 +97,12 @@ pub fn ring_colors(app: &App) -> Option<crate::ring::Colors> {
     crate::ring::Colors::of(th.inner, th.track, th.hues.cyan, th.accent)
 }
 
+/// The first of `texts` that is `room` cells wide at most (the last, the shortest, if none is).
+fn fit(texts: [String; 2], room: usize) -> String {
+    let [full, short] = texts;
+    if full.width() <= room { full } else { short }
+}
+
 /// The main disk as a ring, with its name, what is used of what it holds and what is free at
 /// its right. `false` where the picture could not be made: the bar is drawn instead.
 fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str) -> bool {
@@ -142,19 +150,30 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
     let room = (area.right().saturating_sub(x + 1)) as usize;
     let total = main.total.unwrap_or(0);
     let free = main.available.unwrap_or(0);
-    let (used, all) = (fmt::size(total.saturating_sub(free)), fmt::size(total));
-    // "352 / 512 GB" when both are in the same unit.
-    let of = match (used.rsplit_once(' '), all.rsplit_once(' ')) {
-        (Some((n, u1)), Some((_, u2))) if u1 == u2 => format!("{n} / {all}"),
-        _ => format!("{used} / {all}"),
+    // "352 / 512 GB" when both are in the same unit; in a narrow box "352/512 GB" with the short
+    // sizes, which fits where the first does not.
+    let of_with = |size: fn(u64) -> String, sep: &str| {
+        let (used, all) = (size(total.saturating_sub(free)), size(total));
+        match (used.rsplit_once(' '), all.rsplit_once(' ')) {
+            (Some((n, u1)), Some((_, u2))) if u1 == u2 => format!("{n}{sep}{all}"),
+            _ => format!("{used}{sep}{all}"),
+        }
     };
+    let of = fit(
+        [of_with(fmt::size, " / "), of_with(fmt::size_short, "/")],
+        room,
+    );
+    let left = fit(
+        [
+            tf(Key::FreeSpace, &[&fmt::size(free)]),
+            tf(Key::FreeSpace, &[&fmt::size_short(free)]),
+        ],
+        room,
+    );
     let rows = [
         (name.to_string(), th.base().add_modifier(Modifier::BOLD)),
         (of, th.dim()),
-        (
-            tf(Key::FreeSpace, &[&fmt::size(free)]),
-            th.fg(th.hues.green),
-        ),
+        (left, th.fg(th.hues.green)),
     ];
     for (n, (text, style)) in rows.into_iter().enumerate() {
         let y = ring_at.y + 1 + n as u16;
@@ -233,8 +252,16 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     if !others.is_empty() {
         lines.push(Line::raw(""));
         // A name, a bar of twelve cells and the percentage: the name gets what is left.
+        // In the two columns the bars give up cells (down to four) so that the names stay whole.
         let pct_w = 4;
-        let name_w = w.saturating_sub(1 + 1 + BAR + 1 + pct_w + 1);
+        let longest = other_names.iter().map(|n| n.width()).max().unwrap_or(0);
+        let bar_w = if app.panels_two {
+            w.saturating_sub(1 + 1 + 1 + pct_w + 1 + longest)
+                .clamp(MIN_BAR, BAR)
+        } else {
+            BAR
+        };
+        let name_w = w.saturating_sub(1 + 1 + bar_w + 1 + pct_w + 1);
         for (v, shown_as) in others.iter().zip(&other_names) {
             let name = pad(
                 &rada_core::display::truncate(shown_as, name_w.max(1)),
@@ -245,7 +272,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::styled(name, th.dim()),
                 Span::styled(" ", th.base()),
             ];
-            spans.extend(bar(&th, used_share(v), BAR, false));
+            spans.extend(bar(&th, used_share(v), bar_w, false));
             spans.push(Span::styled(
                 format!(" {}", pad_left(&percent(v), pct_w)),
                 th.dim(),

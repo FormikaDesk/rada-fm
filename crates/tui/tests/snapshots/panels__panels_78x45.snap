@@ -8,41 +8,41 @@ expression: s
 
   +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                               ⋯
 
-╭─[ NAV ]────────────────╮ ╭─[ ~/projects/demo ]─────────────────────────────╮
-│                        │ │                                                 │
-│    ⌂ Home              │ │      Name ↑                               Size  │
-│    ▭ Desktop           │ │                                                 │
-│    ▤ Documents         │ │    ▸ assets                                     │
-│    ↓ Downloads         │ │    ▸ docs                                       │
-│    ▣ Pictures          │ │    ▸ scripts                                    │
-│    ♪ Music             │ │    ▸ src                                        │
-│    ▶ Videos            │ │    ▸ tests                                      │
-│                        │ │    · archive.tar.gz                     17.6 MB │
-│  DEVICES               │ │  ☑ · backup.zip                         39.0 MB │
-│    ▥ System            │ │    · Cargo.toml                           82 B  │
-│    ▥ Data              │ │    · data.json                            49 B  │
-│    ⏏ USB drive         │ │    · demo.mp4                           91.0 MB │
-│                        │ │    · logo.svg                            197 B  │
-│  TAGS ● ● ● ● ● ● ●    │ │    · main.rs                              80 B  │
-│                        │ │    · notes.txt                            28 B  │
-│  PATH                  │ │    · photo.jpg                          70.7 KB │
-│    ⌂ Home              │ │    · README.md                           145 B  │
-│      ▸ projects        │ │    · report.pdf                         2.29 MB │
-│        ▸ demo    (19)  │ │    · screenshot.png                     5.34 KB │
-│          ▸ assets (0)  │ │    · setup.sh                             21 B  │
-│          ▸ docs   (0)  │ │    · song.mp3                           7.44 MB │
-│        … 3 more        │ │                                                 │
-╰────────────────────────╯ │                                                 │
-╭─[ SPACE ]──────────────╮ │                                                 │
-│                        │ │                                                 │
-│  System           62%  │ │                                                 │
-│  ■■■■■■■■■■■■□□□□□□□□  │ │                                                 │
-│  293 GB of 477 GB      │ │                                                 │
-│  183 GB free           │ │          ╭────────────────────────────────────╮ │
-│                        │ │          ┃ ✓ 3 items copied to Documents      │ │
-│  D… ■■■■■□□□□□□□  40%  │ │          ┃   Undo  Ctrl+Z  ·  Show            │ │
-│  U… ■■■■■□□□□□□□  41%  │ │          ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │
-╰────────────────────────╯ ╰─────────────────────────────────────────────────╯
+╭─[ NAV ]──────────────────╮ ╭─[ ~/projects/demo ]───────────────────────────╮
+│                          │ │                                               │
+│    ⌂ Home                │ │      Name ↑                             Size  │
+│    ▭ Desktop             │ │                                               │
+│    ▤ Documents           │ │    ▸ assets                                   │
+│    ↓ Downloads           │ │    ▸ docs                                     │
+│    ▣ Pictures            │ │    ▸ scripts                                  │
+│    ♪ Music               │ │    ▸ src                                      │
+│    ▶ Videos              │ │    ▸ tests                                    │
+│                          │ │    · archive.tar.gz                   17.6 MB │
+│  DEVICES                 │ │  ☑ · backup.zip                       39.0 MB │
+│    ▥ System              │ │    · Cargo.toml                         82 B  │
+│    ▥ Data                │ │    · data.json                          49 B  │
+│    ⏏ USB drive           │ │    · demo.mp4                         91.0 MB │
+│                          │ │    · logo.svg                          197 B  │
+│  TAGS ● ● ● ● ● ● ●      │ │    · main.rs                            80 B  │
+│                          │ │    · notes.txt                          28 B  │
+│  PATH                    │ │    · photo.jpg                        70.7 KB │
+│    ⌂ Home                │ │    · README.md                         145 B  │
+│      ▸ projects          │ │    · report.pdf                       2.29 MB │
+│        ▸ demo      (19)  │ │    · screenshot.png                   5.34 KB │
+│          ▸ assets   (0)  │ │    · setup.sh                           21 B  │
+│          ▸ docs     (0)  │ │    · song.mp3                         7.44 MB │
+│        … 3 more          │ │                                               │
+╰──────────────────────────╯ │                                               │
+╭─[ SPACE ]────────────────╮ │                                               │
+│                          │ │                                               │
+│  System             62%  │ │                                               │
+│  ■■■■■■■■■■■■■■□□□□□□□□  │ │                                               │
+│  293 GB of 477 GB        │ │                                               │
+│  183 GB free             │ │        ╭────────────────────────────────────╮ │
+│                          │ │        ┃ ✓ 3 items copied to Documents      │ │
+│  Data      ■■■□□□□  40%  │ │        ┃   Undo  Ctrl+Z  ·  Show            │ │
+│  USB drive ■■■□□□□  41%  │ │        ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │
+╰──────────────────────────╯ ╰───────────────────────────────────────────────╯
 
   19 items   │  ☑ 1 selected · 39.0 MB  │  ⎘ 2 items r… v0.6.0 ⟳  183 GB free
 

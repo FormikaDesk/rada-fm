@@ -160,9 +160,44 @@ pub fn bytes(n: u64) -> String {
     format!("{} {}", crate::i18n::decimal(&number), UNITS[u])
 }
 
+/// The same as [`bytes`] for a narrow place: no decimals from 10 up, one below (`53 GB`,
+/// `9,5 GB`), so that it is at most six cells wide.
+pub fn bytes_short(n: u64) -> String {
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+    if n < 1024 {
+        return format!("{n} B");
+    }
+    let mut v = n as f64;
+    let mut u = 0;
+    while v >= 1024.0 && u < UNITS.len() - 1 {
+        v /= 1024.0;
+        u += 1;
+    }
+    let number = if v >= 10.0 {
+        format!("{v:.0}")
+    } else {
+        format!("{v:.1}")
+    };
+    format!("{} {}", crate::i18n::decimal(&number), UNITS[u])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_short_size_has_no_decimals_from_ten_up() {
+        assert_eq!(
+            bytes_short(53 * 1024 * 1024 * 1024 + 1024 * 1024 * 100),
+            "53 GB"
+        );
+        assert_eq!(bytes_short(156 * 1024 * 1024 * 1024), "156 GB");
+        assert_eq!(
+            bytes_short(9 * 1024 * 1024 * 1024 + 512 * 1024 * 1024),
+            "9.5 GB"
+        );
+        assert_eq!(bytes_short(300), "300 B");
+    }
 
     #[test]
     fn plain_text_is_unchanged() {

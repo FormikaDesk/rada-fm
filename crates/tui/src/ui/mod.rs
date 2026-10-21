@@ -89,12 +89,16 @@ pub fn details_mode(width: u16, chosen: Option<bool>, layout: LayoutKind) -> Det
 /// command bar and the key hints.
 pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
 
-/// Whether the one-line advice to enlarge the window is shown on a terminal of this size:
-/// below [`FULL_LAYOUT_MIN`], with room to spare a row for it, in the explorer layout (the
-/// compact one is a choice of a small layout), and until the person has closed it.
+/// Whether the one-line advice to enlarge the window is shown on a terminal of this size: only
+/// when the person asked for the panels (`layout = "panels"`) and they do not fit, below
+/// [`FULL_LAYOUT_MIN`], with room to spare a row for it, and until the person has closed it.
+/// With `auto` rada chooses the view and there is nothing to ask; `classic` and `compact` are
+/// choices of a small layout.
 pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
     app.layout == LayoutKind::Explorer
+        && app.layout_pref == crate::LayoutPref::Panels
         && !app.size_notice_dismissed
+        && app.panels_wanted(width, height).is_none()
         && (width < FULL_LAYOUT_MIN.0 || height < FULL_LAYOUT_MIN.1)
         && width >= 24
         && height >= 12

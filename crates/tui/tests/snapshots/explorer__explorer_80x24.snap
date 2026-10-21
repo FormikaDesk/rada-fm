@@ -6,23 +6,23 @@ expression: shot(&mut h)
   ←   →   ↑   ⟳     ⌂ Home › projects › demo │ ⌕ Search file…         Ctrl+P
   +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                                 ⋯
 ╭───╮ ╭────────────────────────────────────────────────────────────────────────╮
-│ ⌂ │ │ ☐   Name ↑                                 Date modified          Size │
+│ ⌂ │ │ ☐   Name ↑                                                        Size │
 │   │ │                                                                        │
-│   │ │ ☐ ▸ assets                                 3 days ago                  │
-│ ▭ │ │ ☐ ▸ docs                                   Yesterday                   │
-│ ▤ │ │ ☐ ▸ scripts                                9 days ago                  │
-│ ↓ │ │ ☐ ▸ src                                    Today 09:30                 │
-│ ▣ │ │ ☐ ▸ tests                                  2 days ago                  │
-│ ♪ │ │ ☑ · archive.tar.gz                         8 days ago          17.6 MB │
-│ ▶ │ │ ☑ · backup.zip                             05/07/2026          39.0 MB │
-│   │ │ ☑ · Cargo.toml                             3 days ago             82 B │
-│   │ │ ☐ · data.json                              6 days ago             49 B │
-│   │ │ ☐ · demo.mp4                               2 weeks ago         91.0 MB │
-│   │ │ ☐ · logo.svg                               5 days ago            197 B │
-│   │ │ ☐ · main.rs                                Today 14:10            80 B │
-│   │ │ ☐ · notes.txt                              Yesterday              28 B │
-│   │ │▌☐ · photo.jpg                              Today 13:30         70.7 KB │
+│   │ │ ☐ ▸ assets                                                             │
+│ ▭ │ │ ☐ ▸ docs                                                               │
+│ ▤ │ │ ☐ ▸ scripts                                                            │
+│ ↓ │ │ ☐ ▸ src                                                                │
+│ ▣ │ │ ☐ ▸ tests                                                              │
+│ ♪ │ │ ☑ · archive.tar.gz                                             17.6 MB │
+│ ▶ │ │ ☑ · backup.zip                                                 39.0 MB │
+│   │ │ ☑ · Cargo.toml                                                    82 B │
+│   │ │ ☐ · data.json                                                     49 B │
+│   │ │ ☐ · demo.mp4                                                   91.0 MB │
+│   │ │ ☐ · logo.svg                                                     197 B │
+│   │ │ ☐ · main.rs                                                       80 B │
+│   │ │ ☐ · notes.txt                                                     28 B │
+│   │ │▌☐ · photo.jpg                                                  70.7 KB │
+│   │ │ ☐ · README.md                                                    145 B │
 ╰───╯ ╰────────────────────────────────────────────────────────────────────────╯
- Enlarge the window for the full layout (now 80×24)  Esc: hide
  19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 i… v0.6.0 ⟳  183 GB free  ≣  ▦  ▥
    Ctrl+C  copy   Ctrl+X  cut   Del  trash   Shift+Del  delete   R  rename all

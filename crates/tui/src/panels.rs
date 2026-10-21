@@ -111,6 +111,9 @@ pub const PANELS_THREE_MIN: (u16, u16) = (100, 24);
 pub const TWO_SPACE_FROM_ROWS: u16 = 36;
 /// Width of the left column of the two-column view: a third of the window, between these.
 pub const TWO_LEFT_WIDTH: (u16, u16) = (24, 28);
+/// Percent of the window's width the left column of the two-column view takes, before it is held
+/// between [`TWO_LEFT_WIDTH`]: the figures of SPAZIO need the room.
+pub const TWO_LEFT_PERCENT: u16 = 36;
 /// Below this many rows the blank rows between the bars at the top and at the bottom go, so
 /// that more files are seen.
 pub const AIRY_FROM: u16 = 42;

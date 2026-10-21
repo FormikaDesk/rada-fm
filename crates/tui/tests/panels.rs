@@ -210,15 +210,20 @@ fn the_panels_at_the_smallest_window_that_gets_them() {
     windows,
     ignore = "the sidebar of a system with no tags has no TAGS section, which the Linux snapshot has"
 )]
-fn a_window_below_70_by_24_gets_the_classic_layout_and_the_advice_to_enlarge_it() {
+fn a_window_below_70_by_24_gets_the_classic_layout_and_asks_for_more_only_if_panels_were_asked_for()
+{
     let mut h = scene(69, 30, "rada", false);
     assert!(!h.app.panels_shown, "69x30 is classic");
+    let s = shot(&mut h);
+    assert!(!s.contains("Enlarge"), "auto asks nothing:\n{s}");
+    insta::assert_snapshot!("panels_classic_69x30", s);
+    // With `layout = "panels"` the window is told what is wanted.
+    h.app.layout_pref = LayoutPref::Panels;
     let s = shot(&mut h);
     assert!(
         s.contains("Enlarge the window for the full layout (now 69×30)"),
         "{s}"
     );
-    insta::assert_snapshot!("panels_classic_69x30", s);
     for (w, hh) in [(69, 46), (100, 23), (160, 23)] {
         h.term.backend_mut().resize(w, hh);
         let _ = h.screen();
@@ -226,6 +231,77 @@ fn a_window_below_70_by_24_gets_the_classic_layout_and_the_advice_to_enlarge_it(
     }
 }
 
+#[test]
+fn a_window_of_78_by_22_is_classic_with_no_advice_no_date_and_the_longest_name_whole() {
+    // Three windows side by side on a laptop: too short for two columns, and rada's to choose.
+    let mut h = scene(78, 22, "rada", false);
+    assert!(!h.app.panels_shown);
+    let s = h.screen();
+    assert!(!s.contains("Enlarge"), "{s}");
+    assert!(
+        !s.contains("Date modified"),
+        "no date column below 90 columns:\n{s}"
+    );
+    let longest = h
+        .names()
+        .into_iter()
+        .max_by_key(|n| n.width())
+        .expect("files");
+    // (The list is short at 22 rows: the cursor goes to the name, which scrolls it into view.)
+    put_cursor(&mut h, &longest);
+    let s = h.screen();
+    assert!(s.contains(&longest), "{longest} is whole:\n{s}");
+}
+
+#[test]
+fn the_date_column_goes_below_90_columns_in_the_classic_list_too() {
+    let mut h = demo_scene(89, 30);
+    assert!(!h.screen().contains("Date modified"));
+    h.term.backend_mut().resize(90, 30);
+    assert!(h.screen().contains("Date modified"));
+}
+
+/// The rows of the box titled `title` in the left column of a screen, as they are drawn.
+fn left_box(screen: &str, title: &str) -> Vec<String> {
+    let mut rows = Vec::new();
+    let mut inside = false;
+    for line in screen.lines() {
+        let cells: Vec<char> = line.chars().collect();
+        // The left column is 28 cells at most.
+        let col: String = cells.iter().take(28).collect();
+        if col.contains(&format!("[ {title} ]")) {
+            inside = true;
+            continue;
+        }
+        if inside {
+            if col.contains('╰') {
+                break;
+            }
+            rows.push(col);
+        }
+    }
+    rows
+}
+
+#[test]
+fn nothing_in_spazio_ends_with_an_ellipsis_at_78_by_45() {
+    for ring in [false, true] {
+        let mut h = scene(78, 45, "rada", false);
+        if ring {
+            h.app.image_ui = Some(rada_tui::ImageUi::sized(
+                ratatui_image::picker::ProtocolType::Kitty,
+                (10, 20),
+            ));
+        }
+        let s = h.screen();
+        let rows = left_box(&s, "SPACE");
+        assert!(rows.len() > 4, "{s}");
+        for r in rows {
+            let text = r.trim_end().trim_end_matches('│').trim_end();
+            assert!(!text.ends_with('…'), "ring {ring}: {r:?}\n{s}");
+        }
+    }
+}
 // ---------------------------------------------------------------------------- two columns
 
 #[test]

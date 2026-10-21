@@ -39,6 +39,10 @@ const NAME_MIN_WITH_TAGS: usize = 18;
 /// Narrower terminals do without the Tag column: the room is the name's.
 const TAGS_FROM: usize = 80;
 
+/// Terminals narrower than this do without the date column (the name has the room); the sort by
+/// date stays, only the column goes. The list of the panels view follows the same width.
+pub const DATE_FROM: usize = 90;
+
 /// Which columns fit, and how wide each is.
 pub struct Columns {
     pub icon: usize,
@@ -63,12 +67,13 @@ pub struct ListOpts {
 }
 
 impl ListOpts {
-    /// Below 100 columns the type goes, below 60 the date goes too, and below 80 the tags go.
-    /// `tags` is whether the Tag column has something to show (see `App::tags_column_wanted`).
+    /// Below 100 columns the type goes, below [`DATE_FROM`] the date goes too, and below 80 the
+    /// tags go. `tags` is whether the Tag column has something to show (see
+    /// `App::tags_column_wanted`).
     pub fn for_terminal(term_width: usize, tags: bool) -> ListOpts {
         ListOpts {
             show_type: term_width >= 100,
-            show_date: term_width >= 60,
+            show_date: term_width >= DATE_FROM,
             show_tags: tags && term_width >= TAGS_FROM,
         }
     }

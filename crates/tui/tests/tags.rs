@@ -547,14 +547,14 @@ fn name_width_and_tags(h: &mut H) -> (usize, bool) {
 fn a_folder_without_tags_gives_the_tag_column_to_the_names() {
     use rada_tui::ui::{ListOpts, list_columns};
 
-    // No file here carries a tag, and the window is as narrow as the file chooser's.
+    // No file here carries a tag, and the window is as narrow as the date column allows.
     let (sb, dir) = sandbox_with_files();
-    let mut h = H::with_config(sb, dir.clone(), 78, 24, |c| c.details_pane = Some(false));
+    let mut h = H::with_config(sb, dir.clone(), 90, 24, |c| c.details_pane = Some(false));
     assert!(h.app.tags_supported() && h.app.show_tags);
     let (name, tags) = name_width_and_tags(&mut h);
     assert!(!tags, "{}", titles(&mut h));
     // What the name had before: the table of the same width with the Tag column let in.
-    let area = 78 - rada_tui::sidebar::Mode::Rail.columns() as usize - 2;
+    let area = 90 - rada_tui::sidebar::Mode::Rail.columns() as usize - 2;
     let opts = |show_tags| ListOpts {
         show_type: false,
         show_date: true,
@@ -590,6 +590,6 @@ fn a_folder_without_tags_gives_the_tag_column_to_the_names() {
         return;
     };
     let mut h = H::with_config(sb, dir, 78, 24, |c| c.details_pane = Some(false));
-    let (_, has) = name_width_and_tags(&mut h);
-    assert!(!has, "{}", titles(&mut h));
+    let line = titles(&mut h);
+    assert!(!line.contains("Tags"), "{line}");
 }

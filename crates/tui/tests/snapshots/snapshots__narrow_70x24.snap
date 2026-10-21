@@ -6,23 +6,23 @@ expression: shot(&mut h)
   ←   →   ↑   ⟳     ⌂ Home › demo › projects                Ctrl+P
   +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶                       ⋯
 ╭───╮ ╭──────────────────────────────────────────────────────────────╮
-│ ⌂ │ │ ☐   Name ↑                       Date modified          Size │
+│ ⌂ │ │ ☐   Name ↑                                              Size │
 │   │ │                                                              │
-│   │ │ ☐ ▸ data                         6 days ago                  │
-│   │ │ ☐ ▸ src                          6 days ago                  │
-│   │ │ ☐ ▸ 目录                         6 days ago                  │
-│   │ │ ☐ · a-very-long-file-name-that…  12 days ago             1 B │
-│   │ │ ☐ · backup.img                   9 days ago           420 MB │
-│   │ │▌☐ · Cargo.toml                   2 days ago             42 B │
-│   │ │ ☐ · main.rs                      Yesterday              37 B │
-│   │ │ ☐ · notes.txt                    5 weeks ago         3.52 KB │
-│   │ │ ☐ · README.md                    Today 09:00            73 B │
-│   │ │ ☐ · тест-файл.md                 Today 10:30            13 B │
-│   │ │ ☐ · 日本語のファイル名.txt       5 days ago             16 B │
-│   │ │ ☐ · 📷 holiday photos 🌴.txt     27/11/2028              6 B │
+│   │ │ ☐ ▸ data                                                     │
+│   │ │ ☐ ▸ src                                                      │
+│   │ │ ☐ ▸ 目录                                                     │
+│   │ │ ☐ · a-very-long-file-name-that-keeps-going-and-…         1 B │
+│   │ │ ☐ · backup.img                                        420 MB │
+│   │ │▌☐ · Cargo.toml                                          42 B │
+│   │ │ ☐ · main.rs                                             37 B │
+│   │ │ ☐ · notes.txt                                        3.52 KB │
+│   │ │ ☐ · README.md                                           73 B │
+│   │ │ ☐ · тест-файл.md                                        13 B │
+│   │ │ ☐ · 日本語のファイル名.txt                              16 B │
+│   │ │ ☐ · 📷 holiday photos 🌴.txt                             6 B │
+│   │ │                                                              │
 │   │ │                                                              │
 │   │ │                                                              │
 ╰───╯ ╰──────────────────────────────────────────────────────────────╯
- Enlarge the window for the full layout (now 70×24)  Esc: hide
  12 items                                         v0.6.0 ⟳   ≣  ▦  ▥
    Enter  open     Space  select     Ctrl+C  copy     Ctrl+V  paste

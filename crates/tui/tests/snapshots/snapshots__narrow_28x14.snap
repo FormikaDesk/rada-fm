@@ -13,6 +13,6 @@ expression: shot(&mut h)
 │ ☐ · a-very-…         1 B │
 │ ☐ · backup.…      420 MB │
 │▌☐ · Cargo.t…        42 B │
+│ ☐ · main.rs         37 B │
 ╰──────────────────────────╯
- Enlarge the window for the…
  12 items          ≣  ▦  ▥

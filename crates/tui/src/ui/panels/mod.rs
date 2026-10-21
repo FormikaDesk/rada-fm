@@ -78,7 +78,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let two = app.panels_two;
     let (left_w, right_w) = if two {
         let (min, max) = crate::panels::TWO_LEFT_WIDTH;
-        ((area.width / 3).clamp(min, max), 0)
+        (
+            (area.width * crate::panels::TWO_LEFT_PERCENT / 100).clamp(min, max),
+            0,
+        )
     } else {
         side_widths(area.width)
     };
