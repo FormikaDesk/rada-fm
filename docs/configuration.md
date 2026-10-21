@@ -33,6 +33,7 @@ language = "auto"     # auto (from the system) | it | en
 remember_tabs = true  # reopen the tabs of the last session
 dates = "relative"    # relative ("Today 14:03", "3 days ago") | absolute (dd/mm/yyyy hh:mm, in the order of your locale)
 sidebar_density = "auto"  # auto (the same as compact) | compact: one line to an entry, one gap between the groups | comfortable: blank lines between the entries as the height of the terminal allows (a line after every entry where all fit, after every second one, or only between the groups), even if the pane then scrolls
+nav = "percorso"      # the NAV box of the panels view: percorso (the places of the sidebar, then only the way to the folder shown: its ancestors and its subfolders) | albero (the places and the whole tree of Home, with an arrow on each folder)
 folder_sizes = "auto" # auto: count the size of the folders you can see, in the background | items: only how many items each holds | off
 folder_size_seconds = 3   # one count gives up after this long and shows "> size"
 folder_size_entries = 200000  # ...or after this many files and folders

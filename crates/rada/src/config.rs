@@ -43,6 +43,8 @@
 //!                            # between groups) | comfortable (blank lines between the entries as
 //!                            # the height of the terminal allows, never fewer than a gap between
 //!                            # groups)
+//! nav = "percorso"           # panels view, NAV box: percorso (the places, then only the way to the
+//!                            # folder shown) | albero (the places and the whole tree of Home)
 //! folder_sizes = "auto"      # auto (count the folders on screen in the background) | items
 //!                            # (only how many items each holds, no walk below) | off
 //! folder_size_seconds = 3    # one count gives up after this long, and shows "> size"
@@ -121,6 +123,7 @@ pub struct FileConfig {
     pub remember_tabs: bool,
     pub dates: Option<String>,
     pub sidebar_density: Option<String>,
+    pub nav: Option<String>,
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
@@ -268,6 +271,7 @@ struct Raw {
     remember_tabs: Option<bool>,
     dates: Option<String>,
     sidebar_density: Option<String>,
+    nav: Option<String>,
     folder_sizes: Option<String>,
     folder_size_seconds: Option<f32>,
     folder_size_entries: Option<u64>,
@@ -352,6 +356,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
         remember_tabs: raw.remember_tabs.unwrap_or(true),
         dates: raw.dates,
         sidebar_density: raw.sidebar_density,
+        nav: raw.nav,
         folder_sizes: raw.folder_sizes,
         folder_size_seconds: raw.folder_size_seconds,
         folder_size_entries: raw.folder_size_entries,

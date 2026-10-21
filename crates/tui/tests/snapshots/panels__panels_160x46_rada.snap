@@ -10,29 +10,29 @@ expression: shot(&mut h)
 
 ╭─[ NAV ]────────────────────╮ ╭─[ ~/projects/demo ]───────────────────────────────────────────────────────────────╮ ╭─[ PREVIEW ]─────────────────────────────╮
 │                            │ │                                                                                   │ │                                         │
-│  ⌄ ⌂ Home                  │ │      Name ↑                                                Size  Date modified    │ │  H  show the hex dump                   │
-│      ▸ Desktop        (0)  │ │                                                                                   │ │                                         │
-│      ▸ Documents      (0)  │ │    ▸ assets                                                      3 days ago       │ │                                         │
-│      ▸ Downloads      (0)  │ │    ▸ docs                                                        Yesterday        │ │                                         │
-│      ▸ Music          (0)  │ │    ▸ scripts                                                     9 days ago       │ │                                         │
-│      ▸ Pictures       (0)  │ │    ▸ src                                                         Today 09:30      │ │                                         │
-│    ⌄ ▸ projects       (1)  │ │    ▸ tests                                                       2 days ago       │ │                                         │
-│      › ▸ demo        (19)  │ │    · archive.tar.gz                                      17.6 MB  8 days ago      │ │                                         │
-│      ▸ Videos         (0)  │ │  ☑ · backup.zip                                          39.0 MB  05/07/2026      │ │                                         │
-│                            │ │    · Cargo.toml                                            82 B  3 days ago       │ │                                         │
-│  TAGS ● ● ● ● ● ● ●        │ │    · data.json                                             49 B  6 days ago       │ │                                         │
-│                            │ │    · demo.mp4                                            91.0 MB  2 weeks ago     │ │                                         │
+│    ⌂ Home                  │ │      Name ↑                                                Size  Date modified    │ │  H  show the hex dump                   │
+│    ▭ Desktop               │ │                                                                                   │ │                                         │
+│    ▤ Documents             │ │    ▸ assets                                                      3 days ago       │ │                                         │
+│    ↓ Downloads             │ │    ▸ docs                                                        Yesterday        │ │                                         │
+│    ▣ Pictures              │ │    ▸ scripts                                                     9 days ago       │ │                                         │
+│    ♪ Music                 │ │    ▸ src                                                         Today 09:30      │ │                                         │
+│    ▶ Videos                │ │    ▸ tests                                                       2 days ago       │ │                                         │
+│                            │ │    · archive.tar.gz                                      17.6 MB  8 days ago      │ │                                         │
+│  DEVICES                   │ │  ☑ · backup.zip                                          39.0 MB  05/07/2026      │ │                                         │
+│    ▥ System                │ │    · Cargo.toml                                            82 B  3 days ago       │ │                                         │
+│    ▥ Data                  │ │    · data.json                                             49 B  6 days ago       │ │                                         │
+│    ⏏ USB drive             │ │    · demo.mp4                                            91.0 MB  2 weeks ago     │ │                                         │
 │                            │ │    · logo.svg                                             197 B  5 days ago       │ │                                         │
-│                            │ │    · main.rs                                               80 B  Today 14:10      │ │                                         │
+│  TAGS ● ● ● ● ● ● ●        │ │    · main.rs                                               80 B  Today 14:10      │ │                                         │
 │                            │ │    · notes.txt                                             28 B  Yesterday        │ │                                         │
-│                            │ │    · photo.jpg                                           70.7 KB  Today 13:30     │ │                                         │
-│                            │ │    · README.md                                            145 B  Today 13:28      │ │                                         │
-│                            │ │    · report.pdf                                          2.29 MB  4 days ago      │ │                                         │
-│                            │ │    · screenshot.png                                      5.34 KB  Yesterday       │ │                                         │
-│                            │ │    · setup.sh                                              21 B  12 days ago      │ │                                         │
-│                            │ │    · song.mp3                                            7.44 MB  30/07/2026      │ │  photo.jpg                  JPEG image  │
-│                            │ │                                                                                   │ │   JPG   70.7 KB                         │
-│                            │ │                                                                                   │ │                                         │
+│  PATH                      │ │    · photo.jpg                                           70.7 KB  Today 13:30     │ │                                         │
+│    ⌂ Home                  │ │    · README.md                                            145 B  Today 13:28      │ │                                         │
+│      ▸ projects            │ │    · report.pdf                                          2.29 MB  4 days ago      │ │                                         │
+│        ▸ demo        (19)  │ │    · screenshot.png                                      5.34 KB  Yesterday       │ │                                         │
+│          ▸ assets     (0)  │ │    · setup.sh                                              21 B  12 days ago      │ │                                         │
+│          ▸ docs       (0)  │ │    · song.mp3                                            7.44 MB  30/07/2026      │ │  photo.jpg                  JPEG image  │
+│          ▸ scripts    (0)  │ │                                                                                   │ │   JPG   70.7 KB                         │
+│        … 2 more            │ │                                                                                   │ │                                         │
 ╰────────────────────────────╯ │                                                                                   │ │                                         │
 ╭─[ SPACE ]──────────────────╮ │                                                                                   │ │    ▸ Open    Open with…  ◉ Preview      │
 │                            │ │                                                                                   │ ╰─────────────────────────────────────────╯

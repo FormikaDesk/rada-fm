@@ -72,6 +72,29 @@ pub fn start_layout(config: Option<&str>, saved: Option<&str>) -> Option<(Layout
     Some((layout, pref))
 }
 
+/// What the NAV box lists under the places.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NavMode {
+    /// The places, then only the way to the folder shown: its ancestors and its subfolders.
+    #[default]
+    Path,
+    /// The places of the tree: every folder of Home that is open.
+    Tree,
+}
+
+impl NavMode {
+    pub const NAMES: [&'static str; 2] = ["percorso", "albero"];
+
+    /// The two words, in Italian or English (`path`, `tree`).
+    pub fn parse(s: &str) -> Option<NavMode> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "percorso" | "path" => Some(NavMode::Path),
+            "albero" | "tree" => Some(NavMode::Tree),
+            _ => None,
+        }
+    }
+}
+
 /// The smallest window (columns, rows) in which `auto` draws the panels.
 pub const AUTO_FROM: (u16, u16) = (140, 36);
 /// The smallest window in which the panels can be drawn at all, when they are asked for.
@@ -185,6 +208,8 @@ pub enum NavKind {
     Heading,
     /// A blank row between two groups.
     Gap,
+    /// "… 12 more": the subfolders the box has no room for. Nothing to choose.
+    More,
     /// One of the favourites, by its index among the items of the sidebar.
     Favorite(usize),
     /// The row of the seven tag colours.
@@ -207,7 +232,7 @@ pub struct NavRow {
 impl NavRow {
     /// Whether the keyboard can stop on this row.
     pub fn selectable(&self) -> bool {
-        !matches!(self.kind, NavKind::Heading | NavKind::Gap)
+        !matches!(self.kind, NavKind::Heading | NavKind::Gap | NavKind::More)
     }
 }
 

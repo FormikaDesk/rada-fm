@@ -634,6 +634,10 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             )
         })?,
     };
+    let nav_mode = match cfg_file.nav.as_deref() {
+        None => rada_tui::panels::NavMode::default(),
+        Some(n) => rada_tui::panels::NavMode::parse(n).with_context(|| tf(Key::MBadNav, &[&n]))?,
+    };
     let saved_ui = rada_core::uistate::load(&dirs.rada_state());
     // Only folders that are still there come back.
     let mut saved_ui = saved_ui;
@@ -664,6 +668,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         view,
         dates,
         sidebar_density,
+        nav_mode,
         basic,
         tags_column: cfg_file.tags_column,
         chooser: chooser.clone(),

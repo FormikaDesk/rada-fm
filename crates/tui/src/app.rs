@@ -404,6 +404,8 @@ pub struct Config {
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries.
     pub sidebar_density: crate::sidebar::Density,
+    /// What the NAV box of the panels view lists under the places.
+    pub nav_mode: crate::panels::NavMode,
     /// The basic profile (ASCII, 16 colours): no rounded ends, no shades, a plain look.
     pub basic: bool,
     /// The Tag column of the list: `None` follows the remembered choice, then shows it.
@@ -650,7 +652,7 @@ pub struct App {
     /// The ring of the SPAZIO box, as it was last made.
     pub ring: Option<crate::ring::Cache>,
     pub nav_area: ratatui::layout::Rect,
-    pub nav_seen: Option<(PathBuf, Option<usize>, usize)>,
+    pub nav_seen: Option<(PathBuf, Option<usize>, usize, usize)>,
     /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
     pub preview_focus: bool,
     /// What git said about the folder shown (panels view), with the folder it was about.
@@ -662,6 +664,8 @@ pub struct App {
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
     pub sidebar_density: crate::sidebar::Density,
+    /// What the NAV box lists under the places (`nav`).
+    pub nav_mode: crate::panels::NavMode,
     /// The basic profile: the soft shapes (rounded ends, shades) give way to plain ones.
     pub basic: bool,
     /// The Tag column of the list is shown.
@@ -851,6 +855,7 @@ impl App {
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
+            nav_mode: cfg.nav_mode,
             basic: cfg.basic,
             show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
             folder_sizes: Default::default(),

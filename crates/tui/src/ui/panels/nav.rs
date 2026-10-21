@@ -40,6 +40,8 @@ fn place_hue(th: &Theme, kind: PlaceKind) -> Color {
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let look = Look::of(app);
+    // The rows of the way shown are as many as fit, so the box's height comes first.
+    app.nav_area = area;
     let rows = app.nav_rows();
     if rows.is_empty() || area.height == 0 {
         return;
@@ -57,13 +59,12 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
     // Scroll to the row the keyboard is on, or else to the folder shown, when either moves (or
     // the tree grows): not on every frame, or the wheel could not take the box anywhere else.
-    app.nav_area = area;
     let max_skip = body.len().saturating_sub(height);
     if let Some(anchor_at) = cursor
         .or(current)
         .and_then(|a| body.iter().position(|i| *i == a))
     {
-        let seen = (app.cwd.clone(), cursor, body.len());
+        let seen = (app.cwd.clone(), cursor, body.len(), height);
         if app.nav_seen.as_ref() != Some(&seen) {
             app.nav_seen = Some(seen);
             if anchor_at < app.nav_scroll {
@@ -121,6 +122,16 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                     Paragraph::new(Span::styled(
                         format!(" {}", row.name),
                         th.faint().add_modifier(Modifier::BOLD),
+                    )),
+                    r,
+                );
+                continue;
+            }
+            NavKind::More => {
+                f.render_widget(
+                    Paragraph::new(Span::styled(
+                        format!(" {}{}", "  ".repeat(row.depth), row.name),
+                        th.faint(),
                     )),
                     r,
                 );
@@ -189,7 +200,9 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                     .unwrap_or_default(),
                 th.text_dim,
             ),
-            _ if row.depth == 0 => (icons::ui(app.icons, Glyph::Home).to_string(), th.hues.blue),
+            _ if row.depth == 0 && row.path == app.home() => {
+                (icons::ui(app.icons, Glyph::Home).to_string(), th.hues.blue)
+            }
             _ => {
                 let kind = app
                     .paths
@@ -227,11 +240,11 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         }
         let head: usize = spans.iter().map(|s| s.content.width()).sum();
         let count = row.count.map(|n| format!("({n})")).unwrap_or_default();
-        let pin_w = if matches!(row.kind, NavKind::Favorite(_)) && !pin.is_empty() {
-            2
-        } else {
-            0
+        let bookmark = match row.kind {
+            NavKind::Favorite(n) => matches!(items[n].origin, Origin::Bookmark { .. }),
+            _ => false,
         };
+        let pin_w = if bookmark && !pin.is_empty() { 2 } else { 0 };
         let room = w.saturating_sub(head + 2 + count.width() + pin_w);
         let name = rada_core::display::truncate(&row.name, room.max(1));
         let name_style = if is_focus || is_current {

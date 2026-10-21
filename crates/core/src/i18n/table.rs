@@ -724,6 +724,8 @@ strings! {
     PanelSpace => "SPACE", "SPAZIO";
     PanelPreview => "PREVIEW", "ANTEPRIMA";
     PanelDetails => "DETAILS", "DETTAGLI";
+    PanelPath => "PATH", "PERCORSO";
+    NavMore => "… {0} more", "… altre {0}";
     // ---- git, in the panels view
     GitLabel => "Git", "Git";
     GitModified => "modified", "modificato";
@@ -1042,6 +1044,7 @@ strings! {
     MBadKeymap => "unknown keymap \"{0}\" (use {1})", "scorciatoie sconosciute \"{0}\" (usa {1})";
     MBadLayout => "unknown layout \"{0}\" (use auto, panels, classic or compact)", "disposizione sconosciuta \"{0}\" (usa auto, pannelli, classico o compact)";
     MBadView => "unknown view \"{0}\" (use details, icons or columns)", "vista sconosciuta \"{0}\" (usa details, icons o columns)";
+    MBadNav => "unknown nav \"{0}\" (use path or tree)", "nav sconosciuto \"{0}\" (usa percorso o albero)";
     MBadDensity => "unknown sidebar_density \"{0}\" (use {1})", "sidebar_density sconosciuta \"{0}\" (usa {1})";
     MBadDates => "unknown dates \"{0}\" (use relative or absolute)", "formato delle date sconosciuto \"{0}\" (usa relative o absolute)";
     MBadFolderSizes => "unknown folder_sizes \"{0}\" (use auto, items or off)", "folder_sizes sconosciuto \"{0}\" (usa auto, items oppure off)";

@@ -8,6 +8,7 @@ mod common;
 
 use common::*;
 use rada_tui::app::App;
+use rada_tui::panels::NavMode;
 use rada_tui::theme::ColorDepth;
 use rada_tui::{IconSet, LayoutPref, Theme};
 use ratatui::style::Color;
@@ -68,6 +69,22 @@ fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
             .lasting(std::time::Duration::from_secs(3600))
             .showing(docs, None),
     );
+    h.settle();
+    h
+}
+
+/// The same with `nav = "albero"`: the NAV box lists the whole tree of Home.
+fn tree_scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
+    let mut h = scene(w, hh, theme, nerd);
+    h.app.nav_mode = NavMode::Tree;
+    h.app.tree = Default::default();
+    h.wait("the way down in the tree", |a| {
+        a.cwd
+            .ancestors()
+            .skip(1)
+            .take_while(|p| p.starts_with(a.home()))
+            .all(|p| a.tree.kids(p).is_some())
+    });
     h.settle();
     h
 }
@@ -287,7 +304,7 @@ fn tab_takes_the_keyboard_from_the_folder_to_nav_to_the_preview_and_back() {
 
 #[test]
 fn the_tree_follows_the_folder_and_its_arrows_open_and_close() {
-    let mut h = scene(160, 46, "rada", false);
+    let mut h = tree_scene(160, 46, "rada", false);
     h.wait("the tree", |a| {
         a.tree.kids(a.home()).is_some() && a.tree.kids(&a.home().join("projects")).is_some()
     });
@@ -313,7 +330,7 @@ fn the_tree_follows_the_folder_and_its_arrows_open_and_close() {
 
 #[test]
 fn nav_is_driven_from_the_keyboard() {
-    let mut h = scene(160, 46, "rada", false);
+    let mut h = tree_scene(160, 46, "rada", false);
     h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
     h.press("tab");
     assert!(h.app.side_focus);
@@ -913,7 +930,7 @@ fn a_click_on_a_folder_of_the_tree_shows_it_in_the_middle_box() {
 
 #[test]
 fn enter_on_a_folder_of_the_tree_shows_it_and_the_arrow_only_opens_the_branch() {
-    let mut h = scene(160, 46, "rada", false);
+    let mut h = tree_scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     go_and_wait(&mut h, &home);
     h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
@@ -943,7 +960,7 @@ fn enter_on_a_folder_of_the_tree_shows_it_and_the_arrow_only_opens_the_branch() 
 /// The demo home with sixty more folders in it, so that the tree is taller than its box, and a
 /// chain of folders far down the list.
 fn long_tree_scene() -> (H, std::path::PathBuf) {
-    let mut h = scene(160, 40, "rada", false);
+    let mut h = tree_scene(160, 40, "rada", false);
     let home = h.app.home().to_path_buf();
     for n in 0..60 {
         std::fs::create_dir_all(home.join(format!("folder-{n:02}"))).unwrap();
@@ -1102,7 +1119,7 @@ fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
 
 #[test]
 fn the_favourites_are_only_the_folders_the_person_added() {
-    let mut h = scene(160, 46, "rada", false);
+    let mut h = tree_scene(160, 46, "rada", false);
     h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
     let is_favorite = |a: &App| {
         a.nav_rows()
@@ -1226,7 +1243,7 @@ fn without_pictures_or_true_colours_the_main_disk_stays_a_bar() {
 
 #[test]
 fn a_click_and_enter_on_scaricati_in_the_tree_show_its_files_in_the_middle_box() {
-    let mut h = scene(160, 46, "rada", false);
+    let mut h = tree_scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     let dl = home.join("Scaricati");
     std::fs::create_dir_all(&dl).unwrap();
@@ -1273,4 +1290,210 @@ fn a_click_and_enter_on_scaricati_in_the_tree_show_its_files_in_the_middle_box()
     h.press("enter");
     h.wait("Scaricati again", move |a| a.cwd == dl && !a.is_loading());
     assert!(h.screen().contains("fattura.pdf"));
+}
+
+/// The demo home with a chain of folders `a/b/c` that has a sibling at every step, and two
+/// folders inside `c` besides `d`; the folder shown is `c`, and the NAV box has answered.
+fn path_scene() -> (H, std::path::PathBuf) {
+    let mut h = scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    let c = home.join("a/b/c");
+    for d in [
+        "a/sib-a",
+        "a/b/sib-b",
+        "a/b/c/d",
+        "a/b/c/kid-1",
+        "a/b/c/kid-2",
+        "sib-home",
+    ] {
+        std::fs::create_dir_all(home.join(d)).unwrap();
+    }
+    go_and_wait(&mut h, &c);
+    h.wait("the subfolders of c", |a| {
+        a.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
+    });
+    h.settle();
+    (h, c)
+}
+
+#[test]
+fn nav_lists_the_places_on_top_as_the_classic_sidebar_does() {
+    let (mut h, _) = path_scene();
+    let rows = h.app.nav_rows();
+    let at = |name: &str| {
+        rows.iter()
+            .position(|r| r.name == name)
+            .unwrap_or(usize::MAX)
+    };
+    let title = rows
+        .iter()
+        .position(|r| r.kind == rada_tui::panels::NavKind::Heading && r.name == "PATH")
+        .expect("the title of the way");
+    let places = [
+        "Home",
+        "Desktop",
+        "Documents",
+        "Downloads",
+        "Pictures",
+        "Music",
+        "Videos",
+        "DEVICES",
+    ];
+    let mut last = 0;
+    for p in places {
+        assert!(at(p) < title, "{p} is above the way: {rows:?}");
+        assert!(at(p) >= last, "{p} is in the order of the sidebar");
+        last = at(p);
+    }
+    assert!(
+        at("USB drive") < at("TAGS") && at("TAGS") < title,
+        "{rows:?}"
+    );
+    let text = nav_text(&mut h);
+    assert!(
+        text.contains("PATH") && text.contains("Documents"),
+        "{text}"
+    );
+}
+
+#[test]
+fn nav_lists_only_the_ancestors_and_the_subfolders_of_the_folder_shown() {
+    let (mut h, c) = path_scene();
+    let home = h.app.home().to_path_buf();
+    let rows = h.app.nav_rows();
+    let title = rows
+        .iter()
+        .position(|r| r.kind == rada_tui::panels::NavKind::Heading && r.name == "PATH")
+        .unwrap();
+    let way: Vec<_> = rows[title + 1..]
+        .iter()
+        .map(|r| (r.path.clone(), r.depth))
+        .collect();
+    let want: Vec<_> = [
+        (home.clone(), 0),
+        (home.join("a"), 1),
+        (home.join("a/b"), 2),
+        (c.clone(), 3),
+        (c.join("d"), 4),
+        (c.join("kid-1"), 4),
+        (c.join("kid-2"), 4),
+    ]
+    .into();
+    assert_eq!(
+        way, want,
+        "no sibling of an ancestor, nothing of Home's own folders"
+    );
+    // The folder shown carries its number of items and is the highlighted row.
+    let here = &rows[title + 4];
+    assert_eq!(here.path, c);
+    assert_eq!(here.count, Some(h.app.listing.all().len()));
+    assert_eq!(App::nav_current(&rows, &c), Some(title + 4));
+    let text = nav_text(&mut h);
+    assert!(
+        !text.contains("sib-") && !text.contains("Desktop ("),
+        "{text}"
+    );
+    // Moving to a folder in the middle box moves the way by itself.
+    go_and_wait(&mut h, &home.join("a"));
+    h.wait("the subfolders of a", |a| a.tree.kids(&a.cwd).is_some());
+    h.settle();
+    let text = nav_text(&mut h);
+    assert!(text.contains("sib-a") && !text.contains("kid-1"), "{text}");
+}
+
+#[test]
+fn a_click_on_an_ancestor_of_the_way_shows_that_folder_in_the_middle_box() {
+    let (mut h, c) = path_scene();
+    let b = c.parent().unwrap().to_path_buf();
+    h.click(&rada_tui::hits::Target::Place(b.clone()));
+    h.wait("b", {
+        let b = b.clone();
+        move |a| a.cwd == b && !a.is_loading()
+    });
+    h.settle();
+    assert!(h.screen().contains("[ ~/a/b ]"));
+    // Enter does the same from the keyboard, on a subfolder.
+    h.wait("the subfolders of b", |a| a.tree.kids(&a.cwd).is_some());
+    h.press("tab");
+    let at = h
+        .app
+        .nav_rows()
+        .iter()
+        .position(|r| r.path == c)
+        .expect("c is listed under b");
+    h.app.nav_cursor = at;
+    h.press("enter");
+    h.wait("c", move |a| a.cwd == c && !a.is_loading());
+}
+
+#[test]
+fn what_does_not_fit_under_the_way_is_counted_in_a_row_of_more() {
+    let (mut h, c) = path_scene();
+    for n in 0..40 {
+        std::fs::create_dir_all(c.join(format!("many-{n:02}"))).unwrap();
+    }
+    go_and_wait(&mut h, &c);
+    h.app.refresh();
+    h.wait("the subfolders of c", |a| {
+        a.tree.kids(&a.cwd).is_some_and(|k| k.len() == 43)
+    });
+    h.settle();
+    let rows = h.app.nav_rows();
+    assert!(
+        rows.len() <= h.app.nav_area.height as usize,
+        "{}",
+        rows.len()
+    );
+    let more = rows.last().unwrap();
+    assert_eq!(more.kind, rada_tui::panels::NavKind::More);
+    let shown = rows
+        .iter()
+        .filter(|r| r.depth == 4 && r.kind != rada_tui::panels::NavKind::More)
+        .count();
+    assert_eq!(more.name, format!("… {} more", 43 - shown));
+    assert!(!more.selectable());
+}
+
+#[test]
+fn with_nav_set_to_albero_the_box_keeps_the_whole_tree() {
+    let h = tree_scene(160, 46, "rada", false);
+    let rows = h.app.nav_rows();
+    assert!(
+        rows.iter().all(|r| r.name != "PATH"),
+        "no title of the way in the tree"
+    );
+    let home = h.app.home().to_path_buf();
+    // Home's own folders are all there, with their arrows, as before.
+    for d in ["Documents", "projects"] {
+        let r = rows.iter().find(|r| r.path == home.join(d)).unwrap();
+        assert_eq!(r.depth, 1);
+    }
+    assert!(rows.iter().any(|r| r.path == home.join("projects/demo")));
+    assert!(matches!(
+        rows[0].kind,
+        rada_tui::panels::NavKind::Folder { open: Some(true) }
+    ));
+    assert_eq!(NavMode::parse("albero"), Some(NavMode::Tree));
+    assert_eq!(NavMode::parse("percorso"), Some(NavMode::Path));
+    assert_eq!(NavMode::default(), NavMode::Path);
+}
+
+#[test]
+fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
+    // The disks arrive after the first frames: SPAZIO appears and NAV loses rows. Here the
+    // window gets shorter instead, with the same effect on the box.
+    let mut h = scene(160, 46, "rada", false);
+    let deep = h.app.home().join("a/b/c/d/e");
+    std::fs::create_dir_all(&deep).unwrap();
+    go_and_wait(&mut h, &deep);
+    h.wait("the way", |a| a.tree.kids(&a.cwd).is_some());
+    h.settle();
+    assert!(nav_text(&mut h).contains(" e "), "in view at first");
+    h.term.backend_mut().resize(160, 36);
+    h.settle();
+    let rows = h.app.nav_rows();
+    let at = App::nav_current(&rows, &deep).unwrap();
+    assert!(at >= 20, "the folder is far down the rows: {at}");
+    let text = nav_text(&mut h);
+    assert!(text.contains(" e "), "the folder shown is in view: {text}");
 }
