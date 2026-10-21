@@ -101,6 +101,19 @@ pub fn draw(
     }
 }
 
+/// What the text of a box may use: one empty column on each side of `inner` and, in a tall
+/// window (`airy`), one empty row under the title. Nothing is left at the bottom.
+pub fn pad(inner: Rect, airy: bool) -> Rect {
+    let top = u16::from(airy).min(inner.height);
+    let side = u16::from(inner.width >= 3);
+    Rect {
+        x: inner.x + side,
+        y: inner.y + top,
+        width: inner.width - 2 * side,
+        height: inner.height - top,
+    }
+}
+
 fn put(buf: &mut Buffer, x: u16, y: u16, symbol: &str, style: Style) {
     let cell = &mut buf[(x, y)];
     cell.set_symbol(symbol);

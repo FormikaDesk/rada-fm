@@ -221,7 +221,9 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             ),
             Target::Act(Action::Open),
         );
-        bar.push(Span::styled("  ", th.base()));
+        // One space between the buttons when the box is narrow, so that the last is not cut.
+        let between = if w < 36 { " " } else { "  " };
+        bar.push(Span::styled(between, th.base()));
         if !e.is_navigable_dir() {
             bar.push_hit(
                 Span::styled(
@@ -230,7 +232,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
                 ),
                 Target::Act(Action::OpenWith),
             );
-            bar.push(Span::styled("  ", th.base()));
+            bar.push(Span::styled(between, th.base()));
         }
         let eye = icons::ui(set, Glyph::Eye);
         bar.push_hit(

@@ -110,9 +110,15 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     nav_row
 }
 
+/// Whether the window is tall enough for the blank row under the title of a box.
+fn is_airy(f: &Frame) -> bool {
+    f.area().height >= AIRY_FROM
+}
+
 /// NAV above, SPAZIO below.
 fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
+    let airy = is_airy(f);
     let others = space::volumes(app).map(|(_, o)| o.len());
     let (nav_area, space_area) = match others {
         None => (area, None),
@@ -120,7 +126,8 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
             // As much of SPAZIO as leaves NAV its rows: the full box, then without the used
             // and free lines of the main disk.
             let ring = space::ring_colors(app).is_some();
-            let want = |compact, ring| space::rows_needed(others, compact, ring) + 2;
+            let want =
+                |compact, ring| space::rows_needed(others, compact, ring) + 2 + u16::from(airy);
             let mut sizes = vec![want(false, false), want(true, false)];
             if ring {
                 sizes.insert(0, want(false, true));
@@ -143,7 +150,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
         &frame::Edge::NONE,
         focused,
     );
-    nav::draw(f, app, inner);
+    nav::draw(f, app, frame::pad(inner, airy));
     frame::settle(f.buffer_mut(), inner, &th);
     if let Some(a) = space_area {
         let inner = frame::draw(
@@ -154,7 +161,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
             &frame::Edge::NONE,
             false,
         );
-        space::draw(f, app, inner);
+        space::draw(f, app, frame::pad(inner, airy));
         frame::settle(f.buffer_mut(), inner, &th);
     }
 }
@@ -163,6 +170,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
 /// notification cards are drawn.
 fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let th = app.th.clone();
+    let airy = is_airy(f);
     let title = match app.view_title() {
         Some(t) => t,
         None => crate::fmt::short_path(&app.cwd, app.home()),
@@ -183,13 +191,14 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     } else {
         0
     };
-    let list = if notice_h > 0 && list_needs_room(app, inner, notice_h) {
+    let padded = frame::pad(inner, airy);
+    let list = if notice_h > 0 && list_needs_room(app, padded, notice_h) {
         Rect {
-            height: inner.height.saturating_sub(notice_h),
-            ..inner
+            height: padded.height.saturating_sub(notice_h),
+            ..padded
         }
     } else {
-        inner
+        padded
     };
     match app.view {
         ViewMode::Details => files::draw(f, app, list),
@@ -222,8 +231,9 @@ fn list_needs_room(app: &App, inner: Rect, cards_h: u16) -> bool {
 /// ANTEPRIMA above, DETTAGLI (or whatever is in its place) below.
 fn draw_right(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
+    let airy = is_airy(f);
     // The lower box takes what its rows need, but ANTEPRIMA keeps most of the column.
-    let want = side::lower_rows(app) + 2;
+    let want = side::lower_rows(app) + 2 + u16::from(airy);
     let h = want
         .min(area.height.saturating_sub(12))
         .max(3.min(area.height));
@@ -236,7 +246,7 @@ fn draw_right(f: &mut Frame, app: &mut App, area: Rect) {
         &frame::Edge::NONE,
         app.preview_focus,
     );
-    side::draw_preview(f, app, inner);
+    side::draw_preview(f, app, frame::pad(inner, airy));
     frame::settle(f.buffer_mut(), inner, &th);
     if bottom.height >= 3 {
         let inner = frame::draw(
@@ -247,7 +257,7 @@ fn draw_right(f: &mut Frame, app: &mut App, area: Rect) {
             &frame::Edge::NONE,
             false,
         );
-        side::draw_lower(f, app, inner);
+        side::draw_lower(f, app, frame::pad(inner, airy));
         frame::settle(f.buffer_mut(), inner, &th);
     }
 }
