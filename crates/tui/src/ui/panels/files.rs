@@ -182,7 +182,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         if vis == app.cursor {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
         } else if marked {
-            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Panel);
         }
         app.hits.add(r, Target::Row(vis));
     }
@@ -202,6 +202,8 @@ fn row<'a>(
     // for it, in every column (a quieter tone would not read on it).
     let row_style = if is_cursor {
         th.cursor_row()
+    } else if marked && th.depth != crate::theme::ColorDepth::Ansi16 {
+        Style::default().bg(th.selection)
     } else if marked {
         th.marked()
     } else {

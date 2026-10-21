@@ -223,6 +223,9 @@ enum Family {
     /// The warm parchment that was the light theme of rada before "chalk": a light variant
     /// of its own, chosen by name; the dark one is rada's.
     Carta,
+    /// A dark theme only: an indigo night with a violet selection and bright hues. A light
+    /// terminal gets Gesso.
+    Neon,
 }
 
 impl Family {
@@ -238,16 +241,19 @@ impl Family {
             (Family::Nebbia, true) => Theme::nebbia_light(),
             (Family::Carta, false) => Theme::rada(),
             (Family::Carta, true) => Theme::carta(),
+            (Family::Neon, false) => Theme::neon(),
+            (Family::Neon, true) => Theme::rada_light(),
         }
     }
 }
 
 impl Theme {
     /// Every built-in theme: three for dark terminals, then their light counterparts.
-    pub const NAMES: [&'static str; 8] = [
+    pub const NAMES: [&'static str; 9] = [
         "rada",
         "catppuccin",
         "tokyo-night",
+        "neon",
         "rada-light",
         "catppuccin-latte",
         "tokyo-night-day",
@@ -271,6 +277,7 @@ impl Theme {
             "tokyo-night-day" | "tokyo-day" | "day" => (Family::TokyoNight, Exact { light: true }),
             "nebbia-light" | "nebbia" | "mist" => (Family::Nebbia, Exact { light: true }),
             "carta" | "paper" => (Family::Carta, Exact { light: true }),
+            "neon" => (Family::Neon, Exact { light: false }),
             _ => return None,
         })
     }
@@ -601,6 +608,68 @@ impl Theme {
             blue: accent,
         };
         t.with_panel_tokens(true)
+    }
+
+    /// "Neon": an indigo night (`#0e1022`, the inside of the boxes `#13152b`) with a violet
+    /// accent and selection and six bright hues, made for the panels view. Chosen with
+    /// `theme = "neon"`; it is a dark theme only.
+    pub fn neon() -> Theme {
+        let accent = rgb(0x8b, 0x7c, 0xf6);
+        let mut t = Theme::rada_base("neon", accent, rgb(0x1e, 0x21, 0x42), rgb(0x18, 0x1a, 0x33));
+        t.canvas = rgb(0x0e, 0x10, 0x22);
+        t.bg = Some(t.canvas);
+        t.popup = t.canvas;
+        t.cmdbar = t.canvas;
+        t.panel = t.canvas;
+        t.inner = rgb(0x13, 0x15, 0x2b);
+        t.text = rgb(0xd9, 0xdd, 0xf2);
+        t.text_dim = rgb(0x7b, 0x82, 0xa9);
+        t.muted = rgb(0x4a, 0x50, 0x78);
+        t.on_accent = t.canvas;
+        // The selection is a violet that white reads on, solid in the panels view and a shade
+        // to a warmer violet in the classic one.
+        t.cursor = rgb(0x70, 0x58, 0xf0);
+        t.grad_row_start = t.cursor;
+        t.grad_row_end = rgb(0x8a, 0x4f, 0xe0);
+        t.cursor_text = rgb(255, 255, 255);
+        t.track = rgb(0x23, 0x26, 0x48);
+        t.sel = rgb(0x18, 0x1a, 0x34);
+        t.field = rgb(0x16, 0x18, 0x31);
+        t.button = rgb(0x1c, 0x1f, 0x3d);
+        t.key_bg = rgb(0x27, 0x2a, 0x50);
+        t.key_text = t.text;
+        t.popup_border = rgb(0x74, 0x7b, 0xa5);
+        t.check = accent;
+        t.disk = accent;
+        t.success = rgb(0x5f, 0xe3, 0xa1);
+        t.warn = rgb(0xff, 0xd8, 0x66);
+        t.error = rgb(0xff, 0x6b, 0x8a);
+        t.hues = Hues {
+            cyan: rgb(0x4f, 0xe0, 0xf0),
+            pink: rgb(0xff, 0x6b, 0xd6),
+            yellow: t.warn,
+            green: t.success,
+            orange: rgb(0xff, 0xa0, 0x5a),
+            blue: rgb(0x6f, 0xa8, 0xff),
+        };
+        t.kinds = KindColors {
+            code: t.hues.yellow,
+            markup: rgb(0xb6, 0x9c, 0xff),
+            text: rgb(0xaa, 0xb0, 0xd6),
+            doc: rgb(0xff, 0x8a, 0x80),
+            image: t.hues.pink,
+            vector: t.hues.cyan,
+            audio: rgb(0xff, 0x8f, 0xe0),
+            video: t.hues.orange,
+            archive: rgb(0xff, 0xbe, 0x64),
+            data: t.hues.green,
+            config: rgb(0x8b, 0x94, 0xbe),
+            binary: t.hues.green,
+            other: rgb(0x8b, 0x94, 0xbe),
+            folder: t.hues.blue,
+            link: t.hues.cyan,
+        };
+        t
     }
 
     /// The default theme for a light terminal, "chalk" (Gesso): an almost neutral off-white,
@@ -1756,6 +1825,44 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn neon_is_the_indigo_night_of_its_design() {
+        let hex = |c: Color| {
+            let (r, g, b) = channels(c);
+            format!("#{r:02x}{g:02x}{b:02x}")
+        };
+        let t = Theme::named("neon", ColorDepth::True).unwrap();
+        assert_eq!(t.name, "neon");
+        assert!(!t.light);
+        assert_eq!(hex(t.canvas), "#0e1022");
+        assert_eq!(t.bg, Some(t.canvas), "painted: one night everywhere");
+        assert_eq!(hex(t.inner), "#13152b");
+        assert_eq!(hex(t.cursor), "#7058f0", "the selection");
+        assert_eq!(hex(t.accent), "#8b7cf6");
+        assert_eq!(hex(t.text), "#d9ddf2");
+        assert_eq!(hex(t.text_dim), "#7b82a9");
+        // The selection is solid in the panels view and the same colour starts the shade of
+        // the classic one.
+        assert_eq!(t.cursor, t.grad_row_start);
+        // It is a dark theme: a light terminal gets Gesso, and `neon` pins the dark one.
+        assert_eq!(Theme::follows_background("neon"), Some(false));
+        assert_eq!(
+            Theme::variant("neon", true, ColorDepth::True).unwrap().name,
+            "rada-light"
+        );
+        assert_eq!(
+            Theme::variant("neon", false, ColorDepth::True)
+                .unwrap()
+                .name,
+            "neon"
+        );
+        // Six hues that differ from one another.
+        let h = t.hues.all();
+        for (i, a) in h.iter().enumerate() {
+            assert!(h.iter().skip(i + 1).all(|b| a != b), "{a:?}");
+        }
     }
 
     #[test]

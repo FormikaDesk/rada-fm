@@ -13,7 +13,7 @@ use ratatui::style::Color;
 use unicode_width::UnicodeWidthStr;
 
 /// The themes the panels are drawn in for the snapshots.
-const THEMES: [&str; 2] = ["rada", "rada-light"];
+const THEMES: [&str; 3] = ["neon", "rada", "rada-light"];
 
 fn shot(h: &mut H) -> String {
     h.screen()

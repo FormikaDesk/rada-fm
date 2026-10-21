@@ -84,7 +84,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         let bg = if is_focus {
             Style::default().bg(th.cursor)
         } else if is_current {
-            th.current_place()
+            Style::default().bg(th.selection)
         } else if hover {
             Style::default().bg(th.mark)
         } else {
@@ -249,7 +249,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         if is_focus {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
         } else if is_current {
-            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Place);
+            soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Panel);
         }
         if !row.path.as_os_str().is_empty() {
             app.hits.add(r, Target::Place(row.path.clone()));

@@ -117,6 +117,9 @@ pub enum RowTone {
     Place,
     /// The place the keyboard is on: the cursor colour.
     Focus,
+    /// A row of the panels view that is the current place or selected: the theme's `selection`
+    /// tone, which stands out from the inside of a box where the quiet one would not.
+    Panel,
 }
 
 /// Colour the background of the cells of `row` (`area.height` is 1) as `tone` says, and give
@@ -134,6 +137,7 @@ pub fn tint_row(buf: &mut Buffer, row: Rect, th: &Theme, look: Look, tone: RowTo
         RowTone::Cursor => th.cursor,
         RowTone::Focus => th.cursor,
         RowTone::Marked | RowTone::Place => th.sel,
+        RowTone::Panel => th.selection,
     };
     for i in 0..w {
         buf[(row.x + i as u16, row.y)].set_bg(colour(i));
