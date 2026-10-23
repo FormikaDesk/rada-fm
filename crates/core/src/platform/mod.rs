@@ -1,9 +1,9 @@
 //! Everything that depends on the operating system lives behind [`Platform`].
 //!
 //! The rest of the core never branches on the OS: it asks the platform. Linux is
-//! complete; Windows and macOS are compilable stubs that already model the concepts
-//! those systems need (drive letters, NTFS junctions and reparse points,
-//! hidden/system attributes, the Windows Recycle Bin, Finder trash).
+//! complete. Windows and macOS are a pre-release: trash, volumes, standard folders and
+//! opening files are implemented and run in CI; carrying attributes over (ACLs, alternate
+//! data streams, resource forks) is not done, and the plan says so.
 
 pub mod access;
 pub mod attrs;

@@ -8,7 +8,7 @@ A Cargo workspace:
 - `crates/tui` — the interface (ratatui + crossterm).
 - `crates/rada` — the `rada` binary.
 
-Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `ExtractFile`, `Compress`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait already models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin), with a complete Linux implementation and compilable stubs for Windows and macOS.
+Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `ExtractFile`, `Compress`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin). Linux is complete; Windows and macOS are a pre-release: trash, volumes, standard folders and opening files are implemented and tested in CI, and carrying attributes over (ACLs, alternate data streams, resource forks) is not done. See [platforms.md](platforms.md).
 
 ### Tests
 
