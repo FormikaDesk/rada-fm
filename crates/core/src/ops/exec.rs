@@ -12,7 +12,7 @@ use super::plan::*;
 use crate::archive::{self, ArchiveError, ListControl, Session};
 use crate::fs::local::{CopyFault, copy_fault};
 use crate::fs::{CopyControl, CopyRequest, Fingerprint, FsMeta, Stamp};
-use crate::platform::{Preserve, Tag};
+use crate::platform::{Preserve, Tag, TrashedItem};
 use crate::{Error, Result, display};
 
 /// Cooperative cancellation shared between the UI and a worker.
@@ -186,6 +186,30 @@ impl RunState {
             .flatten()
             .any(|p| p.ancestors().any(|a| self.blocked.contains(a)))
     }
+}
+
+/// What a copied file is given besides its data.
+struct FileAttrs {
+    mode: Option<u32>,
+    mtime: Option<Stamp>,
+    atime: Option<Stamp>,
+    owner: Option<(u32, u32)>,
+}
+
+/// How a copy goes: checked afterwards, ending a move, one name of several hard links.
+#[derive(Clone, Copy)]
+struct CopyOptions {
+    verify: bool,
+    remove_source: bool,
+    link_primary: bool,
+}
+
+/// The archive member an extraction reads, with the size the archive declares for it.
+struct ArchiveMember<'a> {
+    src: &'a Path,
+    archive: &'a Path,
+    entry: usize,
+    size: u64,
 }
 
 /// Progress/cancel adapter handed to the filesystem copy loop.
@@ -412,19 +436,21 @@ impl Engine {
         Ok(st.archives.get_mut(archive).expect("just inserted"))
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn extract_file(
         &self,
         st: &mut RunState,
         ctl: &mut Ctl<'_>,
-        src: &Path,
-        archive: &Path,
-        entry: usize,
+        member: ArchiveMember<'_>,
         dst: &Path,
-        size: u64,
         mode: Option<u32>,
         mtime: Option<Stamp>,
     ) -> Result<StepResult> {
+        let ArchiveMember {
+            src,
+            archive,
+            entry,
+            size,
+        } = member;
         let fs = &*self.fs;
         self.require_free(dst)?;
         let inner = src.strip_prefix(archive).unwrap_or(src);
@@ -600,27 +626,6 @@ impl Engine {
 
     fn run_step(&self, step: &Step, st: &mut RunState, ctl: &mut Ctl<'_>) -> Result<StepResult> {
         match step {
-            Step::MakeDir { .. } | Step::MakeFile { .. } | Step::FinishDir { .. } => {
-                self.folder_step(step, st)
-            }
-            Step::CopyFile { .. } => self.copy_step(step, ctl),
-            Step::HardLink { .. } | Step::CopySymlink { .. } => self.link_step(step, ctl),
-            Step::ExtractFile { .. } | Step::ExtractSymlink { .. } | Step::Compress { .. } => {
-                self.archive_step(step, st, ctl)
-            }
-            Step::Rename { from, to } => self.rename(from, to),
-            Step::TrashItem { .. } | Step::Restore { .. } => self.trash_step(step),
-            Step::RemoveFile { .. } | Step::RemoveDir { .. } => self.remove_step(step, st),
-            Step::SetTags {
-                path,
-                before,
-                after,
-            } => self.set_tags(path, before, after),
-        }
-    }
-
-    fn folder_step(&self, step: &Step, st: &mut RunState) -> Result<StepResult> {
-        match step {
             Step::MakeDir {
                 path,
                 mode,
@@ -635,12 +640,6 @@ impl Engine {
                 uid,
                 gid,
             } => self.finish_dir(st, path, *mode, *mtime, src.as_deref(), uid.zip(*gid)),
-            _ => unreachable!("run_step sends only folder steps here"),
-        }
-    }
-
-    fn copy_step(&self, step: &Step, ctl: &mut Ctl<'_>) -> Result<StepResult> {
-        match step {
             Step::CopyFile {
                 src,
                 dst,
@@ -653,24 +652,20 @@ impl Engine {
                 gid,
                 link_primary,
                 ..
-            } => self.copy_file(
-                ctl,
-                src,
-                dst,
-                *mode,
-                *mtime,
-                *atime,
-                *verify,
-                *remove_source,
-                uid.zip(*gid),
-                *link_primary,
-            ),
-            _ => unreachable!("run_step sends only CopyFile here"),
-        }
-    }
-
-    fn link_step(&self, step: &Step, ctl: &mut Ctl<'_>) -> Result<StepResult> {
-        match step {
+            } => {
+                let attrs = FileAttrs {
+                    mode: *mode,
+                    mtime: *mtime,
+                    atime: *atime,
+                    owner: uid.zip(*gid),
+                };
+                let options = CopyOptions {
+                    verify: *verify,
+                    remove_source: *remove_source,
+                    link_primary: *link_primary,
+                };
+                self.copy_file(ctl, src, dst, attrs, options)
+            }
             Step::HardLink {
                 existing,
                 link,
@@ -683,17 +678,6 @@ impl Engine {
                 target,
                 remove_source,
             } => self.copy_symlink(src, dst, target, *remove_source),
-            _ => unreachable!("run_step sends only link steps here"),
-        }
-    }
-
-    fn archive_step(
-        &self,
-        step: &Step,
-        st: &mut RunState,
-        ctl: &mut Ctl<'_>,
-    ) -> Result<StepResult> {
-        match step {
             Step::ExtractFile {
                 src,
                 archive,
@@ -702,38 +686,43 @@ impl Engine {
                 size,
                 mode,
                 mtime,
-            } => self.extract_file(st, ctl, src, archive, *entry, dst, *size, *mode, *mtime),
+            } => {
+                let member = ArchiveMember {
+                    src,
+                    archive,
+                    entry: *entry,
+                    size: *size,
+                };
+                self.extract_file(st, ctl, member, dst, *mode, *mtime)
+            }
             Step::ExtractSymlink { dst, target, .. } => self.make_symlink(dst, target),
             Step::Compress {
                 dst, format, items, ..
             } => self.compress(ctl, dst, *format, items),
-            _ => unreachable!("run_step sends only archive steps here"),
-        }
-    }
-
-    fn trash_step(&self, step: &Step) -> Result<StepResult> {
-        match step {
-            Step::TrashItem { path } => {
-                let item = self.platform.trash().trash(path)?;
-                Ok(StepResult {
-                    trashed: Some(item),
-                    ..StepResult::done()
-                })
-            }
-            Step::Restore { item } => {
-                self.platform.trash().restore(item)?;
-                Ok(StepResult::done())
-            }
-            _ => unreachable!("run_step sends only trash steps here"),
-        }
-    }
-
-    fn remove_step(&self, step: &Step, st: &mut RunState) -> Result<StepResult> {
-        match step {
+            Step::Rename { from, to } => self.rename(from, to),
+            Step::TrashItem { path } => self.trash_item(path),
+            Step::Restore { item } => self.restore_item(item),
             Step::RemoveFile { path, expect } => self.remove_file(st, path, expect.as_ref()),
             Step::RemoveDir { path } => self.remove_dir(st, path),
-            _ => unreachable!("run_step sends only remove steps here"),
+            Step::SetTags {
+                path,
+                before,
+                after,
+            } => self.set_tags(path, before, after),
         }
+    }
+
+    fn trash_item(&self, path: &Path) -> Result<StepResult> {
+        let item = self.platform.trash().trash(path)?;
+        Ok(StepResult {
+            trashed: Some(item),
+            ..StepResult::done()
+        })
+    }
+
+    fn restore_item(&self, item: &TrashedItem) -> Result<StepResult> {
+        self.platform.trash().restore(item)?;
+        Ok(StepResult::done())
     }
 
     /// `None` when nothing is there; any other failure to look is an error.
@@ -847,19 +836,13 @@ impl Engine {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn copy_file(
         &self,
         ctl: &mut Ctl<'_>,
         src: &Path,
         dst: &Path,
-        mode: Option<u32>,
-        mtime: Option<Stamp>,
-        atime: Option<Stamp>,
-        verify: bool,
-        remove_source: bool,
-        owner: Option<(u32, u32)>,
-        link_primary: bool,
+        attrs: FileAttrs,
+        options: CopyOptions,
     ) -> Result<StepResult> {
         self.require_free(dst)?;
         let to_device = self.platform.on_device(dst);
@@ -873,17 +856,17 @@ impl Engine {
         let req = CopyRequest {
             src: src.to_path_buf(),
             dst: tmp,
-            mode: mode.map(|m| m | 0o200), // writable until the attributes are set
-            mtime: mtime.map(Into::into),
-            atime: atime.map(Into::into),
-            verify,
-            sync: remove_source,
+            mode: attrs.mode.map(|m| m | 0o200), // writable until the attributes are set
+            mtime: attrs.mtime.map(Into::into),
+            atime: attrs.atime.map(Into::into),
+            verify: options.verify,
+            sync: options.remove_source,
             device,
         };
         self.copy_data(ctl, &req, dst)?;
-        let not_preserved = self.finish_copy(&req, dst, to_device, mode, owner)?;
+        let not_preserved = self.finish_copy(&req, dst, to_device, attrs.mode, attrs.owner)?;
         Ok(StepResult {
-            after: self.settle_source(src, dst, remove_source, link_primary)?,
+            after: self.settle_source(src, dst, options)?,
             not_preserved,
             ..StepResult::done()
         })
@@ -948,18 +931,17 @@ impl Engine {
         &self,
         src: &Path,
         dst: &Path,
-        remove_source: bool,
-        link_primary: bool,
+        options: CopyOptions,
     ) -> Result<Option<Fingerprint>> {
         let fs = &*self.fs;
         let after = fs.lstat(dst).ok().map(|m| {
-            if link_primary {
+            if options.link_primary {
                 m.fingerprint_without_ctime()
             } else {
                 m.fingerprint()
             }
         });
-        if remove_source
+        if options.remove_source
             && let Err(e) = fs.remove_file(src)
             // Someone else already removed the source: the move is what they wanted.
             && e.kind() != io::ErrorKind::NotFound
