@@ -1175,6 +1175,30 @@ impl App {
         self.svc.loader.load(path, self.dir_gen);
     }
 
+    /// The terminal changed size, which is also what a zoom of its font looks like.
+    pub fn on_terminal_resized(&mut self) {
+        if let Some(cell) = crate::images::system_cell_px() {
+            self.use_cell_px(cell);
+        }
+        self.dirty = true;
+    }
+
+    /// The cell is `cell` pixels now. If that is not what the pictures were made for, they
+    /// are made again, and the screen is cleared so that the terminal drops the old ones.
+    pub fn use_cell_px(&mut self, cell: (u16, u16)) {
+        let changed = self
+            .image_ui
+            .as_mut()
+            .is_some_and(|ui| ui.set_cell_px(cell));
+        if changed {
+            self.ring = None;
+            self.previewed = None;
+            self.request_preview();
+            self.full_redraw = true;
+            self.dirty = true;
+        }
+    }
+
     fn request_preview(&mut self) {
         let Some(e) = self.current() else {
             self.preview.content = None;

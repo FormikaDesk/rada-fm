@@ -316,7 +316,7 @@ fn handle_input(app: &mut App, input: Input) -> io::Result<()> {
     match input {
         Input::Event(Event::Key(k)) => app.on_key(k),
         Input::Event(Event::Mouse(m)) => app.on_mouse(m),
-        Input::Event(Event::Resize(_, _)) => app.dirty = true,
+        Input::Event(Event::Resize(_, _)) => app.on_terminal_resized(),
         Input::Event(_) => {}
         Input::Lost(why) => {
             return Err(io::Error::other(format!(

@@ -118,22 +118,23 @@ impl ImageUi {
     /// A given protocol, with the cell size taken from the window's pixel size.
     /// `None` when the system does not report pixel sizes.
     pub fn forced(proto: ProtocolType) -> Option<ImageUi> {
-        let ws = crossterm::terminal::window_size().ok()?;
-        if ws.columns == 0 || ws.rows == 0 || ws.width == 0 || ws.height == 0 {
-            return None;
-        }
-        Some(ImageUi::sized(
-            proto,
-            (ws.width / ws.columns, ws.height / ws.rows),
-        ))
+        Some(ImageUi::sized(proto, system_cell_px()?))
     }
 
     /// A protocol with a cell of a given size in pixels, as a terminal that told it would give.
     pub fn sized(proto: ProtocolType, cell: (u16, u16)) -> ImageUi {
-        #[allow(deprecated)]
-        let mut picker = Picker::from_fontsize(FontSize::new(cell.0, cell.1));
-        picker.set_protocol_type(proto);
-        ImageUi::new(picker)
+        ImageUi::new(picker_for(proto, cell))
+    }
+
+    /// The cell size changed (the font was zoomed): what the pictures are made for follows.
+    /// `true` when it did change, so that the pictures drawn so far are made again. Where
+    /// the system does not say, or half blocks are drawn, nothing changes.
+    pub fn set_cell_px(&mut self, cell: (u16, u16)) -> bool {
+        if cell.0 == 0 || cell.1 == 0 || cell == self.cell_px() || !self.is_graphics() {
+            return false;
+        }
+        self.picker = picker_for(self.picker.protocol_type(), cell);
+        true
     }
 
     /// Ask the terminal for its cell size (and, when no protocol is given, whether it draws
@@ -255,6 +256,22 @@ impl ImageUi {
             Err(e) => tracing::warn!("image encoding failed: {e}"),
         }
     }
+}
+
+/// The size of a cell in pixels as the system reports it now; `None` where it does not.
+pub fn system_cell_px() -> Option<(u16, u16)> {
+    let ws = crossterm::terminal::window_size().ok()?;
+    if ws.columns == 0 || ws.rows == 0 || ws.width == 0 || ws.height == 0 {
+        return None;
+    }
+    Some((ws.width / ws.columns, ws.height / ws.rows))
+}
+
+fn picker_for(proto: ProtocolType, cell: (u16, u16)) -> Picker {
+    #[allow(deprecated)]
+    let mut picker = Picker::from_fontsize(FontSize::new(cell.0, cell.1));
+    picker.set_protocol_type(proto);
+    picker
 }
 
 /// The radius of the rounded corners, as a share of the shorter side of the picture: the

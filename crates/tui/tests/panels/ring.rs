@@ -93,3 +93,53 @@ fn without_pictures_or_true_colours_the_main_disk_stays_a_bar() {
     assert!(h.app.ring.is_none());
     assert!(s.contains("■"), "a bar");
 }
+
+/// The cells of the ring on the screen, as the pieces cover them.
+fn ring_cells(h: &H) -> Vec<ratatui::layout::Rect> {
+    h.app
+        .ring
+        .as_ref()
+        .unwrap()
+        .pieces
+        .iter()
+        .map(|p| p.0)
+        .collect()
+}
+
+#[test]
+fn the_ring_follows_the_cell_when_the_font_is_zoomed() {
+    let mut h = ring_scene("neon");
+    let _ = h.screen();
+    let cells = ring_cells(&h);
+    let before = h.app.ring.as_ref().unwrap().made;
+    // The same cell: nothing is made again.
+    h.app.use_cell_px((10, 20));
+    let _ = h.screen();
+    assert_eq!(h.app.ring.as_ref().unwrap().made, before);
+    // Same columns and rows, other pixels (the font zoomed in a window of the same size).
+    h.app.use_cell_px((14, 28));
+    assert!(h.app.take_full_redraw(), "the old picture is cleared");
+    let _ = h.screen();
+    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (14, 28));
+    assert_eq!(
+        h.app.ring.as_ref().unwrap().made,
+        1,
+        "made for the new cell"
+    );
+    assert_eq!(ring_cells(&h), cells, "in the same cells");
+    // Columns and rows change as well (the window kept its size).
+    h.app.use_cell_px((7, 14));
+    let _ = h.screen();
+    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (7, 14));
+    assert_eq!(h.app.ring.as_ref().unwrap().made, 1);
+    assert_eq!(ring_cells(&h), cells);
+}
+
+#[test]
+fn a_cell_the_system_does_not_report_leaves_the_ring_as_it_is() {
+    let mut h = ring_scene("neon");
+    let _ = h.screen();
+    h.app.use_cell_px((0, 0));
+    assert!(!h.app.take_full_redraw());
+    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (10, 20));
+}
