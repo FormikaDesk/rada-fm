@@ -727,6 +727,7 @@ strings! {
     PanelDetails => "DETAILS", "DETTAGLI";
     PanelPath => "PATH", "PERCORSO";
     NavMore => "… {0} more", "… altre {0}";
+    NavMoreDisks => "… {0} more", "… altri {0}";
     // ---- git, in the panels view
     GitLabel => "Git", "Git";
     GitModified => "modified", "modificato";

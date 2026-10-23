@@ -19,8 +19,10 @@ use crate::ui::widgets::{pad, pad_left};
 
 /// Cells of the bar of a volume that is not the main one.
 const BAR: usize = 12;
-/// The least cells of the bar of a disk in a narrow box.
-const MIN_BAR: usize = 4;
+/// The least cells of the bar of a disk in the box of the three columns.
+const MIN_BAR: usize = 6;
+/// The same in the two columns, whose box is narrower.
+const MIN_BAR_TWO: usize = 4;
 
 /// The volumes the box is about: the main disk (the one of the system: the root of the file
 /// system, or the first fixed disk) and the others, in the order the list gave them.
@@ -198,6 +200,40 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
     true
 }
 
+/// A row for each of the other disks: a name, a bar and the percentage. The name gets the room
+/// it needs and the bars give up cells for it, down to [`MIN_BAR`]; only then is a name cut.
+fn other_lines(app: &App, others: &[Volume], names: &[String], w: usize) -> Vec<Line<'static>> {
+    let th = &app.th;
+    let pct_w = 4;
+    let longest = names.iter().map(|n| n.width()).max().unwrap_or(0);
+    let min_bar = if app.panels_two { MIN_BAR_TWO } else { MIN_BAR };
+    let bar_w = w
+        .saturating_sub(1 + 1 + 1 + pct_w + 1 + longest)
+        .clamp(min_bar, BAR);
+    let name_w = w.saturating_sub(1 + 1 + bar_w + 1 + pct_w + 1);
+    others
+        .iter()
+        .zip(names)
+        .map(|(v, shown_as)| {
+            let name = pad(
+                &rada_core::display::truncate(shown_as, name_w.max(1)),
+                name_w,
+            );
+            let mut spans = vec![
+                Span::styled(" ", th.base()),
+                Span::styled(name, th.dim()),
+                Span::styled(" ", th.base()),
+            ];
+            spans.extend(bar(th, app.icons, used_share(v), bar_w, false));
+            spans.push(Span::styled(
+                format!(" {}", pad_left(&percent(v), pct_w)),
+                th.dim(),
+            ));
+            Line::from(spans)
+        })
+        .collect()
+}
+
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let Some((main, others)) = volumes(app) else {
@@ -255,34 +291,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
     if !others.is_empty() {
         lines.push(Line::raw(""));
-        // A name, a bar of twelve cells and the percentage: the name gets what is left.
-        // In the two columns the bars give up cells (down to four) so that the names stay whole.
-        let pct_w = 4;
-        let longest = other_names.iter().map(|n| n.width()).max().unwrap_or(0);
-        let bar_w = if app.panels_two {
-            w.saturating_sub(1 + 1 + 1 + pct_w + 1 + longest)
-                .clamp(MIN_BAR, BAR)
-        } else {
-            BAR
-        };
-        let name_w = w.saturating_sub(1 + 1 + bar_w + 1 + pct_w + 1);
-        for (v, shown_as) in others.iter().zip(&other_names) {
-            let name = pad(
-                &rada_core::display::truncate(shown_as, name_w.max(1)),
-                name_w,
-            );
-            let mut spans = vec![
-                Span::styled(" ", th.base()),
-                Span::styled(name, th.dim()),
-                Span::styled(" ", th.base()),
-            ];
-            spans.extend(bar(&th, app.icons, used_share(v), bar_w, false));
-            spans.push(Span::styled(
-                format!(" {}", pad_left(&percent(v), pct_w)),
-                th.dim(),
-            ));
-            lines.push(Line::from(spans));
-        }
+        lines.extend(other_lines(app, &others, &other_names, w));
     }
     let below = Rect {
         y: area.y + ring_rows,

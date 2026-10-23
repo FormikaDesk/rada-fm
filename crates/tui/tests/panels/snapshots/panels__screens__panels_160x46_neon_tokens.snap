@@ -1,5 +1,5 @@
 ---
-source: crates/tui/tests/panels.rs
+source: crates/tui/tests/panels/screens.rs
 expression: "token_map(&mut h, &th)"
 ---
 background: c canvas, i inner, C cursor, S sel, A accent, E selection, U button,
@@ -95,8 +95,8 @@ m.tAAAAAAAAAAAAAAAmmmmmmmmm..m.A................................................
 m.ddddddddddddddddd..........m.A...................................................................................A.m..ddddddddddddtttttttttttt...............m
 m.ssssssssssss...............m.A............................................++++++++++++++++++++++++++++++++++++++.A.m..ddddddddddddttttttttttttttt............m
 m............................m.A............................................ssssttttttttttttttttttttttttttt......+.A.m..ddddddddddddtttttttttttt...............m
-m.tddddddtAAAAAmmmmmmmddddd..m.A............................................s...AAAAmmmmmmmmmmmmmAAAA............+.A.m..ddddddddddddm..........................m
-m.tddddddtAAAAAmmmmmmmddddd..m.A............................................+ssssssssssssssssssssssssssssssssssss+.A.m..ddddddddddddnnnnnnnmmmm................m
+m.tdddddddddtAAAAmmmmmddddd..m.A............................................s...AAAAmmmmmmmmmmmmmAAAA............+.A.m..ddddddddddddm..........................m
+m.tdddddddddtAAAAmmmmmddddd..m.A............................................+ssssssssssssssssssssssssssssssssssss+.A.m..ddddddddddddnnnnnnnmmmm................m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
 ................................................................................................................................................................
 .OOOOOOOOOOmmmmmAAAAAAAAAAAAAAAAAAAAAAmmmmmnnnnnnnnnnnnnnnnnnnnnnnn.......................................................................dddddddd..dddddddddddd

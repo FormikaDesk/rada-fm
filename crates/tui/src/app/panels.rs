@@ -22,6 +22,104 @@ pub struct GitView {
 /// A question to git that has had no answer after this long is not waited for.
 const GIT_WAIT: Duration = Duration::from_secs(6);
 
+/// The least the way to the folder is cut down to: the blank row, its title, "… more" and the
+/// folder shown.
+const WAY_MIN: usize = 4;
+
+fn plain_row(kind: NavKind, name: String, path: PathBuf) -> NavRow {
+    NavRow {
+        kind,
+        depth: 0,
+        path,
+        name,
+        count: None,
+    }
+}
+
+fn gap_row() -> NavRow {
+    plain_row(NavKind::Gap, String::new(), PathBuf::new())
+}
+
+fn heading_row(name: &str) -> NavRow {
+    plain_row(NavKind::Heading, name.to_string(), PathBuf::new())
+}
+
+/// The rows of the places of the sidebar whose section `keep` accepts.
+fn favorite_rows(items: &[sidebar::Item], keep: impl Fn(Section) -> bool) -> Vec<NavRow> {
+    (0..items.len())
+        .filter(|n| keep(items[*n].section))
+        .map(|n| {
+            plain_row(
+                NavKind::Favorite(n),
+                items[n].name.clone(),
+                items[n].path.clone(),
+            )
+        })
+        .collect()
+}
+
+/// Rows a block takes with its blank row and its title, none when it is empty.
+fn block_len(rows: &[NavRow]) -> usize {
+    if rows.is_empty() { 0 } else { rows.len() + 2 }
+}
+
+/// The devices as one disk and "… 2 more", when there are more than that.
+fn main_disk_only(mut disks: Vec<NavRow>) -> Vec<NavRow> {
+    if disks.len() > 2 {
+        let others = disks.len() - 1;
+        disks.truncate(1);
+        disks.push(plain_row(
+            NavKind::More,
+            tf(Key::NavMoreDisks, &[&others]),
+            PathBuf::new(),
+        ));
+    }
+    disks
+}
+
+/// The way to the folder shown with its title, in `room` rows: the subfolders go first, then
+/// the oldest folders of the way (a row says how many).
+fn fit_way(chain: Vec<NavRow>, kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
+    if chain.is_empty() {
+        return Vec::new();
+    }
+    let avail = room.max(WAY_MIN) - 2;
+    let hidden = if chain.len() > avail {
+        chain.len() + 1 - avail
+    } else {
+        0
+    };
+    let mut rows = vec![gap_row(), heading_row(Key::PanelPath.tr())];
+    if hidden > 0 {
+        rows.push(plain_row(
+            NavKind::More,
+            tf(Key::NavMore, &[&hidden]),
+            PathBuf::new(),
+        ));
+    }
+    rows.extend(chain.into_iter().skip(hidden));
+    rows.extend(fit_kids(kids, avail.saturating_sub(rows.len() - 2)));
+    rows
+}
+
+/// The subfolders that fit in `room` rows, the last of them "… 3 more" if not all do.
+fn fit_kids(mut kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
+    if kids.len() <= room {
+        return kids;
+    }
+    if room == 0 {
+        return Vec::new();
+    }
+    let depth = kids[0].depth;
+    let hidden = kids.len() - (room - 1);
+    kids.truncate(room - 1);
+    kids.push(NavRow {
+        depth,
+        ..plain_row(NavKind::More, tf(Key::NavMore, &[&hidden]), PathBuf::new())
+    });
+    kids
+}
+
 impl App {
     /// Whether a window `width` × `height` is drawn as panels.
     pub fn panels_wanted(&self, width: u16, height: u16) -> Option<crate::panels::Columns> {
@@ -203,105 +301,81 @@ impl App {
     /// The rows of the NAV box in `percorso` mode: the places as in the classic sidebar (Home,
     /// the standard folders, the favourites, the devices, the tags), then, when the folder shown
     /// is not itself one of them, under a title, the way to it: the nearest place that holds it,
-    /// the folders down to it, the folder with its count and its subfolders, as many as the box
-    /// has room for. The trash is the last row, whatever is shown.
+    /// the folders down to it, the folder with its count and its subfolders. The trash is the
+    /// last row, whatever is shown. The places come first and stay in sight: when the box is too
+    /// short the way gives up rows, and if that is not enough the devices do.
     fn nav_rows_path(&self) -> Vec<NavRow> {
         let items = sidebar::items(self, false);
-        let row = |kind, name: String, path: PathBuf| NavRow {
-            kind,
-            depth: 0,
-            path,
-            name,
-            count: None,
-        };
-        let gap = || row(NavKind::Gap, String::new(), PathBuf::new());
-        let heading = |name: &str| row(NavKind::Heading, name.to_string(), PathBuf::new());
-        let favorite = |n: usize| {
-            row(
-                NavKind::Favorite(n),
-                items[n].name.clone(),
-                items[n].path.clone(),
-            )
-        };
-        let mut rows = Vec::new();
-        for (n, i) in items.iter().enumerate() {
-            if matches!(i.section, Section::Home | Section::Pinned) {
-                rows.push(favorite(n));
-            }
-        }
-        let devices: Vec<usize> = (0..items.len())
-            .filter(|n| items[*n].section == Section::Devices)
-            .collect();
-        if !devices.is_empty() {
-            rows.push(gap());
-            rows.push(heading(Key::SecDevices.tr()));
-            rows.extend(devices.into_iter().map(favorite));
-        }
-        if self.tags_supported() {
-            rows.push(gap());
-            rows.push(row(
-                NavKind::Tags,
-                Key::SecTags.tr().to_string(),
-                PathBuf::new(),
-            ));
-        }
+        let places = favorite_rows(&items, |s| matches!(s, Section::Home | Section::Pinned));
+        let mut devices = favorite_rows(&items, |s| s == Section::Devices);
+        let tags = self.tags_rows();
         let trash = items
             .iter()
             .find(|i| i.section == Section::Trash)
-            .map(|t| row(NavKind::Trash, t.name.clone(), t.path.clone()));
-        // A tag, the recent files or the like is not a place in a tree of folders.
-        if self.view_title().is_none() {
-            // The places a folder can be in or be: not the recent files, a tag, a disk that is
-            // not mounted.
-            let places: Vec<usize> = (0..items.len())
-                .filter(|n| {
-                    !matches!(
-                        items[*n].origin,
-                        Origin::Recent | Origin::Tag(_) | Origin::Unmounted(_)
-                    )
-                })
-                .collect();
-            let is_place = places
-                .iter()
-                .any(|n| rada_core::places::same_folder(&items[*n].path, &self.cwd));
-            if !is_place {
-                self.path_rows(&mut rows, &items, &places, trash.is_some());
-            }
+            .map(|t| plain_row(NavKind::Trash, t.name.clone(), t.path.clone()));
+        let (chain, kids) = self.way_rows(&items);
+        let height = self.nav_area.height as usize;
+        let fixed =
+            |disks: &[NavRow]| places.len() + block_len(disks) + tags.len() + trash.iter().len();
+        let min_way = if chain.is_empty() { 0 } else { WAY_MIN };
+        if height > 0 && fixed(&devices) + min_way > height {
+            devices = main_disk_only(devices);
         }
+        let room = match height {
+            0 => usize::MAX,
+            h => h.saturating_sub(fixed(&devices)),
+        };
+        let mut rows = places;
+        if !devices.is_empty() {
+            rows.push(gap_row());
+            rows.push(heading_row(Key::SecDevices.tr()));
+            rows.extend(devices);
+        }
+        rows.extend(tags);
+        rows.extend(fit_way(chain, kids, room));
         rows.extend(trash);
         rows
     }
 
-    /// The title and the rows of the way to the folder shown (see [`Self::nav_rows_path`]);
-    /// `trash`: the last row of the box is not for them.
-    fn path_rows(
-        &self,
-        rows: &mut Vec<NavRow>,
-        items: &[sidebar::Item],
-        places: &[usize],
-        trash: bool,
-    ) {
-        let nav_row = |kind, depth, name: String, path: PathBuf, count| NavRow {
-            kind,
-            depth,
-            path,
-            name,
-            count,
-        };
-        rows.push(nav_row(
-            NavKind::Gap,
-            0,
-            String::new(),
-            PathBuf::new(),
-            None,
-        ));
-        rows.push(nav_row(
-            NavKind::Heading,
-            0,
-            Key::PanelPath.tr().to_string(),
-            PathBuf::new(),
-            None,
-        ));
+    /// The blank row and the row of the seven tag colours, or nothing where tags are not kept.
+    fn tags_rows(&self) -> Vec<NavRow> {
+        if !self.tags_supported() {
+            return Vec::new();
+        }
+        let tags = plain_row(NavKind::Tags, Key::SecTags.tr().to_string(), PathBuf::new());
+        vec![gap_row(), tags]
+    }
+
+    /// The folders of the way to the folder shown (see [`Self::nav_rows_path`]) and its
+    /// subfolders; both empty when the folder shown is a place itself, or a tag, the recent
+    /// files or the like, which are not in a tree of folders.
+    fn way_rows(&self, items: &[sidebar::Item]) -> (Vec<NavRow>, Vec<NavRow>) {
+        if self.view_title().is_some() {
+            return Default::default();
+        }
+        // The places a folder can be in or be: not the recent files, a tag, a disk that is not
+        // mounted.
+        let places: Vec<usize> = (0..items.len())
+            .filter(|n| {
+                !matches!(
+                    items[*n].origin,
+                    Origin::Recent | Origin::Tag(_) | Origin::Unmounted(_)
+                )
+            })
+            .collect();
+        if places
+            .iter()
+            .any(|n| rada_core::places::same_folder(&items[*n].path, &self.cwd))
+        {
+            return Default::default();
+        }
+        let chain = self.chain_rows(items, &places);
+        let kids = self.kid_rows(chain.last().map_or(0, |r| r.depth + 1));
+        (chain, kids)
+    }
+
+    /// The nearest place that holds the folder shown and the folders down to it, as rows.
+    fn chain_rows(&self, items: &[sidebar::Item], places: &[usize]) -> Vec<NavRow> {
         // The nearest place that holds the folder: the longest path.
         let place = places
             .iter()
@@ -312,73 +386,57 @@ impl App {
             Some(n) => items[n].path.clone(),
             None => self.path_root(),
         };
-        let chain: Vec<&Path> = {
-            let mut c: Vec<&Path> = self
-                .cwd
-                .ancestors()
-                .take_while(|a| a.starts_with(&root))
-                .collect();
-            c.reverse();
-            c
-        };
+        let mut chain: Vec<&Path> = self
+            .cwd
+            .ancestors()
+            .take_while(|a| a.starts_with(&root))
+            .collect();
+        chain.reverse();
         let last = chain.len().saturating_sub(1);
-        let indent = |depth: usize| depth.min(crate::panels::NAV_INDENT_MAX);
+        let mut rows = Vec::new();
         for (depth, dir) in chain.iter().enumerate() {
-            if depth == 0
-                && let Some(n) = place
-            {
+            rows.push(match place {
                 // The place itself, with its icon.
-                rows.push(nav_row(
+                Some(n) if depth == 0 => plain_row(
                     NavKind::Favorite(n),
-                    0,
                     items[n].name.clone(),
                     items[n].path.clone(),
-                    None,
-                ));
-                continue;
-            }
-            let on_disk = dir
-                .file_name()
-                .map(rada_core::display::name)
-                .unwrap_or_else(|| rada_core::display::path(dir));
-            rows.push(nav_row(
-                NavKind::Folder { open: None },
-                indent(depth),
-                self.shown_name(dir, on_disk),
-                dir.to_path_buf(),
-                (depth == last).then(|| self.listing.all().len()),
-            ));
+                ),
+                _ => self.way_row(dir, depth, depth == last),
+            });
         }
+        rows
+    }
+
+    /// The row of a folder of the way, `depth` levels down it; the folder shown (`here`) has
+    /// its count of items.
+    fn way_row(&self, dir: &Path, depth: usize, here: bool) -> NavRow {
+        let on_disk = dir
+            .file_name()
+            .map(rada_core::display::name)
+            .unwrap_or_else(|| rada_core::display::path(dir));
+        NavRow {
+            kind: NavKind::Folder { open: None },
+            depth: depth.min(crate::panels::NAV_INDENT_MAX),
+            path: dir.to_path_buf(),
+            name: self.shown_name(dir, on_disk),
+            count: here.then(|| self.listing.all().len()),
+        }
+    }
+
+    /// The subfolders of the folder shown, as rows `depth` levels in.
+    fn kid_rows(&self, depth: usize) -> Vec<NavRow> {
+        let depth = depth.min(crate::panels::NAV_INDENT_MAX);
         let kids = self.tree.kids(&self.cwd).unwrap_or(&[]);
-        // What the box has room for, once the rows above and the trash are counted (the first
-        // frame does not know its height yet).
-        let room = match self.nav_area.height {
-            0 => usize::MAX,
-            h => (h as usize).saturating_sub(rows.len() + usize::from(trash)),
-        };
-        let shown = if kids.len() > room {
-            room.saturating_sub(1)
-        } else {
-            kids.len()
-        };
-        for k in &kids[..shown] {
-            rows.push(nav_row(
-                NavKind::Folder { open: None },
-                indent(chain.len()),
-                self.shown_name(&k.path, k.name.clone()),
-                k.path.clone(),
-                Some(k.items),
-            ));
-        }
-        if shown < kids.len() && room > 0 {
-            rows.push(nav_row(
-                NavKind::More,
-                indent(chain.len()),
-                tf(Key::NavMore, &[&(kids.len() - shown)]),
-                PathBuf::new(),
-                None,
-            ));
-        }
+        kids.iter()
+            .map(|k| NavRow {
+                kind: NavKind::Folder { open: None },
+                depth,
+                path: k.path.clone(),
+                name: self.shown_name(&k.path, k.name.clone()),
+                count: Some(k.items),
+            })
+            .collect()
     }
 
     /// Where the way shown in NAV starts: Home, or the root of the disk the folder is on.

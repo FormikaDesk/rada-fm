@@ -1,5 +1,5 @@
 ---
-source: crates/tui/tests/panels.rs
+source: crates/tui/tests/panels/screens.rs
 expression: shot(&mut h)
 ---
   rada   ▸ demo  ✕   +                                                                                                                                  ? Help
@@ -41,8 +41,8 @@ expression: shot(&mut h)
 │  293 GB of 477 GB          │ │                                                                                   │ │  Modified    Today, 13:30               │
 │  183 GB free               │ │                                            ╭────────────────────────────────────╮ │ │  Location    ~/projects/demo            │
 │                            │ │                                            ┃ ✓ 3 items copied to Documents      │ │ │  Permissions  -rw-r--r--                │
-│  Data   ■■■■■□□□□□□□  40%  │ │                                            ┃   Undo  Ctrl+Z  ·  Show            │ │ │  Tags        —                          │
-│  USB d… ■■■■■□□□□□□□  41%  │ │                                            ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │ │              History  F3                │
+│  Data      ■■■■□□□□□  40%  │ │                                            ┃   Undo  Ctrl+Z  ·  Show            │ │ │  Tags        —                          │
+│  USB drive ■■■■□□□□□  41%  │ │                                            ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │ │              History  F3                │
 ╰────────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────────╯ ╰─────────────────────────────────────────╯
 
   19 items   │  ☑ 1 selected · 39.0 MB  │  ⎘ 2 items ready to paste                                                                       v0.6.0 ⟳  183 GB free

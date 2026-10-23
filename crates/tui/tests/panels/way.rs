@@ -4,6 +4,7 @@ use crate::common::*;
 use crate::harness::*;
 use rada_tui::app::App;
 use rada_tui::panels::NavMode;
+use rada_tui::sidebar::Section;
 
 #[test]
 fn nav_lists_only_the_ancestors_and_the_subfolders_of_the_folder_shown() {
@@ -171,10 +172,11 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     let shown = h.app.nav_area.height as usize;
     assert!(shown < tall_box, "the box is shorter: {shown} < {tall_box}");
     assert!(
-        at >= shown,
-        "the folder is below the box's rows: {at} of {shown}"
+        rows.len() <= shown,
+        "the way gave up rows to fit: {} of {shown}",
+        rows.len()
     );
-    assert!(in_view(&h), "the folder shown is in view");
+    assert!(at < shown && in_view(&h), "the folder shown is in view");
 }
 
 /// What is listed under the title of the way, as paths.
@@ -246,4 +248,88 @@ fn a_deep_way_keeps_the_name_of_the_folder_shown_whole() {
         text.contains("cartella8"),
         "the name is there whole:\n{text}"
     );
+}
+
+/// The demo home with a folder `levels` deep in it, shown, and its subfolders listed.
+fn deep_scene(w: u16, hh: u16, levels: usize) -> H {
+    let mut h = scene(w, hh, "rada", false);
+    let mut deep = h.app.home().to_path_buf();
+    for n in 0..levels {
+        deep.push(format!("level-{n}"));
+    }
+    for kid in ["kid-1", "kid-2", "kid-3"] {
+        std::fs::create_dir_all(deep.join(kid)).unwrap();
+    }
+    go_and_wait(&mut h, &deep);
+    h.wait("the subfolders", |a| {
+        a.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
+    });
+    h.settle();
+    h
+}
+
+#[test]
+fn the_places_stay_in_sight_and_the_way_gives_up_rows() {
+    let mut h = deep_scene(170, 42, 12);
+    let nav = nav_text(&mut h);
+    let top: Vec<&str> = nav.lines().take(3).collect();
+    assert!(top[0].contains("Home"), "Home is the first row:\n{nav}");
+    assert!(top[1].contains("Desktop"), "{nav}");
+    assert!(
+        nav.contains("DEVICES") && nav.contains("USB drive"),
+        "{nav}"
+    );
+    assert!(nav.contains("… ") && nav.contains(" more"), "{nav}");
+    assert!(nav.contains("level-11"), "the folder shown stays:\n{nav}");
+    assert_eq!(h.app.nav_scroll, 0, "nothing scrolls:\n{nav}");
+}
+
+#[test]
+fn the_devices_give_up_all_but_the_main_disk_when_the_way_cannot_be_cut_further() {
+    let mut h = deep_scene(170, 42, 12);
+    h.app
+        .volumes
+        .extend((1..=2).map(|n| rada_core::platform::Volume {
+            mount_point: format!("/mnt/extra{n}").into(),
+            label: Some(format!("Extra {n}")),
+            fs_type: "ext4".into(),
+            device: "demo".into(),
+            kind: rada_core::platform::VolumeKind::Fixed,
+            drive_letter: None,
+            total: Some(1_000_000_000_000),
+            available: Some(500_000_000_000),
+            read_only: false,
+            responsive: true,
+        }));
+    // The box is drawn once with the new disks: its height is what the rows are made for.
+    let _ = h.screen();
+    let _ = h.screen();
+    let disks = h
+        .app
+        .side_items()
+        .iter()
+        .filter(|i| i.section == Section::Devices)
+        .count();
+    let nav = nav_text(&mut h);
+    assert!(nav.lines().next().unwrap().contains("Home"), "{nav}");
+    assert!(nav.contains("System"), "the main disk stays:\n{nav}");
+    assert!(
+        !nav.contains("Extra") && !nav.contains("USB drive"),
+        "{nav}"
+    );
+    let others = format!("… {} more", disks - 1);
+    assert!(nav.contains(&others), "the other disks are counted:\n{nav}");
+    assert!(nav.contains("level-11"), "{nav}");
+}
+
+#[test]
+fn space_gives_a_disk_name_the_room_it_needs_and_shortens_the_bar() {
+    let mut h = scene(160, 46, "rada", false);
+    let screen = h.screen();
+    let row = screen
+        .lines()
+        .find(|l| l.contains("USB drive") && l.contains('%'))
+        .unwrap_or_else(|| panic!("the name is whole:\n{screen}"));
+    let cells = row.chars().filter(|c| matches!(c, '■' | '□')).count();
+    assert!((6..12).contains(&cells), "the bar is cut down: {row}");
 }
