@@ -3,16 +3,16 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
  ‹ 1/1 ›  projects  +
-  ↑   ⟳     … › p…ts Ctrl…
+  ↑   ⟳     … › pro… Ctrl…
 ╭──────────────────────────╮
 │ ☐   Name ↑          Size │
 │                          │
 │ ☐ ▸ data                 │
 │ ☐ ▸ src                  │
 │ ☐ ▸ 目录                 │
-│ ☐ · a-v…r.gz         1 B │
-│ ☐ · bac….img      420 MB │
-│▌☐ · Ca….toml        42 B │
+│ ☐ · a-very-…         1 B │
+│ ☐ · backup.…      420 MB │
+│▌☐ · Cargo.t…        42 B │
 │ ☐ · main.rs         37 B │
 ╰──────────────────────────╯
  12 items          ≣  ▦  ▥

@@ -153,6 +153,10 @@ pub fn truncate(s: &str, max: usize) -> String {
 /// The longest extension (dot included) that is kept whole when a name is shortened.
 const KEPT_EXTENSION: usize = 8;
 
+/// The least cells kept on each side of the `…` when a name is cut in the middle. Less than
+/// that on either side tells nothing, and the name is cut at the end.
+const MIN_SIDE: usize = 4;
+
 /// Shorten a file or folder name to at most `max` cells by cutting out the middle, so that the
 /// start and the end are both seen: `CV_Alessan…Accenture.pdf`. Cut at the end, five names
 /// that differ only there would all read the same. The end is worth a little more than the
@@ -161,10 +165,10 @@ pub fn truncate_name(name: &str, max: usize) -> String {
     if width(name) <= max {
         return name.to_string();
     }
-    if max < 3 {
+    let room = max.saturating_sub(1);
+    if room < 2 * MIN_SIDE {
         return truncate(name, max);
     }
-    let room = max - 1;
     let extension = name
         .rfind('.')
         .filter(|at| *at > 0)
@@ -174,9 +178,12 @@ pub fn truncate_name(name: &str, max: usize) -> String {
     } else {
         0
     };
-    let tail_w = (room - room * 9 / 20).max(kept).min(room - 1);
-    let head = head_cells(name, room - tail_w);
-    format!("{head}…{}", tail_cells(name, tail_w))
+    let tail_w = (room - room * 9 / 20).max(kept).min(room - MIN_SIDE);
+    let (head, tail) = (head_cells(name, room - tail_w), tail_cells(name, tail_w));
+    if width(head) < MIN_SIDE || width(tail) < MIN_SIDE {
+        return truncate(name, max);
+    }
+    format!("{head}…{tail}")
 }
 
 /// Human readable size (`1.5 MB`, `1,5 MB` in Italian), in powers of 1024 labelled the way
@@ -277,8 +284,19 @@ mod tests {
         assert_eq!(truncate_name(name, 24), "CV_Alessan…Accenture.pdf");
         assert_eq!(truncate_name("Accenture.pdf", 13), "Accenture.pdf");
         assert_eq!(truncate_name("Accenture.pdf", 10), "Acce…e.pdf");
-        assert_eq!(truncate_name("Accenture.pdf", 6), "A….pdf");
         assert_eq!(truncate_name("Accenture.pdf", 2), "A…");
+    }
+
+    #[test]
+    fn a_name_is_cut_in_the_middle_only_with_four_cells_on_each_side() {
+        let name = "CV_Alessandro_Formica_Accenture.pdf";
+        assert_eq!(truncate_name(name, 5), "CV_A…");
+        assert_eq!(truncate_name(name, 8), "CV_Ales…");
+        assert_eq!(truncate_name(name, 9), "CV_A….pdf");
+        assert_eq!(truncate_name(name, 12), "CV_A…ure.pdf");
+        assert_eq!(truncate_name(name, 24), "CV_Alessan…Accenture.pdf");
+        // A wide character that does not fit leaves a side short: cut at the end instead.
+        assert_eq!(truncate_name("a日日日日日日日日日", 9), "a日日日…");
     }
 
     #[test]
