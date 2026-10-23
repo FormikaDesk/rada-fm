@@ -108,6 +108,25 @@ fn fit_way(chain: Vec<NavRow>, kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
     rows
 }
 
+/// Makes the blocks below the places fit in `height` rows beside the `rest` (the places, the
+/// trash and the least of the way): first the blank row above TAGS goes, then the disks but
+/// the main one.
+fn squeeze(
+    devices: Vec<NavRow>,
+    tags: &mut Vec<NavRow>,
+    rest: usize,
+    height: usize,
+) -> Vec<NavRow> {
+    let needed = |disks: &[NavRow], tags: &[NavRow]| rest + block_len(disks) + tags.len();
+    if needed(&devices, tags) > height {
+        tags.retain(|r| r.kind != NavKind::Gap);
+    }
+    if needed(&devices, tags) > height {
+        return main_disk_only(devices);
+    }
+    devices
+}
+
 /// The subfolders that fit in `room` rows, the last of them "… 3 more" if not all do.
 fn fit_kids(mut kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
     if kids.len() <= room {
@@ -314,22 +333,21 @@ impl App {
         let items = sidebar::items(self, false);
         let places = favorite_rows(&items, |s| matches!(s, Section::Home | Section::Pinned));
         let mut devices = favorite_rows(&items, |s| s == Section::Devices);
-        let tags = self.tags_rows();
+        let mut tags = self.tags_rows();
         let trash = items
             .iter()
             .find(|i| i.section == Section::Trash)
             .map(|t| plain_row(NavKind::Trash, t.name.clone(), t.path.clone()));
         let (chain, kids) = self.way_rows(&items);
         let height = self.nav_area.height as usize;
-        let fixed =
-            |disks: &[NavRow]| places.len() + block_len(disks) + tags.len() + trash.iter().len();
+        let rest = places.len() + trash.iter().len();
         let min_way = if chain.is_empty() { 0 } else { WAY_LEAST };
-        if height > 0 && fixed(&devices) + min_way > height {
-            devices = main_disk_only(devices);
+        if height > 0 {
+            devices = squeeze(devices, &mut tags, rest + min_way, height);
         }
         let room = match height {
             0 => usize::MAX,
-            h => h.saturating_sub(fixed(&devices)),
+            h => h.saturating_sub(rest + block_len(&devices) + tags.len()),
         };
         let mut rows = places;
         if !devices.is_empty() {

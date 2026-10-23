@@ -342,11 +342,23 @@ fn space_gives_a_disk_name_the_room_it_needs_and_shortens_the_bar() {
 #[test]
 fn the_blank_row_above_the_way_goes_when_the_box_is_one_row_short() {
     let mut h = deep_scene(170, 42, 12);
-    add_disks(&mut h, 3);
+    add_disks(&mut h, 4);
     let nav = nav_text(&mut h);
     let rows: Vec<&str> = nav.lines().collect();
     let path = rows.iter().position(|r| r.contains("PATH")).unwrap();
     assert!(rows[path - 1].contains("TAGS"), "no blank row:\n{nav}");
+    assert!(rows[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
+    assert!(nav.contains("level-11"), "{nav}");
+}
+
+#[test]
+fn the_blank_row_above_tags_goes_before_the_disks_are_cut() {
+    let mut h = deep_scene(170, 42, 12);
+    add_disks(&mut h, 4);
+    let nav = nav_text(&mut h);
+    let rows: Vec<&str> = nav.lines().collect();
+    let tags = rows.iter().position(|r| r.contains("TAGS")).unwrap();
+    assert!(rows[tags - 1].contains("Extra") || rows[tags - 1].contains("more"));
     assert!(rows[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
     assert!(nav.contains("level-11"), "{nav}");
 }
