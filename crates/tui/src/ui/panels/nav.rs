@@ -87,13 +87,19 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     if let Some(t) = trash {
         placed.push((area.height - 1, t));
     }
-    let w = area.width as usize;
+    // The thumb has a column of its own: a pill must not end under it.
+    let scrolls = body.len() > height && height >= 2;
+    let rows_area = Rect {
+        width: area.width - u16::from(scrolls && area.width > 1),
+        ..area
+    };
+    let w = rows_area.width as usize;
     let pin = icons::ui(app.icons, Glyph::Pin);
     for (y, i) in placed {
         let r = Rect {
             y: area.y + y,
             height: 1,
-            ..area
+            ..rows_area
         };
         let row = &rows[i];
         let is_current = current == Some(i);
@@ -305,7 +311,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
 
     // A thumb on the right edge when the tree does not fit.
-    if body.len() > height && height >= 2 {
+    if scrolls {
         let x = area.x + area.width.saturating_sub(1);
         let thumb = (height * height / body.len()).clamp(1, height);
         let top = (skip * (height - thumb)).checked_div(max_skip).unwrap_or(0);

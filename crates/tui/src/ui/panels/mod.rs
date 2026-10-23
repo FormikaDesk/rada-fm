@@ -4,7 +4,7 @@
 //! and the search), the row of buttons; then NAV and SPAZIO on the left, the folder in the middle
 //! and ANTEPRIMA and DETTAGLI on the right; at the bottom the status bar and the key hints. Each
 //! bar is a row of its own, with a blank row between them while the window has the height for it
-//! ([`crate::panels::AIRY_FROM`]).
+//! ([`crate::panels::AIRY_FROM`], and in part [`crate::panels::SOME_AIR_FROM`]).
 //!
 //! Colours come from the theme only. A box's border is the accent colour while the keyboard is
 //! in it and a quiet one otherwise; its inside is the theme's `inner` tone.
@@ -21,7 +21,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 
 use super::{address, bottom, columns, commands, grid, notice, tabs};
 use crate::app::App;
-use crate::panels::AIRY_FROM;
+use crate::panels::{AIRY_FROM, SOME_AIR_FROM};
 use crate::view::ViewMode;
 
 /// Width of the left column and of the right one for a window `width` columns wide.
@@ -39,36 +39,34 @@ const NAV_MIN_ROWS: u16 = 10;
 /// command bar hang from.
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let th = app.th.clone();
-    let airy = area.height >= AIRY_FROM;
-    let gap = u16::from(airy);
+    let [gap1, gap2, gap3, gap4, gap5] = bar_gaps(area.height);
     let hints_h = u16::from(app.show_hints);
     let [
         tabs_row,
-        gap1,
+        _,
         nav_row,
-        gap2,
+        _,
         buttons_row,
-        gap3,
+        _,
         body,
-        gap4,
+        _,
         status_row,
-        gap5,
+        _,
         hints_row,
     ] = Layout::vertical([
         Constraint::Length(1),
-        Constraint::Length(gap),
+        Constraint::Length(gap1),
         Constraint::Length(1),
-        Constraint::Length(gap),
+        Constraint::Length(gap2),
         Constraint::Length(1),
-        Constraint::Length(gap),
+        Constraint::Length(gap3),
         Constraint::Min(8),
-        Constraint::Length(gap),
+        Constraint::Length(gap4),
         Constraint::Length(1),
-        Constraint::Length(gap * hints_h),
+        Constraint::Length(gap5 * hints_h),
         Constraint::Length(hints_h),
     ])
     .areas(area);
-    let _ = (gap1, gap2, gap3, gap4, gap5);
 
     tabs::draw_tabs(f, app, tabs_row);
     address::draw_address(f, app, nav_row);
@@ -131,6 +129,17 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         notice::draw(f, app, main, now);
     }
     nav_row
+}
+
+/// The blank rows between the bars, in the order of the screen: under the tabs, under the
+/// navigation row, under the buttons, above the status bar, under it. All of them from
+/// [`AIRY_FROM`] rows; then only those under the buttons and under the status bar.
+fn bar_gaps(height: u16) -> [u16; 5] {
+    match height {
+        h if h >= AIRY_FROM => [1; 5],
+        h if h >= SOME_AIR_FROM => [0, 0, 1, 0, 1],
+        _ => [0; 5],
+    }
 }
 
 /// Whether the window is tall enough for the blank row under the title of a box.

@@ -106,31 +106,57 @@ fn the_boxes_have_their_names_on_their_top_edge() {
     assert!(!s.contains('▏') && !s.contains('▎'), "{s}");
 }
 
-#[test]
-fn below_42_rows_the_blank_rows_between_the_bars_go() {
-    let top_of_boxes = |hh: u16| -> usize {
-        let mut h = scene(160, hh, "rada", false);
-        h.screen()
-            .lines()
-            .position(|l| l.contains("[ NAV ]"))
-            .unwrap()
-    };
-    // Tabs, navigation, buttons: each on its own row with a blank one after it.
-    assert_eq!(top_of_boxes(46), 6);
-    assert_eq!(top_of_boxes(42), 6);
-    // Without them from 41 rows: the three rows, and the boxes right under.
-    assert_eq!(top_of_boxes(41), 3);
-    assert_eq!(top_of_boxes(36), 3);
-    // The same at the bottom: the status bar and the hints are one row each.
-    let mut h = scene(160, 41, "rada", false);
+/// The rows of the screen at `hh` rows tall and 110 wide, and where the boxes start and end.
+fn bars_of(hh: u16) -> (Vec<String>, usize, usize) {
+    let mut h = scene(110, hh, "rada", false);
     let lines: Vec<String> = h.screen().lines().map(str::to_string).collect();
+    let first_box = lines.iter().position(|l| l.contains("[ NAV ]")).unwrap();
     let last_box = lines.iter().rposition(|l| l.contains('╯')).unwrap();
+    (lines, first_box, last_box)
+}
+
+#[test]
+fn from_42_rows_all_blank_rows_stay() {
+    let (lines, first_box, last_box) = bars_of(42);
+    // Tabs, navigation, buttons: each on its own row with a blank one after it.
+    assert_eq!(first_box, 6);
     assert!(
-        lines[last_box + 1].contains("items"),
-        "{}",
-        lines[last_box + 1]
+        lines[last_box + 1].trim().is_empty(),
+        "above the status bar"
     );
-    assert!(lines[last_box + 2].contains("Ctrl+C") || lines[last_box + 2].contains("Enter"));
+    assert!(lines[last_box + 2].contains("items"));
+    assert!(
+        lines[last_box + 3].trim().is_empty(),
+        "under the status bar"
+    );
+}
+
+#[test]
+fn from_30_rows_two_blank_rows_stay() {
+    for hh in [41, 34, 30] {
+        let (lines, first_box, last_box) = bars_of(hh);
+        assert_eq!(
+            first_box, 4,
+            "{hh} rows: the three bars, a blank row, the boxes"
+        );
+        assert!(lines[first_box - 1].trim().is_empty(), "{hh} rows");
+        assert!(lines[last_box + 1].contains("items"), "{hh} rows");
+        assert!(lines[last_box + 2].trim().is_empty(), "{hh} rows");
+        assert!(lines[last_box + 3].contains("Ctrl+C") || lines[last_box + 3].contains("Enter"));
+    }
+}
+
+#[test]
+fn below_30_rows_the_blank_rows_go() {
+    for hh in [29, 24] {
+        let (lines, first_box, last_box) = bars_of(hh);
+        assert_eq!(
+            first_box, 3,
+            "{hh} rows: the three bars, and the boxes right under"
+        );
+        assert!(lines[last_box + 1].contains("items"), "{hh} rows");
+        assert!(lines[last_box + 2].contains("Ctrl+C") || lines[last_box + 2].contains("Enter"));
+    }
 }
 
 #[test]

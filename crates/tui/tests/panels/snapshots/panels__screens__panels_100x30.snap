@@ -1,10 +1,11 @@
 ---
-source: crates/tui/tests/panels.rs
+source: crates/tui/tests/panels/screens.rs
 expression: s
 ---
   rada   ▸ demo  ✕   +                                                                      ? Help
   ←   →   ↑   ⟳     ⌂ Home › projects › demo │ ⌕ Search file…                 Ctrl+P     ≣ Details
   New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo           ⋯
+
 ╭─[ NAV ]──────────────────╮ ╭─[ ~/projects/demo ]─────────────────────────────────────────────────╮
 │    ⌂ Home                │ │      Name ↑                                  Size  Date modified    │
 │    ▭ Desktop             │ │                                                                     │
@@ -23,12 +24,11 @@ expression: s
 │                          │ │    · notes.txt                               28 B  Yesterday        │
 │  PATH                    │ │    · photo.jpg                             70.7 KB  Today 13:30     │
 │    ⌂ Home                │ │    · README.md                              145 B  Today 13:28      │
-│      ▸ projects          │ │    · report.pdf                            2.29 MB  4 days ago      │
-│        ▸ demo      (19)  │ │    · screenshot.png                        5.34 KB  Yesterday       │
-│          ▸ assets   (0)  │ │                              ╭────────────────────────────────────╮ │
-│          ▸ docs     (0)  │ │                              ┃ ✓ 3 items copied to Documents      │ │
-│          ▸ scripts  (0)  │ │                              ┃   Undo  Ctrl+Z  ·  Show            │ │
-│        … 2 more          │ │                              ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │
+│      ▸ projects          │ │                              ╭────────────────────────────────────╮ │
+│        ▸ demo      (19)  │ │                              ┃ ✓ 3 items copied to Documents      │ │
+│          ▸ assets   (0)  │ │                              ┃   Undo  Ctrl+Z  ·  Show            │ │
+│        … 4 more          │ │                              ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯
   19 items   │  ☑ 1 selected · 39.0 MB  │  ⎘ 2 items ready to paste           v0.6.0 ⟳  183 GB free
+
    Ctrl+C  copy   Ctrl+X  cut   Del  trash   Shift+Del  delete   R  rename all   Alt+Z  compress

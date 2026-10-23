@@ -9,7 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **The file chooser shows a preview.** From 70 columns the preview of what is under the cursor (a picture, a PDF's first page, text) is beside the list and the navigation pane narrows to its icons; below 70, `Alt+P` puts the preview in the place of the list and takes it away again. The chooser never asks to enlarge the window, whatever `layout` says: it only has the classic layout.
 - **Rename onto a name that exists asks what to do**, with the choices of a copy: skip (the default, nothing changes), keep both (`name (1).ext`) or overwrite. Overwrite sends the old item to the trash first, so `Ctrl+Z` brings both back. Only a file can replace a file, and a folder an empty folder; the other pairs stay blocked, with the reason. The `rename` request takes `conflict` like `copy` does. Bulk rename still refuses name conflicts.
 
+### Changed
+- **The blank rows between the bars of the panels view go in steps.** From 42 rows all of them stay; from 30 to 41 one stays under the buttons and one under the status bar (a 110×30 window is no longer packed); below 30 none, as before.
+
 ### Fixed
+- The scroll thumb of the NAV box has a column of its own: it no longer covers the end of the highlighted row.
 - The list of a file chooser chooses its columns for the room it has, not for the width of the terminal, and the hint `H` of a binary file's preview is cut to the box instead of running out of it.
 
 ## [0.6.0-rc.13] - 2026-10-21

@@ -114,9 +114,12 @@ pub const TWO_LEFT_WIDTH: (u16, u16) = (24, 28);
 /// Percent of the window's width the left column of the two-column view takes, before it is held
 /// between [`TWO_LEFT_WIDTH`]: the figures of SPAZIO need the room.
 pub const TWO_LEFT_PERCENT: u16 = 36;
-/// Below this many rows the blank rows between the bars at the top and at the bottom go, so
-/// that more files are seen.
+/// From this many rows every bar has a blank row after it, and the boxes one under their title.
 pub const AIRY_FROM: u16 = 42;
+/// From this many rows, below [`AIRY_FROM`], one blank row is left under the buttons and one
+/// under the status bar; below it every blank row between the bars goes, so that more files are
+/// seen.
+pub const SOME_AIR_FROM: u16 = 30;
 
 /// How many columns of boxes the panels view has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
