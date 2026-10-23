@@ -261,6 +261,53 @@ fn log_fatal(e: &anyhow::Error) {
 }
 
 fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> Result<()> {
+    run_launch_helper_if_asked();
+    early_language();
+    let matches = cli_text::command::<Cli>().get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
+    if run_exiting_command(&cli)? {
+        return Ok(());
+    }
+    let request = read_request(&cli)?;
+    let (dirs, cfg_file) = open_state(log_guard)?;
+    let caps = detect_terminal(&cli, &cfg_file)?;
+    let start = start_place(&cli)?;
+    let icons_name = icons_setting(&cli, &cfg_file);
+    let icons = pick_icons(icons_name.as_deref(), &dirs, &caps)?;
+    if let Some(Command::Doctor) = &cli.command {
+        print_doctor(&caps, icons_name.as_deref(), icons, &dirs);
+        return Ok(());
+    }
+    let plain_start = request.is_none() && cli.demo.is_none() && start.chooser.is_none();
+    let font_offer = font_offer_if_due(icons_name.as_deref(), icons, &dirs, plain_start);
+    let (theme, adaptive) = pick_theme(&cli, &cfg_file, &caps)?;
+    let image_mode = pick_image_mode(&cli, &cfg_file, &caps)?;
+    let keymap = pick_keymap(&cli, &cfg_file)?;
+    let services = start_services(&cli, &cfg_file, &dirs, start.chooser.is_some())?;
+    let prefs = pick_view_prefs(&cfg_file, &dirs)?;
+
+    let cfg = build_config(
+        &cli,
+        &cfg_file,
+        &dirs,
+        Picks {
+            request,
+            start,
+            icons,
+            theme,
+            adaptive,
+            image_mode,
+            keymap,
+            font_offer,
+            prefs,
+            basic: caps.profile == rada_tui::Profile::Basic,
+        },
+    );
+    let outcome = rada_tui::run::run(cfg, services, caps).context(Key::MTerminalError.tr())?;
+    write_outputs(&cli, &outcome)
+}
+
+fn run_launch_helper_if_asked() {
     // Started by rada itself to call the shell from a process with no console (see
     // `rada_core::platform::launch`): it does that one thing and ends, before anything of the
     // interface or of the command line is touched.
@@ -268,46 +315,13 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
     if let Some(task) = rada_core::platform::launch::parse_helper_args(&raw) {
         std::process::exit(rada_core::platform::windows::run_launch_helper(&task));
     }
-    early_language();
-    let matches = cli_text::command::<Cli>().get_matches();
-    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
+}
+
+/// Runs the command that ends rada before the interface starts, if there is one: `true` then.
+fn run_exiting_command(cli: &Cli) -> Result<bool> {
     if let Some(Command::Setup { what }) = &cli.command {
-        let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
-        let lines = match what {
-            SetupWhat::Desktop {
-                remove,
-                default_file_manager,
-                desktop,
-                yes,
-            } => setup::desktop(
-                &dirs,
-                &setup::DesktopOptions {
-                    remove: *remove,
-                    default_file_manager: *default_file_manager,
-                    desktop: *desktop,
-                    yes: *yes,
-                },
-                &mut std::io::BufReader::new(std::io::stdin()),
-            )?,
-            SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
-            SetupWhat::Shell { shell, remove, yes } => shellsetup::run(
-                &dirs,
-                shell.as_deref(),
-                *remove,
-                *yes,
-                &mut std::io::BufReader::new(std::io::stdin()),
-            )?,
-            SetupWhat::FilePicker { remove, yes } => filepicker::run(
-                &dirs,
-                *remove,
-                *yes,
-                &mut std::io::BufReader::new(std::io::stdin()),
-            )?,
-        };
-        for l in lines {
-            println!("{l}");
-        }
-        return Ok(());
+        run_setup(what)?;
+        return Ok(true);
     }
     if let Some(Command::Debug {
         what: DebugWhat::Devices,
@@ -318,7 +332,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         for line in platform.volumes().diagnose() {
             println!("{line}");
         }
-        return Ok(());
+        return Ok(true);
     }
     if let Some(Command::Update {
         check,
@@ -332,14 +346,16 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         cfg_file.apply_language();
         let settings = cfg_file.update_settings(&dirs.home)?;
         let ctx = update_context(&dirs, settings)?;
-        return update_cmd::run(ctx, *check, *rollback, *yes);
+        update_cmd::run(ctx, *check, *rollback, *yes)?;
+        return Ok(true);
     }
     if cli.spawn_terminal {
-        return desktop::spawn_terminal(cli.path.first().map(PathBuf::as_path));
+        desktop::spawn_terminal(cli.path.first().map(PathBuf::as_path))?;
+        return Ok(true);
     }
     if let Some(shell) = &cli.init {
         print!("{}", shell::snippet(shell));
-        return Ok(());
+        return Ok(true);
     }
 
     if let Some(what) = &cli.schema {
@@ -351,12 +367,55 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
                 rada_core::schema::request()
             }
         );
-        return Ok(());
+        return Ok(true);
     }
+    Ok(false)
+}
+
+fn run_setup(what: &SetupWhat) -> Result<()> {
+    let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
+    let lines = match what {
+        SetupWhat::Desktop {
+            remove,
+            default_file_manager,
+            desktop,
+            yes,
+        } => setup::desktop(
+            &dirs,
+            &setup::DesktopOptions {
+                remove: *remove,
+                default_file_manager: *default_file_manager,
+                desktop: *desktop,
+                yes: *yes,
+            },
+            &mut std::io::BufReader::new(std::io::stdin()),
+        )?,
+        SetupWhat::Font { remove } => setup::font(&dirs, *remove)?,
+        SetupWhat::Shell { shell, remove, yes } => shellsetup::run(
+            &dirs,
+            shell.as_deref(),
+            *remove,
+            *yes,
+            &mut std::io::BufReader::new(std::io::stdin()),
+        )?,
+        SetupWhat::FilePicker { remove, yes } => filepicker::run(
+            &dirs,
+            *remove,
+            *yes,
+            &mut std::io::BufReader::new(std::io::stdin()),
+        )?,
+    };
+    for l in lines {
+        println!("{l}");
+    }
+    Ok(())
+}
+
+fn read_request(cli: &Cli) -> Result<Option<rada_core::ops::OpRequest>> {
     if cli.chooser_file.is_some() && (cli.request.is_some() || cli.demo.is_some()) {
         anyhow::bail!("{}", Key::MChooserWithRequest.tr());
     }
-    let request = match &cli.request {
+    Ok(match &cli.request {
         Some(src) => {
             let text = if src == "-" {
                 std::io::read_to_string(std::io::stdin()).context(Key::MRequestStdin.tr())?
@@ -369,14 +428,22 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             Some(req)
         }
         None => None,
-    };
+    })
+}
+
+fn open_state(
+    log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>,
+) -> Result<(Dirs, config::FileConfig)> {
     let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
     // A state folder from an earlier version may be open to other users: close it first.
     rada_core::statefile::tighten(&dirs.rada_state());
     *log_guard = init_logging(&dirs);
     let cfg_file = config::load(&dirs);
     cfg_file.apply_language();
+    Ok((dirs, cfg_file))
+}
 
+fn detect_terminal(cli: &Cli, cfg_file: &config::FileConfig) -> Result<rada_tui::TermCaps> {
     // What the terminal can do comes first: the icons, the colours and the pictures follow.
     let profile_name = cli
         .profile
@@ -387,10 +454,16 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         Some(n) => rada_tui::Profile::parse(&n).with_context(|| tf(Key::MBadProfile, &[&n]))?,
         None => None,
     };
-    let caps = rada_tui::TermCaps::detect_here(forced_profile);
-    let basic = caps.profile == rada_tui::Profile::Basic;
-    let windows_terminal = caps.terminal == rada_tui::caps::TerminalKind::WindowsTerminal;
+    Ok(rada_tui::TermCaps::detect_here(forced_profile))
+}
 
+struct StartPlace {
+    dir: PathBuf,
+    select: Option<std::ffi::OsString>,
+    chooser: Option<rada_tui::chooser::Chooser>,
+}
+
+fn start_place(cli: &Cli) -> Result<StartPlace> {
     let start = match cli.path.first() {
         Some(p) => p.clone(),
         None => std::env::current_dir().context(Key::MNoCwd.tr())?,
@@ -435,13 +508,28 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             None => Chooser::file(cli.chooser_multiple),
         }
     });
+    Ok(StartPlace {
+        dir: start,
+        select,
+        chooser,
+    })
+}
 
-    let icons_name = cli
-        .icons
+fn icons_setting(cli: &Cli, cfg_file: &config::FileConfig) -> Option<String> {
+    cli.icons
         .clone()
         .or_else(|| std::env::var("RADA_ICONS").ok())
-        .or(cfg_file.icons.clone());
-    let icons = match icons_name.as_deref() {
+        .or(cfg_file.icons.clone())
+}
+
+fn pick_icons(
+    icons_name: Option<&str>,
+    dirs: &Dirs,
+    caps: &rada_tui::TermCaps,
+) -> Result<rada_tui::IconSet> {
+    let basic = caps.profile == rada_tui::Profile::Basic;
+    let windows_terminal = caps.terminal == rada_tui::caps::TerminalKind::WindowsTerminal;
+    Ok(match icons_name {
         // A terminal that draws only ASCII has no icons to show.
         None | Some("auto") if basic => rada_tui::IconSet::None,
         // The best set the terminal's font can draw: Nerd Font symbols when the terminal is
@@ -464,35 +552,52 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         }
         Some(n) => rada_tui::IconSet::parse(n)
             .with_context(|| tf(Key::MBadIcons, &[&n, &rada_tui::IconSet::NAMES.join(", ")]))?,
-    };
-    if let Some(Command::Doctor) = &cli.command {
-        for line in caps.describe() {
-            println!("{line}");
-        }
-        // Why this set: the font the terminal is set to draw with, when it could be read.
-        let chosen = !matches!(icons_name.as_deref(), None | Some("auto"));
-        match fonts::terminal_nerd_font(&dirs.home, windows_terminal) {
-            _ if chosen => println!("{}", tf(Key::DocIconsChosen, &[&icons.name()])),
-            Some(font) => println!("{}", tf(Key::DocIconsNerd, &[&icons.name(), &font.trim()])),
-            None => println!("{}", tf(Key::DocIconsNone, &[&icons.name()])),
-        }
-        return Ok(());
-    }
+    })
+}
 
+fn print_doctor(
+    caps: &rada_tui::TermCaps,
+    icons_name: Option<&str>,
+    icons: rada_tui::IconSet,
+    dirs: &Dirs,
+) {
+    let windows_terminal = caps.terminal == rada_tui::caps::TerminalKind::WindowsTerminal;
+    for line in caps.describe() {
+        println!("{line}");
+    }
+    // Why this set: the font the terminal is set to draw with, when it could be read.
+    let chosen = !matches!(icons_name, None | Some("auto"));
+    match fonts::terminal_nerd_font(&dirs.home, windows_terminal) {
+        _ if chosen => println!("{}", tf(Key::DocIconsChosen, &[&icons.name()])),
+        Some(font) => println!("{}", tf(Key::DocIconsNerd, &[&icons.name(), &font.trim()])),
+        None => println!("{}", tf(Key::DocIconsNone, &[&icons.name()])),
+    }
+}
+
+fn font_offer_if_due(
+    icons_name: Option<&str>,
+    icons: rada_tui::IconSet,
+    dirs: &Dirs,
+    plain_start: bool,
+) -> Option<rada_tui::FontOffer> {
     // The offer to install a Nerd Font: only where the icons were left to rada to decide, they
     // would not draw (one of the Unicode sets stands in for them), and it has not been made
     // before. Never made without being asked.
-    let font_offer = (matches!(icons_name.as_deref(), None | Some("auto"))
+    (matches!(icons_name, None | Some("auto"))
         && matches!(
             icons,
             rada_tui::IconSet::UnicodeIcons | rada_tui::IconSet::UnicodeStd
         )
-        && request.is_none()
-        && cli.demo.is_none()
-        && chooser.is_none()
-        && !font_offered(&dirs))
-    .then(|| make_font_offer(&dirs));
+        && plain_start
+        && !font_offered(dirs))
+    .then(|| make_font_offer(dirs))
+}
 
+fn pick_theme(
+    cli: &Cli,
+    cfg_file: &config::FileConfig,
+    caps: &rada_tui::TermCaps,
+) -> Result<(Theme, Option<rada_tui::app::Adaptive>)> {
     let depth = caps.depth;
     let theme_name = cli
         .theme
@@ -538,23 +643,27 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
     } else {
         theme
     };
-    let bookmarks = cfg_file
-        .bookmarks
-        .iter()
-        .map(|b| rada_tui::palette::expand(b, &dirs.home))
-        .collect();
+    Ok((theme, adaptive))
+}
 
+fn pick_image_mode(
+    cli: &Cli,
+    cfg_file: &config::FileConfig,
+    caps: &rada_tui::TermCaps,
+) -> Result<rada_tui::ImageMode> {
     let images_name = cli
         .images
         .clone()
         .or_else(|| std::env::var("RADA_IMAGES").ok())
         .or(cfg_file.images.clone());
-    let image_mode = match images_name {
+    Ok(match images_name {
         Some(n) => rada_tui::ImageMode::parse(&n).with_context(|| tf(Key::MBadImages, &[&n]))?,
         None if caps.images == rada_tui::caps::ImagePlan::Off => rada_tui::ImageMode::Off,
         None => rada_tui::ImageMode::Auto,
-    };
+    })
+}
 
+fn pick_keymap(cli: &Cli, cfg_file: &config::FileConfig) -> Result<rada_tui::keymap::Keymap> {
     let preset_name = cli
         .keymap
         .clone()
@@ -569,9 +678,15 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         })?,
         None => rada_tui::keymap::Preset::VimClassic,
     };
-    let keymap = rada_tui::keymap::Keymap::new(preset, &cfg_file.keys);
-    let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("RADA_NO_MOUSE").is_none();
+    Ok(rada_tui::keymap::Keymap::new(preset, &cfg_file.keys))
+}
 
+fn start_services(
+    cli: &Cli,
+    cfg_file: &config::FileConfig,
+    dirs: &Dirs,
+    chooser: bool,
+) -> Result<Services> {
     let platform = platform::current_with(
         dirs.clone(),
         platform::PlatformOptions {
@@ -606,17 +721,30 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         ));
     // Updates: the daily check starts once the interface is up. Not in a demo scene, whose
     // screens must not depend on what GitHub says today.
-    let services = if cli.demo.is_some() || chooser.is_some() {
+    Ok(if cli.demo.is_some() || chooser {
         services
     } else {
-        match update_context(&dirs, cfg_file.update_settings(&dirs.home)?) {
+        match update_context(dirs, cfg_file.update_settings(&dirs.home)?) {
             Ok(ctx) => services.with_updates(ctx),
             Err(e) => {
                 tracing::warn!("updates are off: {e}");
                 services
             }
         }
-    };
+    })
+}
+
+struct ViewPrefs {
+    view: rada_tui::ViewMode,
+    dates: rada_tui::fmt::DateStyle,
+    sidebar_density: rada_tui::sidebar::Density,
+    nav_mode: rada_tui::panels::NavMode,
+    saved_ui: rada_core::uistate::UiState,
+    layout: rada_tui::LayoutKind,
+    layout_pref: rada_tui::LayoutPref,
+}
+
+fn pick_view_prefs(cfg_file: &config::FileConfig, dirs: &Dirs) -> Result<ViewPrefs> {
     let view = match cfg_file.view.as_deref() {
         None => rada_tui::ViewMode::Details,
         Some(n) => rada_tui::ViewMode::parse(n).with_context(|| tf(Key::MBadView, &[&n]))?,
@@ -661,7 +789,60 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
                     &[&cfg_file.layout.as_deref().unwrap_or_default()],
                 )
             })?;
-    let cfg = Config {
+    Ok(ViewPrefs {
+        view,
+        dates,
+        sidebar_density,
+        nav_mode,
+        saved_ui,
+        layout,
+        layout_pref,
+    })
+}
+
+struct Picks {
+    request: Option<rada_core::ops::OpRequest>,
+    start: StartPlace,
+    icons: rada_tui::IconSet,
+    theme: Theme,
+    adaptive: Option<rada_tui::app::Adaptive>,
+    image_mode: rada_tui::ImageMode,
+    keymap: rada_tui::keymap::Keymap,
+    font_offer: Option<rada_tui::FontOffer>,
+    prefs: ViewPrefs,
+    basic: bool,
+}
+
+fn build_config(cli: &Cli, cfg_file: &config::FileConfig, dirs: &Dirs, picks: Picks) -> Config {
+    let Picks {
+        request,
+        start,
+        icons,
+        theme,
+        adaptive,
+        image_mode,
+        keymap,
+        font_offer,
+        prefs,
+        basic,
+    } = picks;
+    let ViewPrefs {
+        view,
+        dates,
+        sidebar_density,
+        nav_mode,
+        saved_ui,
+        layout,
+        layout_pref,
+    } = prefs;
+    let chooser = start.chooser;
+    let bookmarks = cfg_file
+        .bookmarks
+        .iter()
+        .map(|b| rada_tui::palette::expand(b, &dirs.home))
+        .collect();
+    let mouse = cfg_file.mouse && !cli.no_mouse && std::env::var_os("RADA_NO_MOUSE").is_none();
+    Config {
         start_explicit: !cli.path.is_empty(),
         layout,
         layout_pref,
@@ -680,7 +861,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             .details
             .or_else(|| (!cfg_file.show_details_pane).then_some(false)),
         saved_ui: saved_ui.clone(),
-        start_dir: start,
+        start_dir: start.dir,
         icons,
         show_hidden: cli.hidden || cfg_file.show_hidden,
         sort: cfg_file.sort,
@@ -699,7 +880,7 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
         show_hints: cfg_file.hints,
         sidebar: saved_ui.sidebar.unwrap_or(cfg_file.sidebar),
         request,
-        select,
+        select: start.select,
         limits: rada_core::preview::Limits {
             image: cfg_file.image_limits.clone(),
             archive_entries: cfg_file.archive_preview_entries,
@@ -707,9 +888,10 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
             syntax_highlight: cfg_file.syntax_highlight,
             ..Default::default()
         },
-    };
+    }
+}
 
-    let outcome = rada_tui::run::run(cfg, services, caps).context(Key::MTerminalError.tr())?;
+fn write_outputs(cli: &Cli, outcome: &rada_tui::run::Outcome) -> Result<()> {
     if let Some(f) = &cli.cwd_file {
         write_cwd(f, &outcome.last_dir).with_context(|| tf(Key::MCannotWrite, &[&f.display()]))?;
     }
