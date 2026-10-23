@@ -156,10 +156,7 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
             }
         }
         Some(Preview::Binary(b)) if app.preview.hex => {
-            lines.push(Line::from(vec![
-                Span::styled("H", th.key()),
-                Span::styled(format!("  {}", Key::PvBackToSummary.tr()), th.dim()),
-            ]));
+            lines.push(hex_hint(&th, Key::PvBackToSummary.tr(), w));
             lines.push(Line::raw(""));
             app.preview.scroll = app.preview.scroll.min(b.hex.len().saturating_sub(1));
             for l in b
@@ -236,10 +233,7 @@ pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
                 }
                 lines.push(Line::raw(""));
             }
-            lines.push(Line::from(vec![
-                Span::styled("H", th.key()),
-                Span::styled(format!("  {}", Key::PvShowHex.tr()), th.dim()),
-            ]));
+            lines.push(hex_hint(&th, Key::PvShowHex.tr(), w));
         }
         Some(Preview::Archive(a)) => {
             let kv = |lines: &mut Vec<Line>, key: &str, value: &str, st: Style| {
@@ -423,6 +417,15 @@ fn kv_lines(lines: &mut Vec<Line>, th: &Theme, key: &str, value: &str, st: Style
 }
 
 /// The one-line (possibly wrapped) description under the file name.
+/// The key that switches between the summary of a binary file and its hex dump, and what it does.
+fn hex_hint(th: &Theme, what: &str, width: usize) -> Line<'static> {
+    let what = display::truncate(&format!("  {what}"), width.saturating_sub(1));
+    Line::from(vec![
+        Span::styled("H", th.key()),
+        Span::styled(what, th.dim()),
+    ])
+}
+
 fn summary_of(content: &Option<Preview>, hex: bool, ago: &str) -> String {
     match content {
         None | Some(Preview::Image(_)) | Some(Preview::Error(_)) => String::new(),

@@ -716,9 +716,10 @@ pub struct App {
 
 impl App {
     pub fn new(mut cfg: Config, svc: Services, image_ui: Option<ImageUi>) -> App {
-        // A chooser starts with the newest first, whatever the `sort` setting says.
+        // A chooser starts with the newest first and the list in front, whatever the settings say.
         if cfg.chooser.is_some() {
             cfg.sort = crate::chooser::default_sort(cfg.sort);
+            cfg.details_pane = None;
         }
         let decode_images = image_ui.is_some();
         // Which folder is in front, and which others were open last time.

@@ -7,6 +7,7 @@
 
 use rada_core::display;
 use rada_core::i18n::{Key, tf};
+use rada_core::model::Entry;
 use rada_core::preview::Preview;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -120,51 +121,49 @@ fn properties(app: &App) -> Vec<(Key, String)> {
     rows
 }
 
-/// Draw the pane in `area`.
-pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+/// Rows the header takes: the name, the type and size, and a blank row.
+const HEADER_ROWS: u16 = 3;
+
+/// The pane's drawing area inside its margins, or `None` when it is too small to draw in.
+fn pane_inner(area: Rect) -> Option<Rect> {
     if area.width < 16 || area.height < 4 {
-        return;
+        return None;
     }
-    let inner = Rect {
+    Some(Rect {
         x: area.x + 1,
         width: area.width.saturating_sub(2),
         ..area
-    };
+    })
+}
+
+/// Several items selected: how many and how big, in place of a preview.
+fn draw_marked_summary(f: &mut Frame, app: &App, inner: Rect) {
+    let th = &app.th;
+    let size: u64 = app
+        .listing
+        .all()
+        .iter()
+        .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
+        .map(|e| e.size)
+        .sum();
+    let lines = vec![
+        Line::from(Span::styled(
+            fmt::selected_items(app.marked.len() as u64),
+            th.base().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            tf(Key::InFiles, &[&fmt::size(size)]),
+            th.dim(),
+        )),
+    ];
+    f.render_widget(Paragraph::new(lines), Rect { height: 2, ..inner });
+}
+
+/// The icon and name of the item under the cursor, then its type and size.
+fn draw_name_and_type(f: &mut Frame, app: &mut App, inner: Rect, e: &Entry) {
+    let th = app.th.clone();
     let w = inner.width as usize;
-
-    // Several items selected: a summary instead of a preview.
-    if app.marked.len() > 1 {
-        let size: u64 = app
-            .listing
-            .all()
-            .iter()
-            .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
-            .map(|e| e.size)
-            .sum();
-        let lines = vec![
-            Line::from(Span::styled(
-                fmt::selected_items(app.marked.len() as u64),
-                th.base().add_modifier(Modifier::BOLD),
-            )),
-            Line::from(Span::styled(
-                tf(Key::InFiles, &[&fmt::size(size)]),
-                th.dim(),
-            )),
-        ];
-        f.render_widget(Paragraph::new(lines), Rect { height: 2, ..inner });
-        return;
-    }
-    let Some(e) = app.current().cloned() else {
-        f.render_widget(
-            Paragraph::new(Span::styled(Key::SelectToSee.tr(), th.dim())),
-            Rect { height: 1, ..inner },
-        );
-        return;
-    };
-
-    // Header: icon and name, then the type and the size.
-    let (glyph, gcolor) = icons::icon(&e, app.icons, &th);
+    let (glyph, gcolor) = icons::icon(e, app.icons, &th);
     let mut head = Vec::new();
     if !glyph.is_empty() {
         head.push(Span::styled(format!("{glyph} "), th.fg(gcolor)));
@@ -180,7 +179,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     );
     app.want_folder_sizes(app.current_index().into_iter());
     let sub = if e.is_dir() {
-        app.folder_summary(&e)
+        app.folder_summary(e)
             .unwrap_or_else(|| rada_core::i18n::type_label(&e.type_label).into_owned())
     } else {
         format!(
@@ -197,12 +196,58 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             ..inner
         },
     );
+}
+
+/// What comes before the preview. The item it is about, when there is one to preview.
+fn draw_header(f: &mut Frame, app: &mut App, inner: Rect) -> Option<Entry> {
+    if app.marked.len() > 1 {
+        draw_marked_summary(f, app, inner);
+        return None;
+    }
+    let Some(e) = app.current().cloned() else {
+        let hint = Span::styled(Key::SelectToSee.tr(), app.th.dim());
+        f.render_widget(Paragraph::new(hint), Rect { height: 1, ..inner });
+        return None;
+    };
+    draw_name_and_type(f, app, inner, &e);
+    Some(e)
+}
+
+/// The pane of a file chooser: the item under the cursor and its preview, nothing to press.
+pub fn draw_chooser_preview(f: &mut Frame, app: &mut App, area: Rect) {
+    let Some(inner) = pane_inner(area) else {
+        return;
+    };
+    if draw_header(f, app, inner).is_none() {
+        return;
+    }
+    let body = Rect {
+        y: inner.y + HEADER_ROWS,
+        height: inner.height.saturating_sub(HEADER_ROWS + 1),
+        ..inner
+    };
+    if body.height >= 3 {
+        app.hits.add(body, Target::Preview);
+        preview::content(f, app, body, false);
+    }
+}
+
+/// Draw the pane in `area`.
+pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
+    let th = app.th.clone();
+    let Some(inner) = pane_inner(area) else {
+        return;
+    };
+    let w = inner.width as usize;
+    let Some(e) = draw_header(f, app, inner) else {
+        return;
+    };
 
     // Below the header: the preview, the buttons, then the properties, with a blank row
     // between each and one more under the last property, before the status bar.
     let mut props = properties(app);
     let quick_look = app.quick_look_available();
-    let fixed_top = 3u16;
+    let fixed_top = HEADER_ROWS;
     let bottom_gap = 1u16;
     let fit = |buttons_h: u16| {
         let avail = inner

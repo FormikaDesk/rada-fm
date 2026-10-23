@@ -59,6 +59,8 @@ pub enum DetailsMode {
 const DETAILS_FROM: u16 = 140;
 /// Narrowest terminal that can show the details pane as an overlay.
 const OVERLAY_FROM: u16 = 60;
+/// Terminal width from which a file chooser always shows the preview beside the list.
+pub const CHOOSER_PREVIEW_FROM: u16 = 70;
 
 /// Whether (and how) the details pane shows on a terminal `width` columns wide, given what
 /// the user chose: nothing (follow the width), on, or off.
@@ -85,6 +87,51 @@ pub fn details_mode(width: u16, chosen: Option<bool>, layout: LayoutKind) -> Det
     }
 }
 
+/// The preview of a file chooser: beside the list from [`CHOOSER_PREVIEW_FROM`] columns, and on
+/// a narrower terminal, when asked for (`Alt+P`), in the place of the list.
+fn chooser_details_mode(width: u16, chosen: Option<bool>) -> DetailsMode {
+    if width >= CHOOSER_PREVIEW_FROM {
+        DetailsMode::Column
+    } else if chosen == Some(true) {
+        DetailsMode::Overlay
+    } else {
+        DetailsMode::Hidden
+    }
+}
+
+fn details_mode_of(app: &App, width: u16) -> DetailsMode {
+    if app.chooser.is_some() {
+        chooser_details_mode(width, app.details)
+    } else {
+        details_mode(width, app.details, app.layout)
+    }
+}
+
+/// The navigation pane, narrowed to its icons when a file chooser's preview needs the room.
+fn side_mode_of(app: &App, width: u16, details: DetailsMode) -> Mode {
+    match Mode::for_width(width, app.side_on) {
+        Mode::Full if app.chooser.is_some() && details == DetailsMode::Column => Mode::Rail,
+        mode => mode,
+    }
+}
+
+/// Width of the column on the right of the list, in a `room` columns wide.
+fn side_pane_width(app: &App, room: u16) -> u16 {
+    if app.chooser.is_some() {
+        (room * 2 / 5).clamp(28, 60)
+    } else {
+        (room * 27 / 100).clamp(34, 50)
+    }
+}
+
+fn draw_side_pane(f: &mut Frame, app: &mut App, area: Rect) {
+    if app.chooser.is_some() {
+        details::draw_chooser_preview(f, app, area);
+    } else {
+        details::draw_details(f, app, area);
+    }
+}
+
 /// The smallest terminal that shows the whole explorer: the navigation pane in full, the
 /// command bar and the key hints.
 pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
@@ -93,9 +140,10 @@ pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
 /// when the person asked for the panels (`layout = "panels"`) and they do not fit, below
 /// [`FULL_LAYOUT_MIN`], with room to spare a row for it, and until the person has closed it.
 /// With `auto` rada chooses the view and there is nothing to ask; `classic` and `compact` are
-/// choices of a small layout.
+/// choices of a small layout. A file chooser never asks: it only has the classic one.
 pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
-    app.layout == LayoutKind::Explorer
+    app.chooser.is_none()
+        && app.layout == LayoutKind::Explorer
         && app.layout_pref == crate::LayoutPref::Panels
         && !app.size_notice_dismissed
         && app.panels_wanted(width, height).is_none()
@@ -258,12 +306,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     // Body: the navigation pane, the folder, and the details pane when there is room; in the
     // explorer layout each is a card with rounded corners, a column of air between them.
-    app.side_mode = Mode::for_width(area.width, app.side_on);
+    let dmode = details_mode_of(app, area.width);
+    app.details_shown = dmode;
+    app.side_mode = side_mode_of(app, area.width, dmode);
     if app.side_mode == Mode::Hidden {
         app.side_focus = false;
     }
-    let dmode = details_mode(area.width, app.details, app.layout);
-    app.details_shown = dmode;
     let carded = explorer && body.height >= 3;
     let mut rest = body;
     if app.side_mode != Mode::Hidden {
@@ -292,7 +340,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         rest = others;
     }
     let main = if dmode == DetailsMode::Column {
-        let pw = (rest.width * 27 / 100).clamp(34, 50);
+        let pw = side_pane_width(app, rest.width);
         let [left, divider, right] = Layout::horizontal([
             Constraint::Min(30),
             Constraint::Length(1),
@@ -301,13 +349,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .areas(rest);
         if carded {
             let inner = soft::card(f, right, &th, false);
-            details::draw_details(f, app, inner);
+            draw_side_pane(f, app, inner);
         } else {
             let rule: Vec<Line> = (0..divider.height)
                 .map(|_| Line::from(Span::styled("│", th.faint())))
                 .collect();
             f.render_widget(Paragraph::new(rule), divider);
-            details::draw_details(f, app, right);
+            draw_side_pane(f, app, right);
         }
         left
     } else {
@@ -338,15 +386,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     } else {
         main
     };
-    match app.view {
-        ViewMode::Columns => columns::draw_columns(f, app, main),
-        ViewMode::Details => list::draw_list(
-            f,
-            app,
-            main,
-            list::ListOpts::for_terminal(area.width as usize, app.tags_column_wanted()),
-        ),
-        ViewMode::Icons => grid::draw_grid(f, app, main),
+    let preview_instead = app.chooser.is_some() && dmode == DetailsMode::Overlay;
+    if preview_instead {
+        details::draw_chooser_preview(f, app, main);
+    } else {
+        draw_folder_view(f, app, main, columns_basis(app, dmode, main, area.width));
     }
     // A shorter list may have left the cursor below its last row: bring it back in view.
     if notice_h > 0 {
@@ -356,7 +400,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             app.dirty = true;
         }
     }
-    if dmode == DetailsMode::Overlay {
+    if dmode == DetailsMode::Overlay && !preview_instead {
         details::draw_overlay(f, app, main);
     }
     if notice {
@@ -378,6 +422,30 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         notice::draw(f, app, notice_area, now);
     }
     finish(f, app, area, (address_h > 0).then_some(address_row));
+}
+
+/// The terminal width the list's columns are chosen for. A file chooser's list shares the row
+/// with a preview, so it counts as the terminal in which the same list sits beside a full
+/// navigation pane.
+fn columns_basis(app: &App, details: DetailsMode, list: Rect, term_width: u16) -> u16 {
+    if app.chooser.is_some() && details == DetailsMode::Column {
+        list.width + Mode::Full.columns()
+    } else {
+        term_width
+    }
+}
+
+fn draw_folder_view(f: &mut Frame, app: &mut App, main: Rect, width: u16) {
+    match app.view {
+        ViewMode::Columns => columns::draw_columns(f, app, main),
+        ViewMode::Details => list::draw_list(
+            f,
+            app,
+            main,
+            list::ListOpts::for_terminal(width as usize, app.tags_column_wanted()),
+        ),
+        ViewMode::Icons => grid::draw_grid(f, app, main),
+    }
 }
 
 /// What is drawn over everything else, in either layout: the suggestions under the bar and the

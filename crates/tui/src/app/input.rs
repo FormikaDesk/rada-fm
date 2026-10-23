@@ -591,12 +591,23 @@ impl App {
         if self.panels_shown && self.panels_two {
             return self.toggle_left_preview();
         }
+        if self.chooser.is_some() {
+            return self.toggle_chooser_preview();
+        }
         let want = !self.details_visible();
         self.details = Some(want);
         self.saved_ui.details = Some(want);
         self.save_ui_state();
         if want && self.term_width < 60 {
             self.toast(ToastKind::Info, Key::TDetailsOnNarrow.tr(), 3);
+        }
+    }
+
+    /// A file chooser shows its preview beside the list from 70 columns; below that, the key
+    /// puts it in the place of the list and takes it away again. None of it is remembered.
+    fn toggle_chooser_preview(&mut self) {
+        if self.term_width < crate::ui::CHOOSER_PREVIEW_FROM {
+            self.details = Some(self.details != Some(true));
         }
     }
 
