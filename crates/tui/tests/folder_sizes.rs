@@ -199,11 +199,14 @@ fn a_folder_that_appears_is_counted_and_one_that_changes_is_counted_again() {
     counted(&mut h);
     let dir = h.app.cwd.clone();
     // A new folder arrives through the watcher.
-    std::fs::create_dir_all(dir.join("fresh")).unwrap();
-    std::fs::write(dir.join("fresh/n"), vec![0u8; 4000]).unwrap();
-    h.wait("the new folder", |a| {
-        a.listing.all().iter().any(|e| e.display == "fresh")
-    });
+    h.wait_making(
+        "the new folder",
+        || {
+            std::fs::create_dir_all(dir.join("fresh")).unwrap();
+            std::fs::write(dir.join("fresh/n"), vec![0u8; 4000]).unwrap();
+        },
+        |a| a.listing.all().iter().any(|e| e.display == "fresh"),
+    );
     counted(&mut h);
     let row = row_of(&mut h, "fresh");
     assert!(row.contains(&fmt::size(4000)), "{row}");

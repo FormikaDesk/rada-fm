@@ -109,19 +109,16 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
 fn a_file_created_from_outside_appears_without_pressing_anything() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir.clone(), 120, 30);
-    // Written again every so often until it shows: a file written before the watcher is in
-    // place is missed by it, and nothing says when that is over.
-    let mut written = None::<Instant>;
-    h.wait("live update", |a| {
-        if written.is_none_or(|t| t.elapsed() > Duration::from_millis(400)) {
-            std::fs::write(dir.join("ext_created.txt"), "hi").unwrap();
-            written = Some(Instant::now());
-        }
-        (0..a.visible.len()).any(|i| {
-            a.entry_at(i)
-                .is_some_and(|e| e.display == "ext_created.txt")
-        })
-    });
+    h.wait_making(
+        "live update",
+        || std::fs::write(dir.join("ext_created.txt"), "hi").unwrap(),
+        |a| {
+            (0..a.visible.len()).any(|i| {
+                a.entry_at(i)
+                    .is_some_and(|e| e.display == "ext_created.txt")
+            })
+        },
+    );
 }
 
 #[test]

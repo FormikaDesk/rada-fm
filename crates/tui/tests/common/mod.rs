@@ -266,6 +266,19 @@ impl H {
         }
     }
 
+    /// Like `wait`, with `make` run again every so often until `done` holds: what is made
+    /// before the watcher is in place is missed by it, and nothing says when that is over.
+    pub fn wait_making(&mut self, what: &str, make: impl Fn(), mut done: impl FnMut(&App) -> bool) {
+        let mut made = None::<Instant>;
+        self.wait(what, |a| {
+            if made.is_none_or(|t| t.elapsed() > Duration::from_millis(400)) {
+                make();
+                made = Some(Instant::now());
+            }
+            done(a)
+        });
+    }
+
     /// Let workers and the encoder thread deliver for a moment, drawing as the real loop does.
     pub fn pump(&mut self, ms: u64) {
         let rx = self.app.events();
