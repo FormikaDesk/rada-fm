@@ -254,8 +254,9 @@ fn draw_card(f: &mut Frame, ctx: &Ctx, c: &Card, rect: Rect, targets: &mut Vec<(
         return;
     }
     // The left side of the border in the colour of the state.
+    let side = crate::icons::mark(ctx.set, crate::icons::Mark::CardSide);
     for y in rect.y + 1..rect.bottom() - 1 {
-        popup::mark(buf, rect.x, y, "┃", tone);
+        popup::mark(buf, rect.x, y, side, tone);
     }
     let w = inner.width as usize;
     let lines = title_lines(c, rect.width as usize);

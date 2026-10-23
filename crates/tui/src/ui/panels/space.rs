@@ -13,6 +13,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::App;
 use crate::fmt;
 use crate::hits::Target;
+use crate::icons::{self, IconSet, Mark};
 use crate::theme::Theme;
 use crate::ui::widgets::{pad, pad_left};
 
@@ -69,16 +70,19 @@ fn percent(v: &Volume) -> String {
 }
 
 /// A bar of `cells` squares: `■■■■■□□□□□□□`.
-fn bar(th: &Theme, used: f64, cells: usize, basic: bool) -> Vec<Span<'static>> {
+fn bar(th: &Theme, set: IconSet, used: f64, cells: usize, basic: bool) -> Vec<Span<'static>> {
     let on = ((used * cells as f64).round() as usize).min(cells);
     let on = if on == 0 && used > 0.005 { 1 } else { on };
     let mut out = Vec::new();
     if basic {
         out.push(Span::styled("[", th.faint()));
     }
-    out.push(Span::styled("■".repeat(on), Style::default().fg(th.disk)));
     out.push(Span::styled(
-        "□".repeat(cells - on),
+        icons::mark(set, Mark::DiskUsed).repeat(on),
+        Style::default().fg(th.disk),
+    ));
+    out.push(Span::styled(
+        icons::mark(set, Mark::DiskFree).repeat(cells - on),
         Style::default().fg(th.muted),
     ));
     if basic {
@@ -228,7 +232,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         ]));
         let across = w.saturating_sub(2);
         let mut spans = vec![Span::styled(" ", th.base())];
-        spans.extend(bar(&th, used_share(&main), across, app.basic));
+        spans.extend(bar(&th, app.icons, used_share(&main), across, app.basic));
         lines.push(Line::from(spans));
         if !compact {
             let total = main.total.unwrap_or(0);
@@ -272,7 +276,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 Span::styled(name, th.dim()),
                 Span::styled(" ", th.base()),
             ];
-            spans.extend(bar(&th, used_share(v), bar_w, false));
+            spans.extend(bar(&th, app.icons, used_share(v), bar_w, false));
             spans.push(Span::styled(
                 format!(" {}", pad_left(&percent(v), pct_w)),
                 th.dim(),

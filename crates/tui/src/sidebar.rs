@@ -145,31 +145,32 @@ impl Item {
 
     /// The icon: a Nerd Font glyph, a plain Unicode mark, or nothing.
     pub fn glyph(&self, set: IconSet) -> &'static str {
-        let (nerd, plain) = match &self.origin {
-            Origin::Place(PlaceKind::Home) => ("\u{f015}", "⌂"),
-            Origin::Place(PlaceKind::Desktop) => ("\u{f108}", "▭"),
-            Origin::Place(PlaceKind::Documents) => ("\u{f15c}", "▤"),
-            Origin::Place(PlaceKind::Downloads) => ("\u{f019}", "↓"),
-            Origin::Place(PlaceKind::Music) => ("\u{f001}", "♪"),
-            Origin::Place(PlaceKind::Pictures) => ("\u{f03e}", "▣"),
-            Origin::Place(PlaceKind::Videos) => ("\u{f03d}", "▶"),
-            Origin::Place(PlaceKind::Trash) => ("\u{f1f8}", "⌫"),
-            Origin::Place(PlaceKind::ICloud) => ("\u{f0c2}", "☁"),
-            Origin::Recent => ("\u{f017}", "○"),
-            Origin::Bookmark { .. } => ("\u{f02e}", "★"),
-            Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏"),
-            Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈"),
+        let (nerd, plain, std) = match &self.origin {
+            Origin::Place(PlaceKind::Home) => ("\u{f015}", "⌂", "⌂"),
+            Origin::Place(PlaceKind::Desktop) => ("\u{f108}", "▭", "▬"),
+            Origin::Place(PlaceKind::Documents) => ("\u{f15c}", "▤", "≡"),
+            Origin::Place(PlaceKind::Downloads) => ("\u{f019}", "↓", "↓"),
+            Origin::Place(PlaceKind::Music) => ("\u{f001}", "♪", "♪"),
+            Origin::Place(PlaceKind::Pictures) => ("\u{f03e}", "▣", "◘"),
+            Origin::Place(PlaceKind::Videos) => ("\u{f03d}", "▶", "►"),
+            Origin::Place(PlaceKind::Trash) => ("\u{f1f8}", "⌫", "×"),
+            Origin::Place(PlaceKind::ICloud) => ("\u{f0c2}", "☁", "○"),
+            Origin::Recent => ("\u{f017}", "○", "○"),
+            Origin::Bookmark { .. } => ("\u{f02e}", "★", "*"),
+            Origin::Device(VolumeKind::Removable) => ("\u{f287}", "⏏", "▲"),
+            Origin::Device(VolumeKind::Network) => ("\u{f0ac}", "≈", "≈"),
             Origin::Device(VolumeKind::Device) | Origin::Unmounted(VolumeKind::Device) => {
-                ("\u{f10b}", "▥")
+                ("\u{f10b}", "▥", "◙")
             }
-            Origin::Unmounted(VolumeKind::Removable) => ("\u{f287}", "⏏"),
-            Origin::Device(_) | Origin::Unmounted(_) => ("\u{f0a0}", "▥"),
+            Origin::Unmounted(VolumeKind::Removable) => ("\u{f287}", "⏏", "▲"),
+            Origin::Device(_) | Origin::Unmounted(_) => ("\u{f0a0}", "▥", "◙"),
             // A dot in the tag's colour, in every set: it is the colour that says what it is.
-            Origin::Tag(_) => ("●", "●"),
+            Origin::Tag(_) => ("●", "●", "●"),
         };
         match set {
             IconSet::Nerd => nerd,
-            IconSet::UnicodeIcons | IconSet::UnicodeStd => plain,
+            IconSet::UnicodeIcons => plain,
+            IconSet::UnicodeStd => std,
             IconSet::None => "",
         }
     }

@@ -2,8 +2,11 @@
 
 use crate::common::*;
 use crate::harness::*;
+use rada_tui::compat::{CompatBackend, Rendering};
 use rada_tui::panels::TWO_SPACE_FROM_ROWS;
-use rada_tui::{LayoutPref, Theme};
+use rada_tui::{IconSet, LayoutPref, Theme, ui};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use ratatui::style::Color;
 use unicode_width::UnicodeWidthStr;
 
@@ -186,4 +189,33 @@ fn the_two_columns_at_78_by_45_and_at_100_by_30() {
         insta::assert_snapshot!(format!("panels_{w}x{hh}"), s);
         assert_fits(&mut h, w, hh);
     }
+}
+
+/// What the terminal gets with the `unicode-std` icon set: after the stand-ins of `compat.rs`.
+fn sent_with_unicode_std(h: &mut H, w: u16, hh: u16) -> String {
+    let how = Rendering::PLAIN.with_std_glyphs();
+    let mut term = Terminal::new(CompatBackend::new(TestBackend::new(w, hh), how)).unwrap();
+    term.draw(|f| ui::draw(f, &mut h.app)).unwrap();
+    let buf = term.backend().inner().buffer();
+    let rows: Vec<String> = (0..hh)
+        .map(|y| {
+            let row: String = (0..w).map(|x| buf[(x, y)].symbol()).collect();
+            row.trim_end().to_string()
+        })
+        .collect();
+    rows.join("\n") + "\n"
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "the navigation pane of a system with no tags has no TAG row, which the Linux snapshot has"
+)]
+fn unicode_std_at_110x30() {
+    let mut h = scene(110, 30, "rada", false);
+    h.app.icons = IconSet::UnicodeStd;
+    h.settle();
+    let s = sent_with_unicode_std(&mut h, 110, 30);
+    assert!(s.contains("[ NAV ]") && !s.contains("[ PREVIEW ]"), "{s}");
+    insta::assert_snapshot!("panels_110x30_unicode_std", s);
 }

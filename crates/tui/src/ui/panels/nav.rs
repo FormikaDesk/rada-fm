@@ -14,16 +14,12 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::App;
 use crate::hits::Target;
-use crate::icons::{self, Glyph};
+use crate::icons::{self, Glyph, Mark};
 use crate::panels::NavKind;
 use crate::sidebar::Origin;
 use crate::theme::Theme;
 use crate::ui::soft::{self, Look, RowTone};
 use crate::ui::widgets::pad;
-
-/// The arrow of a folder that has folders in it: closed, open.
-const CLOSED: &str = "›";
-const OPEN: &str = "⌄";
 
 /// The colour of the icon of a standard place: each has its own hue.
 fn place_hue(th: &Theme, kind: PlaceKind) -> Color {
@@ -155,8 +151,13 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 let mut x = r.x + 6;
                 for (n, hue) in Hue::ALL.iter().enumerate() {
                     let on = is_focus && app.nav_tag == n;
+                    let dot = if on {
+                        Mark::TagDotFocused
+                    } else {
+                        Mark::TagDot
+                    };
                     spans.push(Span::styled(
-                        if on { "◉ " } else { "● " },
+                        format!("{} ", icons::mark(app.icons, dot)),
                         Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
                     ));
                     let path = rada_core::tagsearch::view_path(hue.label(&app.tag_lang));
@@ -185,8 +186,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         // The arrow, the icon, the name, and the number of items on the right.
         let indent = "  ".repeat(row.depth);
         let (arrow, toggles) = match row.kind {
-            NavKind::Folder { open: Some(true) } => (OPEN, true),
-            NavKind::Folder { open: Some(false) } => (CLOSED, true),
+            NavKind::Folder { open: Some(true) } => (icons::mark(app.icons, Mark::TreeOpen), true),
+            NavKind::Folder { open: Some(false) } => {
+                (icons::mark(app.icons, Mark::TreeClosed), true)
+            }
             _ => (" ", false),
         };
         let (glyph, hue) = match &row.kind {
@@ -317,11 +320,12 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         let top = (skip * (height - thumb)).checked_div(max_skip).unwrap_or(0);
         for y in 0..height {
             let on = y >= top && y < top + thumb;
-            let (ch, style) = if on {
-                ("┃", th.dim())
+            let (mark, style) = if on {
+                (Mark::ScrollThumb, th.dim())
             } else {
-                ("│", th.faint())
+                (Mark::ScrollTrack, th.faint())
             };
+            let ch = icons::mark(app.icons, mark);
             f.buffer_mut().set_string(x, area.y + y as u16, ch, style);
         }
     }

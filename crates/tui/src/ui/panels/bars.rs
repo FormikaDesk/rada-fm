@@ -75,7 +75,14 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
     let mut right = Bar::default();
     if w >= 70 {
         right.push_hit(
-            Span::styled(format!("v{} ⟳", app.version()), th.dim().patch(band)),
+            Span::styled(
+                format!(
+                    "v{} {}",
+                    app.version(),
+                    icons::ui(app.icons, Glyph::Refresh)
+                ),
+                th.dim().patch(band),
+            ),
             Target::CheckUpdates,
         );
         right.push(Span::styled("  ", band));
