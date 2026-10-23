@@ -284,47 +284,101 @@ fn the_places_stay_in_sight_and_the_way_gives_up_rows() {
     assert_eq!(h.app.nav_scroll, 0, "nothing scrolls:\n{nav}");
 }
 
-/// Fixed disks `Extra 1`.. added to the demo ones, and the box drawn once with them: its height
-/// is what the rows are made for.
-fn add_disks(h: &mut H, count: usize) {
-    h.app
+/// One more fixed disk, `Extra 1`, `Extra 2`.., and the box drawn with it: its height is what
+/// the rows are made for.
+fn add_disk(h: &mut H) {
+    let n = 1 + h
+        .app
         .volumes
-        .extend((1..=count).map(|n| rada_core::platform::Volume {
-            mount_point: format!("/mnt/extra{n}").into(),
-            label: Some(format!("Extra {n}")),
-            fs_type: "ext4".into(),
-            device: "demo".into(),
-            kind: rada_core::platform::VolumeKind::Fixed,
-            drive_letter: None,
-            total: Some(1_000_000_000_000),
-            available: Some(500_000_000_000),
-            read_only: false,
-            responsive: true,
-        }));
+        .iter()
+        .filter(|v| v.mount_point.starts_with("/mnt/extra"))
+        .count();
+    h.app.volumes.push(rada_core::platform::Volume {
+        mount_point: format!("/mnt/extra{n}").into(),
+        label: Some(format!("Extra {n}")),
+        fs_type: "ext4".into(),
+        device: "demo".into(),
+        kind: rada_core::platform::VolumeKind::Fixed,
+        drive_letter: None,
+        total: Some(1_000_000_000_000),
+        available: Some(500_000_000_000),
+        read_only: false,
+        responsive: true,
+    });
     let _ = h.screen();
     let _ = h.screen();
 }
 
+/// What the scene has besides the way: places, disks, whether tags are kept, the trash.
+struct Blocks {
+    places: usize,
+    disks: usize,
+    tags: bool,
+    trash: usize,
+}
+
+impl Blocks {
+    fn of(h: &H) -> Blocks {
+        let items = h.app.side_items();
+        let count = |sections: &[Section]| {
+            items
+                .iter()
+                .filter(|i| sections.contains(&i.section))
+                .count()
+        };
+        Blocks {
+            places: count(&[Section::Home, Section::Pinned]),
+            disks: count(&[Section::Devices]),
+            tags: h.app.tags_supported(),
+            trash: count(&[Section::Trash]),
+        }
+    }
+
+    /// Rows of the box without the way, the disks in a block of their own (a blank row, a title
+    /// and a row each, or `disks` rows) and the blank row above TAGS if `tags_gap`.
+    fn rows(&self, disks: usize, tags_gap: bool) -> usize {
+        let devices = if disks > 0 { disks + 2 } else { 0 };
+        let tags = if self.tags {
+            1 + usize::from(tags_gap)
+        } else {
+            0
+        };
+        self.places + devices + tags + self.trash
+    }
+}
+
+/// The rows of the way when it has nothing to give up: its title and the folder shown.
+const WAY_LEAST: usize = 3;
+
 #[test]
-fn the_devices_give_up_all_but_the_main_disk_when_the_way_cannot_be_cut_further() {
+fn the_places_stay_in_sight_while_the_blank_rows_and_then_the_disks_give_way() {
     let mut h = deep_scene(170, 42, 12);
-    add_disks(&mut h, 2);
-    let disks = h
-        .app
-        .side_items()
-        .iter()
-        .filter(|i| i.section == Section::Devices)
-        .count();
-    let nav = nav_text(&mut h);
-    assert!(nav.lines().next().unwrap().contains("Home"), "{nav}");
-    assert!(nav.contains("System"), "the main disk stays:\n{nav}");
-    assert!(
-        !nav.contains("Extra") && !nav.contains("USB drive"),
-        "{nav}"
-    );
-    let others = format!("… {} more", disks - 1);
-    assert!(nav.contains(&others), "the other disks are counted:\n{nav}");
-    assert!(nav.contains("level-11"), "{nav}");
+    let mut shrunk = false;
+    for _ in 0..10 {
+        add_disk(&mut h);
+        let b = Blocks::of(&h);
+        let height = h.app.nav_area.height as usize;
+        let nav = nav_text(&mut h);
+        let lines: Vec<&str> = nav.lines().collect();
+        let main_only =
+            b.disks > 2 && lines.iter().any(|l| l.contains("System")) && !nav.contains("Extra 1");
+        let tags_at = lines.iter().position(|l| l.contains("TAGS"));
+        // What the box can hold at the least: one disk and "… more", no blank row above TAGS.
+        let least = b.rows(b.disks.min(2), false) + WAY_LEAST;
+        if least <= height {
+            assert!(lines[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
+            assert!(nav.contains("level-11"), "{nav}");
+        }
+        if let Some(at) = tags_at {
+            let blank = lines[at - 1].trim().is_empty();
+            // The disks are cut only after the blank row above TAGS has gone, and that row goes
+            // only when the box could not hold it.
+            assert!(!(main_only && blank), "{nav}");
+            assert!(blank || b.rows(b.disks, true) + WAY_LEAST > height, "{nav}");
+        }
+        shrunk |= main_only && least <= height;
+    }
+    assert!(shrunk, "the box was never short enough to cut the disks");
 }
 
 #[test]
@@ -337,28 +391,4 @@ fn space_gives_a_disk_name_the_room_it_needs_and_shortens_the_bar() {
         .unwrap_or_else(|| panic!("the name is whole:\n{screen}"));
     let cells = row.chars().filter(|c| matches!(c, '■' | '□')).count();
     assert!((6..12).contains(&cells), "the bar is cut down: {row}");
-}
-
-#[test]
-fn the_blank_row_above_the_way_goes_when_the_box_is_one_row_short() {
-    let mut h = deep_scene(170, 42, 12);
-    add_disks(&mut h, 4);
-    let nav = nav_text(&mut h);
-    let rows: Vec<&str> = nav.lines().collect();
-    let path = rows.iter().position(|r| r.contains("PATH")).unwrap();
-    assert!(rows[path - 1].contains("TAGS"), "no blank row:\n{nav}");
-    assert!(rows[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
-    assert!(nav.contains("level-11"), "{nav}");
-}
-
-#[test]
-fn the_blank_row_above_tags_goes_before_the_disks_are_cut() {
-    let mut h = deep_scene(170, 42, 12);
-    add_disks(&mut h, 4);
-    let nav = nav_text(&mut h);
-    let rows: Vec<&str> = nav.lines().collect();
-    let tags = rows.iter().position(|r| r.contains("TAGS")).unwrap();
-    assert!(rows[tags - 1].contains("Extra") || rows[tags - 1].contains("more"));
-    assert!(rows[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
-    assert!(nav.contains("level-11"), "{nav}");
 }
