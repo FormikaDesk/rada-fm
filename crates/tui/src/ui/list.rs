@@ -390,7 +390,7 @@ fn row<'a>(
     }
 
     let shown = e.display.clone();
-    let name_txt = display::truncate(&shown, cols.name);
+    let name_txt = display::truncate_name(&shown, cols.name);
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
     // In the list of a tag's items, or of recent files, the folder each one is in, dim after

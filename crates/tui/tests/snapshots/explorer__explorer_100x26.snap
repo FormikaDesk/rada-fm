@@ -13,7 +13,7 @@ expression: shot(&mut h)
 │   ▤  Documents         ⚲ │ │ ☐ ▸ scripts       9 days ago       Folder                           │
 │   ↓  Downloads         ⚲ │ │ ☐ ▸ src           Today 09:30      Folder                           │
 │   ▣  Pictures          ⚲ │ │ ☐ ▸ tests         2 days ago       Folder                           │
-│   ♪  Music             ⚲ │ │ ☑ · archive.tar…  8 days ago       Archive (tar.gz)         17.6 MB │
+│   ♪  Music             ⚲ │ │ ☑ · arch….tar.gz  8 days ago       Archive (tar.gz)         17.6 MB │
 │   ▶  Videos            ⚲ │ │ ☑ · backup.zip    05/07/2026       Archive (ZIP)            39.0 MB │
 │                          │ │ ☑ · Cargo.toml    3 days ago       Settings file               82 B │
 │ DEVICES                  │ │ ☐ · data.json     6 days ago       JSON data                   49 B │
@@ -24,7 +24,7 @@ expression: shot(&mut h)
 │   ⏏  USB drive           │ │▌☐ · photo.jpg     Today 13:30      JPEG image               70.7 KB │
 │      ■■■■□□□□□□  35.4 GB │ │ ☐ · README.md     Today 13:28      Markdown                   145 B │
 │                          │ │ ☐ · report.pdf    4 days ago       PDF document             2.29 MB │
-│ TAGS                     │ │ ☐ · screenshot.…  Yesterday        PNG image                5.34 KB │
+│ TAGS                     │ │ ☐ · scre…hot.png  Yesterday        PNG image                5.34 KB │
 ╰──────────────────────────╯ ╰─────────────────────────────────────────────────────────────────────╯
  19 items  │  ☑ 3 selected · 56.6 MB  │  ⎘ 2 items read… v0.6.0 ⟳  183 GB free ■■■■■■□□□□  ≣  ▦  ▥
    Ctrl+C  copy   Ctrl+X  cut   Del  trash   Shift+Del  delete   R  rename all   Alt+Z  compress

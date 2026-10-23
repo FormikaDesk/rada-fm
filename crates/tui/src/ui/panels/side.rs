@@ -157,7 +157,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     let kind = rada_core::i18n::type_label(&e.type_label).into_owned();
     let kind_w = kind.width().min(w / 2);
     let name_room = w.saturating_sub(kind_w + 2);
-    let name = display::truncate(&e.display, name_room.max(1));
+    let name = display::truncate_name(&e.display, name_room.max(1));
     let gap = w.saturating_sub(name.width() + kind_w);
     f.render_widget(
         Paragraph::new(Line::from(vec![

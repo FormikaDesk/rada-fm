@@ -115,6 +115,30 @@ pub fn width(s: &str) -> usize {
     s.chars().map(|c| c.width().unwrap_or(0)).sum()
 }
 
+/// The longest start of `s` that fits in `max` cells.
+pub fn head_cells(s: &str, max: usize) -> &str {
+    let mut w = 0;
+    for (at, c) in s.char_indices() {
+        w += c.width().unwrap_or(0);
+        if w > max {
+            return &s[..at];
+        }
+    }
+    s
+}
+
+/// The longest end of `s` that fits in `max` cells.
+pub fn tail_cells(s: &str, max: usize) -> &str {
+    let mut w = 0;
+    for (at, c) in s.char_indices().rev() {
+        w += c.width().unwrap_or(0);
+        if w > max {
+            return &s[at + c.len_utf8()..];
+        }
+    }
+    s
+}
+
 /// Truncate to at most `max` cells, adding an ellipsis when something was cut.
 pub fn truncate(s: &str, max: usize) -> String {
     if width(s) <= max {
@@ -123,18 +147,36 @@ pub fn truncate(s: &str, max: usize) -> String {
     if max == 0 {
         return String::new();
     }
-    let mut out = String::new();
-    let mut w = 0;
-    for c in s.chars() {
-        let cw = c.width().unwrap_or(0);
-        if w + cw + 1 > max {
-            break;
-        }
-        out.push(c);
-        w += cw;
+    format!("{}…", head_cells(s, max - 1))
+}
+
+/// The longest extension (dot included) that is kept whole when a name is shortened.
+const KEPT_EXTENSION: usize = 8;
+
+/// Shorten a file or folder name to at most `max` cells by cutting out the middle, so that the
+/// start and the end are both seen: `CV_Alessan…Accenture.pdf`. Cut at the end, five names
+/// that differ only there would all read the same. The end is worth a little more than the
+/// start, and an extension is never cut into while there is room for it.
+pub fn truncate_name(name: &str, max: usize) -> String {
+    if width(name) <= max {
+        return name.to_string();
     }
-    out.push('…');
-    out
+    if max < 3 {
+        return truncate(name, max);
+    }
+    let room = max - 1;
+    let extension = name
+        .rfind('.')
+        .filter(|at| *at > 0)
+        .map_or(0, |at| width(&name[at..]));
+    let kept = if extension <= KEPT_EXTENSION {
+        extension
+    } else {
+        0
+    };
+    let tail_w = (room - room * 9 / 20).max(kept).min(room - 1);
+    let head = head_cells(name, room - tail_w);
+    format!("{head}…{}", tail_cells(name, tail_w))
 }
 
 /// Human readable size (`1.5 MB`, `1,5 MB` in Italian), in powers of 1024 labelled the way
@@ -227,6 +269,48 @@ mod tests {
         assert_eq!(truncate("abcdef", 4), "abc…");
         assert_eq!(truncate("日本語です", 5), "日本…");
         assert_eq!(truncate("abc", 3), "abc");
+    }
+
+    #[test]
+    fn long_names_are_cut_in_the_middle() {
+        let name = "CV_Alessandro_Formica_Accenture.pdf";
+        assert_eq!(truncate_name(name, 24), "CV_Alessan…Accenture.pdf");
+        assert_eq!(truncate_name("Accenture.pdf", 13), "Accenture.pdf");
+        assert_eq!(truncate_name("Accenture.pdf", 10), "Acce…e.pdf");
+        assert_eq!(truncate_name("Accenture.pdf", 6), "A….pdf");
+        assert_eq!(truncate_name("Accenture.pdf", 2), "A…");
+    }
+
+    #[test]
+    fn folders_keep_their_last_part_too() {
+        assert_eq!(truncate_name("Progetti_vecchi_2019", 12), "Prog…hi_2019");
+        assert_eq!(truncate_name(".config_backup_old", 10), ".con…p_old");
+    }
+
+    #[test]
+    fn cut_names_fit_the_cell_width() {
+        for name in [
+            "Perché_è_già_così_lungo.txt",
+            "日本語のファイル名です.md",
+            "漢字漢字漢字漢字",
+        ] {
+            for max in 3..width(name) {
+                let cut = truncate_name(name, max);
+                assert!(width(&cut) <= max, "{cut} in {max}");
+                assert!(cut.contains('…'), "{cut}");
+            }
+        }
+        assert_eq!(
+            truncate_name("日本語のファイル名です.md", 12),
+            "日本…です.md"
+        );
+    }
+
+    #[test]
+    fn short_names_stay_whole() {
+        assert_eq!(truncate_name("notes.txt", 20), "notes.txt");
+        assert_eq!(truncate_name("notes.txt", 9), "notes.txt");
+        assert_eq!(truncate_name("日本語", 6), "日本語");
     }
 
     #[test]

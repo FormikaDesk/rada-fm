@@ -11,7 +11,7 @@ expression: shot(&mut h)
 │   ⌂  Home                │ │     ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄           ▄▄▄         ☑ ╭───╮         │
 │                          │ │     █████         █████         █████         █████         █████         │ · │         │
 │ PINNED                   │ │     ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀         ╰───╯         │
-│   ▭  Desktop           ⚲ │ │     assets         docs        scripts         src          tests      archive.tar…     │
+│   ▭  Desktop           ⚲ │ │     assets         docs        scripts         src          tests      arch….tar.gz     │
 │   ▤  Documents         ⚲ │ │                                                                                         │
 │   ↓  Downloads         ⚲ │ │   ☑ ╭───╮       ☑ ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         │
 │   ▣  Pictures          ⚲ │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
@@ -21,7 +21,7 @@ expression: shot(&mut h)
 │ DEVICES                  │ │     ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         ╭───╮         │
 │   ▥  System              │ │     │ · │         │ · │         │ · │         │ · │         │ · │         │ · │         │
 │      ■■■■■■□□□□   183 GB │ │     ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         ╰───╯         │
-│   ▥  Data                │ │   notes.txt     photo.jpg     README.md     report.pdf   screenshot.…    setup.sh       │
+│   ▥  Data                │ │   notes.txt     photo.jpg     README.md     report.pdf   scre…hot.png    setup.sh       │
 │      ■■■■□□□□□□   555 GB │ │                                                                                         │
 │   ⏏  USB drive           │ │     ╭───╮                                                                               │
 │      ■■■■□□□□□□  35.4 GB │ │     │ · │                                                                               │

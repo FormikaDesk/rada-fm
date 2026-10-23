@@ -262,7 +262,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             count.clear();
         }
         let room = w.saturating_sub(head + 2 + count.width() + pin_w);
-        let name = rada_core::display::truncate(&row.name, room.max(1));
+        let name = rada_core::display::truncate_name(&row.name, room.max(1));
         let name_style = if is_focus || is_current {
             text_style.add_modifier(Modifier::BOLD)
         } else {

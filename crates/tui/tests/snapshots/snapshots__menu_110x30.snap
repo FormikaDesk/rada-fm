@@ -13,7 +13,7 @@ expression: shot(&mut h)
 │ TAGS                     │ │ ☐ ▸ data                    6 days ago│  ▦ Open with…                      ›  │
 │   ●  Red                 │ │ ☐ ▸ src                     6 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │   ●  Orange              │ │ ☐ ▸ 目录                    6 days ago│  ✂ Cut                        Ctrl+X  │
-│   ●  Yellow              │ │ ☐ · a-very-long-file-name…  12 days ag│  ⧉ Copy                       Ctrl+C  │
+│   ●  Yellow              │ │ ☐ · a-very-lo…al-v7.tar.gz  12 days ag│  ⧉ Copy                       Ctrl+C  │
 │   ●  Green               │ │ ☐ · backup.img              9 days ago│  ⎘ Paste                      Ctrl+V  │
 │   ●  Blue                │ │ ☐ · Cargo.toml              2 days ago│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │   ●  Purple              │ │▌☐ · main.rs                 Yesterday │  ✎ Rename                         F2  │
@@ -21,7 +21,7 @@ expression: shot(&mut h)
 │                          │ │ ☐ · README.md               Today 09:0│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │                          │ │ ☐ · тест-файл.md            Today 10:3│  ◆ Tags                            ›  │
 │                          │ │ ☐ · 日本語のファイル名.txt  5 days ago│  ⚲ Copy the path        Ctrl+Shift+C  │
-│                          │ │ ☐ · 📷 holiday photos 🌴.…  27/11/2028│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
+│                          │ │ ☐ · 📷 holida…hotos 🌴.txt  27/11/2028│   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │                          │ │                                       │  ≣ Properties              Alt+Enter  │
 │                          │ │                                       │   ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌   │
 │                          │ │                                       │  ✗ Move to trash                 Del  │

@@ -257,7 +257,7 @@ fn row<'a>(
         .and_then(|g| g.items.get(&e.display))
         .copied();
     let mark_w = if git.is_some() { 2 } else { 0 };
-    let name_txt = display::truncate(&e.display, cols.name.saturating_sub(mark_w));
+    let name_txt = display::truncate_name(&e.display, cols.name.saturating_sub(mark_w));
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
     if let Some(state) = git {

@@ -13,7 +13,7 @@ expression: shot(&mut h)
 │ TAGS                     │ │ ☐ ▸ data                              6 days ago       Folder                           │
 │   ●  Red                 │ │ ☐ ▸ src                               6 days ago       Folder                           │
 │   ●  Orange              │ │ ☐ ▸ 目录                              6 days ago       Folder                           │
-│   ●  Yellow              │ │ ☐ · a-very-long-file-name-that-keep…  12 days ago      Archive (tar.gz)             1 B │
+│   ●  Yellow              │ │ ☐ · a-very-long-f…it-final-v7.tar.gz  12 days ago      Archive (tar.gz)             1 B │
 │   ●  Green               │ │ ☐ · backup.img                        9 days ago       Disk image                420 MB │
 │   ●  Blue                │ │ ☑ · Cargo.toml                        2 days ago       Settings file               42 B │
 │   ●  Purple              │ │ ☑ · main.rs                           Yesterday        Rust source                 37 B │

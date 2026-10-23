@@ -172,7 +172,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
             if e.is_navigable_dir() || cursor || marked {
                 st = st.add_modifier(Modifier::BOLD);
             }
-            let name = display::truncate(&e.display, TILE_W - 2);
+            let name = display::truncate_name(&e.display, TILE_W - 2);
             tile_lines[3].push(Span::styled(
                 format!(" {} ", centered(&name, TILE_W - 2)),
                 st.patch(bg),

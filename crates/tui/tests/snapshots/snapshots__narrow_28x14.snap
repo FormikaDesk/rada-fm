@@ -10,9 +10,9 @@ expression: shot(&mut h)
 │ ☐ ▸ data                 │
 │ ☐ ▸ src                  │
 │ ☐ ▸ 目录                 │
-│ ☐ · a-very-…         1 B │
-│ ☐ · backup.…      420 MB │
-│▌☐ · Cargo.t…        42 B │
+│ ☐ · a-v…r.gz         1 B │
+│ ☐ · bac….img      420 MB │
+│▌☐ · Ca….toml        42 B │
 │ ☐ · main.rs         37 B │
 ╰──────────────────────────╯
  12 items          ≣  ▦  ▥

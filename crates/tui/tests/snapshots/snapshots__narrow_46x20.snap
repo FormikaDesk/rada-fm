@@ -11,7 +11,7 @@ expression: shot(&mut h)
 │ ☐ ▸ data                                   │
 │ ☐ ▸ src                                    │
 │ ☐ ▸ 目录                                   │
-│ ☐ · a-very-long-file-name-tha…         1 B │
+│ ☐ · a-very-long…inal-v7.tar.gz         1 B │
 │ ☐ · backup.img                      420 MB │
 │▌☐ · Cargo.toml                        42 B │
 │ ☐ · main.rs                           37 B │

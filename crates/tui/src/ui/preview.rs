@@ -41,7 +41,7 @@ pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
         .current()
         .map(|e| icons::icon(e, app.icons, &th))
         .unwrap_or(("", th.text_dim));
-    let name = display::truncate(&app.preview.name, w.saturating_sub(3));
+    let name = display::truncate_name(&app.preview.name, w.saturating_sub(3));
     let mut title = vec![];
     if app.icons != icons::IconSet::None && !glyph.is_empty() {
         title.push(Span::styled(format!("{glyph} "), th.fg(gcolor)));

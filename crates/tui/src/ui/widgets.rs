@@ -64,18 +64,7 @@ pub fn tail(s: &str, max: usize) -> String {
     if max == 0 {
         return String::new();
     }
-    let mut out: Vec<char> = Vec::new();
-    let mut w = 0;
-    for c in s.chars().rev() {
-        let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-        if w + cw + 1 > max {
-            break;
-        }
-        out.push(c);
-        w += cw;
-    }
-    out.reverse();
-    format!("…{}", out.into_iter().collect::<String>())
+    format!("…{}", rada_core::display::tail_cells(s, max - 1))
 }
 
 pub fn centered(area: Rect, w: u16, h: u16) -> Rect {

@@ -100,7 +100,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let folder = icons::ui(set, Glyph::TabFolder);
     let close = icons::ui(set, Glyph::Close);
     let title_of = |app: &App, i: usize| -> String {
-        let t = display::truncate(&app.tab_title(i), max_title);
+        let t = display::truncate_name(&app.tab_title(i), max_title);
         if folder.is_empty() {
             t
         } else {
@@ -175,7 +175,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
         bar.push_hit(Span::styled("› ", th.dim().patch(band)), Target::TabNext);
         let room = budget.saturating_sub(arrows + 5);
         if room >= 6 {
-            let t = display::truncate(&app.tab_title(app.active_tab), room.min(max_title));
+            let t = display::truncate_name(&app.tab_title(app.active_tab), room.min(max_title));
             bar.push_hits(
                 soft::pill(
                     &th,
