@@ -11,8 +11,8 @@ use super::engine::Engine;
 use super::plan::*;
 use crate::archive::{self, ArchiveError, ListControl, Session};
 use crate::fs::local::{CopyFault, copy_fault};
-use crate::fs::{CopyControl, CopyRequest, Stamp};
-use crate::platform::Preserve;
+use crate::fs::{CopyControl, CopyRequest, Fingerprint, FsMeta, Stamp};
+use crate::platform::{Preserve, Tag};
 use crate::{Error, Result, display};
 
 /// Cooperative cancellation shared between the UI and a worker.
@@ -426,11 +426,7 @@ impl Engine {
         mtime: Option<Stamp>,
     ) -> Result<StepResult> {
         let fs = &*self.fs;
-        match fs.lstat(dst) {
-            Ok(_) => return Err(Error::AlreadyExists(dst.to_path_buf())),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(Error::io("inspect", dst, e)),
-        }
+        self.require_free(dst)?;
         let inner = src.strip_prefix(archive).unwrap_or(src);
         let run = self.archive_run(st, archive)?;
         // The list the plan was made from must still be the archive's list.
@@ -564,11 +560,7 @@ impl Engine {
         items: &[archive::writer::CompressItem],
     ) -> Result<StepResult> {
         let fs = &*self.fs;
-        match fs.lstat(dst) {
-            Ok(_) => return Err(Error::AlreadyExists(dst.to_path_buf())),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(Error::io("inspect", dst, e)),
-        }
+        self.require_free(dst)?;
         let tmp = temp_sibling(dst);
         let sink = fs
             .create_file(&tmp, 0o666)
@@ -607,45 +599,34 @@ impl Engine {
     }
 
     fn run_step(&self, step: &Step, st: &mut RunState, ctl: &mut Ctl<'_>) -> Result<StepResult> {
-        let fs = &*self.fs;
+        match step {
+            Step::MakeDir { .. } | Step::MakeFile { .. } | Step::FinishDir { .. } => {
+                self.folder_step(step, st)
+            }
+            Step::CopyFile { .. } => self.copy_step(step, ctl),
+            Step::HardLink { .. } | Step::CopySymlink { .. } => self.link_step(step, ctl),
+            Step::ExtractFile { .. } | Step::ExtractSymlink { .. } | Step::Compress { .. } => {
+                self.archive_step(step, st, ctl)
+            }
+            Step::Rename { from, to } => self.rename(from, to),
+            Step::TrashItem { .. } | Step::Restore { .. } => self.trash_step(step),
+            Step::RemoveFile { .. } | Step::RemoveDir { .. } => self.remove_step(step, st),
+            Step::SetTags {
+                path,
+                before,
+                after,
+            } => self.set_tags(path, before, after),
+        }
+    }
+
+    fn folder_step(&self, step: &Step, st: &mut RunState) -> Result<StepResult> {
         match step {
             Step::MakeDir {
                 path,
                 mode,
                 restore_mode,
-            } => {
-                match fs.create_dir(path, *mode) {
-                    Ok(()) => {}
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                        return Err(Error::AlreadyExists(path.clone()));
-                    }
-                    Err(e) => return Err(Error::io("create folder", path, e)),
-                }
-                st.created_dirs.insert(path.clone());
-                if let Some(m) = restore_mode {
-                    st.deferred_modes.push((path.clone(), *m));
-                }
-                Ok(StepResult {
-                    created: true,
-                    ..StepResult::done()
-                })
-            }
-
-            Step::MakeFile { path, mode } => {
-                match fs.create_file(path, mode.unwrap_or(0o644)) {
-                    Ok(_sink) => {}
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                        return Err(Error::AlreadyExists(path.clone()));
-                    }
-                    Err(e) => return Err(Error::io("create file", path, e)),
-                }
-                let after = fs.lstat(path).ok().map(|m| m.fingerprint());
-                Ok(StepResult {
-                    after,
-                    ..StepResult::done()
-                })
-            }
-
+            } => self.make_dir(st, path, *mode, *restore_mode),
+            Step::MakeFile { path, mode } => self.make_file(path, *mode),
             Step::FinishDir {
                 path,
                 mode,
@@ -653,45 +634,13 @@ impl Engine {
                 src,
                 uid,
                 gid,
-            } => {
-                if !st.created_dirs.contains(path) {
-                    return Ok(StepResult::noop("folder was not created by this run"));
-                }
-                // Owner and extended attributes first (they are set while the folder is still
-                // writable), then the permissions, then the time.
-                let device = self.platform.on_device(path);
-                let mut not_preserved = Vec::new();
-                if let Some(src) = src
-                    && !device
-                    && !self.platform.on_device(src)
-                {
-                    not_preserved = self
-                        .platform
-                        .fidelity()
-                        .copy_attributes(src, path, Preserve::default(), uid.zip(*gid))
-                        .not_preserved;
-                }
-                if let Some(m) = mode {
-                    // A folder on a device has no permissions to set: the plan said so.
-                    match fs.set_mode(path, *m) {
-                        Err(e) if !device => {
-                            return Err(Error::io("set permissions of", path, e));
-                        }
-                        _ => {}
-                    }
-                }
-                if let Some(t) = mtime {
-                    // Best effort: a wrong folder time must not fail the operation.
-                    if let Err(e) = fs.set_mtime(path, (*t).into(), None) {
-                        tracing::debug!("set time of {}: {e}", path.display());
-                    }
-                }
-                Ok(StepResult {
-                    not_preserved,
-                    ..StepResult::done()
-                })
-            }
+            } => self.finish_dir(st, path, *mode, *mtime, src.as_deref(), uid.zip(*gid)),
+            _ => unreachable!("run_step sends only folder steps here"),
+        }
+    }
 
+    fn copy_step(&self, step: &Step, ctl: &mut Ctl<'_>) -> Result<StepResult> {
+        match step {
             Step::CopyFile {
                 src,
                 dst,
@@ -704,192 +653,47 @@ impl Engine {
                 gid,
                 link_primary,
                 ..
-            } => {
-                match fs.lstat(dst) {
-                    Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(Error::io("inspect", dst, e)),
-                }
-                let to_device = self.platform.on_device(dst);
-                let device = to_device || self.platform.on_device(src);
-                // A device takes the data when the file is closed, so there is no half-written
-                // file to hide under another name, and no rename to trust: it is written under
-                // its own name (which this run has just seen to be free), and removed again if
-                // the copy does not complete.
-                let tmp = if to_device {
-                    dst.clone()
-                } else {
-                    temp_sibling(dst)
-                };
-                // Owner-writable while the attributes are set; the real permissions come last.
-                let req = CopyRequest {
-                    src: src.clone(),
-                    dst: tmp.clone(),
-                    mode: mode.map(|m| m | 0o200),
-                    mtime: mtime.map(Into::into),
-                    atime: atime.map(Into::into),
-                    verify: *verify,
-                    sync: *remove_source,
-                    device,
-                };
-                if let Err(e) = fs.copy_file(&req, ctl) {
-                    return Err(match copy_fault(&e) {
-                        Some(CopyFault::Cancelled) => Error::Cancelled,
-                        Some(CopyFault::SourceChanged) => Error::SourceChanged(src.clone()),
-                        Some(CopyFault::VerifyMismatch(why)) => Error::VerifyFailed {
-                            path: dst.clone(),
-                            reason: why.clone(),
-                        },
-                        None => Error::io2("copy", src, dst, e),
-                    });
-                }
-                // Owner, group, extended attributes and ACLs; whatever cannot be carried over
-                // is reported, never an error.
-                let not_preserved = if device {
-                    Vec::new()
-                } else {
-                    self.platform
-                        .fidelity()
-                        .copy_attributes(src, &tmp, Preserve::default(), uid.zip(*gid))
-                        .not_preserved
-                };
-                if let Some(m) = mode
-                    && !to_device
-                    && let Err(e) = fs.set_mode(&tmp, *m)
-                {
-                    let _ = fs.remove_file(&tmp);
-                    return Err(Error::io("set permissions of", dst, e));
-                }
-                if tmp != *dst
-                    && let Err(e) = fs.rename_noreplace(&tmp, dst)
-                {
-                    let _ = fs.remove_file(&tmp);
-                    return Err(if e.kind() == io::ErrorKind::AlreadyExists {
-                        Error::AlreadyExists(dst.clone())
-                    } else {
-                        Error::io2("finish copy", &tmp, dst, e)
-                    });
-                }
-                let after = fs.lstat(dst).ok().map(|m| {
-                    if *link_primary {
-                        m.fingerprint_without_ctime()
-                    } else {
-                        m.fingerprint()
-                    }
-                });
-                if *remove_source
-                    && let Err(e) = fs.remove_file(src)
-                    // Someone else already removed the source: the move is what they wanted.
-                    && e.kind() != io::ErrorKind::NotFound
-                {
-                    // Never leave the item in two places: undo the copy.
-                    let _ = fs.remove_file(dst);
-                    return Err(Error::io("remove source after copy", src, e));
-                }
-                Ok(StepResult {
-                    after,
-                    not_preserved,
-                    ..StepResult::done()
-                })
-            }
+            } => self.copy_file(
+                ctl,
+                src,
+                dst,
+                *mode,
+                *mtime,
+                *atime,
+                *verify,
+                *remove_source,
+                uid.zip(*gid),
+                *link_primary,
+            ),
+            _ => unreachable!("run_step sends only CopyFile here"),
+        }
+    }
 
+    fn link_step(&self, step: &Step, ctl: &mut Ctl<'_>) -> Result<StepResult> {
+        match step {
             Step::HardLink {
                 existing,
                 link,
                 src_link,
                 ..
-            } => {
-                match fs.lstat(link) {
-                    Ok(_) => return Err(Error::AlreadyExists(link.clone())),
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(Error::io("inspect", link, e)),
-                }
-                let mut not_preserved = Vec::new();
-                match fs.hard_link(existing, link) {
-                    Ok(()) => {}
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                        return Err(Error::AlreadyExists(link.clone()));
-                    }
-                    // This filesystem cannot make hard links (or refuses to): the name gets
-                    // its own copy of the data, and the report says so.
-                    Err(e) if crate::error::is_link_unsupported(&e) => {
-                        let meta = fs
-                            .lstat(existing)
-                            .map_err(|e| Error::io("inspect", existing, e))?;
-                        let tmp = temp_sibling(link);
-                        let req = CopyRequest {
-                            src: existing.clone(),
-                            dst: tmp.clone(),
-                            mode: meta.mode.map(|m| m | 0o200),
-                            mtime: meta.mtime,
-                            atime: meta.atime,
-                            verify: false,
-                            sync: false,
-                            device: self.platform.on_device(existing)
-                                || self.platform.on_device(link),
-                        };
-                        fs.copy_file(&req, ctl)
-                            .map_err(|e| Error::io2("copy", existing, link, e))?;
-                        if let Some(m) = meta.mode {
-                            let _ = fs.set_mode(&tmp, m);
-                        }
-                        if let Err(e) = fs.rename_noreplace(&tmp, link) {
-                            let _ = fs.remove_file(&tmp);
-                            return Err(Error::io2("finish copy", &tmp, link, e));
-                        }
-                        not_preserved.push(
-                            "hard link (the destination cannot make links: copied as a separate file)"
-                                .to_string(),
-                        );
-                    }
-                    Err(e) => return Err(Error::io2("link", existing, link, e)),
-                }
-                let after = fs.lstat(link).ok().map(|m| m.fingerprint());
-                if let Some(s) = src_link
-                    && let Err(e) = fs.remove_file(s)
-                {
-                    let _ = fs.remove_file(link);
-                    return Err(Error::io("remove source link", s, e));
-                }
-                Ok(StepResult {
-                    after,
-                    not_preserved,
-                    ..StepResult::done()
-                })
-            }
-
+            } => self.hard_link(ctl, existing, link, src_link.as_deref()),
             Step::CopySymlink {
                 src,
                 dst,
                 target,
                 remove_source,
-            } => {
-                match fs.lstat(dst) {
-                    Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(Error::io("inspect", dst, e)),
-                }
-                fs.create_symlink(target, dst).map_err(|e| {
-                    if e.kind() == io::ErrorKind::AlreadyExists {
-                        Error::AlreadyExists(dst.clone())
-                    } else {
-                        Error::io("create link", dst, e)
-                    }
-                })?;
-                let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
-                if *remove_source
-                    && let Err(e) = fs.remove_file(src)
-                    && e.kind() != io::ErrorKind::NotFound
-                {
-                    let _ = fs.remove_file(dst);
-                    return Err(Error::io("remove source link", src, e));
-                }
-                Ok(StepResult {
-                    after,
-                    ..StepResult::done()
-                })
-            }
+            } => self.copy_symlink(src, dst, target, *remove_source),
+            _ => unreachable!("run_step sends only link steps here"),
+        }
+    }
 
+    fn archive_step(
+        &self,
+        step: &Step,
+        st: &mut RunState,
+        ctl: &mut Ctl<'_>,
+    ) -> Result<StepResult> {
+        match step {
             Step::ExtractFile {
                 src,
                 archive,
@@ -899,42 +703,16 @@ impl Engine {
                 mode,
                 mtime,
             } => self.extract_file(st, ctl, src, archive, *entry, dst, *size, *mode, *mtime),
-
-            Step::ExtractSymlink { dst, target, .. } => {
-                match fs.lstat(dst) {
-                    Ok(_) => return Err(Error::AlreadyExists(dst.clone())),
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                    Err(e) => return Err(Error::io("inspect", dst, e)),
-                }
-                fs.create_symlink(target, dst).map_err(|e| {
-                    if e.kind() == io::ErrorKind::AlreadyExists {
-                        Error::AlreadyExists(dst.clone())
-                    } else {
-                        Error::io("create link", dst, e)
-                    }
-                })?;
-                let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
-                Ok(StepResult {
-                    after,
-                    ..StepResult::done()
-                })
-            }
-
+            Step::ExtractSymlink { dst, target, .. } => self.make_symlink(dst, target),
             Step::Compress {
                 dst, format, items, ..
             } => self.compress(ctl, dst, *format, items),
+            _ => unreachable!("run_step sends only archive steps here"),
+        }
+    }
 
-            Step::Rename { from, to } => match fs.rename_noreplace(from, to) {
-                Ok(()) => Ok(StepResult::done()),
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                    Err(Error::AlreadyExists(to.clone()))
-                }
-                Err(e) if crate::error::is_exdev(&e) => {
-                    Err(Error::CrossDevice(from.clone(), to.clone()))
-                }
-                Err(e) => Err(Error::io2("rename", from, to, e)),
-            },
-
+    fn trash_step(&self, step: &Step) -> Result<StepResult> {
+        match step {
             Step::TrashItem { path } => {
                 let item = self.platform.trash().trash(path)?;
                 Ok(StepResult {
@@ -942,76 +720,423 @@ impl Engine {
                     ..StepResult::done()
                 })
             }
-
-            Step::RemoveFile { path, expect } => {
-                let meta = match fs.lstat(path) {
-                    Ok(m) => m,
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                        return Ok(StepResult::noop("already gone"));
-                    }
-                    Err(e) => return Err(Error::io("inspect", path, e)),
-                };
-                if let Some(exp) = expect
-                    && let Some(reason) = exp.diff(&meta.fingerprint())
-                {
-                    return Err(Error::Modified {
-                        path: path.clone(),
-                        reason,
-                    });
-                }
-                self.retry_unlocked(st, path, || fs.remove_file(path))
-                    .map_err(|e| Error::io("delete", path, e))?;
-                Ok(StepResult::done())
-            }
-
-            Step::RemoveDir { path } => {
-                let meta = match fs.lstat(path) {
-                    Ok(m) => m,
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                        return Ok(StepResult::noop("already gone"));
-                    }
-                    Err(e) => return Err(Error::io("inspect", path, e)),
-                };
-                match self.retry_unlocked(st, path, || fs.remove_dir(path)) {
-                    Ok(()) => Ok(StepResult {
-                        removed_dir_mode: meta.mode,
-                        ..StepResult::done()
-                    }),
-                    Err(e) if crate::error::is_not_empty(&e) => Ok(StepResult::kept(format!(
-                        "{} was kept because it is not empty",
-                        display::path(path)
-                    ))),
-                    Err(e) => Err(Error::io("remove folder", path, e)),
-                }
-            }
-
             Step::Restore { item } => {
                 self.platform.trash().restore(item)?;
                 Ok(StepResult::done())
             }
+            _ => unreachable!("run_step sends only trash steps here"),
+        }
+    }
 
-            Step::SetTags {
-                path,
-                before,
-                after,
-            } => {
-                let store = self
-                    .platform
-                    .tags()
-                    .ok_or(Error::Unsupported("tags on this system"))?;
-                // What the item has now must be what the plan saw: tags changed since are not
-                // overwritten.
-                let now = store.read(path)?;
-                if now != *before {
-                    return Err(Error::Modified {
-                        path: path.clone(),
-                        reason: "its tags changed".into(),
-                    });
-                }
-                store.write(path, after)?;
-                Ok(StepResult::done())
+    fn remove_step(&self, step: &Step, st: &mut RunState) -> Result<StepResult> {
+        match step {
+            Step::RemoveFile { path, expect } => self.remove_file(st, path, expect.as_ref()),
+            Step::RemoveDir { path } => self.remove_dir(st, path),
+            _ => unreachable!("run_step sends only remove steps here"),
+        }
+    }
+
+    /// `None` when nothing is there; any other failure to look is an error.
+    fn inspect(&self, path: &Path) -> Result<Option<FsMeta>> {
+        match self.fs.lstat(path) {
+            Ok(meta) => Ok(Some(meta)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(Error::io("inspect", path, e)),
+        }
+    }
+
+    fn require_free(&self, path: &Path) -> Result<()> {
+        match self.inspect(path)? {
+            None => Ok(()),
+            Some(_) => Err(Error::AlreadyExists(path.to_path_buf())),
+        }
+    }
+
+    fn fingerprint_after(&self, path: &Path) -> Option<Fingerprint> {
+        self.fs.lstat(path).ok().map(|m| m.fingerprint())
+    }
+
+    fn make_dir(
+        &self,
+        st: &mut RunState,
+        path: &Path,
+        mode: Option<u32>,
+        restore_mode: Option<u32>,
+    ) -> Result<StepResult> {
+        match self.fs.create_dir(path, mode) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                return Err(Error::AlreadyExists(path.to_path_buf()));
+            }
+            Err(e) => return Err(Error::io("create folder", path, e)),
+        }
+        st.created_dirs.insert(path.to_path_buf());
+        if let Some(m) = restore_mode {
+            st.deferred_modes.push((path.to_path_buf(), m));
+        }
+        Ok(StepResult {
+            created: true,
+            ..StepResult::done()
+        })
+    }
+
+    fn make_file(&self, path: &Path, mode: Option<u32>) -> Result<StepResult> {
+        match self.fs.create_file(path, mode.unwrap_or(0o644)) {
+            Ok(_sink) => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                return Err(Error::AlreadyExists(path.to_path_buf()));
+            }
+            Err(e) => return Err(Error::io("create file", path, e)),
+        }
+        Ok(StepResult {
+            after: self.fingerprint_after(path),
+            ..StepResult::done()
+        })
+    }
+
+    fn finish_dir(
+        &self,
+        st: &RunState,
+        path: &Path,
+        mode: Option<u32>,
+        mtime: Option<Stamp>,
+        src: Option<&Path>,
+        owner: Option<(u32, u32)>,
+    ) -> Result<StepResult> {
+        if !st.created_dirs.contains(path) {
+            return Ok(StepResult::noop("folder was not created by this run"));
+        }
+        // Owner and extended attributes first (the folder is still writable), then mode, then time.
+        let device = self.platform.on_device(path);
+        let not_preserved = self.copy_folder_attributes(path, src, owner, device);
+        if let Some(m) = mode {
+            // A folder on a device has no permissions to set: the plan said so.
+            if let Err(e) = self.fs.set_mode(path, m)
+                && !device
+            {
+                return Err(Error::io("set permissions of", path, e));
             }
         }
+        if let Some(t) = mtime {
+            // Best effort: a wrong folder time must not fail the operation.
+            if let Err(e) = self.fs.set_mtime(path, t.into(), None) {
+                tracing::debug!("set time of {}: {e}", path.display());
+            }
+        }
+        Ok(StepResult {
+            not_preserved,
+            ..StepResult::done()
+        })
+    }
+
+    fn copy_folder_attributes(
+        &self,
+        path: &Path,
+        src: Option<&Path>,
+        owner: Option<(u32, u32)>,
+        device: bool,
+    ) -> Vec<String> {
+        match src {
+            Some(src) if !device && !self.platform.on_device(src) => {
+                self.platform
+                    .fidelity()
+                    .copy_attributes(src, path, Preserve::default(), owner)
+                    .not_preserved
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn copy_file(
+        &self,
+        ctl: &mut Ctl<'_>,
+        src: &Path,
+        dst: &Path,
+        mode: Option<u32>,
+        mtime: Option<Stamp>,
+        atime: Option<Stamp>,
+        verify: bool,
+        remove_source: bool,
+        owner: Option<(u32, u32)>,
+        link_primary: bool,
+    ) -> Result<StepResult> {
+        self.require_free(dst)?;
+        let to_device = self.platform.on_device(dst);
+        let device = to_device || self.platform.on_device(src);
+        // A device has no half-written file to hide and no rename to trust: it gets the real name.
+        let tmp = if to_device {
+            dst.to_path_buf()
+        } else {
+            temp_sibling(dst)
+        };
+        let req = CopyRequest {
+            src: src.to_path_buf(),
+            dst: tmp,
+            mode: mode.map(|m| m | 0o200), // writable until the attributes are set
+            mtime: mtime.map(Into::into),
+            atime: atime.map(Into::into),
+            verify,
+            sync: remove_source,
+            device,
+        };
+        self.copy_data(ctl, &req, dst)?;
+        let not_preserved = self.finish_copy(&req, dst, to_device, mode, owner)?;
+        Ok(StepResult {
+            after: self.settle_source(src, dst, remove_source, link_primary)?,
+            not_preserved,
+            ..StepResult::done()
+        })
+    }
+
+    fn copy_data(&self, ctl: &mut Ctl<'_>, req: &CopyRequest, dst: &Path) -> Result<()> {
+        let Err(e) = self.fs.copy_file(req, ctl) else {
+            return Ok(());
+        };
+        Err(match copy_fault(&e) {
+            Some(CopyFault::Cancelled) => Error::Cancelled,
+            Some(CopyFault::SourceChanged) => Error::SourceChanged(req.src.clone()),
+            Some(CopyFault::VerifyMismatch(why)) => Error::VerifyFailed {
+                path: dst.to_path_buf(),
+                reason: why.clone(),
+            },
+            None => Error::io2("copy", &req.src, dst, e),
+        })
+    }
+
+    /// What is left after the data is in: attributes, permissions, the final name.
+    fn finish_copy(
+        &self,
+        req: &CopyRequest,
+        dst: &Path,
+        to_device: bool,
+        mode: Option<u32>,
+        owner: Option<(u32, u32)>,
+    ) -> Result<Vec<String>> {
+        let (fs, tmp) = (&*self.fs, &req.dst);
+        // Whatever cannot be carried over is reported, never an error.
+        let not_preserved = if req.device {
+            Vec::new()
+        } else {
+            self.platform
+                .fidelity()
+                .copy_attributes(&req.src, tmp, Preserve::default(), owner)
+                .not_preserved
+        };
+        if let Some(m) = mode
+            && !to_device
+            && let Err(e) = fs.set_mode(tmp, m)
+        {
+            let _ = fs.remove_file(tmp);
+            return Err(Error::io("set permissions of", dst, e));
+        }
+        if tmp != dst
+            && let Err(e) = fs.rename_noreplace(tmp, dst)
+        {
+            let _ = fs.remove_file(tmp);
+            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
+                Error::AlreadyExists(dst.to_path_buf())
+            } else {
+                Error::io2("finish copy", tmp, dst, e)
+            });
+        }
+        Ok(not_preserved)
+    }
+
+    /// The fingerprint of the copy, and then the end of the source when the copy was a move.
+    fn settle_source(
+        &self,
+        src: &Path,
+        dst: &Path,
+        remove_source: bool,
+        link_primary: bool,
+    ) -> Result<Option<Fingerprint>> {
+        let fs = &*self.fs;
+        let after = fs.lstat(dst).ok().map(|m| {
+            if link_primary {
+                m.fingerprint_without_ctime()
+            } else {
+                m.fingerprint()
+            }
+        });
+        if remove_source
+            && let Err(e) = fs.remove_file(src)
+            // Someone else already removed the source: the move is what they wanted.
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            // Never leave the item in two places: undo the copy.
+            let _ = fs.remove_file(dst);
+            return Err(Error::io("remove source after copy", src, e));
+        }
+        Ok(after)
+    }
+
+    fn hard_link(
+        &self,
+        ctl: &mut Ctl<'_>,
+        existing: &Path,
+        link: &Path,
+        src_link: Option<&Path>,
+    ) -> Result<StepResult> {
+        let fs = &*self.fs;
+        self.require_free(link)?;
+        let mut not_preserved = Vec::new();
+        match fs.hard_link(existing, link) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                return Err(Error::AlreadyExists(link.to_path_buf()));
+            }
+            // No hard links here: the name gets its own copy, and the report says so.
+            Err(e) if crate::error::is_link_unsupported(&e) => {
+                self.copy_instead_of_link(ctl, existing, link)?;
+                not_preserved.push(
+                    "hard link (the destination cannot make links: copied as a separate file)"
+                        .to_string(),
+                );
+            }
+            Err(e) => return Err(Error::io2("link", existing, link, e)),
+        }
+        let after = self.fingerprint_after(link);
+        if let Some(s) = src_link
+            && let Err(e) = fs.remove_file(s)
+        {
+            let _ = fs.remove_file(link);
+            return Err(Error::io("remove source link", s, e));
+        }
+        Ok(StepResult {
+            after,
+            not_preserved,
+            ..StepResult::done()
+        })
+    }
+
+    fn copy_instead_of_link(&self, ctl: &mut Ctl<'_>, existing: &Path, link: &Path) -> Result<()> {
+        let fs = &*self.fs;
+        let meta = fs
+            .lstat(existing)
+            .map_err(|e| Error::io("inspect", existing, e))?;
+        let tmp = temp_sibling(link);
+        let req = CopyRequest {
+            src: existing.to_path_buf(),
+            dst: tmp.clone(),
+            mode: meta.mode.map(|m| m | 0o200),
+            mtime: meta.mtime,
+            atime: meta.atime,
+            verify: false,
+            sync: false,
+            device: self.platform.on_device(existing) || self.platform.on_device(link),
+        };
+        fs.copy_file(&req, ctl)
+            .map_err(|e| Error::io2("copy", existing, link, e))?;
+        if let Some(m) = meta.mode {
+            let _ = fs.set_mode(&tmp, m);
+        }
+        if let Err(e) = fs.rename_noreplace(&tmp, link) {
+            let _ = fs.remove_file(&tmp);
+            return Err(Error::io2("finish copy", &tmp, link, e));
+        }
+        Ok(())
+    }
+
+    fn copy_symlink(
+        &self,
+        src: &Path,
+        dst: &Path,
+        target: &Path,
+        remove_source: bool,
+    ) -> Result<StepResult> {
+        let made = self.make_symlink(dst, target)?;
+        if remove_source
+            && let Err(e) = self.fs.remove_file(src)
+            && e.kind() != io::ErrorKind::NotFound
+        {
+            let _ = self.fs.remove_file(dst);
+            return Err(Error::io("remove source link", src, e));
+        }
+        Ok(made)
+    }
+
+    fn make_symlink(&self, dst: &Path, target: &Path) -> Result<StepResult> {
+        self.require_free(dst)?;
+        self.fs.create_symlink(target, dst).map_err(|e| {
+            if e.kind() == io::ErrorKind::AlreadyExists {
+                Error::AlreadyExists(dst.to_path_buf())
+            } else {
+                Error::io("create link", dst, e)
+            }
+        })?;
+        Ok(StepResult {
+            after: self.fingerprint_after(dst),
+            ..StepResult::done()
+        })
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<StepResult> {
+        match self.fs.rename_noreplace(from, to) {
+            Ok(()) => Ok(StepResult::done()),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                Err(Error::AlreadyExists(to.to_path_buf()))
+            }
+            Err(e) if crate::error::is_exdev(&e) => {
+                Err(Error::CrossDevice(from.to_path_buf(), to.to_path_buf()))
+            }
+            Err(e) => Err(Error::io2("rename", from, to, e)),
+        }
+    }
+
+    fn remove_file(
+        &self,
+        st: &mut RunState,
+        path: &Path,
+        expect: Option<&Fingerprint>,
+    ) -> Result<StepResult> {
+        let Some(meta) = self.inspect(path)? else {
+            return Ok(StepResult::noop("already gone"));
+        };
+        if let Some(exp) = expect
+            && let Some(reason) = exp.diff(&meta.fingerprint())
+        {
+            return Err(Error::Modified {
+                path: path.to_path_buf(),
+                reason,
+            });
+        }
+        self.retry_unlocked(st, path, || self.fs.remove_file(path))
+            .map_err(|e| Error::io("delete", path, e))?;
+        Ok(StepResult::done())
+    }
+
+    fn remove_dir(&self, st: &mut RunState, path: &Path) -> Result<StepResult> {
+        let Some(meta) = self.inspect(path)? else {
+            return Ok(StepResult::noop("already gone"));
+        };
+        match self.retry_unlocked(st, path, || self.fs.remove_dir(path)) {
+            Ok(()) => Ok(StepResult {
+                removed_dir_mode: meta.mode,
+                ..StepResult::done()
+            }),
+            Err(e) if crate::error::is_not_empty(&e) => Ok(StepResult::kept(format!(
+                "{} was kept because it is not empty",
+                display::path(path)
+            ))),
+            Err(e) => Err(Error::io("remove folder", path, e)),
+        }
+    }
+
+    fn set_tags(&self, path: &Path, before: &[Tag], after: &[Tag]) -> Result<StepResult> {
+        let store = self
+            .platform
+            .tags()
+            .ok_or(Error::Unsupported("tags on this system"))?;
+        // What the item has now must be what the plan saw: tags changed since are not overwritten.
+        if store.read(path)? != before {
+            return Err(Error::Modified {
+                path: path.to_path_buf(),
+                reason: "its tags changed".into(),
+            });
+        }
+        store.write(path, after)?;
+        Ok(StepResult::done())
     }
 }
 
