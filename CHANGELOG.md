@@ -3,19 +3,28 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0-rc.14] - 2026-10-23
+
+The file chooser gets a preview, a rename onto a name that exists asks what to do, and the panels view keeps the places in sight and cuts long names in the middle. Still a **pre-release**.
 
 ### Added
-- **The file chooser shows a preview.** From 70 columns the preview of what is under the cursor (a picture, a PDF's first page, text) is beside the list and the navigation pane narrows to its icons; below 70, `Alt+P` puts the preview in the place of the list and takes it away again. The chooser never asks to enlarge the window, whatever `layout` says: it only has the classic layout.
-- **Rename onto a name that exists asks what to do**, with the choices of a copy: skip (the default, nothing changes), keep both (`name (1).ext`) or overwrite. Overwrite sends the old item to the trash first, so `Ctrl+Z` brings both back. Only a file can replace a file, and a folder an empty folder; the other pairs stay blocked, with the reason. The `rename` request takes `conflict` like `copy` does. Bulk rename still refuses name conflicts.
+- **The file chooser shows a preview** of what is under the cursor beside the list, from 70 columns; below that `Alt+P` swaps the list and the preview. The chooser never asks for a bigger window.
+- **Renaming onto a name that exists asks what to do**: skip, keep both, or overwrite. Overwrite sends the old item to the trash first, so `Ctrl+Z` brings both back.
 
 ### Changed
-- **The blank rows between the bars of the panels view go in steps.** From 42 rows all of them stay; from 30 to 41 one stays under the buttons and one under the status bar (a 110×30 window is no longer packed); below 30 none, as before.
+- **Long names are cut in the middle** (`CV_Alessan…Accenture.pdf`), so the start and the end show and similar names can be told apart. This holds in the list, the file chooser, NAV, the path bar, the tabs and the sidebar; a column too narrow for four cells on each side cuts at the end as before.
+- **NAV keeps Home and the other places in sight.** When the box is short, PERCORSO gives up rows first ("… N more"), then the blank rows go, and DEVICES shows only the main disk and "… N more".
+- **SPAZIO gives a disk's name the room it needs**; the bar shrinks, down to six cells.
+- **The blank rows between the bars of the panels view go in steps** with the height of the window.
+- The README opens on the panels view, and Windows and macOS are described as a pre-release.
 
 ### Fixed
-- **`unicode-std` and the panels view.** The marks the panels draw by themselves (the arrows of the tree, the dot of a tag, the thumb of NAV's scroll, the bars of SPAZIO, the side of a card, the update mark in the status bar) now come from the icon module with a glyph of the standard set for each, as the buttons, the menus and the places of NAV already did. The thumb, which had become a thin line like its track, is a solid block. "Selected" is a check mark (`√`) and "ready to paste" a square, so the two no longer look the same. A test draws the panels with `unicode-std` and fails if any glyph beyond the set (Consolas and Cascadia Mono) is drawn or sent, and the test of the sources now sees glyphs written as `\u{…}` too.
-- The scroll thumb of the NAV box has a column of its own: it no longer covers the end of the highlighted row.
-- The list of a file chooser chooses its columns for the room it has, not for the width of the terminal, and the hint `H` of a binary file's preview is cut to the box instead of running out of it.
+- **`unicode-std` and the panels view.** The marks of the panels use the standard set, and "selected" and "ready to paste" no longer look the same.
+- The scroll thumb of NAV no longer covers the end of the highlighted row.
+- The list of a file chooser fits its columns to the room it has, and the hint of a binary file's preview is cut to its box.
+
+### Internal
+- Code review: `docs/ARCHITECTURE.md`, long functions split, and the tests reorganised by subject.
 
 ## [0.6.0-rc.13] - 2026-10-21
 

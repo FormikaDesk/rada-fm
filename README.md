@@ -49,7 +49,7 @@ Prebuilt binaries (Linux x86_64 and aarch64, static; macOS Intel and Apple silic
 With Rust 1.90 or newer ([rustup](https://rustup.rs)), from crates.io:
 
 ```sh
-cargo install rada --locked --version 0.6.0-rc.13
+cargo install rada --locked --version 0.6.0-rc.14
 ```
 
 Only pre-releases are published so far, and cargo does not pick a pre-release by itself, so the version has to be named. With 0.6.0 `cargo install rada --locked` will be enough. More in [docs/install.md](docs/install.md).
