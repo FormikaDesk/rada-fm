@@ -11,7 +11,7 @@ use super::engine::Engine;
 use super::plan::*;
 use crate::archive::{self, ArchiveError, ListControl, Session};
 use crate::fs::local::{CopyFault, copy_fault};
-use crate::fs::{CopyControl, CopyRequest, Fingerprint, FsMeta, Stamp};
+use crate::fs::{CopyControl, CopyRequest, FileSink, Fingerprint, FsMeta, Stamp};
 use crate::platform::{Preserve, Tag, TrashedItem};
 use crate::{Error, Result, display};
 
@@ -175,6 +175,19 @@ struct ArchiveRun {
 }
 
 impl RunState {
+    fn for_plan(plan: &Plan) -> Self {
+        RunState {
+            created_dirs: HashSet::new(),
+            blocked: HashSet::new(),
+            skip_all: false,
+            undo: plan.kind == OpKind::Undo,
+            deferred_modes: Vec::new(),
+            unsynced_dirs: Default::default(),
+            archive_wanted: archive_members(plan),
+            archives: Default::default(),
+        }
+    }
+
     /// A step is pointless when its destination lies under something that failed.
     fn blocked_by(&self, step: &Step) -> bool {
         if self.blocked.is_empty() {
@@ -241,6 +254,131 @@ impl CopyControl for Ctl<'_> {
     }
 }
 
+/// The run that is going: whom to tell, how far it got, what became of the steps.
+struct Running<'a> {
+    handler: &'a mut dyn ExecHandler,
+    cancel: &'a Cancel,
+    prog: Progress,
+    base_bytes: u64,
+    last_emit: Instant,
+    report: ExecReport,
+}
+
+impl<'a> Running<'a> {
+    fn new(plan: &Plan, handler: &'a mut dyn ExecHandler, cancel: &'a Cancel) -> Self {
+        Running {
+            handler,
+            cancel,
+            prog: Progress {
+                steps_total: plan.steps.len() as u64,
+                bytes_total: plan.total_bytes(),
+                ..Default::default()
+            },
+            base_bytes: 0,
+            last_emit: Instant::now(),
+            report: ExecReport::default(),
+        }
+    }
+
+    fn ctl(&mut self) -> Ctl<'_> {
+        Ctl {
+            handler: &mut *self.handler,
+            cancel: self.cancel,
+            prog: &mut self.prog,
+            base_bytes: self.base_bytes,
+            last_emit: &mut self.last_emit,
+        }
+    }
+
+    fn start_step(&mut self, index: usize, step: &Step) {
+        self.prog.current = step.path().to_path_buf();
+        self.prog.current_done = 0;
+        self.prog.current_total = step.bytes();
+        self.prog.bytes_done = self.base_bytes;
+        self.handler.progress(&self.prog);
+        self.handler.step_starting(index, step);
+    }
+
+    fn end_step(&mut self, step: &Step) {
+        self.base_bytes += step.bytes();
+        self.prog.steps_done += 1;
+        self.prog.bytes_done = self.base_bytes;
+    }
+
+    fn skip_blocked(&mut self, st: &mut RunState, step: &Step) {
+        self.report.skipped_dependent += 1;
+        if let Step::MakeDir { path, .. } = step {
+            st.blocked.insert(path.clone());
+        }
+        self.end_step(step);
+    }
+
+    fn record_success(&mut self, index: usize, step: &Step, res: StepResult) {
+        match res.status {
+            StepStatus::Done => {
+                self.report.done += 1;
+                self.report.bytes += step.bytes();
+                if matches!(step, Step::CopyFile { .. } | Step::ExtractFile { .. }) {
+                    self.prog.files_done += 1;
+                }
+            }
+            StepStatus::NoOp => self.report.noop += 1,
+            StepStatus::Kept => {
+                let note = res.note.clone().unwrap_or_default();
+                self.report.kept.push((step.path().to_path_buf(), note));
+            }
+        }
+        self.record_not_preserved(step, &res);
+        self.handler.step_finished(index, step, &res);
+    }
+
+    fn record_not_preserved(&mut self, step: &Step, res: &StepResult) {
+        let at = step.destination().unwrap_or_else(|| step.path());
+        for what in &res.not_preserved {
+            tracing::warn!("{}: {what} was not preserved", at.display());
+            self.report
+                .not_preserved
+                .push((at.to_path_buf(), what.clone()));
+        }
+    }
+
+    /// What to do about a failed step; the failure is on the report unless it is retried.
+    fn record_failure(
+        &mut self,
+        st: &mut RunState,
+        index: usize,
+        step: &Step,
+        error: &Error,
+        attempt: u32,
+    ) -> ErrorChoice {
+        let choice = if st.skip_all {
+            ErrorChoice::Skip
+        } else {
+            let failure = Failure {
+                index,
+                step,
+                error,
+                attempt,
+            };
+            self.handler.on_failure(&failure)
+        };
+        if choice == ErrorChoice::Retry {
+            return choice;
+        }
+        self.report.failed.push(failed(index, step, error));
+        match choice {
+            ErrorChoice::Abort => self.report.aborted = true,
+            _ => {
+                st.skip_all |= choice == ErrorChoice::SkipAll;
+                if let Step::MakeDir { path, .. } | Step::TrashItem { path } = step {
+                    st.blocked.insert(path.clone());
+                }
+            }
+        }
+        choice
+    }
+}
+
 impl Engine {
     /// Run every step of `plan` in order.
     pub fn execute(
@@ -249,137 +387,60 @@ impl Engine {
         handler: &mut dyn ExecHandler,
         cancel: &Cancel,
     ) -> ExecReport {
-        let mut report = ExecReport::default();
-        let mut st = RunState {
-            created_dirs: HashSet::new(),
-            blocked: HashSet::new(),
-            skip_all: false,
-            undo: plan.kind == OpKind::Undo,
-            deferred_modes: Vec::new(),
-            unsynced_dirs: Default::default(),
-            archive_wanted: archive_members(plan),
-            archives: Default::default(),
-        };
-        let mut prog = Progress {
-            steps_total: plan.steps.len() as u64,
-            bytes_total: plan.total_bytes(),
-            ..Default::default()
-        };
-        let mut base_bytes = 0u64;
-        let mut last_emit = Instant::now();
-        handler.progress(&prog);
-
-        'steps: for (index, step) in plan.steps.iter().enumerate() {
+        let mut st = RunState::for_plan(plan);
+        let mut run = Running::new(plan, handler, cancel);
+        run.handler.progress(&run.prog);
+        for (index, step) in plan.steps.iter().enumerate() {
             if cancel.is_cancelled() {
-                report.cancelled = true;
+                run.report.cancelled = true;
                 break;
             }
             if st.blocked_by(step) {
-                report.skipped_dependent += 1;
-                if let Step::MakeDir { path, .. } = step {
-                    st.blocked.insert(path.clone());
-                }
-                base_bytes += step.bytes();
-                prog.steps_done += 1;
-                prog.bytes_done = base_bytes;
+                run.skip_blocked(&mut st, step);
                 continue;
             }
-            prog.current = step.path().to_path_buf();
-            prog.current_done = 0;
-            prog.current_total = step.bytes();
-            prog.bytes_done = base_bytes;
-            handler.progress(&prog);
-
-            handler.step_starting(index, step);
-            let mut attempt = 0u32;
-            loop {
-                attempt += 1;
-                prog.current_done = 0;
-                let outcome = {
-                    let mut ctl = Ctl {
-                        handler: &mut *handler,
-                        cancel,
-                        prog: &mut prog,
-                        base_bytes,
-                        last_emit: &mut last_emit,
-                    };
-                    self.run_step(step, &mut st, &mut ctl)
-                };
-                match outcome {
-                    Ok(res) => {
-                        match res.status {
-                            StepStatus::Done => {
-                                report.done += 1;
-                                report.bytes += step.bytes();
-                                if matches!(step, Step::CopyFile { .. } | Step::ExtractFile { .. })
-                                {
-                                    prog.files_done += 1;
-                                }
-                            }
-                            StepStatus::NoOp => report.noop += 1,
-                            StepStatus::Kept => {
-                                report.kept.push((
-                                    step.path().to_path_buf(),
-                                    res.note.clone().unwrap_or_default(),
-                                ));
-                            }
-                        }
-                        if !res.not_preserved.is_empty() {
-                            let at = step
-                                .destination()
-                                .unwrap_or_else(|| step.path())
-                                .to_path_buf();
-                            for what in &res.not_preserved {
-                                tracing::warn!("{}: {what} was not preserved", at.display());
-                                report.not_preserved.push((at.clone(), what.clone()));
-                            }
-                        }
-                        handler.step_finished(index, step, &res);
-                        break;
-                    }
-                    Err(Error::Cancelled) => {
-                        report.cancelled = true;
-                        break 'steps;
-                    }
-                    Err(error) => {
-                        let choice = if st.skip_all {
-                            ErrorChoice::Skip
-                        } else {
-                            handler.on_failure(&Failure {
-                                index,
-                                step,
-                                error: &error,
-                                attempt,
-                            })
-                        };
-                        match choice {
-                            ErrorChoice::Retry => continue,
-                            ErrorChoice::Abort => {
-                                report.failed.push(failed(index, step, &error));
-                                report.aborted = true;
-                                break 'steps;
-                            }
-                            ErrorChoice::Skip | ErrorChoice::SkipAll => {
-                                if choice == ErrorChoice::SkipAll {
-                                    st.skip_all = true;
-                                }
-                                report.failed.push(failed(index, step, &error));
-                                match step {
-                                    Step::MakeDir { path, .. } | Step::TrashItem { path } => {
-                                        st.blocked.insert(path.clone());
-                                    }
-                                    _ => {}
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
+            run.start_step(index, step);
+            if !self.run_with_retries(index, step, &mut st, &mut run) {
+                break;
             }
-            base_bytes += step.bytes();
-            prog.steps_done += 1;
-            prog.bytes_done = base_bytes;
+            run.end_step(step);
         }
+        self.close_run(&st);
+        run.handler.progress(&run.prog);
+        run.report
+    }
+
+    /// Runs one step, again as often as the handler asks; `false` when the run must stop.
+    fn run_with_retries(
+        &self,
+        index: usize,
+        step: &Step,
+        st: &mut RunState,
+        run: &mut Running<'_>,
+    ) -> bool {
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            run.prog.current_done = 0;
+            match self.run_step(step, st, &mut run.ctl()) {
+                Ok(res) => {
+                    run.record_success(index, step, res);
+                    return true;
+                }
+                Err(Error::Cancelled) => {
+                    run.report.cancelled = true;
+                    return false;
+                }
+                Err(error) => match run.record_failure(st, index, step, &error, attempt) {
+                    ErrorChoice::Retry => continue,
+                    ErrorChoice::Abort => return false,
+                    ErrorChoice::Skip | ErrorChoice::SkipAll => return true,
+                },
+            }
+        }
+    }
+
+    fn close_run(&self, st: &RunState) {
         for dir in &st.unsynced_dirs {
             if let Err(e) = self.fs.sync_dir(dir) {
                 tracing::debug!("sync {}: {e}", dir.display());
@@ -391,8 +452,6 @@ impl Engine {
                 tracing::debug!("restore permissions of {}: {e}", path.display());
             }
         }
-        handler.progress(&prog);
-        report
     }
 
     /// Run `op` on `path`; if an undo is refused because the folder holding it is read-only,
@@ -445,136 +504,118 @@ impl Engine {
         mode: Option<u32>,
         mtime: Option<Stamp>,
     ) -> Result<StepResult> {
-        let ArchiveMember {
-            src,
-            archive,
-            entry,
-            size,
-        } = member;
-        let fs = &*self.fs;
         self.require_free(dst)?;
-        let inner = src.strip_prefix(archive).unwrap_or(src);
-        let run = self.archive_run(st, archive)?;
-        // The list the plan was made from must still be the archive's list.
-        if run.index.entries.get(entry).is_none_or(|e| e.path != inner) {
-            return Err(Error::Archive {
-                path: archive.to_path_buf(),
-                message: "the archive changed since the plan was made".into(),
-            });
-        }
-        // A device takes the data when the file is closed and cannot rename it: see CopyFile.
+        let run = self.checked_archive_run(st, &member)?;
         let device = self.platform.on_device(dst);
+        // A device takes the data when the file is closed and cannot rename it: see CopyFile.
         let tmp = if device {
             dst.to_path_buf()
         } else {
             temp_sibling(dst)
         };
-        let mut sink = fs
+        let sink = self
+            .fs
             .create_file(&tmp, 0o600)
             .map_err(|e| Error::io("create", dst, e))?;
-        enum Stop {
-            No,
-            Write(io::Error),
-            TooBig,
-            Cancelled,
-        }
-        let mut stop = Stop::No;
-        let mut written = 0u64;
-        let r = run.session.read(entry, &mut |chunk| {
-            written += chunk.len() as u64;
-            if written > size {
-                stop = Stop::TooBig;
-                return Ok(false);
-            }
-            if let Err(e) = io::Write::write_all(&mut sink, chunk) {
-                stop = Stop::Write(e);
-                return Ok(false);
-            }
-            if !ctl.advance(chunk.len() as u64) {
-                stop = Stop::Cancelled;
-                return Ok(false);
-            }
-            Ok(true)
-        });
-        drop(sink);
-        let fail = |e: Error| {
-            let _ = fs.remove_file(&tmp);
-            Err(e)
-        };
-        match (stop, r) {
-            (Stop::Write(e), _) => return fail(Error::io("write", dst, e)),
-            (Stop::TooBig, _) => {
-                return fail(Error::Archive {
-                    path: src.to_path_buf(),
-                    message: format!(
-                        "it holds more than the {size} bytes the archive declares for it (an archive bomb?)"
-                    ),
-                });
-            }
-            (Stop::Cancelled, _) | (_, Err(ArchiveError::Cancelled)) => {
-                return fail(Error::Cancelled);
-            }
-            (Stop::No, Err(e)) => return fail(e.into_error(src)),
-            (Stop::No, Ok(n)) if n != size => {
-                return fail(Error::Archive {
-                    path: src.to_path_buf(),
-                    message: format!("it holds {n} bytes, but the archive declares {size}"),
-                });
-            }
-            (Stop::No, Ok(_)) => {}
-        }
-        if let Some(t) = mtime
-            && let Err(e) = fs.set_mtime(&tmp, t.into(), None)
-        {
-            tracing::debug!("set time of {}: {e}", tmp.display());
-        }
-        if let Some(m) = mode
-            && !device
-            && let Err(e) = fs.set_mode(&tmp, m)
-        {
-            return fail(Error::io("set permissions of", dst, e));
-        }
-        if device {
-            // What the device kept is what was sent, or this is not an extraction.
-            match fs.lstat(&tmp) {
-                Ok(m) if m.size == size => {}
-                Ok(m) => {
-                    return fail(Error::io(
-                        "write",
-                        dst,
-                        io::Error::other(format!("the device kept {} of {size} bytes", m.size)),
-                    ));
-                }
-                Err(e) => return fail(Error::io("write", dst, e)),
-            }
-        } else {
-            // The bytes reach the disk before the name does: the journal will say "done" for
-            // this file, and after a power cut the name must not stand on an empty file.
-            if let Err(e) = fs.sync_file(&tmp)
-                && e.kind() != io::ErrorKind::Unsupported
-            {
-                return fail(Error::io("write", dst, e));
-            }
-        }
-        if tmp != dst
-            && let Err(e) = fs.rename_noreplace(&tmp, dst)
-        {
-            let _ = fs.remove_file(&tmp);
-            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
-                Error::AlreadyExists(dst.to_path_buf())
-            } else {
-                Error::io2("finish extraction", &tmp, dst, e)
-            });
+        let placed = stream_member(ctl, run, &member, dst, sink)
+            .and_then(|()| self.place_extracted(&tmp, dst, device, member.size, mode, mtime));
+        if let Err(e) = placed {
+            let _ = self.fs.remove_file(&tmp);
+            return Err(e);
         }
         if let Some(parent) = dst.parent()
             && !device
         {
             st.unsynced_dirs.insert(parent.to_path_buf());
         }
-        let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
         Ok(StepResult {
-            after,
+            after: self.fingerprint_after(dst),
             ..StepResult::done()
+        })
+    }
+
+    fn checked_archive_run<'a>(
+        &self,
+        st: &'a mut RunState,
+        member: &ArchiveMember<'_>,
+    ) -> Result<&'a mut ArchiveRun> {
+        let inner = member
+            .src
+            .strip_prefix(member.archive)
+            .unwrap_or(member.src);
+        let run = self.archive_run(st, member.archive)?;
+        // The list the plan was made from must still be the archive's list.
+        if run
+            .index
+            .entries
+            .get(member.entry)
+            .is_none_or(|e| e.path != inner)
+        {
+            return Err(Error::Archive {
+                path: member.archive.to_path_buf(),
+                message: "the archive changed since the plan was made".into(),
+            });
+        }
+        Ok(run)
+    }
+
+    /// The extracted data is in `tmp`: time, permissions, proof it is whole, then the real name.
+    fn place_extracted(
+        &self,
+        tmp: &Path,
+        dst: &Path,
+        device: bool,
+        size: u64,
+        mode: Option<u32>,
+        mtime: Option<Stamp>,
+    ) -> Result<()> {
+        let fs = &*self.fs;
+        if let Some(t) = mtime
+            && let Err(e) = fs.set_mtime(tmp, t.into(), None)
+        {
+            tracing::debug!("set time of {}: {e}", tmp.display());
+        }
+        if let Some(m) = mode
+            && !device
+            && let Err(e) = fs.set_mode(tmp, m)
+        {
+            return Err(Error::io("set permissions of", dst, e));
+        }
+        self.make_whole(tmp, dst, device, size)?;
+        if tmp != dst {
+            self.rename_into_place(tmp, dst, "finish extraction")?;
+        }
+        Ok(())
+    }
+
+    fn make_whole(&self, tmp: &Path, dst: &Path, device: bool, size: u64) -> Result<()> {
+        let fs = &*self.fs;
+        if device {
+            // What the device kept is what was sent, or this is not an extraction.
+            let kept = fs.lstat(tmp).map_err(|e| Error::io("write", dst, e))?;
+            if kept.size != size {
+                let why = format!("the device kept {} of {size} bytes", kept.size);
+                return Err(Error::io("write", dst, io::Error::other(why)));
+            }
+            return Ok(());
+        }
+        // The bytes reach the disk before the name does: after a power cut the name must not
+        // stand on an empty file.
+        match fs.sync_file(tmp) {
+            Err(e) if e.kind() != io::ErrorKind::Unsupported => Err(Error::io("write", dst, e)),
+            _ => Ok(()),
+        }
+    }
+
+    fn rename_into_place(&self, tmp: &Path, dst: &Path, what: &'static str) -> Result<()> {
+        let Err(e) = self.fs.rename_noreplace(tmp, dst) else {
+            return Ok(());
+        };
+        let _ = self.fs.remove_file(tmp);
+        Err(if e.kind() == io::ErrorKind::AlreadyExists {
+            Error::AlreadyExists(dst.to_path_buf())
+        } else {
+            Error::io2(what, tmp, dst, e)
         })
     }
 
@@ -585,41 +626,19 @@ impl Engine {
         format: archive::ArchiveKind,
         items: &[archive::writer::CompressItem],
     ) -> Result<StepResult> {
-        let fs = &*self.fs;
         self.require_free(dst)?;
         let tmp = temp_sibling(dst);
-        let sink = fs
+        let sink = self
+            .fs
             .create_file(&tmp, 0o666)
             .map_err(|e| Error::io("create", dst, e))?;
-        let mut cancelled = false;
-        let r = archive::writer::write_archive(format, sink, items, &mut |n| {
-            let go = ctl.advance(n);
-            cancelled |= !go;
-            go
-        });
-        match r {
-            Ok(()) => {}
-            Err(e) => {
-                let _ = fs.remove_file(&tmp);
-                return Err(match e {
-                    ArchiveError::Cancelled => Error::Cancelled,
-                    _ if cancelled => Error::Cancelled,
-                    ArchiveError::Io(e) => Error::io("write", dst, e),
-                    other => other.into_error(dst),
-                });
-            }
+        if let Err(e) = write_compressed(ctl, format, items, sink, dst) {
+            let _ = self.fs.remove_file(&tmp);
+            return Err(e);
         }
-        if let Err(e) = fs.rename_noreplace(&tmp, dst) {
-            let _ = fs.remove_file(&tmp);
-            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
-                Error::AlreadyExists(dst.to_path_buf())
-            } else {
-                Error::io2("finish archive", &tmp, dst, e)
-            });
-        }
-        let after = fs.lstat(dst).ok().map(|m| m.fingerprint());
+        self.rename_into_place(&tmp, dst, "finish archive")?;
         Ok(StepResult {
-            after,
+            after: self.fingerprint_after(dst),
             ..StepResult::done()
         })
     }
@@ -913,15 +932,8 @@ impl Engine {
             let _ = fs.remove_file(tmp);
             return Err(Error::io("set permissions of", dst, e));
         }
-        if tmp != dst
-            && let Err(e) = fs.rename_noreplace(tmp, dst)
-        {
-            let _ = fs.remove_file(tmp);
-            return Err(if e.kind() == io::ErrorKind::AlreadyExists {
-                Error::AlreadyExists(dst.to_path_buf())
-            } else {
-                Error::io2("finish copy", tmp, dst, e)
-            });
+        if tmp != dst {
+            self.rename_into_place(tmp, dst, "finish copy")?;
         }
         Ok(not_preserved)
     }
@@ -1119,6 +1131,91 @@ impl Engine {
         }
         store.write(path, after)?;
         Ok(StepResult::done())
+    }
+}
+
+/// What an extraction stopped for, besides the archive's own errors.
+enum ExtractStop {
+    No,
+    Write(io::Error),
+    TooBig,
+    Cancelled,
+}
+
+/// Hands the member's data to `sink`, never more than the archive declares for it.
+fn stream_member(
+    ctl: &mut Ctl<'_>,
+    run: &mut ArchiveRun,
+    member: &ArchiveMember<'_>,
+    dst: &Path,
+    mut sink: Box<dyn FileSink>,
+) -> Result<()> {
+    let mut stop = ExtractStop::No;
+    let mut written = 0u64;
+    let read = run.session.read(member.entry, &mut |chunk| {
+        written += chunk.len() as u64;
+        if written > member.size {
+            stop = ExtractStop::TooBig;
+            return Ok(false);
+        }
+        if let Err(e) = io::Write::write_all(&mut sink, chunk) {
+            stop = ExtractStop::Write(e);
+            return Ok(false);
+        }
+        if !ctl.advance(chunk.len() as u64) {
+            stop = ExtractStop::Cancelled;
+            return Ok(false);
+        }
+        Ok(true)
+    });
+    drop(sink);
+    extraction_result(stop, read, member, dst)
+}
+
+fn extraction_result(
+    stop: ExtractStop,
+    read: std::result::Result<u64, ArchiveError>,
+    member: &ArchiveMember<'_>,
+    dst: &Path,
+) -> Result<()> {
+    let (src, size) = (member.src, member.size);
+    match (stop, read) {
+        (ExtractStop::Write(e), _) => Err(Error::io("write", dst, e)),
+        (ExtractStop::TooBig, _) => Err(Error::Archive {
+            path: src.to_path_buf(),
+            message: format!(
+                "it holds more than the {size} bytes the archive declares for it (an archive bomb?)"
+            ),
+        }),
+        (ExtractStop::Cancelled, _) | (_, Err(ArchiveError::Cancelled)) => Err(Error::Cancelled),
+        (ExtractStop::No, Err(e)) => Err(e.into_error(src)),
+        (ExtractStop::No, Ok(n)) if n != size => Err(Error::Archive {
+            path: src.to_path_buf(),
+            message: format!("it holds {n} bytes, but the archive declares {size}"),
+        }),
+        (ExtractStop::No, Ok(_)) => Ok(()),
+    }
+}
+
+fn write_compressed(
+    ctl: &mut Ctl<'_>,
+    format: archive::ArchiveKind,
+    items: &[archive::writer::CompressItem],
+    sink: Box<dyn FileSink>,
+    dst: &Path,
+) -> Result<()> {
+    let mut cancelled = false;
+    let written = archive::writer::write_archive(format, sink, items, &mut |n| {
+        let go = ctl.advance(n);
+        cancelled |= !go;
+        go
+    });
+    match written {
+        Ok(()) => Ok(()),
+        Err(ArchiveError::Cancelled) => Err(Error::Cancelled),
+        Err(_) if cancelled => Err(Error::Cancelled),
+        Err(ArchiveError::Io(e)) => Err(Error::io("write", dst, e)),
+        Err(other) => Err(other.into_error(dst)),
     }
 }
 
