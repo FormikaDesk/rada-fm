@@ -2806,329 +2806,362 @@ impl App {
     // ------------------------------------------------------------------ modal keys
 
     fn on_modal_key(&mut self, key: KeyEvent) {
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let Some(modal) = self.modal.take() else {
             return;
         };
         match modal {
-            Modal::Scanning {
-                job,
-                what,
-                files,
-                dirs,
-                bytes,
-                current,
-                cancel,
-            } => {
-                if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
-                    cancel.cancel();
-                    self.plan_job = None;
-                } else {
-                    self.modal = Some(Modal::Scanning {
-                        job,
-                        what,
-                        files,
-                        dirs,
-                        bytes,
-                        current,
-                        cancel,
-                    });
-                }
-            }
-            Modal::Plan(mut pv) => match key.code {
-                KeyCode::Esc => {}
-                KeyCode::Char('q') if !pv.needs_typed_confirmation() => {}
-                KeyCode::Enter => {
-                    if pv.cancel_focus {
-                        // The keyboard is on Cancel: Enter cancels.
-                    } else if pv.can_run() {
-                        self.run_plan(pv);
-                    } else {
-                        self.modal = Some(Modal::Plan(pv));
-                    }
-                }
-                KeyCode::Char('c')
-                    if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
-                {
-                    let policy = pv.plan.policy.next();
-                    self.replan_with(&mut pv, policy);
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                // ← → choose how name clashes are settled (the pills, in the order they are in).
-                KeyCode::Left | KeyCode::Right
-                    if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
-                {
-                    let dir = if key.code == KeyCode::Right { 1 } else { -1 };
-                    let policy = crate::ui::policy_step(pv.plan.policy, dir);
-                    if policy != pv.plan.policy {
-                        self.replan_with(&mut pv, policy);
-                    }
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                // Tab moves the keyboard between the buttons.
-                KeyCode::Tab | KeyCode::BackTab => {
-                    pv.cancel_focus = !pv.cancel_focus;
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                // d: every step, or the summary.
-                KeyCode::Char('d') if !pv.needs_typed_confirmation() => {
-                    pv.details = !pv.details;
-                    pv.scroll = 0;
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::Down | KeyCode::Char('j') if !pv.needs_typed_confirmation() => {
-                    pv.scroll += 1;
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::Up | KeyCode::Char('k') if !pv.needs_typed_confirmation() => {
-                    pv.scroll = pv.scroll.saturating_sub(1);
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::PageDown => {
-                    pv.scroll += 10;
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::PageUp => {
-                    pv.scroll = pv.scroll.saturating_sub(10);
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::Backspace if pv.needs_typed_confirmation() => {
-                    pv.typed.pop();
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                KeyCode::Char(c) if pv.needs_typed_confirmation() && !ctrl => {
-                    pv.typed.push(c);
-                    self.modal = Some(Modal::Plan(pv));
-                }
-                _ => self.modal = Some(Modal::Plan(pv)),
-            },
-            Modal::Failure { job, info, reply } => {
-                let choice = match key.code {
-                    KeyCode::Char('s') | KeyCode::Enter => Some(ErrorChoice::Skip),
-                    KeyCode::Char('S') => Some(ErrorChoice::SkipAll),
-                    KeyCode::Char('r') => Some(ErrorChoice::Retry),
-                    KeyCode::Char('a') | KeyCode::Esc | KeyCode::Char('q') => {
-                        Some(ErrorChoice::Abort)
-                    }
-                    _ => None,
-                };
-                match choice {
-                    Some(c) => {
-                        let _ = reply.send(c);
-                    }
-                    None => self.modal = Some(Modal::Failure { job, info, reply }),
-                }
-            }
-            Modal::Input(mut iv) => match key.code {
-                KeyCode::Esc => {}
-                KeyCode::Tab if matches!(iv.kind, InputKind::Compress { .. }) => {
-                    iv.cycle_format();
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Enter => {
-                    if iv.text.is_empty() {
-                        self.modal = Some(Modal::Input(iv));
-                    } else {
-                        self.submit_input(iv);
-                    }
-                }
-                KeyCode::Char(c) if !ctrl => {
-                    iv.insert(c);
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Backspace => {
-                    iv.backspace();
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Delete => {
-                    iv.delete();
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Left => {
-                    iv.cursor = iv.cursor.saturating_sub(1);
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Right => {
-                    iv.cursor = (iv.cursor + 1).min(iv.text.chars().count());
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Home => {
-                    iv.cursor = 0;
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::End => {
-                    iv.cursor = iv.text.chars().count();
-                    self.modal = Some(Modal::Input(iv));
-                }
-                KeyCode::Char('u') if ctrl => {
-                    iv.text.clear();
-                    iv.cursor = 0;
-                    self.modal = Some(Modal::Input(iv));
-                }
-                _ => self.modal = Some(Modal::Input(iv)),
-            },
-            Modal::History(mut h) => match key.code {
-                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('U') => {}
-                KeyCode::Down | KeyCode::Char('j') => {
-                    h.selected = (h.selected + 1).min(h.entries.len().saturating_sub(1));
-                    self.modal = Some(Modal::History(h));
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    h.selected = h.selected.saturating_sub(1);
-                    self.modal = Some(Modal::History(h));
-                }
-                KeyCode::Enter | KeyCode::Char('u') => {
-                    if let Some(e) = h.entries.get(h.selected).cloned() {
-                        if e.is_undoable() || e.can_retry_undo() {
-                            self.start_undo(Some(e.id));
-                        } else {
-                            self.toast(ToastKind::Info, Key::TCannotUndoThis.tr(), 4);
-                            self.modal = Some(Modal::History(h));
-                        }
-                    }
-                }
-                _ => self.modal = Some(Modal::History(h)),
-            },
+            Modal::Scanning { .. } => self.on_scanning_key(modal, key),
+            Modal::Plan(pv) => self.on_plan_key(pv, key),
+            Modal::Failure { job, info, reply } => self.on_failure_key(job, info, reply, key),
+            Modal::Input(iv) => self.on_input_key(iv, key),
+            Modal::History(h) => self.on_history_key(h, key),
             Modal::OpenWith(v) => self.on_open_with_key(v, key),
-            Modal::Palette(mut p) => match key.code {
-                KeyCode::Esc => {}
-                KeyCode::Enter => {
-                    if let Some(item) = p.current() {
-                        let path = item.path.clone();
-                        self.open_dir(path);
-                    }
-                }
-                KeyCode::Down => {
-                    p.move_by(1);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Up => {
-                    p.move_by(-1);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Char('n') | KeyCode::Char('j') if ctrl => {
-                    p.move_by(1);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Char('p') | KeyCode::Char('k') if ctrl => {
-                    p.move_by(-1);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::PageDown => {
-                    p.move_by(8);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::PageUp => {
-                    p.move_by(-8);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Char('u') if ctrl => {
-                    p.clear();
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Backspace => {
-                    p.backspace();
-                    self.modal = Some(Modal::Palette(p));
-                }
-                KeyCode::Char(c) if !ctrl => {
-                    p.insert(c);
-                    self.modal = Some(Modal::Palette(p));
-                }
-                _ => self.modal = Some(Modal::Palette(p)),
-            },
-            Modal::Result(mut r) => match key.code {
-                KeyCode::Char('u') => self.start_undo(None),
-                KeyCode::Char('z') if ctrl => self.start_undo(None),
-                KeyCode::Down | KeyCode::Char('j') => {
-                    r.scroll += 1;
-                    self.modal = Some(Modal::Result(r));
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    r.scroll = r.scroll.saturating_sub(1);
-                    self.modal = Some(Modal::Result(r));
-                }
-                _ => {}
-            },
-            Modal::ConfirmQuit => match key.code {
-                KeyCode::Char('y') | KeyCode::Enter => {
-                    if let Some(r) = &self.running {
-                        r.handle.cancel.cancel();
-                    }
-                    self.should_quit = true;
-                }
-                _ => {}
-            },
-            Modal::Help => match key.code {
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.help_scroll += 1;
-                    self.modal = Some(Modal::Help);
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.help_scroll = self.help_scroll.saturating_sub(1);
-                    self.modal = Some(Modal::Help);
-                }
-                KeyCode::PageDown => {
-                    self.help_scroll += 10;
-                    self.modal = Some(Modal::Help);
-                }
-                KeyCode::PageUp => {
-                    self.help_scroll = self.help_scroll.saturating_sub(10);
-                    self.modal = Some(Modal::Help);
-                }
-                KeyCode::Home => {
-                    self.help_scroll = 0;
-                    self.modal = Some(Modal::Help);
-                }
-                // Closing is deliberate: Esc, q, ? , F1, Enter or Space.
-                KeyCode::Esc | KeyCode::Char('q' | '?' | ' ') | KeyCode::F(1) | KeyCode::Enter => {}
-                _ => self.modal = Some(Modal::Help),
-            },
+            Modal::Palette(p) => self.on_palette_key(p, key),
+            Modal::Result(r) => self.on_result_key(r, key),
+            Modal::ConfirmQuit => self.on_confirm_key(key),
+            Modal::Help => self.on_help_key(key),
             Modal::Menu(m) => self.on_menu_key(m, key),
-            Modal::FullPreview => match key.code {
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.preview.scroll += 1;
-                    self.modal = Some(Modal::FullPreview);
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.preview.scroll = self.preview.scroll.saturating_sub(1);
-                    self.modal = Some(Modal::FullPreview);
-                }
-                KeyCode::PageDown => {
-                    self.preview.scroll += 20;
-                    self.modal = Some(Modal::FullPreview);
-                }
-                KeyCode::PageUp => {
-                    self.preview.scroll = self.preview.scroll.saturating_sub(20);
-                    self.modal = Some(Modal::FullPreview);
-                }
-                KeyCode::Char('H') => {
-                    self.dispatch(Action::ToggleHex);
-                    self.modal = Some(Modal::FullPreview);
-                }
-                KeyCode::Char('Q') => {
-                    self.dispatch(Action::QuickLook);
-                    self.modal = Some(Modal::FullPreview);
-                }
-                // Closing is deliberate: Esc, q, Space or Enter.
-                KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
-                _ => self.modal = Some(Modal::FullPreview),
-            },
+            Modal::FullPreview => self.on_full_preview_key(key),
             Modal::Update(view) => self.on_update_key(view, key),
             Modal::Access(d) => self.on_access_key(d, key),
             Modal::Eject(v) => self.on_eject_key(v, key),
             Modal::Font(v) => self.on_font_key(v, key),
-            Modal::Properties(mut p) => match key.code {
-                KeyCode::Down | KeyCode::Char('j') => {
-                    p.scroll += 1;
-                    self.modal = Some(Modal::Properties(p));
+            Modal::Properties(p) => self.on_properties_key(p, key),
+        }
+    }
+
+    fn on_scanning_key(&mut self, scanning: Modal, key: KeyEvent) {
+        if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
+            if let Modal::Scanning { cancel, .. } = &scanning {
+                cancel.cancel();
+            }
+            self.plan_job = None;
+        } else {
+            self.modal = Some(scanning);
+        }
+    }
+
+    fn on_plan_key(&mut self, mut pv: Box<PlanView>, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Esc => {}
+            KeyCode::Char('q') if !pv.needs_typed_confirmation() => {}
+            KeyCode::Enter => {
+                if pv.cancel_focus {
+                    // The keyboard is on Cancel: Enter cancels.
+                } else if pv.can_run() {
+                    self.run_plan(pv);
+                } else {
+                    self.modal = Some(Modal::Plan(pv));
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    p.scroll = p.scroll.saturating_sub(1);
-                    self.modal = Some(Modal::Properties(p));
+            }
+            KeyCode::Char('c')
+                if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
+            {
+                let policy = pv.plan.policy.next();
+                self.replan_with(&mut pv, policy);
+                self.modal = Some(Modal::Plan(pv));
+            }
+            // ← → choose how name clashes are settled (the pills, in the order they are in).
+            KeyCode::Left | KeyCode::Right
+                if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
+            {
+                let dir = if key.code == KeyCode::Right { 1 } else { -1 };
+                let policy = crate::ui::policy_step(pv.plan.policy, dir);
+                if policy != pv.plan.policy {
+                    self.replan_with(&mut pv, policy);
                 }
-                KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
-                _ => self.modal = Some(Modal::Properties(p)),
-            },
+                self.modal = Some(Modal::Plan(pv));
+            }
+            // Tab moves the keyboard between the buttons.
+            KeyCode::Tab | KeyCode::BackTab => {
+                pv.cancel_focus = !pv.cancel_focus;
+                self.modal = Some(Modal::Plan(pv));
+            }
+            // d: every step, or the summary.
+            KeyCode::Char('d') if !pv.needs_typed_confirmation() => {
+                pv.details = !pv.details;
+                pv.scroll = 0;
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::Down | KeyCode::Char('j') if !pv.needs_typed_confirmation() => {
+                pv.scroll += 1;
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::Up | KeyCode::Char('k') if !pv.needs_typed_confirmation() => {
+                pv.scroll = pv.scroll.saturating_sub(1);
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::PageDown => {
+                pv.scroll += 10;
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::PageUp => {
+                pv.scroll = pv.scroll.saturating_sub(10);
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::Backspace if pv.needs_typed_confirmation() => {
+                pv.typed.pop();
+                self.modal = Some(Modal::Plan(pv));
+            }
+            KeyCode::Char(c) if pv.needs_typed_confirmation() && !ctrl => {
+                pv.typed.push(c);
+                self.modal = Some(Modal::Plan(pv));
+            }
+            _ => self.modal = Some(Modal::Plan(pv)),
+        }
+    }
+
+    fn on_failure_key(
+        &mut self,
+        job: JobId,
+        info: FailureInfo,
+        reply: Sender<ErrorChoice>,
+        key: KeyEvent,
+    ) {
+        let choice = match key.code {
+            KeyCode::Char('s') | KeyCode::Enter => Some(ErrorChoice::Skip),
+            KeyCode::Char('S') => Some(ErrorChoice::SkipAll),
+            KeyCode::Char('r') => Some(ErrorChoice::Retry),
+            KeyCode::Char('a') | KeyCode::Esc | KeyCode::Char('q') => Some(ErrorChoice::Abort),
+            _ => None,
+        };
+        match choice {
+            Some(c) => {
+                let _ = reply.send(c);
+            }
+            None => self.modal = Some(Modal::Failure { job, info, reply }),
+        }
+    }
+
+    fn on_input_key(&mut self, mut iv: InputView, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Esc => {}
+            KeyCode::Tab if matches!(iv.kind, InputKind::Compress { .. }) => {
+                iv.cycle_format();
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Enter => {
+                if iv.text.is_empty() {
+                    self.modal = Some(Modal::Input(iv));
+                } else {
+                    self.submit_input(iv);
+                }
+            }
+            KeyCode::Char(c) if !ctrl => {
+                iv.insert(c);
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Backspace => {
+                iv.backspace();
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Delete => {
+                iv.delete();
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Left => {
+                iv.cursor = iv.cursor.saturating_sub(1);
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Right => {
+                iv.cursor = (iv.cursor + 1).min(iv.text.chars().count());
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Home => {
+                iv.cursor = 0;
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::End => {
+                iv.cursor = iv.text.chars().count();
+                self.modal = Some(Modal::Input(iv));
+            }
+            KeyCode::Char('u') if ctrl => {
+                iv.text.clear();
+                iv.cursor = 0;
+                self.modal = Some(Modal::Input(iv));
+            }
+            _ => self.modal = Some(Modal::Input(iv)),
+        }
+    }
+
+    fn on_history_key(&mut self, mut h: HistoryView, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('U') => {}
+            KeyCode::Down | KeyCode::Char('j') => {
+                h.selected = (h.selected + 1).min(h.entries.len().saturating_sub(1));
+                self.modal = Some(Modal::History(h));
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                h.selected = h.selected.saturating_sub(1);
+                self.modal = Some(Modal::History(h));
+            }
+            KeyCode::Enter | KeyCode::Char('u') => {
+                if let Some(e) = h.entries.get(h.selected).cloned() {
+                    if e.is_undoable() || e.can_retry_undo() {
+                        self.start_undo(Some(e.id));
+                    } else {
+                        self.toast(ToastKind::Info, Key::TCannotUndoThis.tr(), 4);
+                        self.modal = Some(Modal::History(h));
+                    }
+                }
+            }
+            _ => self.modal = Some(Modal::History(h)),
+        }
+    }
+
+    fn on_palette_key(&mut self, mut p: Box<PaletteView>, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Esc => {}
+            KeyCode::Enter => {
+                if let Some(item) = p.current() {
+                    let path = item.path.clone();
+                    self.open_dir(path);
+                }
+            }
+            KeyCode::Down => {
+                p.move_by(1);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Up => {
+                p.move_by(-1);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Char('n') | KeyCode::Char('j') if ctrl => {
+                p.move_by(1);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Char('p') | KeyCode::Char('k') if ctrl => {
+                p.move_by(-1);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::PageDown => {
+                p.move_by(8);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::PageUp => {
+                p.move_by(-8);
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Char('u') if ctrl => {
+                p.clear();
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Backspace => {
+                p.backspace();
+                self.modal = Some(Modal::Palette(p));
+            }
+            KeyCode::Char(c) if !ctrl => {
+                p.insert(c);
+                self.modal = Some(Modal::Palette(p));
+            }
+            _ => self.modal = Some(Modal::Palette(p)),
+        }
+    }
+
+    fn on_result_key(&mut self, mut r: ResultView, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Char('u') => self.start_undo(None),
+            KeyCode::Char('z') if ctrl => self.start_undo(None),
+            KeyCode::Down | KeyCode::Char('j') => {
+                r.scroll += 1;
+                self.modal = Some(Modal::Result(r));
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                r.scroll = r.scroll.saturating_sub(1);
+                self.modal = Some(Modal::Result(r));
+            }
+            _ => {}
+        }
+    }
+
+    fn on_confirm_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Enter => {
+                if let Some(r) = &self.running {
+                    r.handle.cancel.cancel();
+                }
+                self.should_quit = true;
+            }
+            _ => {}
+        }
+    }
+
+    fn on_help_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.help_scroll += 1;
+                self.modal = Some(Modal::Help);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.help_scroll = self.help_scroll.saturating_sub(1);
+                self.modal = Some(Modal::Help);
+            }
+            KeyCode::PageDown => {
+                self.help_scroll += 10;
+                self.modal = Some(Modal::Help);
+            }
+            KeyCode::PageUp => {
+                self.help_scroll = self.help_scroll.saturating_sub(10);
+                self.modal = Some(Modal::Help);
+            }
+            KeyCode::Home => {
+                self.help_scroll = 0;
+                self.modal = Some(Modal::Help);
+            }
+            // Closing is deliberate: Esc, q, ? , F1, Enter or Space.
+            KeyCode::Esc | KeyCode::Char('q' | '?' | ' ') | KeyCode::F(1) | KeyCode::Enter => {}
+            _ => self.modal = Some(Modal::Help),
+        }
+    }
+
+    fn on_full_preview_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.preview.scroll += 1;
+                self.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.preview.scroll = self.preview.scroll.saturating_sub(1);
+                self.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::PageDown => {
+                self.preview.scroll += 20;
+                self.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::PageUp => {
+                self.preview.scroll = self.preview.scroll.saturating_sub(20);
+                self.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Char('H') => {
+                self.dispatch(Action::ToggleHex);
+                self.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Char('Q') => {
+                self.dispatch(Action::QuickLook);
+                self.modal = Some(Modal::FullPreview);
+            }
+            // Closing is deliberate: Esc, q, Space or Enter.
+            KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
+            _ => self.modal = Some(Modal::FullPreview),
+        }
+    }
+
+    fn on_properties_key(&mut self, mut p: PropsView, key: KeyEvent) {
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                p.scroll += 1;
+                self.modal = Some(Modal::Properties(p));
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                p.scroll = p.scroll.saturating_sub(1);
+                self.modal = Some(Modal::Properties(p));
+            }
+            KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
+            _ => self.modal = Some(Modal::Properties(p)),
         }
     }
 
