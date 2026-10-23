@@ -284,12 +284,12 @@ fn the_places_stay_in_sight_and_the_way_gives_up_rows() {
     assert_eq!(h.app.nav_scroll, 0, "nothing scrolls:\n{nav}");
 }
 
-#[test]
-fn the_devices_give_up_all_but_the_main_disk_when_the_way_cannot_be_cut_further() {
-    let mut h = deep_scene(170, 42, 12);
+/// Fixed disks `Extra 1`.. added to the demo ones, and the box drawn once with them: its height
+/// is what the rows are made for.
+fn add_disks(h: &mut H, count: usize) {
     h.app
         .volumes
-        .extend((1..=2).map(|n| rada_core::platform::Volume {
+        .extend((1..=count).map(|n| rada_core::platform::Volume {
             mount_point: format!("/mnt/extra{n}").into(),
             label: Some(format!("Extra {n}")),
             fs_type: "ext4".into(),
@@ -301,9 +301,14 @@ fn the_devices_give_up_all_but_the_main_disk_when_the_way_cannot_be_cut_further(
             read_only: false,
             responsive: true,
         }));
-    // The box is drawn once with the new disks: its height is what the rows are made for.
     let _ = h.screen();
     let _ = h.screen();
+}
+
+#[test]
+fn the_devices_give_up_all_but_the_main_disk_when_the_way_cannot_be_cut_further() {
+    let mut h = deep_scene(170, 42, 12);
+    add_disks(&mut h, 2);
     let disks = h
         .app
         .side_items()
@@ -332,4 +337,16 @@ fn space_gives_a_disk_name_the_room_it_needs_and_shortens_the_bar() {
         .unwrap_or_else(|| panic!("the name is whole:\n{screen}"));
     let cells = row.chars().filter(|c| matches!(c, '■' | '□')).count();
     assert!((6..12).contains(&cells), "the bar is cut down: {row}");
+}
+
+#[test]
+fn the_blank_row_above_the_way_goes_when_the_box_is_one_row_short() {
+    let mut h = deep_scene(170, 42, 12);
+    add_disks(&mut h, 3);
+    let nav = nav_text(&mut h);
+    let rows: Vec<&str> = nav.lines().collect();
+    let path = rows.iter().position(|r| r.contains("PATH")).unwrap();
+    assert!(rows[path - 1].contains("TAGS"), "no blank row:\n{nav}");
+    assert!(rows[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
+    assert!(nav.contains("level-11"), "{nav}");
 }

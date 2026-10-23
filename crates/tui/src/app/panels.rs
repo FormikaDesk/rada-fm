@@ -22,9 +22,11 @@ pub struct GitView {
 /// A question to git that has had no answer after this long is not waited for.
 const GIT_WAIT: Duration = Duration::from_secs(6);
 
-/// The least the way to the folder is cut down to: the blank row, its title, "… more" and the
-/// folder shown.
+/// The rows the way to the folder needs to have a blank row above its title: the blank row, the
+/// title, "… more" and the folder shown. With a row less the blank row goes.
 const WAY_MIN: usize = 4;
+/// The least it is cut down to.
+const WAY_LEAST: usize = WAY_MIN - 1;
 
 fn plain_row(kind: NavKind, name: String, path: PathBuf) -> NavRow {
     NavRow {
@@ -83,13 +85,17 @@ fn fit_way(chain: Vec<NavRow>, kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
     if chain.is_empty() {
         return Vec::new();
     }
-    let avail = room.max(WAY_MIN) - 2;
+    let mut rows = vec![heading_row(Key::PanelPath.tr())];
+    if room >= WAY_MIN {
+        rows.insert(0, gap_row());
+    }
+    let head = rows.len();
+    let avail = room.max(WAY_LEAST) - head;
     let hidden = if chain.len() > avail {
         chain.len() + 1 - avail
     } else {
         0
     };
-    let mut rows = vec![gap_row(), heading_row(Key::PanelPath.tr())];
     if hidden > 0 {
         rows.push(plain_row(
             NavKind::More,
@@ -98,7 +104,7 @@ fn fit_way(chain: Vec<NavRow>, kids: Vec<NavRow>, room: usize) -> Vec<NavRow> {
         ));
     }
     rows.extend(chain.into_iter().skip(hidden));
-    rows.extend(fit_kids(kids, avail.saturating_sub(rows.len() - 2)));
+    rows.extend(fit_kids(kids, avail.saturating_sub(rows.len() - head)));
     rows
 }
 
@@ -317,7 +323,7 @@ impl App {
         let height = self.nav_area.height as usize;
         let fixed =
             |disks: &[NavRow]| places.len() + block_len(disks) + tags.len() + trash.iter().len();
-        let min_way = if chain.is_empty() { 0 } else { WAY_MIN };
+        let min_way = if chain.is_empty() { 0 } else { WAY_LEAST };
         if height > 0 && fixed(&devices) + min_way > height {
             devices = main_disk_only(devices);
         }
