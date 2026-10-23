@@ -11,7 +11,7 @@
 
 rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual desktop shortcuts work together, the interface is in English and Italian, and it looks the same in any modern terminal.
 
-![The main screen in English: three panels as rounded cards, one bar at the top, the row under the cursor shaded, the tags as dots, disks as segments](docs/screenshots/principale-inglese.png)
+![The panels view on the Neon theme: NAV and disk space on the left, the folder in the middle, the preview and details on the right](docs/screenshots/principale-pannelli.png)
 
 ## Why rada
 
@@ -20,6 +20,7 @@ rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual 
 - **Recovery after a crash.** The journal is written as it goes. If rada is killed mid-copy, the next start removes the half-written file, keeps both copies of a cut move, and tells you. Tested with `SIGKILL`, full disks and property tests that check copy → undo gives back the starting state.
 - **Signed updates.** `rada update` checks a [minisign](https://jedisct1.github.io/minisign/) signature made with an offline key before it installs anything, and can roll back. Signed releases start with 0.6.0-rc.9.
 - **Phones and USB sticks.** On Linux, phones, cameras and unmounted sticks appear in the sidebar; you can mount, copy to and eject them, and the plan says what a phone cannot keep.
+- **Fits the window.** Three boxes, two, or the classic layout, chosen from the size of the window.
 - **Linux, macOS, Windows.** Linux is supported; macOS and Windows are a pre-release (Trash and Recycle Bin, Finder tags, Quick Look, drive ejection) and still have rough edges.
 
 | ![The plan window](docs/screenshots/piano.png) | ![The window of an undo](docs/screenshots/annulla.png) |
@@ -27,6 +28,19 @@ rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual 
 | Every operation shows a **plan** first. | **Undo** says what comes back or goes away, line by line. |
 
 rada is young and written by one person. Read [what is guaranteed and what is not](docs/SAFETY.md), keep backups of what matters, and report anything strange.
+
+## Layouts
+
+rada chooses the layout from the size of the window (`layout = "auto"`, the default).
+
+- **Panels.** From 140×36 cells, NAV, the folder and the preview are three boxes. From 70×24 there are two, and `Alt+P` swaps NAV and the preview.
+- **Classic.** A sidebar and a list. Smaller windows get it by themselves; `layout = "classic"` or the View menu keeps it at any size.
+
+| ![Panels on the Neon theme: three boxes](docs/screenshots/principale-pannelli.png) | ![Panels on the Gesso theme, the light one](docs/screenshots/principale-pannelli-gesso.png) |
+|---|---|
+| Panels, dark theme. | Panels, light theme. |
+| ![Panels in a window of 78×45 cells: two boxes](docs/screenshots/principale-due-riquadri.png) | ![The classic layout: sidebar and list](docs/screenshots/principale-inglese.png) |
+| Two boxes in a narrower window. | Classic: sidebar and list. |
 
 ## Install
 

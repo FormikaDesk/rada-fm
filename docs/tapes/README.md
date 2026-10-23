@@ -9,7 +9,7 @@ scripts/docs-media            # everything
 scripts/docs-media principale # the tapes whose name starts with it
 ```
 
-The terminal is 170×42 cells in JetBrainsMono Nerd Font. Each tape starts from
+The terminal is 170×42 cells in JetBrainsMono Nerd Font. `principale-due-riquadri` is 78×45 (`Set Width 760`, `Set Height 858`) to show the two-box panels view. Each tape starts from
 `ambiente.tape` (the terminal and the environment: language, a home of its own, no network)
 `ambiente-carta.tape` (the same on the light "Carta" theme, `--theme carta`; `recenti` and `recenti-carta` draw the Recent list), `ambiente-gesso.tape` (the same on the default light theme, "Gesso", `--theme rada-light`: `principale-gesso`, `tag-menu-gesso`, `recenti-gesso`, `notifiche-gesso`) `ambiente-neon.tape` and `ambiente-gesso-pannelli.tape` (the panels view on Neon and on Gesso: `principale-pannelli`, `principale-pannelli-gesso`; they ask for `layout = "panels"` in the demo home's configuration, which otherwise keeps the classic layout) or `ambiente-catppuccin.tape` and ends in a PNG of
 `docs/screenshots/` or a GIF of `docs/media/`. VHS, `ttyd`, `ffmpeg`, python3 with Pillow and
