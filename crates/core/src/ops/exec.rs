@@ -517,16 +517,17 @@ impl Engine {
             .fs
             .create_file(&tmp, 0o600)
             .map_err(|e| Error::io("create", dst, e))?;
-        let placed = stream_member(ctl, run, &member, dst, sink)
-            .and_then(|()| self.place_extracted(&tmp, dst, device, member.size, mode, mtime));
-        if let Err(e) = placed {
+        let ready = stream_member(ctl, run, &member, dst, sink)
+            .and_then(|()| self.prepare_extracted(&tmp, dst, device, member.size, mode, mtime));
+        if let Err(e) = ready {
             let _ = self.fs.remove_file(&tmp);
             return Err(e);
         }
-        if let Some(parent) = dst.parent()
-            && !device
-        {
-            st.unsynced_dirs.insert(parent.to_path_buf());
+        if tmp != dst {
+            self.rename_into_place(&tmp, dst, "finish extraction")?;
+        }
+        if !device {
+            st.unsynced_dirs.extend(dst.parent().map(Path::to_path_buf));
         }
         Ok(StepResult {
             after: self.fingerprint_after(dst),
@@ -559,8 +560,8 @@ impl Engine {
         Ok(run)
     }
 
-    /// The extracted data is in `tmp`: time, permissions, proof it is whole, then the real name.
-    fn place_extracted(
+    /// The extracted data is in `tmp`: time, permissions, and proof that it is whole.
+    fn prepare_extracted(
         &self,
         tmp: &Path,
         dst: &Path,
@@ -581,11 +582,7 @@ impl Engine {
         {
             return Err(Error::io("set permissions of", dst, e));
         }
-        self.make_whole(tmp, dst, device, size)?;
-        if tmp != dst {
-            self.rename_into_place(tmp, dst, "finish extraction")?;
-        }
-        Ok(())
+        self.make_whole(tmp, dst, device, size)
     }
 
     fn make_whole(&self, tmp: &Path, dst: &Path, device: bool, size: u64) -> Result<()> {
