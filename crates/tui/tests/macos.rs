@@ -216,7 +216,7 @@ fn icloud_drive_is_in_the_sidebar_when_it_is_there() {
 // ------------------------------------------------------------------ the system says no
 
 #[test]
-fn a_folder_the_system_has_not_allowed_is_explained_with_a_way_to_allow_it() {
+fn disallowed_folder_explains_how_to_allow() {
     let sb = Sandbox::new();
     std::fs::create_dir_all(sb.dirs.home.join("Documents/work")).unwrap();
     sb.mkdir("d");
@@ -387,7 +387,7 @@ fn a_busy_disk_says_so_and_can_be_tried_again() {
 }
 
 #[test]
-fn the_delete_key_in_the_sidebar_ejects_a_disk_and_a_disk_in_use_is_left_first() {
+fn delete_in_sidebar_ejects_a_disk() {
     let (mut h, p, v) = with_usb(None);
     // Looking inside the disk: ejecting it moves out first.
     h.app.open_dir(v.mount_point.clone());
@@ -553,7 +553,7 @@ fn without_the_mac_table_cmd_does_nothing() {
 // ---------------------------------------------------------------------------- the Finder's names
 
 #[test]
-fn a_localized_folder_is_shown_without_its_suffix_and_properties_keeps_the_real_name() {
+fn localized_folder_hides_its_suffix() {
     let sb = Sandbox::new();
     sb.write("d/Chrome Apps.localized/.localized", "");
     sb.write("d/Chrome Apps.localized/App.txt", "a");
@@ -582,7 +582,7 @@ fn a_localized_folder_is_shown_without_its_suffix_and_properties_keeps_the_real_
 }
 
 #[test]
-fn the_preview_of_a_folder_hides_what_the_list_hides_until_hidden_files_are_shown() {
+fn folder_preview_follows_hidden_files() {
     let sb = Sandbox::new();
     sb.write("d/Apps/.DS_Store", "x");
     sb.write("d/Apps/.localized", "");

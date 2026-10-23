@@ -83,7 +83,7 @@ fn row_with<'a>(screen: &'a str, what: &str) -> &'a str {
 }
 
 #[test]
-fn the_sidebar_has_the_seven_colours_in_the_systems_language_then_the_users_tags() {
+fn sidebar_lists_seven_colours_then_tags() {
     let Some((sb, home)) = scene() else { return };
     let mut h = H::new(sb, home.clone(), 150, 40);
     h.app.tag_lang = "it".into();

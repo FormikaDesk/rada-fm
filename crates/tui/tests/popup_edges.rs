@@ -238,7 +238,7 @@ fn open_a_submenu(h: &mut H) {
 }
 
 #[test]
-fn a_menu_and_its_submenu_have_a_border_of_the_colour_behind_them_and_no_shadow() {
+fn menu_border_is_the_colour_behind() {
     for name in THEMES {
         let mut h = scene(name, 120, 36, 12);
         let th = h.app.th.clone();
@@ -263,7 +263,7 @@ fn a_menu_and_its_submenu_have_a_border_of_the_colour_behind_them_and_no_shadow(
 }
 
 #[test]
-fn a_menu_opened_near_the_bottom_stays_above_the_status_bar_and_the_key_hints() {
+fn menu_near_bottom_clears_the_status_bar() {
     for name in THEMES {
         let (w, hgt) = (120u16, 30u16);
         let mut h = scene(name, w, hgt, 60);
@@ -362,7 +362,7 @@ fn the_window_that_asks_before_deleting_is_one_tone_inside_its_line() {
 }
 
 #[test]
-fn stacked_notifications_have_a_border_of_the_colour_behind_them_and_a_side_to_match() {
+fn notice_border_is_the_colour_behind() {
     for name in THEMES {
         let mut h = scene(name, 120, 36, 6);
         let th = h.app.th.clone();
@@ -407,7 +407,7 @@ fn a_notification_is_still_a_card_with_its_colour_at_the_side() {
 /// of the list shows between the two lines: not the cursor row, which is in another colour and
 /// passes behind them.
 #[test]
-fn a_submenu_is_right_against_its_menu_and_nothing_of_the_list_shows_between() {
+fn submenu_touches_its_menu() {
     for name in THEMES {
         for (side, click_x) in [("right", 31u16), ("left", 138u16)] {
             let mut h = scene(name, 140, 30, 12);

@@ -292,7 +292,7 @@ fn a_check_reads_the_list_and_sends_nothing_but_who_asks() {
 }
 
 #[test]
-fn a_stable_version_is_not_shown_prereleases_and_a_prerelease_is_shown_later_ones() {
+fn stable_hides_prereleases_not_later_ones() {
     let w = world("0.5.0", Settings::default());
     w.list(&[("v0.6.0-rc.2", true), ("v0.5.1", false)]);
     let Check::Newer(n) = update::check(&w.ctx, true, T0) else {
@@ -613,7 +613,7 @@ impl World {
 }
 
 #[test]
-fn the_signature_is_checked_before_the_checksum_and_before_the_program_ever_runs() {
+fn signature_is_checked_before_checksum() {
     let w = world("0.6.0-rc.1", Settings::default());
     w.publish("v0.7.0", false, &marking_program(NEW));
     w.list(&[("v0.7.0", false)]);
@@ -642,7 +642,7 @@ fn the_signature_is_checked_before_the_checksum_and_before_the_program_ever_runs
 }
 
 #[test]
-fn a_release_signed_with_another_key_is_refused_before_anything_is_downloaded_or_run() {
+fn wrong_key_is_refused_before_download() {
     let w = world("0.6.0-rc.1", Settings::default());
     let (archive, sums) = w.publish("v0.7.0", false, &marking_program(NEW));
     // Same files, signed by somebody else: the checksum is right, the signature is not ours.
@@ -882,7 +882,7 @@ fn the_worker_reports_what_it_finds_and_what_it_does() {
 }
 
 #[test]
-fn the_background_check_is_silent_when_there_is_nothing_or_no_network_but_a_manual_one_answers() {
+fn background_check_is_silent_manual_answers() {
     let mut w = world("0.6.0-rc.2", Settings::default());
     w.list(&[("v0.6.0-rc.1", true)]);
     let (tx, rx) = unbounded();

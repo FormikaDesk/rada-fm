@@ -104,7 +104,7 @@ fn a_selection_and_the_clipboard_are_in_italian() {
 }
 
 #[test]
-fn the_layout_holds_the_longest_italian_words_at_170_140_120_and_80_columns() {
+fn longest_italian_words_fit_at_each_width() {
     with_lang(Lang::It, || {
         for (w, hh) in SIZES {
             let mut h = demo_scene(w, hh);

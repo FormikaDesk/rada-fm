@@ -31,7 +31,7 @@ fn kids_of(dir: &std::path::Path, hidden: bool) -> Vec<TreeKid> {
 }
 
 #[test]
-fn the_subfolders_come_with_their_item_counts_and_whether_they_have_folders() {
+fn subfolders_come_with_counts() {
     let sb = Sandbox::new();
     sb.write("home/docs/a.txt", "a");
     sb.write("home/docs/b.txt", "b");

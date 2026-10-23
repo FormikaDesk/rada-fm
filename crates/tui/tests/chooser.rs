@@ -102,7 +102,7 @@ fn a_single_chooser_takes_no_marks() {
 }
 
 #[test]
-fn a_folder_chooser_lists_folders_only_and_chooses_the_one_under_the_cursor() {
+fn folder_chooser_lists_only_folders() {
     let (mut h, dir, _) = chooser_at(Chooser::folder(false));
     assert_eq!(h.names(), ["sub"]);
     h.key(KeyCode::Enter);
@@ -312,7 +312,7 @@ fn the_menu_of_a_right_click_does_not_open() {
 }
 
 #[test]
-fn a_new_folder_can_be_made_where_the_answer_is_a_folder_or_a_place_to_save() {
+fn new_folder_in_a_folder_or_save_chooser() {
     let (mut h, dir, _) = chooser_at(Chooser::save("x.txt"));
     h.app.dispatch(Action::NewFolder);
     assert!(matches!(h.app.modal, Some(rada_tui::app::Modal::Input(_))));

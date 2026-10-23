@@ -689,7 +689,7 @@ fn the_plan_counts_real_bytes_for_sparse_files_and_undo_removes_the_copy() {
 }
 
 #[test]
-fn a_sparse_file_moved_across_filesystems_stays_sparse_and_comes_back_sparse() {
+fn sparse_file_stays_sparse_across_moves() {
     let sb = Sandbox::new();
     let Some(other) = other_filesystem_dir(&sb) else {
         return;

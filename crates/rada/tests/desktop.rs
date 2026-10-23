@@ -313,7 +313,7 @@ fn removing_a_default_that_had_no_predecessor_leaves_no_dangling_handler() {
 }
 
 #[test]
-fn a_default_changed_by_someone_else_in_the_meantime_is_not_overridden_on_remove() {
+fn remove_keeps_a_default_set_by_others() {
     let sb = Sandbox::new();
     sb.fake_update_db();
     sb.fake_xdg_mime();
@@ -390,7 +390,7 @@ fn spawn_terminal_falls_back_to_terminal_variable_then_known_terminals() {
 }
 
 #[test]
-fn every_known_terminal_is_started_with_rada_s_identity_where_it_takes_one() {
+fn terminals_start_with_rada_identity() {
     for (term, expect) in [
         ("kitty", "kitty --class com.formikadesk.rada "),
         ("foot", "foot --app-id=com.formikadesk.rada "),
@@ -421,7 +421,7 @@ fn spawn_terminal_explains_when_there_is_no_terminal() {
 }
 
 #[test]
-fn the_entry_file_in_the_repository_is_a_valid_desktop_file_when_the_validator_exists() {
+fn repo_entry_file_is_a_valid_desktop_file() {
     let Ok(out) = Command::new("desktop-file-validate")
         .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packaging/linux/rada.desktop"))
         .output()

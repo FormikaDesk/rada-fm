@@ -93,7 +93,7 @@ fn back_and_forward_can_be_rebound_and_are_listed_in_the_help() {
 }
 
 #[test]
-fn a_change_in_the_folder_left_behind_does_not_cancel_going_somewhere_else() {
+fn change_behind_does_not_cancel_a_visit() {
     use rada_core::events::{CoreEvent, WatchEvent};
     // The watcher reports a change of the folder the person is leaving, after they asked to
     // go elsewhere and before the answer came. Reading the old folder again used to take

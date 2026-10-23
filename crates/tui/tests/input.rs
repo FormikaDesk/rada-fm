@@ -210,7 +210,7 @@ fn redoing(h: &H) -> bool {
 }
 
 #[test]
-fn the_vim_only_preset_ignores_classic_keys_and_the_classic_one_ignores_letters() {
+fn presets_ignore_each_others_keys() {
     let mut h = harness();
     h.app.keymap = Keymap::new(Preset::Vim, &HashMap::new());
     h.press("ctrl+a");

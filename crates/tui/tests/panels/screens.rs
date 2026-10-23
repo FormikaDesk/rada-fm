@@ -135,8 +135,7 @@ fn the_panels_at_the_smallest_window_that_gets_them() {
     windows,
     ignore = "the sidebar of a system with no tags has no TAGS section, which the Linux snapshot has"
 )]
-fn a_window_below_70_by_24_gets_the_classic_layout_and_asks_for_more_only_if_panels_were_asked_for()
-{
+fn small_window_gets_classic_layout() {
     let mut h = scene(69, 30, "rada", false);
     assert!(!h.app.panels_shown, "69x30 is classic");
     let s = shot(&mut h);

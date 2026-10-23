@@ -189,7 +189,7 @@ fn a_single_folder_at_the_top_is_not_wrapped_in_a_second_one() {
 }
 
 #[test]
-fn several_things_at_the_top_get_a_folder_and_a_named_folder_is_taken_literally() {
+fn several_roots_get_a_folder() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let dir = sb.mkdir("here");
@@ -509,7 +509,7 @@ fn damaged_archives_say_so() {
 // ---------------------------------------------------------------------- conflicts, undo
 
 #[test]
-fn conflicts_follow_the_usual_policies_and_overwrite_goes_through_the_trash() {
+fn conflicts_follow_the_policies() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let j = sb.journal();
@@ -735,7 +735,7 @@ fn seven_zip_with_a_huge_dictionary(sb: &Sandbox) -> Option<PathBuf> {
 }
 
 #[test]
-fn a_7z_asking_for_gigabytes_of_dictionary_is_refused_before_it_is_unpacked() {
+fn huge_7z_dictionary_is_refused() {
     let sb = Sandbox::new();
     let Some(a) = seven_zip_with_a_huge_dictionary(&sb) else {
         eprintln!("skipped: no 7z to make a fixture");
@@ -1084,7 +1084,7 @@ fn an_archive_that_changed_since_the_plan_is_not_extracted_blindly() {
 }
 
 #[test]
-fn a_full_disk_in_the_middle_of_a_member_is_an_error_and_leaves_nothing_half_written() {
+fn full_disk_mid_member_leaves_no_partial() {
     let sb = Sandbox::new();
     let ffs = FaultFs::new();
     let e = sb.engine_with(ffs.clone());

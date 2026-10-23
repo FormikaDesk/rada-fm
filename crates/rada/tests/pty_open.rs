@@ -186,7 +186,7 @@ fn open_a_file(answers_cursor: bool) -> (Vec<u8>, bool, String) {
 }
 
 #[test]
-fn rada_stays_when_a_file_is_opened_on_a_terminal_that_answers_the_cursor_question() {
+fn open_file_keeps_rada_on_cursor_reply() {
     let (seen, running, log) = open_a_file(true);
     let text = String::from_utf8_lossy(&seen).to_string();
     assert!(running, "rada ended: {}\nlog: {log}", tail(&text));

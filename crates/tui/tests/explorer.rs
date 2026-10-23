@@ -660,7 +660,7 @@ fn clicking_a_column_title_sorts_by_it_and_the_arrow_follows() {
 // ---------------------------------------------------------------------------- selection
 
 #[test]
-fn the_checkbox_selects_the_name_moves_the_cursor_and_a_double_click_opens() {
+fn checkbox_selects_double_click_opens() {
     let mut h = scene(140, 30);
     let _ = h.screen();
     // Click a name: the cursor moves, nothing is selected.
@@ -704,7 +704,7 @@ fn the_checkbox_selects_the_name_moves_the_cursor_and_a_double_click_opens() {
 }
 
 #[test]
-fn the_cursor_row_is_solid_the_selected_rows_are_quiet_and_the_tick_stays_under_the_cursor() {
+fn cursor_row_solid_selected_rows_quiet() {
     let mut h = busy_scene(140, 30);
     let _ = h.screen();
     let th = h.app.th.clone();
@@ -782,7 +782,7 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
 }
 
 #[test]
-fn long_names_are_cut_with_an_ellipsis_in_the_icons_view_and_scrolling_follows_the_cursor() {
+fn icons_view_cuts_names_and_follows_cursor() {
     let sb = rada_core::testutil::Sandbox::new();
     for i in 0..60 {
         sb.write(
@@ -879,7 +879,7 @@ fn pane_rows(h: &mut H) -> Vec<String> {
 }
 
 #[test]
-fn the_buttons_have_blank_rows_between_them_and_the_properties_a_blank_row_before_the_status() {
+fn blank_rows_between_bars_and_status() {
     let mut h = scene(170, 35);
     h.app.marked.clear();
     let rows = pane_rows(&mut h);
@@ -937,7 +937,7 @@ fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
 }
 
 #[test]
-fn the_one_field_and_the_buttons_are_pills_with_nerd_icons_and_rectangles_without() {
+fn field_and_buttons_are_pills_with_nerd_font() {
     let mut h = scene(170, 35);
     let row = |h: &mut H| h.screen().lines().nth(2).unwrap().to_string();
     let plain = row(&mut h);
@@ -954,7 +954,7 @@ fn the_one_field_and_the_buttons_are_pills_with_nerd_icons_and_rectangles_withou
 }
 
 #[test]
-fn half_a_row_of_space_separates_the_tabs_from_the_address_and_goes_first_on_a_short_terminal() {
+fn tabs_gap_goes_first_on_a_short_terminal() {
     let mut h = scene(170, 35);
     let s = h.screen();
     let gap = s.lines().nth(1).unwrap();
@@ -977,7 +977,7 @@ fn half_a_row_of_space_separates_the_tabs_from_the_address_and_goes_first_on_a_s
 }
 
 #[test]
-fn the_details_pane_is_hidden_below_140_columns_and_alt_p_shows_it_over_the_list() {
+fn details_pane_hidden_below_140_columns() {
     let mut h = scene(120, 30);
     let s = h.screen();
     assert!(!s.contains("Location"), "hidden by default:\n{s}");

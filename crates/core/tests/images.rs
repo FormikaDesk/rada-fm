@@ -116,7 +116,7 @@ fn every_supported_format_gives_header_info_first_then_pixels() {
 /// was sent, so under load the decoded picture could arrive first and the header (still
 /// "loading") after it. The header must always come first, whatever the machine is doing.
 #[test]
-fn the_header_always_comes_before_the_pixels_even_when_decoding_is_instant() {
+fn header_comes_before_the_pixels() {
     let sb = Sandbox::new();
     // A tiny picture decodes in microseconds: the best chance for the pixels to win.
     let p = save(&sb, "tiny.png", &gradient(4, 4), ImageFormat::Png);

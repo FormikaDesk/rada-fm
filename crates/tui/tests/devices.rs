@@ -138,7 +138,7 @@ fn an_open_phone_opens_like_a_folder_and_nothing_inside_is_counted() {
 }
 
 #[test]
-fn a_click_on_a_device_that_is_not_mounted_mounts_it_and_it_becomes_a_device() {
+fn click_mounts_an_unmounted_device() {
     let mut s = scene(None);
     s.h.click(&Target::Place(PathBuf::from("gphoto2://Canon/")));
     s.h.wait("the camera is open", |a| {
@@ -206,7 +206,7 @@ fn enter_in_the_sidebar_and_the_menu_mount_a_stick_too() {
 }
 
 #[test]
-fn a_mount_that_cannot_be_done_says_what_to_install_and_the_program_goes_on() {
+fn failed_mount_says_what_to_install() {
     let why = rada_core::i18n::t(Key::DevNoMtp).to_string();
     let mut s = scene(Some(why.clone()));
     s.h.click(&Target::Place(PathBuf::from("gphoto2://Canon/")));
@@ -242,7 +242,7 @@ fn a_mount_that_cannot_be_done_says_what_to_install_and_the_program_goes_on() {
 }
 
 #[test]
-fn an_open_phone_is_ejected_after_a_question_and_a_device_not_mounted_cannot_be() {
+fn eject_asks_first_and_needs_a_mount() {
     let mut s = scene(None);
     s.h.right_click(&Target::Place(s.phone.clone()));
     assert!(s.h.screen().contains("Eject"));
@@ -290,7 +290,7 @@ fn an_open_phone_is_ejected_after_a_question_and_a_device_not_mounted_cannot_be(
 }
 
 #[test]
-fn pasting_onto_a_phone_shows_what_is_different_there_in_the_plan_before_anything_is_done() {
+fn paste_to_phone_plan_shows_differences() {
     let mut s = scene(None);
     s.h.wait("the file", |a| a.listing.all().len() == 1);
     s.h.press("ctrl+c");
@@ -397,7 +397,7 @@ Volume(0): motorola edge 40
     }
 
     #[test]
-    fn a_phone_that_is_plugged_in_and_not_open_is_in_the_sidebar_and_enter_mounts_it() {
+    fn closed_phone_is_listed_and_enter_mounts() {
         let (mut h, _, calls) = run(GIO_UNMOUNTED, false);
         h.wait("the phone is listed", |a| !a.unmounted.is_empty());
         let screen = h.screen();
@@ -414,7 +414,7 @@ Volume(0): motorola edge 40
     }
 
     #[test]
-    fn a_phone_the_desktop_has_already_opened_is_in_the_sidebar_under_its_name() {
+    fn open_phone_is_listed_by_name() {
         let (mut h, phone, _) = run(GIO_OPEN, true);
         h.wait("the phone is listed", |a| {
             a.volumes.iter().any(|v| {
@@ -436,7 +436,7 @@ Volume(0): motorola edge 40
 }
 
 #[test]
-fn inside_a_phone_the_path_bar_names_the_device_and_the_real_path_stays_in_the_details() {
+fn phone_path_bar_names_the_device() {
     let mut s = scene(None);
     let storage = s.phone.join("Internal storage");
     s.h.app.open_dir(storage.clone());

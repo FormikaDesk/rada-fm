@@ -63,7 +63,7 @@ fn removing_a_font_that_was_never_installed_is_a_quiet_nothing() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn setup_desktop_makes_rada_app_in_the_users_applications_and_remove_takes_it_away() {
+fn setup_desktop_adds_and_removes_the_app() {
     let sb = Sandbox::new();
     let out = sb.rada(&["setup", "desktop"]);
     assert!(out.status.success(), "{}", text(&out));

@@ -353,7 +353,7 @@ fn cancelling_a_compression_removes_the_half_written_archive() {
 }
 
 #[test]
-fn progress_is_counted_in_real_bytes_and_the_archive_can_be_cancelled_at_any_time() {
+fn progress_in_bytes_and_cancel() {
     let sb = Sandbox::new();
     let e = sb.engine();
     let src = fixture(&sb);

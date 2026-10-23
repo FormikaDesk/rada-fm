@@ -30,7 +30,7 @@ fn mac_with(spec: MacLikeSpec, sb: Sandbox, start: PathBuf) -> (H, Arc<MacLike>)
 }
 
 #[test]
-fn the_list_is_there_newest_first_read_only_and_opens_the_folder_of_a_file() {
+fn recents_newest_first_read_only() {
     let sb = Sandbox::new();
     let a = sb.write("docs/old.txt", "o");
     let b = sb.write("work/new.txt", "n");

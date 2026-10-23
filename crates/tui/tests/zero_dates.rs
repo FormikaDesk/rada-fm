@@ -9,7 +9,7 @@ use common::*;
 use rada_core::testutil::*;
 
 #[test]
-fn a_file_with_no_date_shows_a_dash_in_the_list_and_in_the_details_and_no_1970() {
+fn no_date_shows_a_dash_not_1970() {
     let sb = Sandbox::new();
     let dated = sb.write("d/dated.txt", "a");
     let nodate = sb.write("d/nodate.txt", "b");

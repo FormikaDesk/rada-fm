@@ -80,7 +80,7 @@ fn clicking_the_notice_or_pressing_its_key_opens_the_notes() {
 }
 
 #[test]
-fn a_program_of_a_package_manager_is_told_what_to_run_and_cannot_update_itself() {
+fn package_install_is_told_what_to_run() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 140, 36);
     offer(
@@ -190,7 +190,7 @@ fn a_failed_update_explains_itself_and_offers_the_log() {
 }
 
 #[test]
-fn accepting_starts_the_worker_and_a_worker_that_cannot_work_ends_in_the_failure_window() {
+fn accept_starts_worker_failure_window() {
     let (sb, dir) = sandbox_with_files();
     let state = sb.mkdir("state/rada");
     // No release list anywhere: a closed local port, so the answer is immediate and no real

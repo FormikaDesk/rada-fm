@@ -6,7 +6,7 @@ use rada_tui::LayoutPref;
 use unicode_width::UnicodeWidthStr;
 
 #[test]
-fn a_window_of_78_by_22_is_classic_with_no_advice_no_date_and_the_longest_name_whole() {
+fn window_78x22_is_classic() {
     // Three windows side by side on a laptop: too short for two columns, and rada's to choose.
     let mut h = scene(78, 22, "rada", false);
     assert!(!h.app.panels_shown);

@@ -135,7 +135,7 @@ fn windows_says_when_a_pdf_needs_a_password() {
 
 #[cfg(windows)]
 #[test]
-fn windows_asks_the_shell_for_a_thumbnail_and_a_type_it_cannot_draw_fails_cleanly() {
+fn windows_shell_thumbnail_or_clean_failure() {
     let sb = Sandbox::new();
     // No handler on a CI runner draws a Word file: the answer is a plain failure, not a hang
     // or a crash; with Office installed it is a picture.

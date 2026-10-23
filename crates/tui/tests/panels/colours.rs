@@ -5,7 +5,7 @@ use rada_tui::Theme;
 use ratatui::style::Color;
 
 #[test]
-fn the_selected_row_is_filled_with_the_selection_colour_and_its_text_reads_on_it() {
+fn selected_row_has_the_selection_fill() {
     for name in THEMES {
         let mut h = scene(160, 46, name, true);
         let th = h.app.th.clone();
@@ -74,7 +74,7 @@ fn every_colour_of_the_panels_is_a_theme_token_in_every_theme() {
 }
 
 #[test]
-fn the_folders_of_the_way_have_the_colour_of_the_folders_of_the_middle_box() {
+fn way_folders_have_the_folder_colour() {
     let (mut h, _) = path_scene();
     let buf = h.redrawn_buffer();
     let nav = h.app.nav_area;

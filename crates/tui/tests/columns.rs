@@ -23,7 +23,7 @@ fn scene() -> (H, std::path::PathBuf) {
 }
 
 #[test]
-fn three_columns_show_the_folder_above_the_folder_here_and_what_is_under_the_cursor() {
+fn columns_show_parent_here_and_cursor() {
     let (mut h, dir) = scene();
     // Draw until the folder above has been read.
     for _ in 0..200 {
@@ -143,7 +143,7 @@ fn too_narrow_for_three_columns_it_is_a_table() {
 }
 
 #[test]
-fn the_view_menu_and_the_key_switch_to_columns_and_the_choice_is_remembered_per_tab() {
+fn columns_choice_is_kept_per_tab() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 150, 30);
     assert_eq!(h.app.view, ViewMode::Details);

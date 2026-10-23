@@ -91,7 +91,7 @@ fn place(h: &H, name: &str) -> PathBuf {
 }
 
 #[test]
-fn the_full_sidebar_shows_places_under_their_real_names_and_only_those_that_exist() {
+fn sidebar_lists_existing_places_by_name() {
     let mut h = italian(150, 30);
     let s = h.screen();
     for needle in [
@@ -145,7 +145,7 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
 }
 
 #[test]
-fn tab_puts_the_keyboard_in_the_sidebar_with_visible_focus_and_enter_opens() {
+fn tab_focuses_the_sidebar_enter_opens() {
     let mut h = italian(150, 30);
     let _ = h.screen();
     h.key(KeyCode::Tab);
@@ -223,7 +223,7 @@ fn narrow_terminals_get_a_column_of_icons_with_the_places_only() {
 }
 
 #[test]
-fn in_the_icon_column_the_name_appears_in_the_bottom_bar_on_hover_and_on_focus() {
+fn icon_column_names_item_on_hover() {
     let mut h = italian(90, 30);
     let docs = place(&h, "Documenti");
     let (x, y) = h.where_is(&Target::Place(docs));
@@ -331,7 +331,7 @@ fn the_menu_open_goes_there() {
 }
 
 #[test]
-fn the_bookmark_key_works_on_the_item_in_the_sidebar_and_delete_removes_a_bookmark() {
+fn bookmark_key_and_delete_in_sidebar() {
     let mut h = italian(150, 30);
     let _ = h.screen();
     // Put the focus on the "docs" place and bookmark it with the key.
@@ -551,7 +551,7 @@ fn the_icon_has_a_space_after_it_in_every_entry() {
 }
 
 #[test]
-fn the_entries_stand_one_column_in_from_the_titles_and_a_disks_bar_follows_its_disk() {
+fn sidebar_entries_indent_and_disk_bar() {
     let mut h = italian(150, 60);
     let screen = h.screen();
     let lines: Vec<&str> = screen.lines().collect();
@@ -642,7 +642,7 @@ fn every_look() -> Vec<(rada_tui::icons::IconSet, &'static str, bool)> {
 /// In the icon-only column, the icon of the place you are in is drawn, and in a colour that
 /// can be told from the pill behind it, in every theme and with and without the half circles.
 #[test]
-fn in_the_icon_column_the_icon_of_the_current_place_is_there_and_shows_against_the_pill() {
+fn icon_column_marks_the_current_place() {
     use rada_tui::theme::{ColorDepth, Theme};
     use unicode_width::UnicodeWidthStr;
 

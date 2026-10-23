@@ -187,7 +187,7 @@ fn crash_at(point: &str) -> (usize, usize) {
 }
 
 #[test]
-fn killed_in_the_middle_of_a_big_member_the_temporary_file_goes_and_nothing_is_half_written() {
+fn kill_mid_member_removes_the_temp_file() {
     let (adopted, temps) = crash_at("mid:OUT");
     assert!(temps >= 1, "the kill really left a temporary file");
     assert_eq!(

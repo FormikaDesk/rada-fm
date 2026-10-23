@@ -65,7 +65,7 @@ fn git_scene() -> Option<H> {
 }
 
 #[test]
-fn a_folder_in_a_git_repository_shows_its_branch_its_counts_and_which_files_changed() {
+fn git_folder_shows_branch_and_counts() {
     let Some(mut h) = git_scene() else { return };
     let s = h.screen();
     // On the top edge of the folder's box: the branch, one changed file, one new one.

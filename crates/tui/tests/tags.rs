@@ -435,7 +435,7 @@ fn titles(h: &mut H) -> String {
 }
 
 #[test]
-fn the_tag_column_can_be_hidden_from_the_view_menu_and_the_choice_is_remembered() {
+fn tag_column_hidden_from_view_menu() {
     let Some((sb, dir)) = scene(&[("a.txt", &["Red", "Blue"])]) else {
         return;
     };
@@ -471,7 +471,7 @@ fn the_tag_column_can_be_hidden_from_the_view_menu_and_the_choice_is_remembered(
 }
 
 #[test]
-fn the_configuration_and_the_remembered_choice_decide_whether_the_column_shows() {
+fn config_and_choice_decide_tag_column() {
     let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
         return;
     };

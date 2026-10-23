@@ -33,7 +33,7 @@ fn a_click_on_a_folder_of_the_tree_shows_it_in_the_middle_box() {
 }
 
 #[test]
-fn enter_on_a_folder_of_the_tree_shows_it_and_the_arrow_only_opens_the_branch() {
+fn tree_enter_shows_arrow_only_opens() {
     let mut h = tree_scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     go_and_wait(&mut h, &home);
@@ -83,7 +83,7 @@ fn long_tree_scene() -> (H, std::path::PathBuf) {
 }
 
 #[test]
-fn a_deep_folder_is_opened_highlighted_and_scrolled_into_view_in_a_long_tree() {
+fn long_tree_scrolls_to_a_deep_folder() {
     let (mut h, deep) = long_tree_scene();
     h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
     assert!(
@@ -206,7 +206,7 @@ fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
 }
 
 #[test]
-fn a_click_and_enter_on_scaricati_in_the_tree_show_its_files_in_the_middle_box() {
+fn nav_click_opens_folder() {
     let mut h = tree_scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     let dl = home.join("Scaricati");

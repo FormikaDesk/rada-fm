@@ -50,7 +50,7 @@ fn copy_plan(e: &Engine, src: &Path, dest: &Path, verify: bool) -> Plan {
 }
 
 #[test]
-fn a_full_disk_halfway_through_a_file_leaves_no_partial_file_and_the_rest_is_undoable() {
+fn full_disk_leaves_no_partial_file() {
     let sb = Sandbox::new();
     big(&sb.path("src/big.bin"), 24);
     sb.write("src/a.txt", "a");
@@ -225,7 +225,7 @@ fn a_source_deleted_while_it_is_copied_does_not_lose_the_copy_of_a_move() {
 }
 
 #[test]
-fn a_destination_that_vanishes_mid_way_fails_the_rest_without_panics_and_undo_still_runs() {
+fn vanished_destination_fails_the_rest() {
     let sb = Sandbox::new();
     sb.write("src/a.txt", "a");
     sb.write("src/b.txt", "b");
@@ -261,7 +261,7 @@ fn a_destination_that_vanishes_mid_way_fails_the_rest_without_panics_and_undo_st
 }
 
 #[test]
-fn a_copy_of_a_read_only_file_into_a_read_only_destination_is_refused_in_the_plan() {
+fn read_only_into_read_only_is_refused() {
     if is_root() {
         return;
     }

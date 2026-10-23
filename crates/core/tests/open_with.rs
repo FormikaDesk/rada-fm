@@ -152,7 +152,7 @@ fn the_applications_that_fit_the_type_are_listed_the_default_first() {
 }
 
 #[test]
-fn mimeinfo_cache_and_added_associations_bring_applications_whose_files_do_not_say() {
+fn mimeinfo_cache_adds_applications() {
     let sb = Sandbox::new();
     mime_database(&sb);
     let bin = script(&sb, "prog", &sb.root.join("unused.log"));

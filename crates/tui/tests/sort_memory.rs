@@ -73,7 +73,7 @@ fn state_with(tab: SavedTab) -> UiState {
 }
 
 #[test]
-fn a_date_that_is_not_reversed_is_the_newest_first_and_the_folders_stay_first() {
+fn plain_date_sort_is_newest_first() {
     let (sb, dir) = dated();
     let mut h = H::with_config(sb, dir, 170, 35, |c| {
         c.sort = config_sort(SortKey::Modified, false)
@@ -121,7 +121,7 @@ fn a_tab_with_a_choice_keeps_it_over_the_configuration() {
 }
 
 #[test]
-fn a_file_from_before_cannot_tell_so_name_not_reversed_is_taken_for_no_choice() {
+fn old_state_file_means_no_sort_choice() {
     // What the older versions wrote for every tab, chosen or not.
     let name = saved_tab(std::path::Path::new("/x"), Some("name"), false, None);
     let (h, _, _) = start_with(state_with(name), config_sort(SortKey::Modified, false));
@@ -210,7 +210,7 @@ fn wait_for_tabs(state: &std::path::Path, n: usize) -> UiState {
 }
 
 #[test]
-fn a_session_after_another_follows_a_configuration_that_changed_but_keeps_a_choice() {
+fn new_config_wins_unless_a_choice_was_made() {
     // First session: the configuration says name; one tab is sorted by hand, one is not.
     let (sb, dir) = dated();
     let state = sb.dirs.rada_state();

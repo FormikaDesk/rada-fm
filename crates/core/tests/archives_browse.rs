@@ -39,7 +39,7 @@ fn limits(sb: &Sandbox) -> Limits {
 }
 
 #[test]
-fn a_path_through_a_file_is_found_in_the_archive_and_an_ordinary_one_is_not() {
+fn path_through_a_file_is_in_the_archive() {
     let sb = Sandbox::new();
     let a = sb.path("a.zip");
     write_zip(&a, &members());

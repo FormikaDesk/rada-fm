@@ -223,7 +223,7 @@ fn killed_in_the_middle_of_a_big_file_the_temporary_file_is_cleaned_up() {
 }
 
 #[test]
-fn killed_just_after_the_rename_the_finished_file_is_adopted_into_the_history() {
+fn kill_after_rename_adopts_the_file() {
     let o = crash_at("after_rename:OUT/tree/c.txt", false);
     assert_eq!(
         o.adopted, 1,
@@ -250,8 +250,7 @@ fn a_move_across_filesystems_killed_mid_file_loses_nothing() {
     not(target_os = "linux"),
     ignore = "needs a tmpfs next to the disk (two filesystems), which only the Linux test machines have"
 )]
-fn a_move_killed_between_the_copy_and_the_removal_of_the_source_keeps_both_and_undo_removes_the_copy()
- {
+fn kill_mid_move_keeps_both_and_undo_cleans() {
     let o = crash_at("before_unlink:src/tree/c.txt", true);
     assert_eq!(o.adopted, 1, "the copy is in place");
 }

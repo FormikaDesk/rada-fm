@@ -150,7 +150,7 @@ fn files_that_are_hard_links_become_separate_files_on_a_phone() {
 }
 
 #[test]
-fn a_tree_is_copied_to_a_phone_under_its_own_names_with_no_temporary_file_and_no_rename() {
+fn phone_copy_has_final_names_no_temp() {
     let sb = Sandbox::new();
     let (_, storage, root) = with_phone(&sb);
     sb.write("src/a.txt", "hello");
@@ -235,7 +235,7 @@ fn a_move_from_a_phone_asks_for_the_undo_it_cannot_promise() {
 }
 
 #[test]
-fn a_copy_the_phone_did_not_keep_whole_is_a_failure_and_a_move_keeps_its_source() {
+fn phone_partial_copy_fails_move_keeps_source() {
     let sb = Sandbox::new();
     let (_, storage, root) = with_phone(&sb);
     sb.write("src/big.bin", vec![1u8; 200_000]);
@@ -346,7 +346,7 @@ fn a_copy_to_a_phone_and_its_undo_leave_both_sides_as_they_were() {
 }
 
 #[test]
-fn a_move_inside_one_storage_is_a_rename_with_a_warning_and_between_two_phones_a_copy() {
+fn phone_move_is_rename_or_copy() {
     let sb = Sandbox::new();
     let (e, storage, root) = with_phone(&sb);
     std::fs::create_dir_all(storage.join("DCIM")).unwrap();
@@ -498,7 +498,7 @@ fn the_words_of_the_warnings_exist_in_both_languages() {
 // ------------------------------------------------------- not counted, not read, not tagged
 
 #[test]
-fn an_entry_on_a_phone_is_not_asked_for_tags_and_a_file_there_is_not_read_for_a_preview() {
+fn phone_entries_skip_tags_and_previews() {
     let sb = Sandbox::new();
     let (e, storage, _) = with_phone(&sb);
     let probe = sb.write("probe", "x");

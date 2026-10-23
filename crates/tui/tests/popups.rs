@@ -192,7 +192,7 @@ fn notification_titles_start_with_a_capital() {
 }
 
 #[test]
-fn ctrl_l_asks_for_the_whole_screen_to_be_drawn_again_wherever_it_is_pressed() {
+fn ctrl_l_redraws_everywhere() {
     let (mut h, _dest) = files(150, 40);
     assert!(!h.app.take_full_redraw());
     h.press("ctrl+l");
@@ -209,7 +209,7 @@ fn ctrl_l_asks_for_the_whole_screen_to_be_drawn_again_wherever_it_is_pressed() {
 }
 
 #[test]
-fn starting_a_program_has_the_screen_drawn_again_now_and_a_few_times_after() {
+fn starting_a_program_redraws_the_screen() {
     let (mut h, _dest) = files(150, 40);
     h.app.after_launch();
     assert!(h.app.take_full_redraw(), "at once");

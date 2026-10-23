@@ -639,7 +639,7 @@ exit $status
     }
 
     #[test]
-    fn a_cancel_leaves_the_answer_empty_and_the_portal_is_told_nothing_went_wrong() {
+    fn cancel_leaves_the_answer_empty() {
         let s = Stage::new();
         let out = s.w.p("answer");
         fs::write(&out, "").unwrap();

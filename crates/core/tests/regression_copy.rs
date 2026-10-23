@@ -164,7 +164,7 @@ fn copying_a_folder_into_itself_or_a_descendant_is_blocked() {
     windows,
     ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
-fn an_unreadable_file_does_not_stop_the_rest_and_the_error_has_the_full_path() {
+fn unreadable_file_does_not_stop_the_copy() {
     if is_root() {
         eprintln!("skipped: running as root, chmod 000 does not block reads");
         return;

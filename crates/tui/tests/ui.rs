@@ -241,7 +241,7 @@ fn rename_asks_for_a_plan_and_bulk_rename_previews_names() {
     windows,
     ignore = "needs POSIX permissions or file names that Windows rejects"
 )]
-fn the_screen_never_contains_control_characters_from_hostile_names_at_any_size() {
+fn hostile_names_never_reach_the_screen() {
     let sb = Sandbox::new();
     let evil = [
         "line\nbreak.txt",

@@ -338,7 +338,7 @@ fn quick_look_with_nothing_to_show_is_said_plainly() {
 }
 
 #[test]
-fn where_the_system_has_no_thumbnails_an_office_file_is_still_an_archive_card() {
+fn office_file_without_thumbnail_is_a_card() {
     let sb = Sandbox::new();
     let p = sb.path("a.docx");
     // A real, tiny zip.

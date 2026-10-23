@@ -143,7 +143,7 @@ fn bad_requests_are_refused_before_anything_is_read() {
 }
 
 #[test]
-fn a_delete_request_is_still_flagged_irreversible_and_needs_the_confirmation_flow() {
+fn delete_request_stays_irreversible() {
     let sb = Sandbox::new();
     let f = sb.write("x.txt", "x");
     let e = sb.engine();

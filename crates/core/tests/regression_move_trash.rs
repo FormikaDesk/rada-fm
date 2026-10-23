@@ -490,7 +490,7 @@ mod linux_only {
     }
 
     #[test]
-    fn when_no_per_device_trash_is_possible_the_item_is_copied_to_the_home_trash() {
+    fn no_device_trash_copies_to_home_trash() {
         let sb = Sandbox::new();
         let Some(other) = other_filesystem_dir(&sb) else {
             return;

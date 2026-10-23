@@ -71,7 +71,7 @@ fn unusable_buttons_are_not_clickable_and_usable_ones_are() {
 }
 
 #[test]
-fn the_one_field_shows_the_path_and_what_to_search_and_shows_what_is_typed() {
+fn one_field_shows_path_search_and_typing() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 140, 30);
     let row = address_row(&mut h);
@@ -106,7 +106,7 @@ fn commands_is_a_hint_at_the_bottom_and_starts_the_field() {
 }
 
 #[test]
-fn when_it_narrows_the_search_goes_and_the_path_folds_around_the_current_folder() {
+fn narrow_bar_drops_search_and_folds_path() {
     let mut h = deep(220);
     let row = address_row(&mut h);
     assert!(

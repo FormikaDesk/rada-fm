@@ -17,7 +17,7 @@ fn ring_scene(theme: &str) -> H {
 }
 
 #[test]
-fn where_the_terminal_draws_pictures_the_main_disk_is_a_ring_with_its_figures_beside_it() {
+fn disk_is_a_ring_where_pictures_draw() {
     let mut h = ring_scene("neon");
     let s = h.screen();
     let ring = h.app.ring.as_ref().expect("the ring was made");
