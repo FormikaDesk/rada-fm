@@ -130,7 +130,8 @@ fn bad_requests_are_refused_before_anything_is_read() {
     assert!(
         try_plan(OpRequest::Rename {
             path: sb.path("a"),
-            new_name: String::new()
+            new_name: String::new(),
+            conflict: Default::default(),
         })
         .is_some()
     );

@@ -10,7 +10,7 @@ use super::names;
 use super::plan::*;
 use super::scan::{LinkState, Scan, ScanNode};
 use crate::display;
-use crate::fs::FileKind;
+use crate::fs::{FileKind, FsMeta};
 use crate::i18n::{self, Key, tf};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +60,13 @@ fn summary_of(r: &ScanNode, action: ItemAction) -> ItemSummary {
 
 fn items_label(n: u64) -> String {
     i18n::count(n, Key::ItemOne, Key::ItemMany)
+}
+
+fn rename_step(from: &Path, to: &Path) -> Step {
+    Step::Rename {
+        from: from.to_path_buf(),
+        to: to.to_path_buf(),
+    }
 }
 
 fn not_found(e: &io::Error) -> bool {
@@ -330,79 +337,29 @@ impl Engine {
 
     // ------------------------------------------------------------------ rename / mkdir
 
-    pub fn plan_rename(&self, from: &Path, new_name: &OsStr) -> Plan {
-        let mut plan = Plan::empty(
-            OpKind::Rename,
-            tf(
-                Key::TitleRename,
-                &[&display::path(from), &display::name(new_name)],
-            ),
-        );
+    pub fn plan_rename(&self, from: &Path, new_name: &OsStr, policy: ConflictPolicy) -> Plan {
         let mut ws = WarningSet::default();
-        plan.totals.items = 1;
-        let rules = self.platform.path_rules();
-        let parent = from.parent().unwrap_or(Path::new("."));
-        let to = parent.join(new_name);
-        match self.fs.lstat(from) {
-            Err(_) => ws.add(WarningKind::Missing, Severity::Blocking, Some(from)),
-            Ok(src_meta) => {
-                if let Err(why) = names::validate(&rules, new_name) {
-                    ws.add_with(
-                        WarningKind::InvalidName,
-                        Severity::Blocking,
-                        Some(&to),
-                        Some(why),
-                    );
-                } else if from.file_name() == Some(new_name) {
-                    ws.add_with(
-                        WarningKind::InvalidName,
-                        Severity::Blocking,
-                        Some(&to),
-                        Some("the name is unchanged".into()),
-                    );
-                } else {
-                    match self.fs.lstat(&to) {
-                        Ok(existing) => {
-                            // On case-insensitive filesystems "a" -> "A" names the same file.
-                            let same_file = existing.ino.is_some()
-                                && existing.ino == src_meta.ino
-                                && existing.dev == src_meta.dev;
-                            if same_file && rules.case_insensitive {
-                                plan.steps.push(Step::Rename {
-                                    from: from.to_path_buf(),
-                                    to: to.clone(),
-                                });
-                            } else {
-                                ws.add(WarningKind::Conflict, Severity::Blocking, Some(&to));
-                            }
-                        }
-                        Err(e) if not_found(&e) => {
-                            if !self.fs.can_write(parent) {
-                                ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
-                            } else {
-                                plan.steps.push(Step::Rename {
-                                    from: from.to_path_buf(),
-                                    to: to.clone(),
-                                });
-                            }
-                        }
-                        Err(e) => ws.add_with(
-                            WarningKind::NotWritable,
-                            Severity::Blocking,
-                            Some(&to),
-                            Some(e.to_string()),
-                        ),
-                    }
-                }
+        let src = self.fs.lstat(from);
+        let target = from.parent().unwrap_or(Path::new(".")).join(new_name);
+        let (steps, to) = match &src {
+            Err(_) => {
+                ws.add(WarningKind::Missing, Severity::Blocking, Some(from));
+                (Vec::new(), target)
             }
-        }
+            Ok(meta) => self.rename_steps(from, meta, target, policy, &mut ws),
+        };
+        let name = to.file_name().unwrap_or(new_name);
+        let title = tf(
+            Key::TitleRename,
+            &[&display::path(from), &display::name(name)],
+        );
+        let mut plan = Plan::empty(OpKind::Rename, title);
+        plan.steps = steps;
+        plan.policy = policy;
+        plan.totals.items = 1;
         plan.items.push(ItemSummary {
             path: from.to_path_buf(),
-            kind: self
-                .fs
-                .lstat(from)
-                .map(|m| m.kind)
-                .unwrap_or(crate::fs::FileKind::File),
+            kind: src.map(|m| m.kind).unwrap_or(FileKind::File),
             action: ItemAction::Rename,
             files: 0,
             dirs: 0,
@@ -416,6 +373,112 @@ impl Engine {
         plan.renames.push((from.to_path_buf(), to));
         plan.warnings = ws.finish();
         plan
+    }
+
+    /// The steps that rename `from` to `to`, and the name it ends up with.
+    fn rename_steps(
+        &self,
+        from: &Path,
+        src: &FsMeta,
+        to: PathBuf,
+        policy: ConflictPolicy,
+        ws: &mut WarningSet,
+    ) -> (Vec<Step>, PathBuf) {
+        if let Some(why) = self.bad_rename_name(from, &to) {
+            ws.add_with(
+                WarningKind::InvalidName,
+                Severity::Blocking,
+                Some(&to),
+                Some(why),
+            );
+            return (Vec::new(), to);
+        }
+        match self.fs.lstat(&to) {
+            Ok(existing) if self.is_same_file(src, &existing) => (vec![rename_step(from, &to)], to),
+            Ok(existing) => self.rename_onto(from, src, &existing, to, policy, ws),
+            Err(e) if not_found(&e) => {
+                let parent = to.parent().unwrap_or(Path::new("."));
+                if self.fs.can_write(parent) {
+                    return (vec![rename_step(from, &to)], to);
+                }
+                ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
+                (Vec::new(), to)
+            }
+            Err(e) => {
+                let detail = Some(e.to_string());
+                ws.add_with(
+                    WarningKind::NotWritable,
+                    Severity::Blocking,
+                    Some(&to),
+                    detail,
+                );
+                (Vec::new(), to)
+            }
+        }
+    }
+
+    fn bad_rename_name(&self, from: &Path, to: &Path) -> Option<String> {
+        let name = to.file_name().unwrap_or_default();
+        let unchanged = || (from.file_name() == Some(name)).then(|| "the name is unchanged".into());
+        let rules = self.platform.path_rules();
+        names::validate(&rules, name).err().or_else(unchanged)
+    }
+
+    /// On case-insensitive filesystems "a" -> "A" names the same file.
+    fn is_same_file(&self, src: &FsMeta, existing: &FsMeta) -> bool {
+        self.platform.path_rules().case_insensitive
+            && existing.ino.is_some()
+            && existing.ino == src.ino
+            && existing.dev == src.dev
+    }
+
+    fn rename_onto(
+        &self,
+        from: &Path,
+        src: &FsMeta,
+        existing: &FsMeta,
+        to: PathBuf,
+        policy: ConflictPolicy,
+        ws: &mut WarningSet,
+    ) -> (Vec<Step>, PathBuf) {
+        match policy {
+            ConflictPolicy::Skip => {
+                ws.add(WarningKind::Conflict, Severity::Warning, Some(&to));
+                (Vec::new(), to)
+            }
+            ConflictPolicy::KeepBoth => {
+                ws.add(WarningKind::Conflict, Severity::Warning, Some(&to));
+                let parent = to.parent().unwrap_or(Path::new("."));
+                let name = to.file_name().unwrap_or_default();
+                let free = names::first_free(parent, name, |p| self.fs.lstat(p).is_ok());
+                (vec![rename_step(from, &free)], free)
+            }
+            ConflictPolicy::Overwrite if self.can_replace(src, existing, &to) => {
+                ws.add(WarningKind::Conflict, Severity::Warning, Some(&to));
+                ws.add(WarningKind::Overwrite, Severity::Warning, Some(&to));
+                let steps = vec![Step::TrashItem { path: to.clone() }, rename_step(from, &to)];
+                (steps, to)
+            }
+            ConflictPolicy::Overwrite => {
+                let why = i18n::t(Key::RenameCannotReplace).to_string();
+                ws.add_with(
+                    WarningKind::Conflict,
+                    Severity::Blocking,
+                    Some(&to),
+                    Some(why),
+                );
+                (Vec::new(), to)
+            }
+        }
+    }
+
+    /// A file replaces a file, a folder replaces an empty folder; nothing else.
+    fn can_replace(&self, src: &FsMeta, existing: &FsMeta, to: &Path) -> bool {
+        match (src.is_dir(), existing.is_dir()) {
+            (false, false) => true,
+            (true, true) => self.fs.read_dir(to).is_ok_and(|items| items.is_empty()),
+            _ => false,
+        }
     }
 
     pub fn plan_mkdir(&self, parent: &Path, name: &OsStr) -> Plan {
@@ -584,13 +647,7 @@ impl Transfer<'_> {
 
     /// First free `name (n).ext` in `parent`.
     fn keep_both(&self, parent: &Path, name: &OsStr) -> PathBuf {
-        for n in 1u32.. {
-            let cand = parent.join(names::numbered(name, n));
-            if !self.exists(&cand) {
-                return cand;
-            }
-        }
-        unreachable!("u32 range exhausted")
+        names::first_free(parent, name, |p| self.exists(p))
     }
 
     /// Plan one source node into `parent`, checking what is already there.

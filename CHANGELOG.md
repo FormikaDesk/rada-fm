@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Rename onto a name that exists asks what to do**, with the choices of a copy: skip (the default, nothing changes), keep both (`name (1).ext`) or overwrite. Overwrite sends the old item to the trash first, so `Ctrl+Z` brings both back. Only a file can replace a file, and a folder an empty folder; the other pairs stay blocked, with the reason. The `rename` request takes `conflict` like `copy` does. Bulk rename still refuses name conflicts.
+
 ## [0.6.0-rc.13] - 2026-10-21
 
 The **panels view** — the screen as rounded boxes — with the **Neon** theme, the state of a git repository, folders from **zoxide**, colours in the preview of source files, and the corrections of what was seen in it: the NAV tree opens its folders, follows the folder you are in and scrolls, the favourites no longer repeat the standard folders, and SPAZIO draws the main disk as a ring. Security updates of two libraries. Still a **pre-release**.

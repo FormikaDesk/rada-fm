@@ -236,7 +236,11 @@ fn undoing_a_rename_and_a_bulk_rename_including_swaps() {
     let sb = Sandbox::new();
     let (e, j) = (sb.engine(), sb.journal());
     let f = sb.write("d/old.name.txt", "x");
-    let out = run_journaled(&e, &j, &e.plan_rename(&f, "new.name.txt".as_ref()));
+    let out = run_journaled(
+        &e,
+        &j,
+        &e.plan_rename(&f, "new.name.txt".as_ref(), Default::default()),
+    );
     assert!(sb.path("d/new.name.txt").exists());
     let (_, rep) = undo(&e, &j, &out.id);
     assert_eq!(rep.status(), RunStatus::Completed);

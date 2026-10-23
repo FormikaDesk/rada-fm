@@ -26,7 +26,11 @@ fn folder_names_with_dots_do_not_misplace_the_destination() {
     assert!(!sb.path("v1").exists() && !sb.path("out").exists());
 
     // Rename keeps the dotted parents and only touches the final component.
-    let plan = e.plan_rename(&dest.join("sub/data.txt"), "renamed.v3.txt".as_ref());
+    let plan = e.plan_rename(
+        &dest.join("sub/data.txt"),
+        "renamed.v3.txt".as_ref(),
+        Default::default(),
+    );
     assert!(plan.is_executable());
     run(&e, &plan);
     assert!(dest.join("sub/renamed.v3.txt").exists());
@@ -491,11 +495,14 @@ fn rename_rejects_invalid_names_without_touching_anything() {
     sb.write("exists.txt", "y");
     let e = sb.engine();
     for bad in ["", ".", "..", "a/b", "exists.txt", "f.txt"] {
-        let plan = e.plan_rename(&f, bad.as_ref());
+        let plan = e.plan_rename(&f, bad.as_ref(), Default::default());
         assert!(!plan.is_executable(), "{bad:?} must be refused");
     }
     let too_long = "x".repeat(300);
-    assert!(!e.plan_rename(&f, too_long.as_ref()).is_executable());
+    assert!(
+        !e.plan_rename(&f, too_long.as_ref(), Default::default())
+            .is_executable()
+    );
     assert!(f.exists());
 }
 
@@ -678,7 +685,7 @@ fn error_messages_use_display_escapes_for_hostile_names() {
     let sb = Sandbox::new();
     let weird = sb.write("a\nb\u{1b}[31m.txt", "x");
     let e = sb.engine();
-    let plan = e.plan_rename(&weird, "ok.txt".as_ref());
+    let plan = e.plan_rename(&weird, "ok.txt".as_ref(), Default::default());
     assert!(
         plan.title.contains("\\n") && plan.title.contains("\\e"),
         "{}",

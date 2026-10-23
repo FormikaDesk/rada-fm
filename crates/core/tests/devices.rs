@@ -403,7 +403,7 @@ fn renaming_trashing_and_archiving_on_a_phone_have_their_own_words() {
     let sb = Sandbox::new();
     let (e, storage, _) = with_phone(&sb);
     std::fs::write(storage.join("a.txt"), "a").unwrap();
-    let plan = e.plan_rename(&storage.join("a.txt"), "b.txt".as_ref());
+    let plan = e.plan_rename(&storage.join("a.txt"), "b.txt".as_ref(), Default::default());
     assert!(plan.is_executable(), "{:?}", plan.warnings);
     assert_eq!(
         severity(&plan, WarningKind::DeviceRename),

@@ -1994,6 +1994,9 @@ impl App {
                 mode: TransferMode::Move,
             },
             (OpKind::Extract | OpKind::Compress, _) if plan.request.is_some() => Replan::Request,
+            (OpKind::Rename, _) if plan.has_conflicts() && plan.blocking().next().is_none() => {
+                Replan::Request
+            }
             _ => Replan::None,
         };
         if self.demo_auto_run {

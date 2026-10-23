@@ -465,6 +465,7 @@ strings! {
     PolKeep => "keep both", "tieni entrambi";
     PolOver => "overwrite", "sovrascrivi";
     PolicyChange => "← →", "← →";
+    RenameCannotReplace => "only a file can replace a file, and a folder an empty folder", "solo un file può sostituire un file, e una cartella una cartella vuota";
     PlanQDelete => "Delete {0} permanently?", "Eliminare definitivamente {0}?";
     PlanQTrash => "Move {0} to the trash?", "Spostare {0} nel cestino?";
     UndoQ => "Undo {0}?", "Annullare {0}?";

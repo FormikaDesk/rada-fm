@@ -3,7 +3,7 @@
 //! other file managers in folders like `v1.2/`.
 
 use std::ffi::{OsStr, OsString};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::platform::PathRules;
 
@@ -82,6 +82,14 @@ pub fn numbered(name: &OsStr, n: u32) -> OsString {
     out.push(format!(" ({n})"));
     out.push(ext);
     out
+}
+
+/// The first `name (n).ext` in `parent` that `taken` does not claim.
+pub fn first_free(parent: &Path, name: &OsStr, taken: impl Fn(&Path) -> bool) -> PathBuf {
+    (1u32..)
+        .map(|n| parent.join(numbered(name, n)))
+        .find(|candidate| !taken(candidate))
+        .expect("u32 range exhausted")
 }
 
 #[cfg(test)]

@@ -65,6 +65,9 @@ pub enum OpRequest {
         path: PathBuf,
         /// The new file name (a single name, no folder separators).
         new_name: String,
+        /// What to do when the new name already exists.
+        #[serde(default)]
+        conflict: ConflictPolicy,
     },
     /// Rename several items with a pattern such as `{name}_{n:3}.{ext}` or `s/old/new/`.
     BulkRename {
@@ -189,7 +192,7 @@ impl OpRequest {
                 require_absolute(sources, "sources")?;
                 require_absolute(std::slice::from_ref(destination), "destination")
             }
-            OpRequest::Rename { path, new_name } => {
+            OpRequest::Rename { path, new_name, .. } => {
                 require_absolute(std::slice::from_ref(path), "path")?;
                 if new_name.is_empty() {
                     return Err(Error::Invalid("the new name is empty".into()));
@@ -255,7 +258,8 @@ impl OpRequest {
             OpRequest::Copy { conflict, .. }
             | OpRequest::Move { conflict, .. }
             | OpRequest::Extract { conflict, .. }
-            | OpRequest::Compress { conflict, .. } => *conflict = policy,
+            | OpRequest::Compress { conflict, .. }
+            | OpRequest::Rename { conflict, .. } => *conflict = policy,
             _ => return None,
         }
         Some(r)
@@ -395,8 +399,12 @@ impl Engine {
                     undo: None,
                 }
             }
-            OpRequest::Rename { path, new_name } => Planned {
-                plan: self.plan_rename(path, new_name.as_ref()),
+            OpRequest::Rename {
+                path,
+                new_name,
+                conflict,
+            } => Planned {
+                plan: self.plan_rename(path, new_name.as_ref(), *conflict),
                 scan: None,
                 undo: None,
             },

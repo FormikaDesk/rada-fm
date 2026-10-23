@@ -77,6 +77,8 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 
 In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (skip existing / keep both / overwrite, where the old file goes to the trash so undo can restore it), `Tab` switches between the summary and every step, arrows scroll, `Esc` cancels. Paths are shown relative to the source and destination folders, which are named once at the top.
 
+Renaming to a name that already exists opens the same plan. *Skip* is the default and changes nothing; *keep both* uses the next free `name (1).ext`; *overwrite* sends the old item to the trash first, so `Ctrl+Z` brings everything back. Only a file can replace a file, and a folder an empty folder. Bulk rename still refuses name conflicts.
+
 ### Mouse
 
 Click a name to put the cursor there; the box on its left (or `Space`) selects; double-click opens; the wheel scrolls (a turn is three rows, or one row of tiles); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: the tabs (middle click closes), **← → ↑ ⟳**, the path segments, the bar, every button of the command bar, a column title to sort, an item of the navigation pane (right-click for *Open* and *Pin / Unpin*), the buttons of the details pane, the Details / Icons switch, every key of the hints, a command or place offered by the bar, and the buttons of any window. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop is planned for a later release.

@@ -75,6 +75,11 @@
       "description": "Rename one item inside its folder.",
       "type": "object",
       "properties": {
+        "conflict": {
+          "description": "What to do when the new name already exists.",
+          "$ref": "#/$defs/ConflictPolicy",
+          "default": "skip"
+        },
         "new_name": {
           "description": "The new file name (a single name, no folder separators).",
           "type": "string"

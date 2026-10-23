@@ -11,8 +11,8 @@ use crossbeam_channel::Sender;
 use crate::events::{CoreEvent, FailureInfo, JobEvent, JobId};
 use crate::journal::Journal;
 use crate::ops::{
-    Cancel, Engine, ErrorChoice, ExecHandler, Failure, OpRequest, Plan, Progress, Scan,
-    ScanControl, TransferOptions, UndoPlan,
+    Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, Failure, OpRequest, Plan, Progress,
+    Scan, ScanControl, TransferOptions, UndoPlan,
 };
 
 #[derive(Clone)]
@@ -211,6 +211,7 @@ impl Jobs {
         self.plan_request(OpRequest::Rename {
             path: from,
             new_name,
+            conflict: ConflictPolicy::default(),
         })
     }
 

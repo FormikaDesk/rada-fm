@@ -597,6 +597,7 @@ fn nothing_can_be_written_into_or_changed_inside_an_archive() {
         OpRequest::Rename {
             path: inside.clone(),
             new_name: "g".into(),
+            conflict: Default::default(),
         },
         OpRequest::MakeDir {
             parent: a.clone(),
