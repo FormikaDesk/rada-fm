@@ -3,7 +3,7 @@ source: crates/tui/tests/snapshots.rs
 expression: shot(&mut h)
 ---
  ‹ 1/1 ›  projects  +
-  ↑   ⟳     … › pro… Ctrl…
+  ↑   ⟳     … › p…ts Ctrl…
 ╭──────────────────────────╮
 │ ☐   Name ↑          Size │
 │                          │

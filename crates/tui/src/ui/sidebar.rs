@@ -279,7 +279,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     let note = item.note().map(|n| format!(" {n}")).unwrap_or_default();
                     let note_w = note.width();
                     let room = w.saturating_sub(head + pin_w + 1 + note_w);
-                    let name = rada_core::display::truncate(&item.name, room);
+                    let name = rada_core::display::truncate_name(&item.name, room);
                     if note_w == 0 {
                         spans.push(Span::styled(
                             pad(&name, w.saturating_sub(head + pin_w)),

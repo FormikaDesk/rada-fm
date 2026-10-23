@@ -120,7 +120,7 @@ fn crumbs(app: &App, budget: usize) -> Vec<(Span<'static>, Option<Target>)> {
                 out.push(sep());
             }
             let text = if i + 1 == n {
-                display::truncate(label, budget.max(4))
+                display::truncate_name(label, budget.max(4))
             } else {
                 label.clone()
             };
@@ -145,7 +145,7 @@ fn crumbs(app: &App, budget: usize) -> Vec<(Span<'static>, Option<Target>)> {
         ));
         out.push(sep());
         let room = budget.saturating_sub(1 + sep_w).max(4);
-        out.push(seg_span(n - 1, display::truncate(&segs[n - 1].0, room)));
+        out.push(seg_span(n - 1, display::truncate_name(&segs[n - 1].0, room)));
         return out;
     }
     while start > 1 && head + tail_from(start - 1) <= budget {
