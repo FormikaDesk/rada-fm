@@ -13,6 +13,7 @@ use common::*;
 use crossterm::event::KeyCode;
 use rada_core::testutil::*;
 use rada_tui::compat::{CompatBackend, Rendering, STD_GLYPHS, ascii_for, std_for};
+use rada_tui::icons::{self, Glyph};
 use rada_tui::theme::ColorDepth;
 use rada_tui::{IconSet, Theme, ui};
 use ratatui::Terminal;
@@ -262,8 +263,11 @@ fn the_panels_view_draws_only_standard_glyphs_with_unicode_std() {
                     .nav_rows()
                     .iter()
                     .position(|r| r.kind == rada_tui::panels::NavKind::Tags);
-                h.app.nav_cursor = tags.expect("a row of tags");
-                h.app.nav_tag = 2;
+                // A system with no tags (Windows) has no such row: the focus stays on NAV.
+                if let Some(row) = tags {
+                    h.app.nav_cursor = row;
+                    h.app.nav_tag = 2;
+                }
             }
             let (drawn, sent) = std_screen_glyphs(&mut h, w, hh);
             let outside = |glyphs: &[char]| -> String {
@@ -275,5 +279,15 @@ fn the_panels_view_draws_only_standard_glyphs_with_unicode_std() {
             assert_eq!(outside(&sent), "", "sent at {w}x{hh}, focus {focus}");
             assert_eq!(outside(&drawn), "", "drawn at {w}x{hh}, focus {focus}");
         }
+    }
+}
+
+#[test]
+fn unicode_std_marks_selected_and_ready_to_paste_apart() {
+    let checked = icons::ui(IconSet::UnicodeStd, Glyph::Checked);
+    let clipboard = icons::ui(IconSet::UnicodeStd, Glyph::Clipboard);
+    assert_ne!(checked, clipboard);
+    for mark in [checked, clipboard] {
+        assert!(mark.chars().all(|c| STD_GLYPHS.contains(c)), "{mark:?}");
     }
 }
