@@ -1,6 +1,9 @@
 //! The offer to install a Nerd Font, made once.
 
-use super::*;
+use super::{App, FontOffer, Modal, ToastKind};
+use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
 
 pub enum FontStage {
     Ask,

@@ -5,9 +5,13 @@
 
 use rada_core::platform::{PlaceKind, TagColor as Hue};
 
-use super::*;
+use super::{App, ToastKind};
+use crate::keymap::Action;
 use crate::panels::{NavKind, NavMode, NavRow};
 use crate::sidebar::{self, Origin, Section};
+use rada_core::i18n::{Key, tf};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 /// What git said about the folder shown: the answer, and the folder it is about.
 pub struct GitView {

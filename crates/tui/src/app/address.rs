@@ -14,11 +14,13 @@
 //! The subfolders come from a worker (`Services::complete_dirs`): this code never reads the
 //! disk. What it keeps is the last list it was given and filters it as the text changes.
 
-use std::path::Component;
+use std::path::{Component, Path, PathBuf};
 
-use super::*;
-use crate::fuzzy;
-use crate::palette::PaletteKind;
+use super::{App, FilterState};
+use crate::keymap::Action;
+use crate::palette::{PaletteItem, PaletteKind, PaletteView};
+use crate::{fmt, fuzzy};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Most commands and places offered under the field in the search mode.
 const MAX_COMMANDS: usize = 5;

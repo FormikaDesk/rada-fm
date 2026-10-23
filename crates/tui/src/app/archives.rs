@@ -3,7 +3,12 @@
 use rada_core::archive::{self, ArchiveKind, name_is_zip_document, name_suggests_archive};
 use rada_core::ops::{ConflictPolicy, ExtractInto, OpRequest};
 
-use super::*;
+use super::{App, InputKind, InputView, Modal, ToastKind};
+use crate::keymap::Action;
+use rada_core::i18n::{Key, tf};
+use rada_core::model::Entry;
+use rada_core::preview::Preview;
+use std::path::{Path, PathBuf};
 
 impl App {
     /// Whether Enter should open `e` as a folder: its name says archive, or its content did

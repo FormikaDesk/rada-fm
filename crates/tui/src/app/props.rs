@@ -3,7 +3,9 @@
 
 use rada_core::i18n::{Key, tf};
 
-use super::*;
+use super::{App, Modal};
+use crate::fmt;
+use rada_core::model::Entry;
 
 pub struct PropsView {
     pub title: String,

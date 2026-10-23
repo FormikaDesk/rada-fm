@@ -5,7 +5,11 @@
 
 use rada_core::platform::openwith::{self as ow, OpenApp, Prefs};
 
-use super::*;
+use super::{App, InputKind, InputView, MenuView, Modal, ToastKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
+use std::path::{Path, PathBuf};
 
 pub struct OpenWithView {
     pub path: PathBuf,

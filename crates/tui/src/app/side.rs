@@ -1,8 +1,14 @@
 //! The sidebar's behaviour: showing and hiding it, moving the keyboard focus into it,
 //! what its keys do, and its menu.
 
-use super::*;
+use super::{App, MenuCmd, MenuItem, MenuView, Modal, ToastKind};
+use crate::fmt;
+use crate::keymap::Action;
 use crate::sidebar::{self, Item, Mode, Origin};
+use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
+use std::path::{Path, PathBuf};
 
 /// Actions that mean the same wherever the keyboard focus is; everything else is about
 /// the list, and the sidebar does not pretend to do it.

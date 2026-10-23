@@ -2,8 +2,12 @@
 //! there, and the window that asks for the name of a file to save. What may not be done is
 //! decided by [`crate::chooser::Chooser::allows`] and enforced in `dispatch`.
 
-use super::*;
+use super::{App, InputKind, InputView, Modal, ToastKind};
 use crate::chooser::{self, Kind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rada_core::i18n::{Key, tf};
+use rada_core::model::Entry;
+use std::path::PathBuf;
 
 impl App {
     /// A key that means something only to a chooser. `true` when it was taken.

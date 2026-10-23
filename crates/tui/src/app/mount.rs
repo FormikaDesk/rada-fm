@@ -4,7 +4,10 @@
 
 use rada_core::platform::Unmounted;
 
-use super::*;
+use super::{App, ToastKind};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
+use std::path::{Path, PathBuf};
 
 impl App {
     /// The id of the plugged-in device that `path` stands for in the sidebar, if any.

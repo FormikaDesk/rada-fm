@@ -4,7 +4,14 @@
 
 use rada_core::update::{Applied, Mode, Notice, UpdateEvent};
 
-use super::*;
+use super::{App, Modal, PropsView, ToastKind};
+use crate::fmt;
+use crate::keymap::Action;
+use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
+use std::path::PathBuf;
+use std::time::Instant;
 
 /// What the update worker last told.
 pub enum UpdateStatus {

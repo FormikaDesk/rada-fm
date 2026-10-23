@@ -27,7 +27,7 @@ use rada_core::platform::Volume;
 use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
 use crate::fmt::{self, DateFormat, DateStyle};
-use crate::hits::{Hits, Target};
+use crate::hits::Hits;
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
 use crate::keymap::{Action, Keymap};

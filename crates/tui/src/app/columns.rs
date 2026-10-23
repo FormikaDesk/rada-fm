@@ -6,9 +6,11 @@
 //! the folder above, Right goes into the folder under the cursor; the drawing is in
 //! `ui/columns.rs`.
 
-use rada_core::model::DirListing;
+use rada_core::model::{DirListing, Entry};
 
-use super::*;
+use super::App;
+use crate::view::ViewMode;
+use std::path::{Path, PathBuf};
 
 /// Generations at or above this are answers about the folder above, not about the shown one.
 pub const PARENT_GEN: u64 = 1 << 62;

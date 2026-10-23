@@ -7,7 +7,15 @@
 
 use rada_core::uistate::SavedTab;
 
-use super::*;
+use super::{App, FilterState, LoadState, ToastKind, Viewport};
+use crate::nav::NavMove;
+use crate::view::ViewMode;
+use rada_core::archive::ArchiveView;
+use rada_core::i18n::{Key, tf};
+use rada_core::model::{DirListing, SortKey, SortSpec};
+use std::collections::{BTreeSet, HashMap};
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 
 /// More tabs than this and a new one is refused (every tab is a folder kept in memory).
 pub const MAX_TABS: usize = 24;

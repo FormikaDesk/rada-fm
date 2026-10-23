@@ -11,7 +11,12 @@ use rada_core::foldersize::{
 };
 use rada_core::fs::FileKind;
 
-use super::*;
+use super::App;
+use crate::fmt;
+use rada_core::model::Entry;
+use rada_core::platform::Volume;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// What the Size column and the details pane say about a folder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

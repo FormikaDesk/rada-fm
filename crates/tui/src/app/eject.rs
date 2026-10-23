@@ -3,7 +3,11 @@
 
 use rada_core::platform::Volume;
 
-use super::*;
+use super::{App, Modal, ToastKind};
+use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::events::CoreEvent;
+use rada_core::i18n::{Key, tf};
+use std::path::{Path, PathBuf};
 
 pub enum EjectStage {
     Confirm,
