@@ -203,13 +203,14 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         // itself.
         name: match p.kind {
             PlaceKind::Home | PlaceKind::Trash => p.name(),
-            _ => app.shown_name(&p.path, p.name()),
+            _ => app.places.shown_name(&p.path, p.name()),
         },
         locked: app.devices.denied_for(&p.path).is_some(),
         path: p.path.clone(),
         usage: None,
     };
     for p in app
+        .places
         .paths
         .places
         .iter()
@@ -218,7 +219,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         out.push(place(p, Section::Home));
     }
     // The files used lately, right under Home, when the system has a list of them.
-    if app.paths.recent_files {
+    if app.places.paths.recent_files {
         out.push(Item {
             section: Section::Home,
             origin: Origin::Recent,
@@ -229,6 +230,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         });
     }
     for p in app
+        .places
         .paths
         .places
         .iter()
@@ -238,6 +240,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
     }
     let trash = |out: &mut Vec<Item>| {
         for p in app
+            .places
             .paths
             .places
             .iter()
@@ -251,9 +254,10 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         return out;
     }
 
-    let state_bookmarks = &app.paths.bookmarks;
+    let state_bookmarks = &app.places.paths.bookmarks;
     let mut seen: Vec<&PathBuf> = Vec::new();
     for (path, removable) in app
+        .places
         .config_bookmarks()
         .iter()
         .map(|p| (p, false))
@@ -263,6 +267,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         // not listed a second time.
         if seen.contains(&path)
             || app
+                .places
                 .paths
                 .places
                 .iter()
@@ -272,11 +277,11 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         }
         seen.push(path);
         // A bookmark in both places can be removed from the state, but would stay.
-        let removable = removable && !app.config_bookmarks().contains(path);
+        let removable = removable && !app.places.config_bookmarks().contains(path);
         out.push(Item {
             section: Section::Pinned,
             origin: Origin::Bookmark { removable },
-            name: app.shown_name(path, base_name(path)),
+            name: app.places.shown_name(path, base_name(path)),
             locked: app.devices.denied_for(path).is_some(),
             path: path.clone(),
             usage: None,
@@ -289,7 +294,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         .iter()
         .filter(|v| v.kind != VolumeKind::Virtual)
     {
-        let name = app.shown_name(&v.mount_point, device_name(v));
+        let name = app.places.shown_name(&v.mount_point, device_name(v));
         let usage = match (v.total, v.available) {
             (Some(t), Some(a)) if t > 0 && v.responsive => Some(Usage {
                 used: (1.0 - a as f64 / t as f64).clamp(0.0, 1.0),
@@ -328,9 +333,9 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             locked: false,
         };
         for c in Hue::ALL {
-            out.push(tag(c.label(&app.tag_lang).to_string(), Some(c)));
+            out.push(tag(c.label(&app.places.tag_lang).to_string(), Some(c)));
         }
-        for t in &app.known_tags {
+        for t in &app.places.known_tags {
             out.push(tag(t.name.clone(), t.color));
         }
     }

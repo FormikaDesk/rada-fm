@@ -295,6 +295,7 @@ impl App {
         let mut rows = Vec::new();
         let home = self.home().to_path_buf();
         let home_name = self
+            .places
             .paths
             .places
             .iter()
@@ -491,7 +492,7 @@ impl App {
             kind: NavKind::Folder { open: None },
             depth: depth.min(crate::panels::NAV_INDENT_MAX),
             path: dir.to_path_buf(),
-            name: self.shown_name(dir, on_disk),
+            name: self.places.shown_name(dir, on_disk),
             count: here.then(|| self.listing.all().len()),
         }
     }
@@ -505,7 +506,7 @@ impl App {
                 kind: NavKind::Folder { open: None },
                 depth,
                 path: k.path.clone(),
-                name: self.shown_name(&k.path, k.name.clone()),
+                name: self.places.shown_name(&k.path, k.name.clone()),
                 count: Some(k.items),
             })
             .collect()
@@ -541,7 +542,7 @@ impl App {
                 kind: NavKind::Folder { open },
                 depth,
                 path: k.path.clone(),
-                name: self.shown_name(&k.path, k.name.clone()),
+                name: self.places.shown_name(&k.path, k.name.clone()),
                 count: Some(k.items),
             });
             if open == Some(true) {
@@ -718,7 +719,7 @@ impl App {
                     let path = match row.kind {
                         NavKind::Tags => {
                             let c = Hue::ALL[self.nav_tag.min(Hue::ALL.len() - 1)];
-                            rada_core::tagsearch::view_path(c.label(&self.tag_lang))
+                            rada_core::tagsearch::view_path(c.label(&self.places.tag_lang))
                         }
                         NavKind::Heading | NavKind::Gap | NavKind::More => return true,
                         _ => row.path,
@@ -738,7 +739,7 @@ impl App {
                 if let Some(row) = here
                     && matches!(row.kind, NavKind::Folder { .. } | NavKind::Favorite(_))
                 {
-                    let add = !self.paths.bookmarks.contains(&row.path);
+                    let add = !self.places.paths.bookmarks.contains(&row.path);
                     self.set_bookmark(row.path, add);
                 }
             }

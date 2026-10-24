@@ -28,7 +28,9 @@ fn the_favourites_are_only_the_folders_the_person_added() {
         .position(|r| r.path == added)
         .unwrap();
     h.press("B");
-    h.wait("the bookmark", |a| a.paths.bookmarks.contains(&added));
+    h.wait("the bookmark", |a| {
+        a.places.paths.bookmarks.contains(&added)
+    });
     let rows = h.app.nav_rows();
     let favs: Vec<_> = rows
         .iter()
@@ -95,8 +97,9 @@ fn nav_lists_the_places_on_top_as_the_classic_sidebar_does() {
 fn with_trash(h: &mut H) {
     let t = h.app.home().join(".trash");
     let kind = rada_core::platform::PlaceKind::Trash;
-    h.app.paths.places.retain(|p| p.kind != kind);
+    h.app.places.paths.places.retain(|p| p.kind != kind);
     h.app
+        .places
         .paths
         .places
         .push(rada_core::places::Place { kind, path: t });
@@ -179,7 +182,7 @@ fn in_the_trash_folder_only_the_trash_is_the_current_place() {
     // and no other place (Downloads, say) is.
     let mut h = demo_scene(120, 44);
     with_trash(&mut h);
-    let trash = h.app.paths.places.last().unwrap().path.clone();
+    let trash = h.app.places.paths.places.last().unwrap().path.clone();
     std::fs::create_dir_all(&trash).unwrap();
     go_and_wait(&mut h, &trash);
     // (The places are read again now and then: the demo's trash with them.)
@@ -198,7 +201,7 @@ fn in_the_trash_folder_only_the_trash_is_the_current_place() {
 
     let mut h = scene(160, 46, "rada", false);
     with_trash(&mut h);
-    let trash = h.app.paths.places.last().unwrap().path.clone();
+    let trash = h.app.places.paths.places.last().unwrap().path.clone();
     std::fs::create_dir_all(&trash).unwrap();
     go_and_wait(&mut h, &trash);
     with_trash(&mut h);

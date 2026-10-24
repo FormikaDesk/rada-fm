@@ -66,7 +66,7 @@ fn italian_with(w: u16, h: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'sta
     .unwrap();
     let mut h = H::with_config(sb, home.join("Scaricati"), w, h, tweak);
     h.wait("the places and bookmarks", |a| {
-        a.paths.places.len() >= 3 && a.paths.bookmarks.len() == 2
+        a.places.paths.places.len() >= 3 && a.places.paths.bookmarks.len() == 2
     });
     set_volumes(&mut h);
     h
@@ -307,7 +307,7 @@ fn the_menu_adds_and_removes_bookmarks() {
     h.key(KeyCode::Enter);
     h.wait("the bookmark arrives from the worker", {
         let docs = docs.clone();
-        move |a| a.paths.bookmarks.contains(&docs)
+        move |a| a.places.paths.bookmarks.contains(&docs)
     });
 
     // A bookmark: Open, Remove.
@@ -317,7 +317,7 @@ fn the_menu_adds_and_removes_bookmarks() {
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
     h.wait("it is gone again", move |a| {
-        !a.paths.bookmarks.contains(&docs)
+        !a.places.paths.bookmarks.contains(&docs)
     });
 }
 
@@ -342,7 +342,7 @@ fn bookmark_key_and_delete_in_sidebar() {
     h.press("B");
     h.wait("bookmarked", {
         let d = docs.clone();
-        move |a| a.paths.bookmarks.contains(&d)
+        move |a| a.places.paths.bookmarks.contains(&d)
     });
     // The folder is already listed as a place: bookmarking it does not list it a second
     // time, and Delete on the place (which is not a bookmark entry) takes nothing away.
@@ -350,12 +350,14 @@ fn bookmark_key_and_delete_in_sidebar() {
     assert_eq!(listed(&h), 1, "once, as the place");
     h.key(KeyCode::Delete);
     assert!(
-        h.app.paths.bookmarks.contains(&docs),
+        h.app.places.paths.bookmarks.contains(&docs),
         "a place is not a bookmark entry"
     );
     // The key again takes the bookmark off.
     h.press("B");
-    h.wait("removed", move |a| !a.paths.bookmarks.contains(&docs));
+    h.wait("removed", move |a| {
+        !a.places.paths.bookmarks.contains(&docs)
+    });
 }
 
 #[test]
@@ -369,8 +371,9 @@ fn a_bookmark_of_a_folder_the_pane_already_lists_is_not_listed_again() {
         .expect("Documenti is a standard place")
         .path;
     // Pinned by hand (the same folder, written with a trailing slash) and in the configuration.
-    h.app.paths.bookmarks.push(docs.join(""));
+    h.app.places.paths.bookmarks.push(docs.join(""));
     h.app
+        .places
         .paths
         .bookmarks
         .push(PathBuf::from(format!("{}/", docs.display())));

@@ -581,9 +581,8 @@ pub struct App {
 
     /// Disks, sticks and phones, and the folders the system holds back.
     pub devices: mount::Devices,
-    /// Recent folders, state bookmarks and standard places (from the places worker).
-    pub paths: rada_core::places::PathLists,
-    cfg_bookmarks: Vec<PathBuf>,
+    /// The places the sidebar lists, and the tags it knows.
+    pub places: side::Places,
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
     pub running: Option<Running>,
@@ -624,11 +623,6 @@ pub struct App {
     last_click: Option<(Instant, usize)>,
     /// How soon a second click on the same row makes a double click.
     pub double_click: Duration,
-    /// The language the names of the seven tag colours are written in (the system's).
-    pub tag_lang: String,
-    /// Tags of the user's own seen on the items of the folders shown so far (the sidebar's TAGS
-    /// section lists them after the seven colours), by name.
-    pub known_tags: Vec<rada_core::platform::Tag>,
     pub help_scroll: usize,
 
     // ---- the explorer interface
@@ -779,8 +773,7 @@ impl App {
             preview_gen: 0,
             previewed: None,
             devices: Default::default(),
-            paths: Default::default(),
-            cfg_bookmarks: cfg.bookmarks,
+            places: side::Places::new(cfg.bookmarks, svc_tag_language(&svc)),
             clipboard: None,
             modal: None,
             running: None,
@@ -812,8 +805,6 @@ impl App {
             sel_anchor: None,
             last_click: None,
             double_click: Duration::from_millis(400),
-            tag_lang: svc_tag_language(&svc),
-            known_tags: Vec::new(),
             help_scroll: 0,
             view,
             layout: cfg.layout,
@@ -888,15 +879,6 @@ impl App {
         }
         app.maybe_offer_font(cfg.font_offer);
         app
-    }
-
-    /// The name to show for a folder or drive: the one the system's file manager shows, else
-    /// `on_disk`.
-    pub fn shown_name(&self, path: &Path, on_disk: String) -> String {
-        self.paths
-            .shown_name(path)
-            .map(str::to_string)
-            .unwrap_or(on_disk)
     }
 
     /// "Now" for relative dates.
@@ -1261,23 +1243,6 @@ impl App {
             && self.listing.all().iter().any(|e| !e.tags.is_empty())
     }
 
-    /// Remember the tags of the user's own that these items carry, for the sidebar.
-    fn note_tags<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
-        use rada_core::platform::TagColor as Hue;
-        let before = self.known_tags.len();
-        for t in entries.into_iter().flat_map(|e| e.tags.iter()) {
-            if Hue::from_name(&t.name).is_none()
-                && !self.known_tags.iter().any(|k| k.is_called(&t.name))
-                && self.known_tags.len() < 60
-            {
-                self.known_tags.push(t.clone());
-            }
-        }
-        if self.known_tags.len() != before {
-            self.known_tags.sort_by_key(|t| t.name.to_lowercase());
-        }
-    }
-
     /// Say why nothing can be made here when the list is a tag's items, not a folder.
     pub(super) fn refuse_in_tag_view(&mut self, what: &str) -> bool {
         if self.recents_view() {
@@ -1491,7 +1456,7 @@ impl App {
             }
             CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
             CoreEvent::Paths(p) => {
-                self.paths = p;
+                self.places.paths = p;
                 self.refresh_palette();
             }
             CoreEvent::Job(j) => self.on_job(j),
@@ -1548,7 +1513,7 @@ impl App {
                 match result {
                     Ok(entries) => {
                         self.devices.allow(&path);
-                        self.note_tags(&entries);
+                        self.places.note_tags(&entries);
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
                             // Before the first listing there is no cursor yet: use the
@@ -1620,10 +1585,11 @@ impl App {
                     return;
                 }
                 let keep = self.cursor_name();
-                self.note_tags(updates.iter().filter_map(|u| match u {
-                    rada_core::model::EntryUpdate::Upsert(e) => Some(e),
-                    _ => None,
-                }));
+                self.places
+                    .note_tags(updates.iter().filter_map(|u| match u {
+                        rada_core::model::EntryUpdate::Upsert(e) => Some(e),
+                        _ => None,
+                    }));
                 self.listing.apply(updates);
                 self.sync_folder_sizes();
                 let existing: BTreeSet<OsString> =
@@ -2492,19 +2458,13 @@ impl App {
                 kind,
             });
         };
-        let bookmarks: Vec<PathBuf> = self
-            .cfg_bookmarks
-            .iter()
-            .chain(self.paths.bookmarks.iter())
-            .cloned()
-            .collect();
-        for p in &bookmarks {
+        for p in &self.places.bookmarks() {
             add(&mut items, p, PaletteKind::Bookmark, None, None);
         }
-        for p in self.paths.recents.iter().filter(|p| **p != cwd) {
+        for p in self.places.paths.recents.iter().filter(|p| **p != cwd) {
             add(&mut items, p, PaletteKind::Recent, None, None);
         }
-        for place in &self.paths.places {
+        for place in &self.places.paths.places {
             add(&mut items, &place.path, PaletteKind::Place, None, None);
         }
         add(
@@ -2677,6 +2637,7 @@ impl App {
                 let items = fmt::count(3, Key::ItemOne, Key::ItemMany);
                 self.undo_label = Some(tf(Key::DoneCopy, &[&items]));
                 let folder = self
+                    .places
                     .paths
                     .places
                     .iter()
@@ -2723,6 +2684,7 @@ impl App {
             "toasts" | "toasts-error" => {
                 let long = Duration::from_secs(60);
                 let trash = self
+                    .places
                     .paths
                     .places
                     .iter()
@@ -2794,14 +2756,14 @@ impl App {
             return;
         }
         let cwd = self.cwd.clone();
-        let add = !self.paths.bookmarks.contains(&cwd);
+        let add = !self.places.paths.bookmarks.contains(&cwd);
         self.set_bookmark(cwd, add);
     }
 
     /// Add a folder to the bookmarks, or take it out (nothing happens when it already is
     /// as asked).
     pub(super) fn set_bookmark(&mut self, path: PathBuf, add: bool) {
-        if self.paths.bookmarks.contains(&path) == add {
+        if self.places.paths.bookmarks.contains(&path) == add {
             return;
         }
         self.svc.places.toggle_bookmark(path);

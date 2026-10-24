@@ -160,7 +160,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                         format!("{} ", icons::mark(app.icons, dot)),
                         Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
                     ));
-                    let path = rada_core::tagsearch::view_path(hue.label(&app.tag_lang));
+                    let path = rada_core::tagsearch::view_path(hue.label(&app.places.tag_lang));
                     app.hits.add(
                         Rect {
                             x,
@@ -214,6 +214,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             }
             _ => {
                 let kind = app
+                    .places
                     .paths
                     .places
                     .iter()

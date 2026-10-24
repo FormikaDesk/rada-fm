@@ -198,7 +198,7 @@ impl App {
         // What the Finder calls the folder ("Scrivania"), when that is not its name. (On
         // Windows the tab keeps the name on disk for now: see the notes of 0.6.0-rc.8.)
         if self.svc.platform.name().starts_with("macos") {
-            self.shown_name(p, on_disk)
+            self.places.shown_name(p, on_disk)
         } else {
             on_disk
         }

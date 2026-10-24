@@ -50,7 +50,7 @@ fn recents_newest_first_read_only() {
         sb,
         dir,
     );
-    h.wait("the entry", |a| a.paths.recent_files);
+    h.wait("the entry", |a| a.places.paths.recent_files);
     let s = h.screen();
     assert!(s.contains("Recent"), "the sidebar has the entry: {s}");
     go_recent(&mut h);
@@ -88,7 +88,7 @@ fn without_a_source_there_is_no_entry_and_no_error() {
     let dir = sb.path("d");
     let (mut h, _) = mac_with(MacLikeSpec::default(), sb, dir);
     h.pump(200);
-    assert!(!h.app.paths.recent_files);
+    assert!(!h.app.places.paths.recent_files);
     assert!(!h.screen().contains("Recent"));
 }
 
@@ -117,7 +117,7 @@ fn the_linux_list_is_the_recently_used_file_of_the_data_folder() {
     )
     .unwrap();
     let mut h = H::new(sb, dir, 150, 34);
-    h.wait("the entry", |a| a.paths.recent_files);
+    h.wait("the entry", |a| a.places.paths.recent_files);
     go_recent(&mut h);
     assert_eq!(h.names(), ["b.txt", "a.txt"]);
 }
@@ -130,6 +130,6 @@ fn a_missing_recently_used_file_leaves_the_sidebar_as_it_was() {
     let dir = sb.path("d");
     let mut h = H::new(sb, dir, 150, 34);
     h.pump(200);
-    assert!(!h.app.paths.recent_files);
+    assert!(!h.app.places.paths.recent_files);
     assert!(!h.screen().contains("Recent"));
 }

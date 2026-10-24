@@ -228,8 +228,7 @@ impl App {
             if let Some(e) = cur
                 && e.is_navigable_dir()
             {
-                let pinned =
-                    self.paths.bookmarks.contains(&e.path) || self.cfg_bookmarks.contains(&e.path);
+                let pinned = self.places.is_bookmarked(&e.path);
                 items.push(MenuItem::bookmark(e.path.clone(), !pinned, gap));
                 gap = false;
             }
@@ -339,7 +338,7 @@ impl App {
         // The colours are called what the system calls them (a Mac in Italian says "Blu"): a
         // tag of another name has no colour for the Finder. A tag with the colour counts
         // whatever its name.
-        let lang = self.tag_lang.as_str();
+        let lang = self.places.tag_lang.as_str();
         let has_colour = |c: Hue| {
             !targets.is_empty()
                 && targets.iter().all(|e| {

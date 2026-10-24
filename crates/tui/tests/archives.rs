@@ -69,12 +69,13 @@ fn enter_opens_an_archive_as_a_folder_and_the_breadcrumb_says_so() {
     // The archive's folders were never recorded as places to come back to.
     assert!(
         h.app
+            .places
             .paths
             .recents
             .iter()
             .all(|p| !p.to_string_lossy().contains("photos.zip")),
         "{:?}",
-        h.app.paths.recents
+        h.app.places.paths.recents
     );
 }
 

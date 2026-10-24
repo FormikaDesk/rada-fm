@@ -74,7 +74,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
                 label = std::path::MAIN_SEPARATOR_STR.to_string();
             }
             let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
-            ((app.shown_name(&root, label), root), rest)
+            ((app.places.shown_name(&root, label), root), rest)
         }
     }};
     let mut out = vec![first];
@@ -82,7 +82,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
     for c in rest.components() {
         if let Component::Normal(n) = c {
             acc.push(n);
-            out.push((app.shown_name(&acc, display::name(n)), acc.clone()));
+            out.push((app.places.shown_name(&acc, display::name(n)), acc.clone()));
         }
     }
     out

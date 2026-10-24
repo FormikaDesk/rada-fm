@@ -71,7 +71,10 @@ fn the_folders_of_a_mac_are_named_in_the_language_of_the_interface() {
     let desktop_projects = home.join("Desktop/progetti");
     let mut h = start(sb, &desktop_projects, &tables);
     h.wait("the names", |a| {
-        a.paths.shown_name(&a.home().join("Desktop")).is_some()
+        a.places
+            .paths
+            .shown_name(&a.home().join("Desktop"))
+            .is_some()
     });
     let s = h.screen();
     // The sidebar, with the nine names of the Finder that exist here.
@@ -134,7 +137,7 @@ fn the_folders_of_a_mac_are_named_in_the_language_of_the_interface() {
     std::fs::create_dir_all(&tables).unwrap();
     let home = sb.dirs.home.clone();
     let mut h = start(sb, &home, &tables);
-    h.wait("the places", |a| a.paths.places.len() > 3);
+    h.wait("the places", |a| a.places.paths.places.len() > 3);
     let names = h.names();
     assert!(names.contains(&"Desktop".to_string()), "{names:?}");
     assert!(!names.contains(&"Scrivania".to_string()), "{names:?}");

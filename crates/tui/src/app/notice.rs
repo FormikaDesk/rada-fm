@@ -609,6 +609,7 @@ impl App {
             }
             OpKind::Trash => Outcome {
                 folder: self
+                    .places
                     .paths
                     .places
                     .iter()
@@ -638,7 +639,7 @@ impl App {
             .file_name()
             .map(rada_core::display::name)
             .unwrap_or_else(|| rada_core::display::path(p));
-        self.shown_name(p, on_disk)
+        self.places.shown_name(p, on_disk)
     }
 
     /// The card for an operation that went through cleanly: what was done, to how many items

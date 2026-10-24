@@ -8,6 +8,8 @@ use crate::sidebar::{self, Item, Mode, Origin};
 use crossterm::event::{KeyCode, KeyEvent};
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
+use rada_core::model::Entry;
+use rada_core::platform::Tag;
 use std::path::{Path, PathBuf};
 
 /// Actions that mean the same wherever the keyboard focus is; everything else is about
@@ -24,6 +26,74 @@ pub(super) const PASS_THROUGH: &[Action] = &[
     Action::Sort,
     Action::SortReverse,
 ];
+
+/// The places the sidebar lists, and the tags it knows.
+pub struct Places {
+    /// Recent folders, state bookmarks and standard places (from the places worker).
+    pub paths: rada_core::places::PathLists,
+    cfg_bookmarks: Vec<PathBuf>,
+    /// The language the names of the seven tag colours are written in (the system's).
+    pub tag_lang: String,
+    /// Tags of the user's own seen on the items of the folders shown so far (the sidebar's TAGS
+    /// section lists them after the seven colours), by name.
+    pub known_tags: Vec<Tag>,
+}
+
+impl Places {
+    pub fn new(cfg_bookmarks: Vec<PathBuf>, tag_lang: String) -> Places {
+        Places {
+            paths: Default::default(),
+            cfg_bookmarks,
+            tag_lang,
+            known_tags: Vec::new(),
+        }
+    }
+
+    /// The bookmarks of `config.toml`.
+    pub fn config_bookmarks(&self) -> &[PathBuf] {
+        &self.cfg_bookmarks
+    }
+
+    /// Every bookmark: those of `config.toml` first, then the ones made inside the program.
+    pub fn bookmarks(&self) -> Vec<PathBuf> {
+        self.cfg_bookmarks
+            .iter()
+            .chain(self.paths.bookmarks.iter())
+            .cloned()
+            .collect()
+    }
+
+    pub fn is_bookmarked(&self, path: &Path) -> bool {
+        self.paths.bookmarks.iter().any(|b| b == path)
+            || self.cfg_bookmarks.iter().any(|b| b == path)
+    }
+
+    /// The name to show for a folder or drive: the one the system's file manager shows, else
+    /// `on_disk`.
+    pub fn shown_name(&self, path: &Path, on_disk: String) -> String {
+        self.paths
+            .shown_name(path)
+            .map(str::to_string)
+            .unwrap_or(on_disk)
+    }
+
+    /// Remember the tags of the user's own that these items carry, for the sidebar.
+    pub(super) fn note_tags<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
+        use rada_core::platform::TagColor as Hue;
+        let before = self.known_tags.len();
+        for t in entries.into_iter().flat_map(|e| e.tags.iter()) {
+            if Hue::from_name(&t.name).is_none()
+                && !self.known_tags.iter().any(|k| k.is_called(&t.name))
+                && self.known_tags.len() < 60
+            {
+                self.known_tags.push(t.clone());
+            }
+        }
+        if self.known_tags.len() != before {
+            self.known_tags.sort_by_key(|t| t.name.to_lowercase());
+        }
+    }
+}
 
 impl App {
     /// A folder could not be opened because the system is waiting for the person to allow it:
@@ -62,10 +132,6 @@ impl App {
             return;
         }
         self.modal = Some(Modal::Access(d));
-    }
-
-    pub fn config_bookmarks(&self) -> &[PathBuf] {
-        &self.cfg_bookmarks
     }
 
     /// The items the sidebar shows right now.
@@ -160,7 +226,7 @@ impl App {
                 if let Some(item) = items.get(self.side_cursor)
                     && !matches!(item.origin, Origin::Unmounted(_))
                 {
-                    let add = !self.paths.bookmarks.contains(&item.path);
+                    let add = !self.places.paths.bookmarks.contains(&item.path);
                     self.set_bookmark(item.path.clone(), add);
                 }
             }
@@ -212,8 +278,8 @@ impl App {
             ));
             return MenuView::new(at, items);
         }
-        let is_state = self.paths.bookmarks.iter().any(|b| b == path);
-        let is_config = self.cfg_bookmarks.iter().any(|b| b == path);
+        let is_state = self.places.paths.bookmarks.iter().any(|b| b == path);
+        let is_config = self.places.config_bookmarks().iter().any(|b| b == path);
         if is_state {
             items.push(MenuItem::bookmark(path.to_path_buf(), false, true));
         } else if !is_config {

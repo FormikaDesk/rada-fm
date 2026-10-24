@@ -519,7 +519,7 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     put("setup.sh", 21, 12 * day);
     put("song.mp3", 7_800_000, 72 * day);
     let mut h = H::new(sb, dir, w, h);
-    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     h.app.hooks.clock = Some(demo_now());
     h.app.details = None;
     h.app.tz = jiff::tz::TimeZone::UTC;

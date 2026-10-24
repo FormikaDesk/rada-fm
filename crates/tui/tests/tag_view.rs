@@ -63,7 +63,7 @@ fn scene() -> Option<(Sandbox, PathBuf)> {
 
 /// Open the list of a tag the way the sidebar does: a click on its row when it has one.
 fn open_tag(h: &mut H, name: &str) {
-    h.app.tag_lang = "it".into();
+    h.app.places.tag_lang = "it".into();
     if h.app.side_items().iter().any(|i| i.path == view_path(name)) {
         h.click(&Target::Place(view_path(name)));
     } else {
@@ -86,7 +86,7 @@ fn row_with<'a>(screen: &'a str, what: &str) -> &'a str {
 fn sidebar_lists_seven_colours_then_tags() {
     let Some((sb, home)) = scene() else { return };
     let mut h = H::new(sb, home.clone(), 150, 40);
-    h.app.tag_lang = "it".into();
+    h.app.places.tag_lang = "it".into();
     // The folder with a tag of the user's own is opened: it joins the list.
     h.app.open_dir(home.join("Work"));
     h.wait("Work", |a| a.cwd.ends_with("Work") && !a.is_loading());
@@ -211,5 +211,12 @@ fn a_list_of_tagged_items_is_not_remembered_as_a_place() {
         home,
         "the home folder, not tag:Rosso"
     );
-    assert!(!h.app.paths.recents.iter().any(|p| p.starts_with("tag:")));
+    assert!(
+        !h.app
+            .places
+            .paths
+            .recents
+            .iter()
+            .any(|p| p.starts_with("tag:"))
+    );
 }

@@ -611,7 +611,7 @@ fn places_are_offered_too_and_a_click_goes_there() {
     let (sb, dir) = files();
     let target = sb.path("w/dir");
     let mut h = H::new(sb, dir, 120, 30);
-    h.app.paths.bookmarks.push(target.clone());
+    h.app.places.paths.bookmarks.push(target.clone());
     h.press("ctrl+p");
     h.keys("dir");
     let s = h.screen();

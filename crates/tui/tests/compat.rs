@@ -132,7 +132,7 @@ fn plain_scene(w: u16, h: u16) -> H {
         cfg.theme = Theme::named("rada", ColorDepth::Ansi16).unwrap();
         cfg.mouse = false;
     });
-    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     h
 }
 
@@ -222,7 +222,7 @@ fn panels_std_scene(w: u16, hh: u16) -> H {
         cfg.layout_pref = rada_tui::LayoutPref::Panels;
         cfg.nav_mode = rada_tui::panels::NavMode::Tree;
     });
-    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
     h.app.notify(
         rada_tui::app::Notice::new(rada_tui::app::NoticeKind::Ok, "1 item copied")

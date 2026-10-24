@@ -157,7 +157,10 @@ fn the_sidebar_and_the_breadcrumbs_use_the_names_the_finder_shows() {
     let start = desktop.join("progetti");
     let mut h = H::with_system(sb, start, 150, 30, sys, |_| {});
     h.wait("the names", |a| {
-        a.paths.shown_name(&a.home().join("Desktop")).is_some()
+        a.places
+            .paths
+            .shown_name(&a.home().join("Desktop"))
+            .is_some()
     });
     let s = h.screen();
     assert!(s.contains("Scrivania"), "the sidebar: {s}");
@@ -206,7 +209,11 @@ fn icloud_drive_is_in_the_sidebar_when_it_is_there() {
     );
     let mut h = H::with_system(sb, dir, 150, 30, sys, |_| {});
     h.wait("places", |a| {
-        a.paths.places.iter().any(|p| p.kind == PlaceKind::ICloud)
+        a.places
+            .paths
+            .places
+            .iter()
+            .any(|p| p.kind == PlaceKind::ICloud)
     });
     assert!(h.screen().contains("iCloud Drive"));
     h.click(&Target::Place(cloud.clone()));

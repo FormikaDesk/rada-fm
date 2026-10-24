@@ -36,7 +36,7 @@ fn chooser(w: u16, h: u16, pref: LayoutPref) -> H {
         c.layout_pref = pref;
         c.theme = Theme::rada();
     });
-    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(fixed_now());
     h.app.tz = jiff::tz::TimeZone::UTC;

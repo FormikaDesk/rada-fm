@@ -38,7 +38,7 @@ impl App {
             return;
         };
         let name = crate::sidebar::device_name(&volume);
-        let name = self.shown_name(&volume.mount_point, name);
+        let name = self.places.shown_name(&volume.mount_point, name);
         self.modal = Some(Modal::Eject(EjectView {
             name,
             volume,

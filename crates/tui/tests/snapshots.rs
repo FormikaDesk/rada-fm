@@ -71,7 +71,7 @@ fn scene(w: u16, h: u16) -> H {
     let mut h = H::new(sb, dir, w, h);
     // The sidebar's places arrive from a worker: wait for them so that every screen is the
     // same screen, run after run.
-    h.wait("the places", |a| !a.paths.places.is_empty());
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     // ... and the volumes: a late answer would put the real ones back after they are cleared.
     h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(fixed_now());

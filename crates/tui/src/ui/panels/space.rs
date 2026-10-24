@@ -247,7 +247,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let w = area.width as usize;
     let compact = area.height < rows_needed(others.len(), false, false);
     let mut lines: Vec<Line> = Vec::new();
-    let name_of = |v: &Volume| app.shown_name(&v.mount_point, crate::sidebar::device_name(v));
+    let name_of = |v: &Volume| {
+        app.places
+            .shown_name(&v.mount_point, crate::sidebar::device_name(v))
+    };
     let ring_name = name_of(&main);
     let other_names: Vec<String> = others.iter().map(name_of).collect();
 
