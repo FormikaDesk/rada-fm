@@ -334,6 +334,7 @@ pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     let band = th.band();
     let mut b = Bar::default();
     let Some(v) = app
+        .devices
         .volumes
         .iter()
         .filter(|v| app.cwd.starts_with(&v.mount_point))

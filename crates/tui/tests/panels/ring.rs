@@ -74,7 +74,7 @@ fn the_ring_is_made_again_only_when_the_percentage_changes() {
     let total = 512_000_000_000u64;
     // The first volume of the demo is the main disk (its mount point is the root of the
     // system, which is not `/` everywhere).
-    h.app.volumes[0].available = Some(total / 10);
+    h.app.devices.volumes[0].available = Some(total / 10);
     let _ = h.screen();
     assert_eq!(h.app.ring.as_ref().unwrap().made, 2);
 }

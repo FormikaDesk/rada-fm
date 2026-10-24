@@ -74,7 +74,7 @@ fn italian_with(w: u16, h: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'sta
 
 /// Two disks, as if the system had reported them (the real list depends on the machine).
 fn set_volumes(h: &mut H) {
-    h.app.volumes = vec![
+    h.app.devices.volumes = vec![
         volume("/", "System", VolumeKind::Fixed, 500, 200),
         volume(
             "/run/media/user/USB",

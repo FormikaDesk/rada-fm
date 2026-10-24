@@ -110,7 +110,7 @@ fn in_a_place_there_is_no_way_and_the_place_is_the_highlighted_row() {
     for place in [
         home.clone(),
         home.join("Documents"),
-        h.app.volumes[0].mount_point.clone(),
+        h.app.devices.volumes[0].mount_point.clone(),
     ] {
         go_and_wait(&mut h, &place);
         h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());

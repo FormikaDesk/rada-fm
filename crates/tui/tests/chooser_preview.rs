@@ -37,10 +37,10 @@ fn chooser(w: u16, h: u16, pref: LayoutPref) -> H {
         c.theme = Theme::rada();
     });
     h.wait("the places", |a| !a.paths.places.is_empty());
-    h.wait("the volumes", |a| a.volumes_seen);
+    h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(fixed_now());
     h.app.tz = jiff::tz::TimeZone::UTC;
-    h.app.volumes.clear();
+    h.app.devices.volumes.clear();
     while h.cursor_name() != "README.md" {
         h.keys("j");
     }

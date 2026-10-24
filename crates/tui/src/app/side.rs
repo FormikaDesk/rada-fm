@@ -29,8 +29,7 @@ impl App {
     /// A folder could not be opened because the system is waiting for the person to allow it:
     /// say so with the way to do it, and remember it for the sidebar.
     pub(super) fn on_access_denied(&mut self, d: rada_core::platform::AccessDenied) {
-        self.denied.retain(|x| x.folder != d.folder);
-        self.denied.push(d.clone());
+        self.devices.deny(d.clone());
         if self.modal.is_none() {
             self.modal = Some(Modal::Access(d));
         } else {
@@ -88,7 +87,7 @@ impl App {
             items.iter().find(|i| &i.path == h)
         }?;
         if item.locked
-            && let Some(d) = self.denied_for(&item.path)
+            && let Some(d) = self.devices.denied_for(&item.path)
         {
             return Some(d.message());
         }
@@ -203,7 +202,7 @@ impl App {
             // A tag is not a folder: nothing to pin or eject.
             return MenuView::new(at, items);
         }
-        if let Some(id) = self.unmounted_id(path) {
+        if let Some(id) = self.devices.unmounted_id(path) {
             // Plugged in and not mounted: there is no folder to pin, and "Open" is "Mount".
             items.clear();
             items.push(MenuItem::command(

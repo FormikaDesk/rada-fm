@@ -24,7 +24,8 @@ pub struct EjectView {
 impl App {
     /// The disk mounted at `mount`, if the system can eject it.
     pub fn ejectable(&self, mount: &Path) -> Option<&Volume> {
-        self.volumes
+        self.devices
+            .volumes
             .iter()
             .find(|v| v.mount_point == mount)
             .filter(|v| self.svc.platform.volumes().can_eject(v))
@@ -94,7 +95,9 @@ impl App {
                     && v.volume.mount_point == mount
                 {
                     v.stage = EjectStage::Failed(why);
-                } else if let Some(volume) = self.volumes.iter().find(|v| v.mount_point == mount) {
+                } else if let Some(volume) =
+                    self.devices.volumes.iter().find(|v| v.mount_point == mount)
+                {
                     self.modal = Some(Modal::Eject(EjectView {
                         name,
                         volume: volume.clone(),

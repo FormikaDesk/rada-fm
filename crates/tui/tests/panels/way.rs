@@ -289,11 +289,12 @@ fn the_places_stay_in_sight_and_the_way_gives_up_rows() {
 fn add_disk(h: &mut H) {
     let n = 1 + h
         .app
+        .devices
         .volumes
         .iter()
         .filter(|v| v.mount_point.starts_with("/mnt/extra"))
         .count();
-    h.app.volumes.push(rada_core::platform::Volume {
+    h.app.devices.volumes.push(rada_core::platform::Volume {
         mount_point: format!("/mnt/extra{n}").into(),
         label: Some(format!("Extra {n}")),
         fs_type: "ext4".into(),

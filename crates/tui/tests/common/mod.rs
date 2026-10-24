@@ -534,7 +534,7 @@ pub fn demo_scene(w: u16, h: u16) -> H {
             })
             .collect(),
     );
-    h.app.volumes = {
+    h.app.devices.volumes = {
         use rada_core::platform::{Volume, VolumeKind};
         let gb = 1_000_000_000u64;
         let system_root = h

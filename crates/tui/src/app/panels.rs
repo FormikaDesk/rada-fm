@@ -516,7 +516,8 @@ impl App {
         if self.cwd.starts_with(self.home()) {
             return self.home().to_path_buf();
         }
-        self.volumes
+        self.devices
+            .volumes
             .iter()
             .map(|v| &v.mount_point)
             .filter(|m| self.cwd.starts_with(m))

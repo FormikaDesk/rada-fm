@@ -28,6 +28,7 @@ const MIN_BAR_TWO: usize = 4;
 /// system, or the first fixed disk) and the others, in the order the list gave them.
 pub fn volumes(app: &App) -> Option<(&Volume, Vec<&Volume>)> {
     let all: Vec<&Volume> = app
+        .devices
         .volumes
         .iter()
         .filter(|v| v.kind != VolumeKind::Virtual && v.total.is_some_and(|t| t > 0))

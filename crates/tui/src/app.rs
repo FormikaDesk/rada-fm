@@ -579,14 +579,8 @@ pub struct App {
     preview_gen: u64,
     previewed: Option<PathBuf>,
 
-    pub volumes: Vec<Volume>,
-    /// Sticks and phones that are plugged in and not mounted: the sidebar offers to mount them.
-    pub unmounted: Vec<rada_core::platform::Unmounted>,
-    /// What is being mounted right now (by id), so that a second Enter does not start it again.
-    mounting: std::collections::HashSet<String>,
-    /// The list of volumes has arrived from the worker at least once (tests wait for it so
-    /// that a late answer does not replace the list they set).
-    pub volumes_seen: bool,
+    /// Disks, sticks and phones, and the folders the system holds back.
+    pub devices: mount::Devices,
     /// Recent folders, state bookmarks and standard places (from the places worker).
     pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
@@ -697,9 +691,6 @@ pub struct App {
     saved_ui: rada_core::uistate::UiState,
     /// Layout the last frame used, for the keyboard and the tests.
     pub screen: (u16, u16),
-    /// Folders the system is waiting for the person to allow (macOS), as learnt from the folders
-    /// that could not be opened.
-    pub denied: Vec<rada_core::platform::AccessDenied>,
     /// The advice to enlarge a small window was closed (for the rest of this session).
     pub size_notice_dismissed: bool,
     /// The last frame showed it.
@@ -787,10 +778,7 @@ impl App {
             },
             preview_gen: 0,
             previewed: None,
-            volumes: Vec::new(),
-            unmounted: Vec::new(),
-            mounting: Default::default(),
-            volumes_seen: false,
+            devices: Default::default(),
             paths: Default::default(),
             cfg_bookmarks: cfg.bookmarks,
             clipboard: None,
@@ -859,7 +847,6 @@ impl App {
             details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
-            denied: Vec::new(),
             size_notice_dismissed: false,
             size_notice_visible: false,
             updates: Updates {
@@ -910,11 +897,6 @@ impl App {
             .shown_name(path)
             .map(str::to_string)
             .unwrap_or(on_disk)
-    }
-
-    /// The refusal that covers `path`, if the system is holding it back.
-    pub fn denied_for(&self, path: &Path) -> Option<&rada_core::platform::AccessDenied> {
-        self.denied.iter().find(|d| path.starts_with(&d.folder))
     }
 
     /// "Now" for relative dates.
@@ -1228,7 +1210,7 @@ impl App {
 
     pub fn open_dir(&mut self, path: PathBuf) {
         // A device that is plugged in and not mounted is not a folder yet: opening it mounts it.
-        if let Some(id) = self.unmounted_id(&path) {
+        if let Some(id) = self.devices.unmounted_id(&path) {
             self.start_mount(&id);
             return;
         }
@@ -1489,19 +1471,19 @@ impl App {
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),
             CoreEvent::Volumes(v) => {
-                self.volumes_seen = true;
-                self.volumes = if self.hooks.demo_volumes {
+                self.devices.volumes_seen = true;
+                self.devices.volumes = if self.hooks.demo_volumes {
                     demo_volumes()
                 } else {
                     v
                 };
                 self.folder_info
                     .sizes
-                    .set_volumes(&self.volumes, self.svc.platform.device_root());
+                    .set_volumes(&self.devices.volumes, self.svc.platform.device_root());
                 self.refresh_palette();
             }
             CoreEvent::Unmounted(list) => {
-                self.unmounted = if self.hooks.demo_volumes {
+                self.devices.unmounted = if self.hooks.demo_volumes {
                     Vec::new()
                 } else {
                     list
@@ -1565,9 +1547,7 @@ impl App {
                 }
                 match result {
                     Ok(entries) => {
-                        // It opened: whatever the system was holding back for this place, it
-                        // is not any more.
-                        self.denied.retain(|d| !path.starts_with(&d.folder));
+                        self.devices.allow(&path);
                         self.note_tags(&entries);
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
@@ -2478,8 +2458,12 @@ impl App {
         let home = self.svc.home.clone();
         let cwd = self.cwd.clone();
         // A mount point is listed once, as a disk (so "/" is not both "System" and a disk).
-        let mounts: std::collections::HashSet<PathBuf> =
-            self.volumes.iter().map(|v| v.mount_point.clone()).collect();
+        let mounts: std::collections::HashSet<PathBuf> = self
+            .devices
+            .volumes
+            .iter()
+            .map(|v| v.mount_point.clone())
+            .collect();
         let mut add = |items: &mut Vec<PaletteItem>,
                        path: &Path,
                        kind: PaletteKind,
@@ -2530,7 +2514,7 @@ impl App {
             Some(Key::DiskSystem.tr().into()),
             Some(std::path::MAIN_SEPARATOR_STR.into()),
         );
-        for v in &self.volumes {
+        for v in &self.devices.volumes {
             let label = v.label.clone().unwrap_or_else(|| {
                 if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
                     Key::DiskSystem.tr().to_string()

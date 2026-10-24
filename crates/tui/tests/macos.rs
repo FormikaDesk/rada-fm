@@ -287,7 +287,7 @@ fn disallowed_folder_explains_how_to_allow() {
     fs.clear();
     h.app.open_dir(docs.clone());
     h.wait("opened", |a| a.cwd == docs && !a.is_loading());
-    assert!(h.app.denied.is_empty());
+    assert!(h.app.devices.denied.is_empty());
 }
 
 #[test]
@@ -325,7 +325,7 @@ fn with_usb(error: Option<&str>) -> (H, Arc<MacLike>, Volume) {
         },
     );
     let mut h = H::with_system(sb, dir, 150, 30, sys, |_| {});
-    h.wait("the disks", |a| !a.volumes.is_empty());
+    h.wait("the disks", |a| !a.devices.volumes.is_empty());
     (h, p, v)
 }
 
@@ -412,8 +412,8 @@ fn a_disk_that_cannot_be_ejected_has_no_eject_entry() {
     let dir = sb.path("d");
     let (_, sys) = mac(&sb, MacLikeSpec::default());
     let mut h = H::with_system(sb, dir, 150, 30, sys, |_| {});
-    h.wait("disks", |a| !a.volumes.is_empty());
-    let first = h.app.volumes[0].mount_point.clone();
+    h.wait("disks", |a| !a.devices.volumes.is_empty());
+    let first = h.app.devices.volumes[0].mount_point.clone();
     h.right_click(&Target::Place(first));
     assert!(!h.screen().contains("Eject"));
 }

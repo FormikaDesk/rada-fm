@@ -73,11 +73,11 @@ fn scene(w: u16, h: u16) -> H {
     // same screen, run after run.
     h.wait("the places", |a| !a.paths.places.is_empty());
     // ... and the volumes: a late answer would put the real ones back after they are cleared.
-    h.wait("the volumes", |a| a.volumes_seen);
+    h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(fixed_now());
     h.app.tz = jiff::tz::TimeZone::UTC;
     h.app.details = Some(false);
-    h.app.volumes.clear();
+    h.app.devices.volumes.clear();
     h
 }
 

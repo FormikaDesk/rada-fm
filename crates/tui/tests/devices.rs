@@ -73,7 +73,7 @@ fn scene(mount_error: Option<String>) -> Scene {
     ));
     let mut h = H::with_system(sb, start, 150, 34, (Arc::new(LocalFs), platform), |_| {});
     h.wait("the devices", |a| {
-        !a.volumes.is_empty() && !a.unmounted.is_empty()
+        !a.devices.volumes.is_empty() && !a.devices.unmounted.is_empty()
     });
     Scene { h, log, phone }
 }
@@ -142,11 +142,15 @@ fn click_mounts_an_unmounted_device() {
     let mut s = scene(None);
     s.h.click(&Target::Place(PathBuf::from("gphoto2://Canon/")));
     s.h.wait("the camera is open", |a| {
-        a.volumes.iter().any(|v| v.device == "gphoto2://Canon/")
+        a.devices
+            .volumes
+            .iter()
+            .any(|v| v.device == "gphoto2://Canon/")
     });
     assert_eq!(calls(&s.log), ["mount gphoto2://Canon/"]);
     s.h.wait("the entry is no longer 'not mounted'", |a| {
-        a.pending_devices()
+        a.devices
+            .pending()
             .iter()
             .all(|u| u.id != "gphoto2://Canon/")
     });
@@ -183,7 +187,7 @@ fn enter_in_the_sidebar_and_the_menu_mount_a_stick_too() {
     assert!(!screen.contains("Pin to navigation"), "{screen}");
     s.h.key(KeyCode::Enter);
     s.h.wait("the stick is mounted", |a| {
-        a.volumes.iter().any(|v| v.device == "/dev/sdb1")
+        a.devices.volumes.iter().any(|v| v.device == "/dev/sdb1")
     });
     assert_eq!(calls(&s.log), ["mount /dev/sdb1"]);
 
@@ -200,7 +204,10 @@ fn enter_in_the_sidebar_and_the_menu_mount_a_stick_too() {
     }
     s.h.key(KeyCode::Enter);
     s.h.wait("the camera is open", |a| {
-        a.volumes.iter().any(|v| v.device == "gphoto2://Canon/")
+        a.devices
+            .volumes
+            .iter()
+            .any(|v| v.device == "gphoto2://Canon/")
     });
     assert_eq!(calls(&s.log), ["mount gphoto2://Canon/"]);
 }
@@ -399,7 +406,7 @@ Volume(0): motorola edge 40
     #[test]
     fn closed_phone_is_listed_and_enter_mounts() {
         let (mut h, _, calls) = run(GIO_UNMOUNTED, false);
-        h.wait("the phone is listed", |a| !a.unmounted.is_empty());
+        h.wait("the phone is listed", |a| !a.devices.unmounted.is_empty());
         let screen = h.screen();
         assert!(screen.contains("moto"), "{screen}");
         assert!(screen.contains("not mounted"), "{screen}");
@@ -417,7 +424,7 @@ Volume(0): motorola edge 40
     fn open_phone_is_listed_by_name() {
         let (mut h, phone, _) = run(GIO_OPEN, true);
         h.wait("the phone is listed", |a| {
-            a.volumes.iter().any(|v| {
+            a.devices.volumes.iter().any(|v| {
                 v.kind == VolumeKind::Device && v.label.as_deref() == Some("motorola edge 40")
             })
         });
@@ -427,7 +434,7 @@ Volume(0): motorola edge 40
             !screen.contains("not mounted"),
             "it is open, not waiting to be mounted:\n{screen}"
         );
-        assert!(h.app.pending_devices().is_empty());
+        assert!(h.app.devices.pending().is_empty());
         // And it opens.
         h.click(&Target::Place(phone.clone()));
         h.wait("the phone", move |a| a.cwd == phone && !a.is_loading());

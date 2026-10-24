@@ -205,7 +205,7 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             PlaceKind::Home | PlaceKind::Trash => p.name(),
             _ => app.shown_name(&p.path, p.name()),
         },
-        locked: app.denied_for(&p.path).is_some(),
+        locked: app.devices.denied_for(&p.path).is_some(),
         path: p.path.clone(),
         usage: None,
     };
@@ -277,13 +277,18 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             section: Section::Pinned,
             origin: Origin::Bookmark { removable },
             name: app.shown_name(path, base_name(path)),
-            locked: app.denied_for(path).is_some(),
+            locked: app.devices.denied_for(path).is_some(),
             path: path.clone(),
             usage: None,
         });
     }
 
-    for v in app.volumes.iter().filter(|v| v.kind != VolumeKind::Virtual) {
+    for v in app
+        .devices
+        .volumes
+        .iter()
+        .filter(|v| v.kind != VolumeKind::Virtual)
+    {
         let name = app.shown_name(&v.mount_point, device_name(v));
         let usage = match (v.total, v.available) {
             (Some(t), Some(a)) if t > 0 && v.responsive => Some(Usage {
@@ -296,12 +301,12 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             section: Section::Devices,
             origin: Origin::Device(v.kind),
             name,
-            locked: app.denied_for(&v.mount_point).is_some(),
+            locked: app.devices.denied_for(&v.mount_point).is_some(),
             path: v.mount_point.clone(),
             usage,
         });
     }
-    for u in app.pending_devices() {
+    for u in app.devices.pending() {
         out.push(Item {
             section: Section::Devices,
             origin: Origin::Unmounted(u.kind),
