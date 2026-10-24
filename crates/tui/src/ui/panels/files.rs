@@ -57,7 +57,7 @@ fn columns(app: &App, width: usize) -> Cols {
     if app.tags_column_wanted() && width >= fixed(&cols) + TAG_W + GAP + 22 {
         cols.tags = TAG_W;
     }
-    if width < fixed(&cols) + 18 || (app.frame.term_width as usize) < crate::ui::list::DATE_FROM {
+    if width < fixed(&cols) + 18 || (app.frame.term_width() as usize) < crate::ui::list::DATE_FROM {
         cols.date = 0;
     }
     let gaps = 1 + usize::from(cols.date > 0) + usize::from(cols.tags > 0);

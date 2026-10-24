@@ -250,7 +250,7 @@ impl App {
         }
         self.saved_ui.sidebar = Some(self.side_nav.wanted);
         self.save_ui_state();
-        if self.side_nav.wanted && Mode::for_width(self.frame.term_width, true) == Mode::Hidden {
+        if self.side_nav.wanted && Mode::for_width(self.frame.term_width(), true) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarOnNarrow.tr(), 3);
         }
     }
@@ -267,12 +267,12 @@ impl App {
         if !self.side_nav.wanted {
             self.toggle_sidebar();
         }
-        if Mode::for_width(self.frame.term_width, self.side_nav.wanted) == Mode::Hidden {
+        if Mode::for_width(self.frame.term_width(), self.side_nav.wanted) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarNarrow.tr(), 3);
             return;
         }
         // Make the next frame's mode current before looking at the items.
-        self.frame.side_mode = Mode::for_width(self.frame.term_width, self.side_nav.wanted);
+        self.frame.side_mode = Mode::for_width(self.frame.term_width(), self.side_nav.wanted);
         let items = self.side_items();
         if items.is_empty() {
             return;

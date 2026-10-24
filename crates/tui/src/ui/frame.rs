@@ -8,9 +8,8 @@ use ratatui::layout::Rect;
 use std::path::PathBuf;
 
 pub struct LastFrame {
-    /// Layout the last frame used, for the keyboard and the tests.
+    /// Size of the area the last frame used, for the keyboard and the tests.
     pub screen: (u16, u16),
-    pub term_width: u16,
     /// Where the field of the bar at the top was drawn (what is offered under it lines up
     /// with it).
     pub bar_field: Rect,
@@ -44,7 +43,6 @@ impl Default for LastFrame {
     fn default() -> LastFrame {
         LastFrame {
             screen: (0, 0),
-            term_width: 0,
             bar_field: Rect::default(),
             popup_covers: Vec::new(),
             hits: Hits::default(),
@@ -62,10 +60,14 @@ impl Default for LastFrame {
 }
 
 impl LastFrame {
+    /// The width of the terminal at the last frame.
+    pub fn term_width(&self) -> u16 {
+        self.screen.0
+    }
+
     /// A frame of `area` begins: nothing is clickable yet.
     pub fn begin(&mut self, area: Rect) {
         self.hits.clear();
-        self.term_width = area.width;
         self.screen = (area.width, area.height);
     }
 
