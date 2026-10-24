@@ -53,7 +53,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
         ((label, root), rest)
     } else {
         match app.cwd.strip_prefix(home) {
-        Ok(rest) => ((home_mark(app.icons).to_string(), home.to_path_buf()), rest),
+        Ok(rest) => ((home_mark(app.settings.icons).to_string(), home.to_path_buf()), rest),
         Err(_) => {
             let mut root = PathBuf::new();
             let mut label = String::new();
@@ -96,7 +96,7 @@ fn natural_width(segs: &[(String, PathBuf)]) -> usize {
 /// The path as spans fitting in `budget` cells: all of it, or the first segment, a "…" for
 /// the middle (clickable: it lists what it hides) and as many of the last segments as fit.
 fn crumbs(app: &App, budget: usize) -> Vec<(Span<'static>, Option<Target>)> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let segs = segments(app);
     let n = segs.len();
@@ -168,7 +168,7 @@ fn crumbs(app: &App, budget: usize) -> Vec<(Span<'static>, Option<Target>)> {
 
 /// A button-like field: `⌕ Filter…  Ctrl+F`. The words stay; the key may go.
 fn field<'a>(app: &App, icon: &str, label: &str, key: Option<String>, target: Target) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let mut b = Bar::default();
     b.push_hit(
         Span::styled(format!(" {icon}{label} "), th.chip()),
@@ -182,10 +182,10 @@ fn field<'a>(app: &App, icon: &str, label: &str, key: Option<String>, target: Ta
 
 /// The right-hand side for one level of squeezing.
 fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let mut b = Bar::default();
-    let key = |a: Action| if keys { app.keymap.hint(a) } else { None };
+    let key = |a: Action| if keys { app.settings.keymap.hint(a) } else { None };
 
     if let Some(f) = &app.filter {
         // The field shows what is being typed; its label has nothing to say any more.
@@ -197,7 +197,7 @@ fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
     } else {
         b.append(field(
             app,
-            if app.icons == IconSet::None {
+            if app.settings.icons == IconSet::None {
                 ""
             } else {
                 "⌕ "
@@ -235,7 +235,7 @@ fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
 }
 
 pub fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;

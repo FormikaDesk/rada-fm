@@ -25,7 +25,7 @@ fn put_cursor(h: &mut H, name: &str) {
 
 fn scene(icons: IconSet) -> H {
     let mut h = demo_scene(170, 40);
-    h.app.icons = icons;
+    h.app.settings.icons = icons;
     put_cursor(&mut h, "photo.jpg");
     h
 }
@@ -43,7 +43,7 @@ fn cursor_cells(h: &mut H) -> Vec<ratatui::buffer::Cell> {
 #[test]
 fn with_nerd_icons_the_cursor_row_is_shaded_across_and_has_round_ends() {
     let mut h = scene(IconSet::Nerd);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let cells = cursor_cells(&mut h);
     let w = cells.len();
     // The ends are half circles in the colour of the shade at that end, on the background.
@@ -66,7 +66,7 @@ fn with_nerd_icons_the_cursor_row_is_shaded_across_and_has_round_ends() {
 #[test]
 fn selected_rows_are_tinted_with_round_ends_too() {
     let mut h = scene(IconSet::Nerd);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     put_cursor(&mut h, "backup.zip");
     h.press("space");
     put_cursor(&mut h, "photo.jpg");
@@ -90,7 +90,7 @@ fn every_colour_of_a_soft_frame_is_a_token_or_a_shade_between_two() {
             }
         }
         let mut h = scene(IconSet::Nerd);
-        h.app.th = th.clone();
+        h.app.settings.th = th.clone();
         let _ = h.screen();
         let buf = h.term.backend().buffer().clone();
         for y in 0..buf.area.height {
@@ -114,8 +114,8 @@ fn every_colour_of_a_soft_frame_is_a_token_or_a_shade_between_two() {
 #[test]
 fn in_256_colours_the_shade_is_solid() {
     let mut h = scene(IconSet::Nerd);
-    h.app.th = Theme::named("rada", ColorDepth::Ansi256).unwrap();
-    let th = h.app.th.clone();
+    h.app.settings.th = Theme::named("rada", ColorDepth::Ansi256).unwrap();
+    let th = h.app.settings.th.clone();
     let cells = cursor_cells(&mut h);
     let w = cells.len();
     assert!(
@@ -139,7 +139,7 @@ fn in_256_colours_the_shade_is_solid() {
 fn without_nerd_glyphs_there_are_no_special_glyphs_and_no_shade() {
     for icons in [IconSet::UnicodeIcons, IconSet::UnicodeStd, IconSet::None] {
         let mut h = scene(icons);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let screen = h.screen();
         assert!(
             !screen.contains(CAP_LEFT) && !screen.contains(CAP_RIGHT),
@@ -158,8 +158,8 @@ fn without_nerd_glyphs_there_are_no_special_glyphs_and_no_shade() {
 #[test]
 fn the_basic_profile_draws_the_plain_look() {
     let mut h = scene(IconSet::None);
-    h.app.basic = true;
-    h.app.th = Theme::named("rada", ColorDepth::Ansi16).unwrap();
+    h.app.settings.basic = true;
+    h.app.settings.th = Theme::named("rada", ColorDepth::Ansi16).unwrap();
     let screen = h.screen();
     assert!(!screen.contains(CAP_LEFT) && !screen.contains('▔'));
     // The disks are bars of ten segments in brackets once the glyphs are plain.

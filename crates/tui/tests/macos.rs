@@ -597,7 +597,7 @@ fn folder_preview_follows_hidden_files() {
     let dir = sb.path("d");
     let (_, sys) = mac(&sb, MacLikeSpec::default());
     let mut h = H::with_system(sb, dir, 170, 36, sys, |_| {});
-    h.app.details = Some(true);
+    h.app.settings.details = Some(true);
     let in_preview = |a: &rada_tui::app::App| match &a.preview.content {
         Some(rada_core::preview::Preview::Dir(d)) => {
             Some(d.entries.iter().map(|e| e.0.clone()).collect::<Vec<_>>())

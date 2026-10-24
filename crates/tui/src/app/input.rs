@@ -317,13 +317,13 @@ impl App {
             && !self.side_nav.focus
             && key.modifiers.is_empty()
             && matches!(key.code, KeyCode::Right | KeyCode::Char('l'))
-            && self.keymap.action_for(&key) == Some(Action::Open)
+            && self.settings.keymap.action_for(&key) == Some(Action::Open)
         {
             self.columns_right();
             self.redraw.dirty = true;
             return;
         }
-        if let Some(action) = self.keymap.action_for(&key) {
+        if let Some(action) = self.settings.keymap.action_for(&key) {
             // In NAV of the panels view the sideways arrows open and close the folders.
             if self.frame.panels_shown
                 && self.side_nav.focus
@@ -495,7 +495,7 @@ impl App {
             }),
             ToggleHidden => {
                 let keep = self.cursor_name();
-                self.show_hidden = !self.show_hidden;
+                self.settings.show_hidden = !self.settings.show_hidden;
                 self.rebuild_visible();
                 self.restore_cursor(keep);
                 // A folder's preview lists what the list lists.
@@ -576,8 +576,8 @@ impl App {
 
     /// Show or hide the Tag column of the list, and remember it.
     pub fn toggle_tags_column(&mut self) {
-        self.show_tags = !self.show_tags;
-        self.saved_ui.tags_column = Some(self.show_tags);
+        self.settings.show_tags = !self.settings.show_tags;
+        self.saved_ui.tags_column = Some(self.settings.show_tags);
         self.save_ui_state();
         self.redraw.dirty = true;
     }
@@ -595,7 +595,7 @@ impl App {
             return self.toggle_chooser_preview();
         }
         let want = !self.details_visible();
-        self.details = Some(want);
+        self.settings.details = Some(want);
         self.saved_ui.details = Some(want);
         self.save_ui_state();
         if want && self.frame.term_width() < 60 {
@@ -607,7 +607,7 @@ impl App {
     /// puts it in the place of the list and takes it away again. None of it is remembered.
     fn toggle_chooser_preview(&mut self) {
         if self.frame.term_width() < crate::ui::CHOOSER_PREVIEW_FROM {
-            self.details = Some(self.details != Some(true));
+            self.settings.details = Some(self.settings.details != Some(true));
         }
     }
 
@@ -802,7 +802,7 @@ impl App {
     // ------------------------------------------------------------------ mouse
 
     pub fn on_mouse(&mut self, m: MouseEvent) {
-        if !self.mouse {
+        if !self.settings.mouse {
             return;
         }
         // Motion only matters for what is under the pointer in the sidebar (its names show
@@ -1026,8 +1026,7 @@ impl App {
         if i >= self.visible.len() {
             return;
         }
-        let double =
-            matches!(self.last_click, Some((t, r)) if r == i && t.elapsed() < self.double_click);
+        let double = matches!(self.last_click, Some((t, r)) if r == i && t.elapsed() < self.settings.double_click);
         self.last_click = Some((Instant::now(), i));
         if mods.contains(KeyModifiers::CONTROL) {
             // Ctrl+click adds or removes one item and becomes the new anchor.
@@ -1218,18 +1217,18 @@ impl App {
     /// The shortest key for an action, for messages: vim's single letter when the vim
     /// keys are on, else the classic shortcut.
     pub fn key_for(&self, action: Action) -> Option<String> {
-        let list = self.keymap.bindings(action);
+        let list = self.settings.keymap.bindings(action);
         list.iter()
             .filter(|b| b.vim && !b.classic || b.custom)
             .map(|b| b.chord.to_string())
             .min_by_key(|s| s.len())
-            .or_else(|| self.keymap.hint(action))
+            .or_else(|| self.settings.keymap.hint(action))
     }
 
     /// Is the vim scheme on? (Shown in the help footer.)
     pub fn has_scheme(&self, s: Scheme) -> bool {
         Action::ALL.iter().any(|a| {
-            self.keymap.bindings(*a).iter().any(|b| match s {
+            self.settings.keymap.bindings(*a).iter().any(|b| match s {
                 Scheme::Vim => b.vim,
                 Scheme::Classic => b.classic,
             })

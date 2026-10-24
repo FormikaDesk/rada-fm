@@ -11,7 +11,7 @@ fn every_pill_has_both_ends_and_one_colour_from_end_to_end() {
             let mut h = scene(w, hh, name, true);
             let what = format!("{name} {w}x{hh}");
             let buf = h.redrawn_buffer();
-            let behind = [h.app.th.inner, h.app.th.canvas];
+            let behind = [h.app.settings.th.inner, h.app.settings.th.canvas];
             let pills = assert_pills(&buf, &what, &behind);
             // The selected row, the tab, the "rada" and the count, the keys, the buttons, the
             // labels: a screen has dozens.
@@ -54,7 +54,7 @@ fn without_a_nerd_font_a_pill_is_a_plain_rectangle_of_the_same_width() {
 #[test]
 fn the_pill_check_catches_a_broken_pill() {
     let mut h = scene(160, 46, "rada", true);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let good = h.redrawn_buffer();
     let find = |sym: &str| {
         (0..good.area.height)

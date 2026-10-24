@@ -59,14 +59,14 @@ fn a_rust_file_and_a_toml_file_are_drawn_in_several_colours() {
     let mut h = folder();
     put_cursor(&mut h, "a.rs");
     let buf = h.redrawn_buffer();
-    let normal = h.app.th.text;
+    let normal = h.app.settings.th.text;
     let comment = colours_of(&buf, "// hi");
     assert!(!comment.contains(&normal), "{comment:?}");
     let line = colours_of(&buf, "let n = 42;");
     assert!(line.len() >= 3, "keyword, plain, number: {line:?}");
     assert!(line.iter().any(|c| *c != normal));
     // Every colour is one the theme has.
-    let th = &h.app.th;
+    let th = &h.app.settings.th;
     let own: Vec<Color> = vec![
         th.text,
         th.text_dim,

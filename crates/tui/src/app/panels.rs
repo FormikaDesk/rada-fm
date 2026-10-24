@@ -192,8 +192,8 @@ impl App {
     /// Whether a window `width` × `height` is drawn as panels.
     pub fn panels_wanted(&self, width: u16, height: u16) -> Option<crate::panels::Columns> {
         crate::panels::columns_for(
-            self.layout_pref,
-            self.layout,
+            self.settings.layout_pref,
+            self.settings.layout,
             self.session.chooser.is_some(),
             width,
             height,
@@ -203,10 +203,10 @@ impl App {
     /// Choose the layout (the View menu): it is remembered, and the window decides what is drawn
     /// when the choice is `auto`.
     pub fn set_layout_pref(&mut self, pref: crate::panels::LayoutPref) {
-        if self.layout_pref == pref {
+        if self.settings.layout_pref == pref {
             return;
         }
-        self.layout_pref = pref;
+        self.settings.layout_pref = pref;
         if pref == crate::panels::LayoutPref::Classic {
             self.side_nav.focus = false;
             self.preview.focus = false;
@@ -224,21 +224,29 @@ impl App {
     /// Make the tree lead to the current folder and ask for what it still lacks. Called by the
     /// drawing: it only sends requests, the answers arrive as events.
     pub fn want_tree(&mut self) {
-        if self.nav_mode == NavMode::Path {
+        if self.settings.nav_mode == NavMode::Path {
             // Only the folder shown is asked about: its subfolders are what the box lists.
             let want = self.view_title().is_none().then(|| self.cwd.clone());
             if self.side_nav.tree.open.iter().ne(want.iter()) {
                 self.side_nav.tree.open = want.into_iter().collect();
             }
-            for dir in self.side_nav.tree.wanted(self.show_hidden, self.dir_gen) {
-                self.svc.tree_dirs(dir, self.show_hidden);
+            for dir in self
+                .side_nav
+                .tree
+                .wanted(self.settings.show_hidden, self.dir_gen)
+            {
+                self.svc.tree_dirs(dir, self.settings.show_hidden);
             }
             return;
         }
         let root = self.svc.home.clone();
         self.side_nav.tree.follow(&root, &self.cwd);
-        for dir in self.side_nav.tree.wanted(self.show_hidden, self.dir_gen) {
-            self.svc.tree_dirs(dir, self.show_hidden);
+        for dir in self
+            .side_nav
+            .tree
+            .wanted(self.settings.show_hidden, self.dir_gen)
+        {
+            self.svc.tree_dirs(dir, self.settings.show_hidden);
         }
     }
 
@@ -289,7 +297,7 @@ impl App {
 
     /// The rows of the NAV box: the tree from Home, the favourites, the tags and the trash.
     pub fn nav_rows(&self) -> Vec<NavRow> {
-        if self.nav_mode == NavMode::Path {
+        if self.settings.nav_mode == NavMode::Path {
             return self.nav_rows_path();
         }
         let mut rows = Vec::new();

@@ -93,7 +93,7 @@ fn yes_installs_in_the_background_and_says_what_to_do_next() {
     assert_eq!(installs.load(Ordering::SeqCst), 1);
     // The card wraps what it says: read it as running text (the details pane, which shares
     // its rows, put away).
-    h.app.details = Some(false);
+    h.app.settings.details = Some(false);
     let raw = h.screen();
     let s = raw
         .replace(['│', '┃', '╭', '╮', '╰', '╯', '─', '━'], " ")

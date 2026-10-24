@@ -27,7 +27,7 @@ fn scene(w: u16, h: u16) -> H {
     let dir = sb.path("d");
     let mut h = H::new(sb, dir, w, h);
     h.wait("the listing", |a| a.listing.len() == 3);
-    h.app.details = Some(false); // the pane would cover the right of the list
+    h.app.settings.details = Some(false); // the pane would cover the right of the list
     h
 }
 
@@ -145,7 +145,7 @@ fn ordering_by_size_uses_the_counted_size_of_folders() {
 #[test]
 fn the_details_pane_says_how_many_items_and_how_big() {
     let mut h = scene(170, 35);
-    h.app.details = Some(true);
+    h.app.settings.details = Some(true);
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
     counted(&mut h);
     h.keys("g");
@@ -175,7 +175,7 @@ fn leaving_a_folder_drops_what_was_being_counted_and_the_next_is_counted() {
     let dir = sb.path("a");
     let other = sb.path("b");
     let mut h = H::new(sb, dir, 120, 30);
-    h.app.details = Some(false);
+    h.app.settings.details = Some(false);
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
     h.wait("the listing", |a| a.listing.len() == 1);
     let _ = h.screen();

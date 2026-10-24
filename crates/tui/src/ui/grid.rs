@@ -65,7 +65,7 @@ fn centered(text: &str, width: usize) -> String {
 }
 
 pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     if area.width < TILE_W as u16 || area.height < TILE_H as u16 - 1 {
         // Too small for a single tile: fall back to a plain message.
         f.render_widget(
@@ -130,19 +130,19 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 Style::default()
             };
-            let (glyph, gcolor) = icons::icon(e, app.icons, &th);
+            let (glyph, gcolor) = icons::icon(e, app.settings.icons, &th);
             let color: Color = if e.is_navigable_dir() {
                 th.kinds.folder
             } else {
                 gcolor
             };
-            let lines_of_art = art(e, app.icons, glyph);
+            let lines_of_art = art(e, app.settings.icons, glyph);
             let pad_l = (TILE_W - ART_W) / 2;
             for (i, a) in lines_of_art.iter().enumerate() {
                 let mut spans = vec![Span::styled(" ".repeat(pad_l), bg)];
                 if i == 0 && marked {
                     // The tick sits in the corner of the art, over its first cell.
-                    let tick = icons::ui(app.icons, Glyph::Checked);
+                    let tick = icons::ui(app.settings.icons, Glyph::Checked);
                     spans[0] = Span::styled(
                         format!("{}{tick} ", " ".repeat(pad_l.saturating_sub(2))),
                         bg.patch(th.fg(th.check)),

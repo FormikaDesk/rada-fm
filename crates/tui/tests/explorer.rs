@@ -165,7 +165,7 @@ fn the_explorer_at_every_size_in_both_themes() {
         }
         for (name, theme) in [("dark", "rada"), ("light", "rada-light")] {
             let th = Theme::named(theme, ColorDepth::True).unwrap();
-            h.app.th = th.clone();
+            h.app.settings.th = th.clone();
             insta::assert_snapshot!(
                 format!("explorer_{w}x{hh}_{name}_tokens"),
                 token_map(&mut h, &th)
@@ -185,7 +185,7 @@ fn the_icons_view() {
     assert_eq!(h.app.view, ViewMode::Icons);
     insta::assert_snapshot!("icons_120x30", shot(&mut h));
     let th = Theme::named("rada-light", ColorDepth::True).unwrap();
-    h.app.th = th.clone();
+    h.app.settings.th = th.clone();
     insta::assert_snapshot!("icons_120x30_light_tokens", token_map(&mut h, &th));
 }
 
@@ -713,7 +713,7 @@ fn checkbox_selects_double_click_opens() {
 fn cursor_row_solid_selected_rows_quiet() {
     let mut h = busy_scene(140, 30);
     let _ = h.screen();
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let buf = h.term.backend().buffer().clone();
     let cursor_row = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
     // The cursor row: the solid colour, white text, and a bar in the leftmost cell.
@@ -925,7 +925,7 @@ fn blank_rows_between_bars_and_status() {
 fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
     let mut h = scene(170, 35);
     h.app.marked.clear();
-    h.app.icons = rada_tui::IconSet::Nerd;
+    h.app.settings.icons = rada_tui::IconSet::Nerd;
     let rows = pane_rows(&mut h);
     let with_caps = |needle: &str| {
         rows.iter()
@@ -951,7 +951,7 @@ fn field_and_buttons_are_pills_with_nerd_font() {
         !plain.contains('\u{e0b6}') && plain.contains("Search files or type a command"),
         "{plain}"
     );
-    h.app.icons = rada_tui::IconSet::Nerd;
+    h.app.settings.icons = rada_tui::IconSet::Nerd;
     let round = row(&mut h);
     // The four little buttons, the field, the key in it and the pill of the view: a pill each.
     assert_eq!(round.matches('\u{e0b6}').count(), 7, "{round}");

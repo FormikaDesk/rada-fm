@@ -133,7 +133,7 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
     let buf = h.term.backend().buffer().clone();
     assert_eq!(
         buf[(r.x + 4, r.y)].bg,
-        h.app.th.sel,
+        h.app.settings.th.sel,
         "the place we are in has its own background"
     );
     let docs = place(&h, "Documenti");
@@ -166,7 +166,11 @@ fn tab_focuses_the_sidebar_enter_opens() {
         .find(&Target::Place(items[cur].path.clone()))
         .unwrap();
     let buf = h.term.backend().buffer().clone();
-    assert_eq!(buf[(r.x + 4, r.y)].bg, h.app.th.cursor, "focus is visible");
+    assert_eq!(
+        buf[(r.x + 4, r.y)].bg,
+        h.app.settings.th.cursor,
+        "focus is visible"
+    );
 
     // Up to the previous item (Documenti), and open it.
     h.key(KeyCode::Up);
@@ -542,7 +546,7 @@ fn the_icon_has_a_space_after_it_in_every_entry() {
     let items = h.app.side_items();
     let mut seen = 0;
     for item in &items {
-        let glyph = item.glyph(h.app.icons);
+        let glyph = item.glyph(h.app.settings.icons);
         assert!(!glyph.is_empty(), "the scene draws icons");
         let y = row_of(&mut h, item.path.clone()) as usize;
         let name: String = item.name.chars().take(3).collect();
@@ -580,7 +584,7 @@ fn sidebar_entries_indent_and_disk_bar() {
     let items = h.app.side_items();
     let system = items.iter().find(|i| i.name == "System").unwrap().clone();
     let y = row_of(&mut h, system.path.clone()) as usize;
-    let glyph_x = start(lines[y], system.glyph(h.app.icons));
+    let glyph_x = start(lines[y], system.glyph(h.app.settings.icons));
     assert_eq!(
         glyph_x,
         title_x + 2,
@@ -605,7 +609,7 @@ fn sidebar_entries_indent_and_disk_bar() {
     {
         let y = row_of(&mut h, item.path.clone()) as usize;
         assert_eq!(
-            start(lines[y], item.glyph(h.app.icons)),
+            start(lines[y], item.glyph(h.app.settings.icons)),
             glyph_x,
             "{}: {}",
             item.name,
@@ -659,8 +663,8 @@ fn icon_column_marks_the_current_place() {
     for (icons, name, focus) in every_look() {
         {
             let mut h = italian(78, 24);
-            h.app.th = Theme::named(name, ColorDepth::True).unwrap();
-            h.app.icons = icons;
+            h.app.settings.th = Theme::named(name, ColorDepth::True).unwrap();
+            h.app.settings.icons = icons;
             let want = place(&h, "Scaricati");
             assert_eq!(h.app.cwd, want);
             let item = h

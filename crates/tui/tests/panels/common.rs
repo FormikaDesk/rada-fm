@@ -27,10 +27,10 @@ pub fn put_cursor(h: &mut H, name: &str) {
 /// they can be read.
 pub fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
     let mut h = demo_scene(w, hh);
-    h.app.layout_pref = LayoutPref::Auto;
-    h.app.th = Theme::named(theme, ColorDepth::True).unwrap();
+    h.app.settings.layout_pref = LayoutPref::Auto;
+    h.app.settings.th = Theme::named(theme, ColorDepth::True).unwrap();
     if nerd {
-        h.app.icons = IconSet::Nerd;
+        h.app.settings.icons = IconSet::Nerd;
     }
     put_cursor(&mut h, "backup.zip");
     h.press("space");
@@ -59,7 +59,7 @@ pub fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
 /// The same with `nav = "albero"`: the NAV box lists the whole tree of Home.
 pub fn tree_scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
     let mut h = scene(w, hh, theme, nerd);
-    h.app.nav_mode = NavMode::Tree;
+    h.app.settings.nav_mode = NavMode::Tree;
     h.app.side_nav.tree = Default::default();
     h.wait("the way down in the tree", |a| {
         a.cwd

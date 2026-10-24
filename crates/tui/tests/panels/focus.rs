@@ -8,7 +8,7 @@ use unicode_width::UnicodeWidthStr;
 #[test]
 fn tab_takes_the_keyboard_from_the_folder_to_nav_to_the_preview_and_back() {
     let mut h = scene(160, 46, "rada", false);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     // The border of the box with the keyboard in it is the accent colour, the others quiet.
     let border_of = |h: &mut H, title: &str| -> Color {
         let buf = h.redrawn_buffer();

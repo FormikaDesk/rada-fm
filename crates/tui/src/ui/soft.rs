@@ -33,7 +33,7 @@ pub struct Look {
 
 impl Look {
     pub fn of(app: &App) -> Look {
-        Look::new(&app.th, app.icons, app.basic)
+        Look::new(&app.settings.th, app.settings.icons, app.settings.basic)
     }
 
     pub fn new(th: &Theme, icons: IconSet, basic: bool) -> Look {

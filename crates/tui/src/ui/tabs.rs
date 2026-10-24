@@ -30,12 +30,12 @@ pub fn scheme_label(preset: Preset) -> &'static str {
 }
 
 pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
-    let set = app.icons;
+    let set = app.settings.icons;
     let n = app.tab_count();
 
     let mut right = Bar::default();
@@ -53,7 +53,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     }
     if w >= 200 {
         right.push(Span::styled(
-            format!("{}  ", scheme_label(app.keymap.preset)),
+            format!("{}  ", scheme_label(app.settings.keymap.preset)),
             th.dim().patch(band),
         ));
     }

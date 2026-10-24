@@ -79,7 +79,7 @@ impl App {
     }
 
     fn item_properties(&self, e: &Entry) -> PropsView {
-        let when = |t| fmt::date_with_day(t, self.now(), self.date_format, &self.tz);
+        let when = |t| self.settings.date_with_day(t, self.now());
         let mut rows: Vec<(String, String)> = vec![
             (
                 Key::PropName.tr().into(),

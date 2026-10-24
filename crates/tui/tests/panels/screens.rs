@@ -110,7 +110,7 @@ fn the_panels_at_160_by_46_in_each_theme() {
             h.app.frame.panels_shown && !h.app.frame.panels_two,
             "{name}: three columns at 160x46"
         );
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let tag = name.replace('-', "_");
         insta::assert_snapshot!(format!("panels_160x46_{tag}"), shot(&mut h));
         insta::assert_snapshot!(
@@ -145,7 +145,7 @@ fn small_window_gets_classic_layout() {
     assert!(!s.contains("Enlarge"), "auto asks nothing:\n{s}");
     insta::assert_snapshot!("panels_classic_69x30", s);
     // With `layout = "panels"` the window is told what is wanted.
-    h.app.layout_pref = LayoutPref::Panels;
+    h.app.settings.layout_pref = LayoutPref::Panels;
     let s = shot(&mut h);
     assert!(
         s.contains("Enlarge the window for the full layout (now 69×30)"),
@@ -216,7 +216,7 @@ fn sent_with_unicode_std(h: &mut H, w: u16, hh: u16) -> String {
 )]
 fn unicode_std_at_110x30() {
     let mut h = scene(110, 30, "rada", false);
-    h.app.icons = IconSet::UnicodeStd;
+    h.app.settings.icons = IconSet::UnicodeStd;
     h.settle();
     let s = sent_with_unicode_std(&mut h, 110, 30);
     assert!(s.contains("[ NAV ]") && !s.contains("[ PREVIEW ]"), "{s}");

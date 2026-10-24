@@ -111,7 +111,7 @@ fn sidebar_lists_seven_colours_then_tags() {
     let rows: Vec<usize> = order.iter().map(|w| at(w)).collect();
     assert!(rows.windows(2).all(|w| w[0] < w[1]), "order: {rows:?}\n{s}");
     // Each dot is drawn in its colour.
-    let blue = h.app.th.tag_color(Some(TagColor::Blue));
+    let blue = h.app.settings.th.tag_color(Some(TagColor::Blue));
     let buf = h.term.backend().buffer().clone();
     let y = rows[4] as u16;
     let dot = (0..buf.area.width)

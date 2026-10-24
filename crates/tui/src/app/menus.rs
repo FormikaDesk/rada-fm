@@ -90,7 +90,7 @@ impl App {
                 MenuItem::toggle(
                     ToggleHidden,
                     Key::MenuHiddenFiles.tr(),
-                    self.show_hidden,
+                    self.settings.show_hidden,
                     false,
                 ),
                 MenuItem::toggle(
@@ -99,23 +99,28 @@ impl App {
                     self.side_nav.wanted,
                     false,
                 ),
-                MenuItem::toggle(ToggleTags, Key::MenuTagColumn.tr(), self.show_tags, false),
+                MenuItem::toggle(
+                    ToggleTags,
+                    Key::MenuTagColumn.tr(),
+                    self.settings.show_tags,
+                    false,
+                ),
                 MenuItem::choice(
                     MenuCmd::Layout(LayoutPref::Auto),
                     Key::MenuLayoutAuto.tr(),
-                    self.layout_pref == LayoutPref::Auto,
+                    self.settings.layout_pref == LayoutPref::Auto,
                     true,
                 ),
                 MenuItem::choice(
                     MenuCmd::Layout(LayoutPref::Panels),
                     Key::MenuLayoutPanels.tr(),
-                    self.layout_pref == LayoutPref::Panels,
+                    self.settings.layout_pref == LayoutPref::Panels,
                     false,
                 ),
                 MenuItem::choice(
                     MenuCmd::Layout(LayoutPref::Classic),
                     Key::MenuLayoutClassic.tr(),
-                    self.layout_pref == LayoutPref::Classic,
+                    self.settings.layout_pref == LayoutPref::Classic,
                     false,
                 ),
             ],
@@ -156,7 +161,7 @@ impl App {
                 };
                 Some(MenuTitle {
                     icon: "",
-                    icon_color: self.th.accent,
+                    icon_color: self.settings.th.accent,
                     name: rada_core::i18n::tf(Key::TagsOf, &[&what]),
                     kind: String::new(),
                 })
@@ -168,17 +173,17 @@ impl App {
     /// The head of the menu of an item: its icon, its name and what kind of file it is; with
     /// several items selected, how many.
     fn item_menu_title(&self) -> Option<MenuTitle> {
-        let th = &self.th;
+        let th = &self.settings.th;
         if self.marked.len() > 1 {
             return Some(MenuTitle {
-                icon: crate::icons::ui(self.icons, crate::icons::Glyph::Checked),
+                icon: crate::icons::ui(self.settings.icons, crate::icons::Glyph::Checked),
                 icon_color: th.accent,
                 name: crate::fmt::count(self.marked.len() as u64, Key::ItemOne, Key::ItemMany),
                 kind: String::new(),
             });
         }
         let e = self.current()?;
-        let (icon, icon_color) = crate::icons::icon(e, self.icons, th);
+        let (icon, icon_color) = crate::icons::icon(e, self.settings.icons, th);
         Some(MenuTitle {
             icon,
             icon_color,

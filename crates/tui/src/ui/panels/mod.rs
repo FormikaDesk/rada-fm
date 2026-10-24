@@ -38,9 +38,9 @@ const NAV_MIN_ROWS: u16 = 10;
 /// Draw the whole screen. Returns the row of the bar at the top, which the suggestions of the
 /// command bar hang from.
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let [gap1, gap2, gap3, gap4, gap5] = bar_gaps(area.height);
-    let hints_h = u16::from(app.show_hints);
+    let hints_h = u16::from(app.settings.show_hints);
     let [
         tabs_row,
         _,
@@ -153,7 +153,7 @@ fn is_airy(f: &Frame) -> bool {
 
 /// NAV above, SPAZIO below.
 fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let airy = is_airy(f);
     // The two columns have SPAZIO only in a tall window.
     let with_space = !app.frame.panels_two || f.area().height >= crate::panels::TWO_SPACE_FROM_ROWS;
@@ -209,7 +209,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
 /// The folder: its path on the top edge and the list inside. Returns the inside, where the
 /// notification cards are drawn.
 fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let airy = is_airy(f);
     let title = match app.view_title() {
         Some(t) => t,
@@ -270,7 +270,7 @@ fn list_needs_room(app: &App, inner: Rect, cards_h: u16) -> bool {
 
 /// ANTEPRIMA above, DETTAGLI (or whatever is in its place) below.
 fn draw_right(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let airy = is_airy(f);
     // The lower box takes what its rows need, but ANTEPRIMA keeps most of the column.
     let want = side::lower_rows(app) + 2 + u16::from(airy);

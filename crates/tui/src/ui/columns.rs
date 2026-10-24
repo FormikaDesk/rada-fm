@@ -32,7 +32,7 @@ pub fn widths(width: u16) -> (u16, u16, u16) {
 }
 
 pub fn draw_columns(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     if area.width < MIN_WIDTH || area.height < 3 {
         // Too narrow: the table does what it can.
         let opts =
@@ -73,8 +73,8 @@ fn line_of(
     style: Style,
     glyph_style: Option<Style>,
 ) -> Line<'static> {
-    let th = &app.th;
-    let (glyph, color) = icons::icon(e, app.icons, th);
+    let th = &app.settings.th;
+    let (glyph, color) = icons::icon(e, app.settings.icons, th);
     let arrow = if e.is_navigable_dir() { "›" } else { " " };
     let lead = if glyph.is_empty() {
         " ".to_string()
@@ -107,7 +107,7 @@ fn line_of(
 
 /// The first column: the folder above, with the folder you are in picked out.
 fn draw_parent(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let entries: Vec<(rada_core::model::Entry, bool)> = app
         .parent_entries()
@@ -148,7 +148,7 @@ fn draw_parent(f: &mut Frame, app: &mut App, area: Rect) {
 
 /// The second column: the folder you are in.
 fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let rows = area.height as usize;
     app.viewport.rows = rows;
@@ -202,11 +202,11 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
 
 /// The third column: the name and what it holds (a folder's items, a file's preview).
 fn draw_next(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let Some(e) = app.current().cloned() else {
         return;
     };
-    let (glyph, color) = icons::icon(&e, app.icons, &th);
+    let (glyph, color) = icons::icon(&e, app.settings.icons, &th);
     let mut head = Vec::new();
     if !glyph.is_empty() {
         head.push(Span::styled(format!(" {glyph} "), th.fg(color)));

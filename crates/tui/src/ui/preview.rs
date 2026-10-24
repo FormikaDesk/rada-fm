@@ -20,7 +20,7 @@ use crate::theme::{Density, Theme};
 
 /// The preview over the whole screen: the name, a line of facts, then the content.
 pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let pad = match th.density {
         Density::Airy => 3,
         Density::Balanced => 2,
@@ -39,11 +39,11 @@ pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
     // Title: the file's icon and name, then one line of facts.
     let (glyph, gcolor) = app
         .current()
-        .map(|e| icons::icon(e, app.icons, &th))
+        .map(|e| icons::icon(e, app.settings.icons, &th))
         .unwrap_or(("", th.text_dim));
     let name = display::truncate_name(&app.preview.name, w.saturating_sub(3));
     let mut title = vec![];
-    if app.icons != icons::IconSet::None && !glyph.is_empty() {
+    if app.settings.icons != icons::IconSet::None && !glyph.is_empty() {
         title.push(Span::styled(format!("{glyph} "), th.fg(gcolor)));
     }
     title.push(Span::styled(name, th.base().add_modifier(Modifier::BOLD)));
@@ -100,7 +100,7 @@ pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
 /// What the file holds: text, a folder's items, a picture, an archive's summary. `full` is
 /// the whole-screen preview, which also carries the facts the details pane lists itself.
 pub fn content(f: &mut Frame, app: &mut App, body: Rect, full: bool) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let w = body.width as usize;
     let h = body.height as usize;
     if w < 4 || h == 0 {
@@ -493,7 +493,7 @@ fn archive_counts(files: u64, dirs: u64, links: u64) -> String {
 
 fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) {
     use ratatui_image::{Resize, StatefulImage};
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let Some(view) = &app.preview.image else {
         return;
     };

@@ -31,7 +31,7 @@ fn properties(app: &App) -> Vec<(Key, String)> {
     let Some(e) = app.current() else {
         return Vec::new();
     };
-    let when = |t| fmt::date_with_day(t, app.now(), app.date_format, &app.tz);
+    let when = |t| app.settings.date_with_day(t, app.now());
     let mut rows: Vec<(Key, String)> = Vec::new();
     if let Some(img) = &app.preview.image
         && app.preview.name == e.display
@@ -138,7 +138,7 @@ fn pane_inner(area: Rect) -> Option<Rect> {
 
 /// Several items selected: how many and how big, in place of a preview.
 fn draw_marked_summary(f: &mut Frame, app: &App, inner: Rect) {
-    let th = &app.th;
+    let th = &app.settings.th;
     let size: u64 = app
         .listing
         .all()
@@ -161,9 +161,9 @@ fn draw_marked_summary(f: &mut Frame, app: &App, inner: Rect) {
 
 /// The icon and name of the item under the cursor, then its type and size.
 fn draw_name_and_type(f: &mut Frame, app: &mut App, inner: Rect, e: &Entry) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let w = inner.width as usize;
-    let (glyph, gcolor) = icons::icon(e, app.icons, &th);
+    let (glyph, gcolor) = icons::icon(e, app.settings.icons, &th);
     let mut head = Vec::new();
     if !glyph.is_empty() {
         head.push(Span::styled(format!("{glyph} "), th.fg(gcolor)));
@@ -205,7 +205,7 @@ fn draw_header(f: &mut Frame, app: &mut App, inner: Rect) -> Option<Entry> {
         return None;
     }
     let Some(e) = app.current().cloned() else {
-        let hint = Span::styled(Key::SelectToSee.tr(), app.th.dim());
+        let hint = Span::styled(Key::SelectToSee.tr(), app.settings.th.dim());
         f.render_widget(Paragraph::new(hint), Rect { height: 1, ..inner });
         return None;
     };
@@ -234,7 +234,7 @@ pub fn draw_chooser_preview(f: &mut Frame, app: &mut App, area: Rect) {
 
 /// Draw the pane in `area`.
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let Some(inner) = pane_inner(area) else {
         return;
     };
@@ -288,7 +288,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let by = inner.y + fixed_top + preview_h + 1;
     let end = inner.y + inner.height;
     if by < end {
-        let set = app.icons;
+        let set = app.settings.icons;
         let rounded = set == icons::IconSet::Nerd;
         let primary = (
             th.accent,
@@ -432,7 +432,7 @@ pub fn draw_overlay(f: &mut Frame, app: &mut App, main: Rect) {
         ..main
     };
     f.render_widget(Clear, area);
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let rule: Vec<Line> = (0..area.height)
         .map(|_| Line::from(Span::styled("│", th.faint())))
         .collect();

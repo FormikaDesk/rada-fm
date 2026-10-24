@@ -33,10 +33,10 @@ pub struct Ctx<'a> {
 impl<'a> Ctx<'a> {
     pub fn of(app: &'a crate::app::App) -> Ctx<'a> {
         Ctx {
-            th: &app.th,
+            th: &app.settings.th,
             look: Look::of(app),
-            set: app.icons,
-            basic: app.basic,
+            set: app.settings.icons,
+            basic: app.settings.basic,
         }
     }
 

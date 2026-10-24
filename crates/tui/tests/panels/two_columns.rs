@@ -65,7 +65,7 @@ fn the_pills_are_whole_in_two_columns_down_to_70() {
     for (w, hh) in [(70, 30), (78, 45), (100, 30)] {
         let mut h = scene(w, hh, "rada", true);
         let what = format!("{w}x{hh}");
-        let behind = [h.app.th.inner, h.app.th.canvas];
+        let behind = [h.app.settings.th.inner, h.app.settings.th.canvas];
         let pills = assert_pills(&h.redrawn_buffer(), &what, &behind);
         assert!(pills > 5, "{what}: only {pills} pills");
         h.press("alt+p");

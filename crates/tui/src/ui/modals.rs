@@ -61,7 +61,7 @@ pub(super) fn titled(ctx: &Ctx, label: &str, tone: Tone, title: &str) -> Line<'s
 
 /// The preview of the item under the cursor over the whole screen.
 fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     f.render_widget(Clear, area);
     if let Some(bg) = th.bg {
         f.render_widget(Block::default().style(Style::default().bg(bg)), area);
@@ -165,8 +165,8 @@ pub(super) fn dims_backdrop(app: &App) -> bool {
 /// above (a menu opened near the bottom moves up instead), and without the row over the status
 /// bar, so that the line of the menu is never against the colour of the bar.
 pub(super) fn popup_room(app: &App, area: Rect) -> Rect {
-    let explorer = app.layout == crate::view::LayoutKind::Explorer;
-    let hints = super::hints_height(explorer && app.show_hints, area.height);
+    let explorer = app.settings.layout == crate::view::LayoutKind::Explorer;
+    let hints = super::hints_height(explorer && app.settings.show_hints, area.height);
     Rect {
         height: area.height.saturating_sub(2 + hints),
         ..area
@@ -178,7 +178,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         draw_full_preview(f, app, area);
         return;
     }
-    let mut th = app.th.clone();
+    let mut th = app.settings.th.clone();
     if dims_backdrop(app) {
         // A window over the dimmed screen is a tone of its own, and so is everything in it.
         th.popup = th.modal_surface();
@@ -187,8 +187,8 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
     let ctx = super::popup::Ctx {
         th: &th,
         look: super::soft::Look::of(app),
-        set: app.icons,
-        basic: app.basic,
+        set: app.settings.icons,
+        basic: app.settings.basic,
     };
     let home = app.home().to_path_buf();
     let spinner = SPIN[app.redraw.spinner % SPIN.len()];
@@ -233,18 +233,32 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             ];
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Plan(pv) => {
-            super::plan::draw(f, &ctx, pv, &home, &app.keymap, area, &mut app.frame.hits)
-        }
+        Modal::Plan(pv) => super::plan::draw(
+            f,
+            &ctx,
+            pv,
+            &home,
+            &app.settings.keymap,
+            area,
+            &mut app.frame.hits,
+        ),
         Modal::Palette(p) => draw_palette(f, &th, p, area, &mut app.frame.hits),
         Modal::OpenWith(v) => {
             // Opened from the context menu: the menu stays in view and the list sits beside it.
             let anchor = v.under.as_deref().map(|m| {
-                super::menu::draw_behind(f, &ctx, &app.keymap, m, room);
-                super::menu::beside(&ctx, &app.keymap, m, room)
+                super::menu::draw_behind(f, &ctx, &app.settings.keymap, m, room);
+                super::menu::beside(&ctx, &app.settings.keymap, m, room)
             });
             let at = if anchor.is_some() { room } else { area };
-            super::openwith::draw(f, &ctx, &app.keymap, v, at, anchor, &mut app.frame.hits);
+            super::openwith::draw(
+                f,
+                &ctx,
+                &app.settings.keymap,
+                v,
+                at,
+                anchor,
+                &mut app.frame.hits,
+            );
         }
         Modal::Failure { info, .. } => {
             let w = 88.min(area.width.saturating_sub(4));
@@ -381,8 +395,17 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             );
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Help => draw_help(f, &ctx, area, &app.keymap, app.mouse, app.help_scroll),
-        Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, room, &mut app.frame.hits),
+        Modal::Help => draw_help(
+            f,
+            &ctx,
+            area,
+            &app.settings.keymap,
+            app.settings.mouse,
+            app.help_scroll,
+        ),
+        Modal::Menu(m) => {
+            super::menu::draw(f, &ctx, &app.settings.keymap, m, room, &mut app.frame.hits)
+        }
         Modal::Properties(p) => draw_properties(f, &ctx, p, area, &mut app.frame.hits),
         Modal::Update(u) => super::updates::draw_update(f, &ctx, u, area, &mut app.frame.hits),
         Modal::Access(d) => super::dialogs::draw_access(f, &ctx, d, area, &mut app.frame.hits),

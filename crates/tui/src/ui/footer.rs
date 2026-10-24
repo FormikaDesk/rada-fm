@@ -27,7 +27,7 @@ struct Hint {
 
 impl Hint {
     fn act(app: &App, action: Action, what: &'static str) -> Option<Hint> {
-        app.keymap.hint(action).map(|key| Hint {
+        app.settings.keymap.hint(action).map(|key| Hint {
             key,
             what,
             click: Some(Target::Act(action)),
@@ -139,7 +139,7 @@ fn hints(app: &App) -> Vec<Hint> {
 
 /// The state on the left.
 fn status<'a>(app: &App) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let mut b = Bar::default();
     b.push(Span::styled(" ", band));
@@ -166,7 +166,7 @@ fn status<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled("   ", band));
     }
     if let Some(c) = &app.ops.clipboard {
-        let icon = if app.icons == IconSet::Nerd {
+        let icon = if app.settings.icons == IconSet::Nerd {
             "\u{f0ea}"
         } else {
             "⎘"
@@ -185,7 +185,7 @@ fn status<'a>(app: &App) -> Bar<'a> {
         ));
         b.push(Span::styled("   ", band));
     }
-    if app.show_hidden {
+    if app.settings.show_hidden {
         b.push(Span::styled(
             "hidden files shown",
             th.fg(th.warn).patch(band),
@@ -197,7 +197,7 @@ fn status<'a>(app: &App) -> Bar<'a> {
 
 /// The free space of the disk the current folder is on, with a bar of how full it is.
 fn free_space<'a>(app: &App) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let mut b = Bar::default();
     let Some(v) = app
@@ -222,7 +222,7 @@ fn free_space<'a>(app: &App) -> Bar<'a> {
 }
 
 pub fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
@@ -233,7 +233,7 @@ pub fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
 
     // The hints take what is left, centred between the two sides.
     let mut mid = Bar::default();
-    if app.show_hints {
+    if app.settings.show_hints {
         let room = w.saturating_sub(lw + rw + 4);
         let mut used = 0;
         for h in hints(app) {

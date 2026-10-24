@@ -483,7 +483,7 @@ fn the_picture_has_rounded_corners_blended_into_the_background() {
     let dir = sb.path("pics");
     let mut h = H::new(sb, dir, 170, 40);
     let _ = show_photo(&mut h);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let canvas = rada_tui::theme::rgb_of(th.canvas).unwrap();
     let buf = h.term.backend().buffer().clone();
     // The cells of the picture: half blocks in colours that are no theme token.

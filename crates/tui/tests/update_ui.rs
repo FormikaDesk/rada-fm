@@ -312,7 +312,7 @@ fn a_newer_version_is_a_pill_in_the_tab_bar_that_opens_the_notes() {
     let x = (0..buf.area.width)
         .find(|&x| buf[(x, 0)].symbol() == "↑")
         .expect("the arrow");
-    assert_eq!(buf[(x, 0)].bg, h.app.th.accent);
+    assert_eq!(buf[(x, 0)].bg, h.app.settings.th.accent);
     // A click is the same as the key.
     h.click(&Target::Act(Action::Update));
     let s = h.screen();

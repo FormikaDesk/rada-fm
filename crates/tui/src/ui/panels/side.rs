@@ -63,7 +63,7 @@ pub fn draw_lower(f: &mut Frame, app: &mut App, area: Rect) {
 
 /// A rounded label: `text` in `hue` on a light touch of the same colour.
 fn chip(app: &App, text: &str, hue: Color) -> Vec<Span<'static>> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let fill = th.chip_fill(hue);
     soft::pill(
         th,
@@ -88,7 +88,7 @@ fn type_word(e: &Entry) -> String {
 }
 
 pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     if area.width < 16 || area.height < 3 {
         return;
     }
@@ -213,7 +213,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
 
     if foot_h >= 5 {
         // "Apri" is a full pill but short; the two others are coloured words.
-        let set = app.icons;
+        let set = app.settings.icons;
         let look = Look::of(app);
         let open = format!("{} {}", icons::ui(set, Glyph::Open), Key::BtnOpen.tr());
         let mut bar = Bar::default();
@@ -268,7 +268,7 @@ struct Detail {
 
 /// The rows of the box, in the order they are given up when it is short: the last goes first.
 fn details_rows(app: &App) -> Vec<Detail> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let Some(e) = app.current() else {
         return vec![Detail {
             label: "",
@@ -277,7 +277,7 @@ fn details_rows(app: &App) -> Vec<Detail> {
         }];
     };
     let text = |s: String| vec![Span::styled(s, th.base())];
-    let when = |t| fmt::date_with_day(t, app.now(), app.date_format, &app.tz);
+    let when = |t| app.settings.date_with_day(t, app.now());
     let mut rows = vec![Detail {
         label: Key::PropModified.tr(),
         value: text(when(e.mtime)),
@@ -342,7 +342,11 @@ fn details_rows(app: &App) -> Vec<Detail> {
         });
     }
     // The link to the history, with the key the keymap really gives it.
-    let key = app.keymap.hint(Action::History).unwrap_or_default();
+    let key = app
+        .settings
+        .keymap
+        .hint(Action::History)
+        .unwrap_or_default();
     rows.push(Detail {
         label: "",
         value: vec![
@@ -408,7 +412,7 @@ fn fit_value(spans: Vec<Span<'static>>, room: usize, th: &Theme) -> Vec<Span<'st
 }
 
 fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let label_w = 12;
     let inner = Rect {
         x: area.x + 1,

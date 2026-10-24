@@ -141,7 +141,7 @@ fn an_error_stays_until_it_is_closed_and_has_the_style_of_an_error() {
         s.contains("permission denied") && s.contains("Close") && s.contains("Esc"),
         "{s}"
     );
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let buf = h.term.backend().buffer().clone();
     let (x, y) = (0..buf.area.height)
         .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))

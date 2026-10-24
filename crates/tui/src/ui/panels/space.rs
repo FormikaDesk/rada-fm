@@ -102,11 +102,11 @@ pub fn ring_colors(app: &App) -> Option<crate::ring::Colors> {
         .image_ui
         .as_ref()
         .is_some_and(|u| u.is_graphics())
-        || app.basic
+        || app.settings.basic
     {
         return None;
     }
-    let th = &app.th;
+    let th = &app.settings.th;
     crate::ring::Colors::of(th.inner, th.track, th.hues.cyan, th.accent)
 }
 
@@ -131,7 +131,7 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
     if crate::ring::pieces(&mut app.frame.ring, ui, pct, &colors).is_none() {
         return false;
     }
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     // A picture the terminal draws lies over the cells: where a popup is drawn it is left out.
     if !app.frame.popup_covers.iter().any(|c| c.intersects(ring_at)) {
         for (r, proto) in app.frame.ring.as_ref().map_or(&[][..], |c| &c.pieces) {
@@ -210,7 +210,7 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
 /// A row for each of the other disks: a name, a bar and the percentage. The name gets the room
 /// it needs and the bars give up cells for it, down to [`MIN_BAR`]; only then is a name cut.
 fn other_lines(app: &App, others: &[Volume], names: &[String], w: usize) -> Vec<Line<'static>> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let pct_w = 4;
     let longest = names.iter().map(|n| n.width()).max().unwrap_or(0);
     let min_bar = if app.frame.panels_two {
@@ -235,7 +235,7 @@ fn other_lines(app: &App, others: &[Volume], names: &[String], w: usize) -> Vec<
                 Span::styled(name, th.dim()),
                 Span::styled(" ", th.base()),
             ];
-            spans.extend(bar(th, app.icons, used_share(v), bar_w, false));
+            spans.extend(bar(th, app.settings.icons, used_share(v), bar_w, false));
             spans.push(Span::styled(
                 format!(" {}", pad_left(&percent(v), pct_w)),
                 th.dim(),
@@ -246,7 +246,7 @@ fn other_lines(app: &App, others: &[Volume], names: &[String], w: usize) -> Vec<
 }
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let Some((main, others)) = volumes(app) else {
         return;
     };
@@ -282,7 +282,13 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         ]));
         let across = w.saturating_sub(2);
         let mut spans = vec![Span::styled(" ", th.base())];
-        spans.extend(bar(&th, app.icons, used_share(&main), across, app.basic));
+        spans.extend(bar(
+            &th,
+            app.settings.icons,
+            used_share(&main),
+            across,
+            app.settings.basic,
+        ));
         lines.push(Line::from(spans));
         if !compact {
             let total = main.total.unwrap_or(0);

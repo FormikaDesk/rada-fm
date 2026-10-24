@@ -103,9 +103,9 @@ fn chooser_details_mode(width: u16, chosen: Option<bool>) -> DetailsMode {
 
 fn details_mode_of(app: &App, width: u16) -> DetailsMode {
     if app.session.chooser.is_some() {
-        chooser_details_mode(width, app.details)
+        chooser_details_mode(width, app.settings.details)
     } else {
-        details_mode(width, app.details, app.layout)
+        details_mode(width, app.settings.details, app.settings.layout)
     }
 }
 
@@ -145,8 +145,8 @@ pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
 /// choices of a small layout. A file chooser never asks: it only has the classic one.
 pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
     app.session.chooser.is_none()
-        && app.layout == LayoutKind::Explorer
-        && app.layout_pref == crate::LayoutPref::Panels
+        && app.settings.layout == LayoutKind::Explorer
+        && app.settings.layout_pref == crate::LayoutPref::Panels
         && !app.size_notice_dismissed
         && app.panels_wanted(width, height).is_none()
         && (width < FULL_LAYOUT_MIN.0 || height < FULL_LAYOUT_MIN.1)
@@ -187,7 +187,7 @@ fn draw_chooser_bar(f: &mut Frame, app: &App, area: Rect) {
     let Some(ch) = &app.session.chooser else {
         return;
     };
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let title = format!(" {} ", ch.title());
@@ -213,7 +213,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         f.render_widget(Paragraph::new(Key::TooSmall.tr()), area);
         return;
     }
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     if let Some(bg) = th.bg {
         f.render_widget(Block::default().style(Style::default().bg(bg)), area);
     }
@@ -234,10 +234,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // Top to bottom: tabs, address, commands, the body, the progress of a running operation,
     // the status bar and the key hints. The hints go first when the terminal is short, the
     // command bar next; the compact layout has neither, nor the address bar.
-    let explorer = app.layout == LayoutKind::Explorer;
+    let explorer = app.settings.layout == LayoutKind::Explorer;
     let tabs_h = 1;
     // The half row of air is made of ▀: the basic profile has no such glyph.
-    let gap_h = if app.basic {
+    let gap_h = if app.settings.basic {
         0
     } else {
         top_gap_height(explorer, area.height)
@@ -254,7 +254,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let hints_h = if app.session.chooser.is_some() {
         0
     } else {
-        hints_height(explorer && app.show_hints, area.height)
+        hints_height(explorer && app.settings.show_hints, area.height)
     };
     let notice = size_notice_shown(app, area.width, area.height);
     app.frame.size_notice_visible = notice;
@@ -449,7 +449,7 @@ fn draw_folder_view(f: &mut Frame, app: &mut App, main: Rect, width: u16) {
 /// What is drawn over everything else, in either layout: the suggestions under the bar and the
 /// window in front.
 fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     if let (Some(row), true) = (address_row, app.address.is_some()) {
         address::draw_suggestions(f, app, row, area);
     }
@@ -472,13 +472,13 @@ fn popup_rects(app: &App, area: Rect) -> Vec<Rect> {
     let room = modals::popup_room(app, area);
     match &app.modal {
         None | Some(Modal::FullPreview) => Vec::new(),
-        Some(Modal::Menu(m)) => menu::rects(&ctx, &app.keymap, m, room),
+        Some(Modal::Menu(m)) => menu::rects(&ctx, &app.settings.keymap, m, room),
         Some(Modal::OpenWith(v)) => {
             let mut rects = Vec::new();
             let mut anchor = None;
             if let Some(m) = v.under.as_deref() {
-                rects.extend(menu::rects(&ctx, &app.keymap, m, room));
-                anchor = Some(menu::beside(&ctx, &app.keymap, m, room));
+                rects.extend(menu::rects(&ctx, &app.settings.keymap, m, room));
+                anchor = Some(menu::beside(&ctx, &app.settings.keymap, m, room));
             }
             let at = if anchor.is_some() { room } else { area };
             rects.push(openwith::rect(&ctx, v, at, anchor));

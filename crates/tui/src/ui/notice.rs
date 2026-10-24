@@ -67,8 +67,8 @@ fn link(text: impl Into<String>, quiet: bool, hit: NoticeHit) -> Link {
 /// (the newest two when something is running).
 pub fn cards(app: &App, now: Instant) -> Vec<Card> {
     let mut out: Vec<Card> = Vec::new();
-    let key_of = |a: Action| app.keymap.hint(a).unwrap_or_default();
-    let done = icons::ui(app.icons, Glyph::Done);
+    let key_of = |a: Action| app.settings.keymap.hint(a).unwrap_or_default();
+    let done = icons::ui(app.settings.icons, Glyph::Done);
     let mut notes: Vec<Card> = Vec::new();
     for (n, _) in app.notices.shown(now) {
         let (mark, tone) = match n.kind {
@@ -76,7 +76,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             NoticeKind::Info => ("●", Tone::Info),
             NoticeKind::Warn => ("▲", Tone::Warn),
             NoticeKind::Error => (
-                if app.icons == icons::IconSet::None {
+                if app.settings.icons == icons::IconSet::None {
                     "x"
                 } else {
                     "✕"
@@ -214,12 +214,12 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect, now: Instant) {
     if cards.is_empty() || area.width < 24 || area.height < 4 {
         return;
     }
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let ctx = Ctx {
         th: &th,
         look: super::soft::Look::of(app),
-        set: app.icons,
-        basic: app.basic,
+        set: app.settings.icons,
+        basic: app.settings.basic,
     };
     let width = common_width(&cards, area.width as usize);
     let total: u16 = cards.iter().map(|c| height(c, width)).sum();

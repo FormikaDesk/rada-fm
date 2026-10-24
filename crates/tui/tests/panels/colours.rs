@@ -8,7 +8,7 @@ use ratatui::style::Color;
 fn selected_row_has_the_selection_fill() {
     for name in THEMES {
         let mut h = scene(160, 46, name, true);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let buf = h.redrawn_buffer();
         // The row of photo.jpg: a run of cells with the cursor colour as their background.
         let (x, y) = (0..buf.area.height)
@@ -55,7 +55,7 @@ fn selected_row_has_the_selection_fill() {
 fn every_colour_of_the_panels_is_a_theme_token_in_every_theme() {
     for name in Theme::NAMES {
         let mut h = scene(160, 46, name, true);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let allowed = th.all_colors();
         let buf = h.redrawn_buffer();
         for y in 0..buf.area.height {

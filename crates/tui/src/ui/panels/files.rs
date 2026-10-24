@@ -36,9 +36,9 @@ struct Cols {
 }
 
 fn columns(app: &App, width: usize) -> Cols {
-    let icon = app.icons.width();
+    let icon = app.settings.icons.width();
     let size = Key::ColSize.tr().width() + 2;
-    let date = match app.dates {
+    let date = match app.settings.dates {
         DateStyle::Relative => 14,
         DateStyle::Absolute => 16,
     }
@@ -67,7 +67,7 @@ fn columns(app: &App, width: usize) -> Cols {
 }
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     if area.height < 2 || area.width < 24 {
         return;
@@ -197,7 +197,7 @@ fn row<'a>(
     cols: &Cols,
     width: usize,
 ) -> Line<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let marked = app.marked.contains(&e.name);
     // The selected row is filled with the selection colour and its text is the theme's text
     // for it, in every column (a quieter tone would not read on it).
@@ -217,7 +217,7 @@ fn row<'a>(
             s.patch(row_style)
         }
     };
-    let (glyph, gcolor) = icons::icon(e, app.icons, th);
+    let (glyph, gcolor) = icons::icon(e, app.settings.icons, th);
     let broken = e
         .link
         .as_ref()
@@ -235,7 +235,7 @@ fn row<'a>(
     if e.is_navigable_dir() || is_cursor || marked {
         name_style = name_style.add_modifier(Modifier::BOLD);
     }
-    let tick = icons::ui(app.icons, Glyph::Checked);
+    let tick = icons::ui(app.settings.icons, Glyph::Checked);
     let mut spans: Vec<Span> = vec![
         Span::styled(" ", with(Style::default())),
         Span::styled(

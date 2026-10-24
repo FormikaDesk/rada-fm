@@ -230,7 +230,7 @@ impl H {
         // A double click is two clicks within a time. The tests do not depend on how fast a
         // machine is: any two clicks of a test are a double click unless the test says
         // otherwise (see `a_slow_second_click_is_not_a_double_click`).
-        app.double_click = Duration::from_secs(600);
+        app.settings.double_click = Duration::from_secs(600);
         let mut h = H {
             app,
             term: Terminal::new(TestBackend::new(w, h)).unwrap(),
@@ -543,8 +543,8 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     let mut h = H::new(sb, dir, w, h);
     h.wait("the places", |a| !a.places.paths.places.is_empty());
     h.app.hooks.clock = Some(demo_now());
-    h.app.details = None;
-    h.app.tz = jiff::tz::TimeZone::UTC;
+    h.app.settings.details = None;
+    h.app.settings.tz = jiff::tz::TimeZone::UTC;
     // Creation times are the real ones of the sandbox: leave them out of the screenshots.
     let entries: Vec<rada_core::model::Entry> = h.app.listing.all().to_vec();
     h.app.listing.apply(

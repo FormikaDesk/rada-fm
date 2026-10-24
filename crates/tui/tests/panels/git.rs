@@ -135,10 +135,10 @@ fn git_is_never_called_when_it_is_off() {
 #[test]
 fn the_git_labels_are_pills_and_every_colour_of_them_is_the_themes() {
     let Some(mut h) = git_scene() else { return };
-    h.app.icons = IconSet::Nerd;
+    h.app.settings.icons = IconSet::Nerd;
     for name in ["main.rs", "setup.sh"] {
         put_cursor(&mut h, name);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let buf = h.redrawn_buffer();
         let behind = [th.inner, th.canvas];
         assert_pills(&buf, &format!("git, on {name}"), &behind);

@@ -236,7 +236,7 @@ fn event_loop(
     let cmd_keys = cfg.cmd_keys && caps.may_query && ask_for_cmd_keys();
     match_terminal_background(&cfg.theme, caps);
     let mut app = App::new(cfg, svc, image_ui);
-    app.keymap.prefer_cmd = cmd_keys;
+    app.settings.keymap.prefer_cmd = cmd_keys;
     tracing::info!("Cmd key reported by the terminal: {cmd_keys}");
     for key in replay {
         app.on_key(key);

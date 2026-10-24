@@ -227,7 +227,7 @@ fn the_hints_follow_the_keymap_in_use() {
     use rada_tui::keymap::{Keymap, Preset};
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 200, 30);
-    h.app.keymap = Keymap::new(Preset::Vim, &Default::default());
+    h.app.settings.keymap = Keymap::new(Preset::Vim, &Default::default());
     let row = hints_row(&mut h);
     assert!(
         row.contains(" y ") && row.contains("copy") && !row.contains("Ctrl+C"),
@@ -236,7 +236,7 @@ fn the_hints_follow_the_keymap_in_use() {
     // A rebound key shows its new name.
     let mut keys = std::collections::HashMap::new();
     keys.insert("copy".to_string(), vec!["f9".to_string()]);
-    h.app.keymap = Keymap::new(Preset::VimClassic, &keys);
+    h.app.settings.keymap = Keymap::new(Preset::VimClassic, &keys);
     let row = hints_row(&mut h);
     assert!(row.contains("F9") && row.contains("copy"), "{row}");
 }
@@ -245,7 +245,7 @@ fn the_hints_follow_the_keymap_in_use() {
 fn hints_can_be_switched_off_and_the_status_stays() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 160, 30);
-    h.app.show_hints = false;
+    h.app.settings.show_hints = false;
     let last = hints_row(&mut h);
     assert!(
         !last.contains("Ctrl+C") && last.contains("items"),

@@ -55,10 +55,10 @@ impl Level {
 }
 
 fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let look = Look::of(app);
     let bar = Style::default().bg(th.cmdbar);
-    let set = app.icons;
+    let set = app.settings.icons;
     let ro = app.archive.is_some();
     let nowhere = ro || app.tag_view().is_some();
     let has_target = !app.marked.is_empty() || app.current().is_some();
@@ -211,13 +211,13 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
 }
 
 pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let bar = Style::default().bg(th.cmdbar);
     let w = area.width as usize;
     // With three rows the outer two are half blocks in the bar's colour.
     let inner = if area.height >= 3 {
         // The basic profile has ASCII only: there the edge rows are the bar's colour itself.
-        let basic = app.basic;
+        let basic = app.settings.basic;
         let edge = |glyph: &str| {
             let (glyph, style) = if basic {
                 (" ", bar)
@@ -245,7 +245,7 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
     };
     f.render_widget(Block::default().style(bar), inner);
 
-    let more = icons::ui(app.icons, Glyph::More);
+    let more = icons::ui(app.settings.icons, Glyph::More);
     let more_w = more.width() + 1;
     // The fullest version that fits, with room kept for the "more" button.
     let tries = [

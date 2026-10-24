@@ -432,6 +432,7 @@ mod ops;
 mod panels;
 mod preview;
 mod props;
+mod settings;
 mod side;
 mod sizes;
 pub use sizes::FolderSizeView;
@@ -475,8 +476,8 @@ fn svc_tag_language(svc: &Services) -> String {
 }
 
 pub struct App {
-    pub th: Theme,
-    pub icons: IconSet,
+    /// What comes from `config.toml` and the View menu.
+    pub settings: settings::Settings,
     svc: Services,
     /// What only tests and screenshots use.
     pub hooks: TestHooks,
@@ -491,7 +492,6 @@ pub struct App {
     pub cursor: usize,
     pub scroll: usize,
     pub marked: BTreeSet<OsString>,
-    pub show_hidden: bool,
     pub sort: SortSpec,
     /// The order of this tab was chosen by the person (a click on a column title, the Sort
     /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
@@ -526,9 +526,6 @@ pub struct App {
     pub session: chooser::Session,
     pub redraw: Redraw,
 
-    pub keymap: Keymap,
-    pub mouse: bool,
-    pub show_hints: bool,
     /// The sidebar and the NAV box: the keyboard in them, their cursors and the tree.
     pub side_nav: side::SideNav,
     /// What the last frame drew, for the keyboard, the mouse and the tests.
@@ -536,32 +533,13 @@ pub struct App {
     pub filter: Option<FilterState>,
     sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
-    /// How soon a second click on the same row makes a double click.
-    pub double_click: Duration,
     pub help_scroll: usize,
 
     // ---- the explorer interface
     /// How the folder of the front tab is shown.
     pub view: ViewMode,
-    pub layout: LayoutKind,
-    /// The details pane: `None` follows the width of the terminal.
-    pub details: Option<bool>,
-    /// Panels, the classic layout, or whichever fits the window (the View menu sets it).
-    pub layout_pref: crate::panels::LayoutPref,
-    pub dates: DateStyle,
-    pub date_format: DateFormat,
-    /// How much room the sidebar leaves between its entries (`sidebar_density`).
-    pub sidebar_density: crate::sidebar::Density,
-    /// What the NAV box lists under the places (`nav`).
-    pub nav_mode: crate::panels::NavMode,
-    /// The basic profile: the soft shapes (rounded ends, shades) give way to plain ones.
-    pub basic: bool,
-    /// The Tag column of the list is shown.
-    pub show_tags: bool,
     /// What is worked out about the folder shown.
     pub folder_info: panels::FolderInfo,
-    /// The time zone dates are shown in (the system's; tests pin it).
-    pub tz: jiff::tz::TimeZone,
     pub remember_tabs: bool,
     /// The tabs; the slot of the front one is empty, its state lives in the fields above.
     tabs: Vec<TabState>,
@@ -619,8 +597,25 @@ impl App {
         tab_slots[active] = TabState::default();
 
         let mut app = App {
-            th: cfg.theme,
-            icons: cfg.icons,
+            settings: settings::Settings {
+                th: cfg.theme,
+                icons: cfg.icons,
+                keymap: cfg.keymap,
+                mouse: cfg.mouse,
+                show_hints: cfg.show_hints,
+                show_hidden: cfg.show_hidden,
+                double_click: Duration::from_millis(400),
+                dates: cfg.dates,
+                date_format: cfg.date_format,
+                sidebar_density: cfg.sidebar_density,
+                nav_mode: cfg.nav_mode,
+                basic: cfg.basic,
+                show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
+                tz: jiff::tz::TimeZone::system(),
+                layout: cfg.layout,
+                layout_pref: cfg.layout_pref,
+                details: cfg.details_pane,
+            },
             cwd: start_dir.clone(),
             archive: None,
             listing: DirListing::new(start_dir.clone(), Vec::new(), sort),
@@ -630,7 +625,6 @@ impl App {
             cursor: 0,
             scroll: 0,
             marked: BTreeSet::new(),
-            show_hidden: cfg.show_hidden,
             sort,
             sort_chosen,
             sort_outside_recents: None,
@@ -654,28 +648,14 @@ impl App {
                 redraw_at: Vec::new(),
                 spinner: 0,
             },
-            keymap: cfg.keymap,
-            mouse: cfg.mouse,
-            show_hints: cfg.show_hints,
             side_nav: side::SideNav::new(cfg.sidebar),
             frame: Default::default(),
             filter: None,
             sel_anchor: None,
             last_click: None,
-            double_click: Duration::from_millis(400),
             help_scroll: 0,
             view,
-            layout: cfg.layout,
-            details: cfg.details_pane,
-            layout_pref: cfg.layout_pref,
-            dates: cfg.dates,
-            date_format: cfg.date_format,
-            sidebar_density: cfg.sidebar_density,
-            nav_mode: cfg.nav_mode,
-            basic: cfg.basic,
-            show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
             folder_info: Default::default(),
-            tz: jiff::tz::TimeZone::system(),
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
             active_tab: active,
@@ -697,7 +677,7 @@ impl App {
                 ..TestHooks::default()
             },
         };
-        for w in std::mem::take(&mut app.keymap.warnings) {
+        for w in std::mem::take(&mut app.settings.keymap.warnings) {
             tracing::warn!("keymap: {w}");
         }
         if !app.svc.journal_ok {
@@ -847,7 +827,7 @@ impl App {
 
     fn rebuild_visible(&mut self) {
         self.folder_info.date_cache.clear();
-        let show = self.show_hidden;
+        let show = self.settings.show_hidden;
         // Choosing a folder: only folders are listed.
         let dirs_only = self
             .session
@@ -994,7 +974,7 @@ impl App {
             return;
         };
         let path = e.path.clone();
-        if let Some((generation, limits)) = self.preview.ask(&path, self.show_hidden) {
+        if let Some((generation, limits)) = self.preview.ask(&path, self.settings.show_hidden) {
             self.svc.previewer.request(path, generation, limits);
         }
     }
@@ -1062,7 +1042,7 @@ impl App {
     /// and at least one item of the folder carries one. A folder with none has nothing to put
     /// in it, and the room goes to the names.
     pub fn tags_column_wanted(&self) -> bool {
-        self.show_tags
+        self.settings.show_tags
             && self.tags_supported()
             && self.listing.all().iter().any(|e| !e.tags.is_empty())
     }
@@ -1460,10 +1440,10 @@ impl App {
     fn on_preview(&mut self, ev: PreviewEvent) {
         // Rounded corners, blended into the colour behind the picture (the theme's own
         // background, or its canvas).
-        let bg = if self.basic {
+        let bg = if self.settings.basic {
             None
         } else {
-            crate::theme::rgb_of(self.th.bg.unwrap_or(self.th.canvas))
+            crate::theme::rgb_of(self.settings.th.bg.unwrap_or(self.settings.th.canvas))
         };
         self.preview.show(ev, bg);
     }
@@ -2905,13 +2885,7 @@ impl App {
             if let Some(slot @ None) = self.folder_info.date_cache.get_mut(i)
                 && let Some(e) = self.listing.all().get(i)
             {
-                *slot = Some(fmt::explorer_date_in(
-                    e.used.or(e.mtime),
-                    now,
-                    self.dates,
-                    self.date_format,
-                    &self.tz,
-                ));
+                *slot = Some(self.settings.explorer_date(e.used.or(e.mtime), now));
             }
         }
     }

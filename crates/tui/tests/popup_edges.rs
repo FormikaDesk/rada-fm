@@ -29,8 +29,8 @@ fn scene(theme: &str, w: u16, h: u16, files: usize) -> H {
     let dir = sb.path("w");
     let mut hh = H::new(sb, dir, w, h);
     // The list takes the width: what lies behind the cards is the list.
-    hh.app.details = Some(false);
-    hh.app.th = Theme::named(theme, ColorDepth::True).unwrap();
+    hh.app.settings.details = Some(false);
+    hh.app.settings.th = Theme::named(theme, ColorDepth::True).unwrap();
     hh
 }
 
@@ -241,7 +241,7 @@ fn open_a_submenu(h: &mut H) {
 fn menu_border_is_the_colour_behind() {
     for name in THEMES {
         let mut h = scene(name, 120, 36, 12);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         // The menu of the empty part of the list: New, Sort by and View open menus on every
         // system (the menu of an item has Tags only where the system keeps them).
         let before = buffer(&mut h);
@@ -267,7 +267,7 @@ fn menu_near_bottom_clears_the_status_bar() {
     for name in THEMES {
         let (w, hgt) = (120u16, 30u16);
         let mut h = scene(name, w, hgt, 60);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         h.keys("G");
         // Drawn once, so that the rows are known.
         let _ = buffer(&mut h);
@@ -305,7 +305,7 @@ fn a_submenu_that_opens_on_the_left_has_no_dark_strip_and_no_empty_row() {
     for name in THEMES {
         // The menu opened at the right edge: its submenu has no room beside it on that side.
         let mut h = scene(name, 100, 30, 12);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let before = buffer(&mut h);
         right_click_at(&mut h, 98, 24);
         open_a_submenu(&mut h);
@@ -328,7 +328,7 @@ fn a_submenu_that_opens_on_the_left_has_no_dark_strip_and_no_empty_row() {
 fn the_window_that_asks_before_deleting_is_one_tone_inside_its_line() {
     for name in THEMES {
         let mut h = scene(name, 120, 36, 6);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let before = buffer(&mut h);
         h.keys("D");
         plan_modal(&mut h);
@@ -365,7 +365,7 @@ fn the_window_that_asks_before_deleting_is_one_tone_inside_its_line() {
 fn notice_border_is_the_colour_behind() {
     for name in THEMES {
         let mut h = scene(name, 120, 36, 6);
-        let th = h.app.th.clone();
+        let th = h.app.settings.th.clone();
         let before = buffer(&mut h);
         h.app.notify(
             Notice::new(NoticeKind::Ok, "3 items moved to the trash")
@@ -394,7 +394,7 @@ fn notice_border_is_the_colour_behind() {
 fn a_notification_is_still_a_card_with_its_colour_at_the_side() {
     // The colour of the state is on the left, the border's own line on the other sides.
     let mut h = scene("rada", 120, 36, 6);
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     h.app
         .notify(Notice::new(NoticeKind::Ok, "3 items moved to the trash"));
     let b = buffer(&mut h);
@@ -411,7 +411,7 @@ fn submenu_touches_its_menu() {
     for name in THEMES {
         for (side, click_x) in [("right", 31u16), ("left", 138u16)] {
             let mut h = scene(name, 140, 30, 12);
-            let th = h.app.th.clone();
+            let th = h.app.settings.th.clone();
             // The cursor is on a row that the menu and its submenu both cover.
             h.app.cursor = 8;
             let before = buffer(&mut h);

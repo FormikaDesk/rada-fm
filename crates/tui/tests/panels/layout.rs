@@ -127,7 +127,7 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
 
     // Panels asked for: drawn in a window that auto would give the classic layout.
     choose_in_view_menu(&mut h, "panels");
-    assert_eq!(h.app.layout_pref, LayoutPref::Panels);
+    assert_eq!(h.app.settings.layout_pref, LayoutPref::Panels);
     let _ = h.screen();
     assert!(
         h.app.frame.panels_shown && !h.app.frame.panels_two,

@@ -128,7 +128,7 @@ fn a_tagged_file_shows_dots_in_its_colours_in_the_tag_column() {
     let sub_row = s.lines().find(|l| l.contains(" sub")).unwrap();
     assert!(!after(sub_row, "sub").contains('●'), "{sub_row}");
     // The dot is drawn in the tag's colour.
-    let red = h.app.th.tag_color(Some(TagColor::Red));
+    let red = h.app.settings.th.tag_color(Some(TagColor::Red));
     let buf = h.term.backend().buffer().clone();
     let mut found = false;
     for y in 0..buf.area.height {
@@ -468,7 +468,7 @@ fn tag_column_hidden_from_view_menu() {
         guard += 1;
     }
     h.key(KeyCode::Enter);
-    assert!(!h.app.show_tags);
+    assert!(!h.app.settings.show_tags);
     assert!(!titles(&mut h).contains("Tags"), "{}", titles(&mut h));
     // The dots are gone from the list too (the details pane still has them).
     let a_row = h
@@ -480,7 +480,7 @@ fn tag_column_hidden_from_view_menu() {
     assert!(!a_row.contains("● ●"), "{a_row}");
     // Brought back by its key.
     h.press("f8");
-    assert!(h.app.show_tags && titles(&mut h).contains("Tags"));
+    assert!(h.app.settings.show_tags && titles(&mut h).contains("Tags"));
 }
 
 #[test]
@@ -490,7 +490,7 @@ fn config_and_choice_decide_tag_column() {
     };
     // `tags_column = false` in the configuration.
     let mut h = H::with_config(sb, dir, 170, 30, |c| c.tags_column = Some(false));
-    assert!(!h.app.show_tags);
+    assert!(!h.app.settings.show_tags);
     assert!(!titles(&mut h).contains("Tags"));
 
     // What was chosen last time, when the configuration says nothing.
@@ -498,7 +498,7 @@ fn config_and_choice_decide_tag_column() {
         return;
     };
     let h = H::with_config(sb, dir, 170, 30, |c| c.saved_ui.tags_column = Some(false));
-    assert!(!h.app.show_tags);
+    assert!(!h.app.settings.show_tags);
     // And the file wins over what was remembered.
     let Some((sb, dir)) = scene(&[("a.txt", &["Red"])]) else {
         return;
@@ -507,7 +507,7 @@ fn config_and_choice_decide_tag_column() {
         c.tags_column = Some(true);
         c.saved_ui.tags_column = Some(false);
     });
-    assert!(h.app.show_tags);
+    assert!(h.app.settings.show_tags);
 }
 
 #[test]
@@ -522,7 +522,7 @@ fn up_to_three_dots_then_plus_n_and_a_tag_with_no_colour_is_a_dim_dot() {
     let s = h.screen();
     let a = s.lines().find(|l| l.contains("a.txt")).unwrap();
     assert!(a.contains("● ● ● +2"), "{a}");
-    let th = h.app.th.clone();
+    let th = h.app.settings.th.clone();
     let buf = h.term.backend().buffer().clone();
     let y = (0..buf.area.height)
         .find(|&y| {
@@ -563,7 +563,7 @@ fn a_folder_without_tags_gives_the_tag_column_to_the_names() {
     // No file here carries a tag, and the window is as narrow as the date column allows.
     let (sb, dir) = sandbox_with_files();
     let mut h = H::with_config(sb, dir.clone(), 90, 24, |c| c.details_pane = Some(false));
-    assert!(h.app.tags_supported() && h.app.show_tags);
+    assert!(h.app.tags_supported() && h.app.settings.show_tags);
     let (name, tags) = name_width_and_tags(&mut h);
     assert!(!tags, "{}", titles(&mut h));
     // What the name had before: the table of the same width with the Tag column let in.
@@ -574,7 +574,7 @@ fn a_folder_without_tags_gives_the_tag_column_to_the_names() {
         show_tags,
     };
     let rel = rada_tui::fmt::DateStyle::Relative;
-    let icons = h.app.icons.width();
+    let icons = h.app.settings.icons.width();
     assert_eq!(name, list_columns(area, opts(false), icons, rel).name);
     let before = list_columns(area, opts(true), icons, rel);
     assert!(

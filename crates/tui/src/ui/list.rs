@@ -123,10 +123,15 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
 
 /// Draw the table of the front tab in `area` (any area: nothing here knows where it is).
 pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let count = app.visible.len();
-    let cols = columns(area.width as usize, opts, app.icons.width(), app.dates);
+    let cols = columns(
+        area.width as usize,
+        opts,
+        app.settings.icons.width(),
+        app.settings.dates,
+    );
 
     // Column titles, in a pill of their own; the sorted one carries an arrow.
     let head_bg = Style::default().bg(th.field);
@@ -154,7 +159,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         format!(
             " {} ",
             icons::ui(
-                app.icons,
+                app.settings.icons,
                 if all_marked {
                     Glyph::Checked
                 } else {
@@ -309,7 +314,7 @@ fn row<'a>(
     width: usize,
     look: Look,
 ) -> Line<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let marked = app.marked.contains(&e.name);
     // The cursor row is solid with white text; selected rows are a quiet tone; the cursor on
     // a selected row wins, but its tick stays.
@@ -330,7 +335,7 @@ fn row<'a>(
         }
     };
 
-    let (glyph, gcolor) = icons::icon(e, app.icons, th);
+    let (glyph, gcolor) = icons::icon(e, app.settings.icons, th);
     let broken = e
         .link
         .as_ref()
@@ -350,7 +355,7 @@ fn row<'a>(
     }
 
     let check = icons::ui(
-        app.icons,
+        app.settings.icons,
         if marked {
             Glyph::Checked
         } else {

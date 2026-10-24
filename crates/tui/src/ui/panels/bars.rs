@@ -21,7 +21,7 @@ use crate::ui::widgets::Bar;
 
 /// The branch with its icon, and how far it is from its upstream: `⎇ main ↑2 ↓1`.
 pub fn branch_text(app: &App, git: &GitStatus) -> String {
-    let icon = icons::ui(app.icons, Glyph::Branch);
+    let icon = icons::ui(app.settings.icons, Glyph::Branch);
     let mut s = String::new();
     if !icon.is_empty() {
         s.push_str(icon);
@@ -43,7 +43,7 @@ pub fn folder_edge(app: &App) -> Edge {
     let Some(git) = app.git_here() else {
         return Edge::NONE;
     };
-    let th = &app.th;
+    let th = &app.settings.th;
     let mut right = vec![Span::styled(
         branch_text(app, git),
         th.fg(th.hues.pink).add_modifier(Modifier::BOLD),
@@ -64,7 +64,7 @@ pub fn folder_edge(app: &App) -> Edge {
 }
 
 pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let band = th.band();
     let look = Look::of(app);
     f.render_widget(Block::default().style(band), area);
@@ -79,7 +79,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
                 format!(
                     "v{} {}",
                     app.version(),
-                    icons::ui(app.icons, Glyph::Refresh)
+                    icons::ui(app.settings.icons, Glyph::Refresh)
                 ),
                 th.dim().patch(band),
             ),
@@ -113,7 +113,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
             .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
-        let tick = icons::ui(app.icons, Glyph::Checked);
+        let tick = icons::ui(app.settings.icons, Glyph::Checked);
         left.push(sep());
         left.push(Span::styled(
             format!(
@@ -131,7 +131,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
         ));
     }
     if let Some(c) = &app.ops.clipboard {
-        let icon = icons::ui(app.icons, Glyph::Clipboard);
+        let icon = icons::ui(app.settings.icons, Glyph::Clipboard);
         let verb = if c.mode == rada_core::ops::TransferMode::Copy {
             Key::ReadyPaste
         } else {
@@ -160,7 +160,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
             th.fg(th.hues.pink).patch(band),
         ));
     }
-    if app.show_hidden {
+    if app.settings.show_hidden {
         left.push(sep());
         left.push(Span::styled(
             Key::HiddenShown.tr(),

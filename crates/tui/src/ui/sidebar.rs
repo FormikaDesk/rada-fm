@@ -100,7 +100,7 @@ fn choose_air(items: &[Item], rail: bool, height: usize, density: Density) -> Ai
 }
 
 pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let items = app.side_items();
     if items.is_empty() || area.height == 0 {
@@ -113,7 +113,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
         .focus
         .then_some(app.side_nav.side_cursor.min(items.len() - 1));
     let height = area.height as usize;
-    let air = choose_air(&items, rail, height, app.sidebar_density);
+    let air = choose_air(&items, rail, height, app.settings.sidebar_density);
     let mut rows = layout(&items, rail, air);
     // The trash sits at the bottom of the pane when there is room to spare above it.
     let mut trash_row: Option<Row> = None;
@@ -136,7 +136,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
     let skip = (anchor_row + 1).saturating_sub(height);
 
     let w = area.width as usize;
-    let pin = icons::ui(app.icons, Glyph::Pin);
+    let pin = icons::ui(app.settings.icons, Glyph::Pin);
     let mut placed: Vec<(u16, &Row)> = rows
         .iter()
         .skip(skip)
@@ -195,16 +195,16 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         .map(|u| fmt::size(u.free))
                         .unwrap_or_default();
                     let free_w = free.width().max(7);
-                    let bar_w = segment_bar_width(app.basic);
+                    let bar_w = segment_bar_width(app.settings.basic);
                     // Under the name of the disk, where the name starts.
-                    let indent = if item.glyph(app.icons).is_empty() {
+                    let indent = if item.glyph(app.settings.icons).is_empty() {
                         4
                     } else {
                         5
                     };
                     spans.push(Span::styled(" ".repeat(indent), row_style));
                     if let Some(u) = &item.usage {
-                        spans.extend(segment_bar(&th, u.used, app.basic, row_style.bg));
+                        spans.extend(segment_bar(&th, u.used, app.settings.basic, row_style.bg));
                     }
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     // What is free is pushed to the right edge, with a column of air before the
@@ -231,7 +231,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     _ if marked => th.accent,
                     _ => th.text_dim,
                 };
-                let glyph = item.glyph(app.icons);
+                let glyph = item.glyph(app.settings.icons);
                 let mark = if glyph.is_empty() && rail {
                     item.initial()
                 } else {
@@ -265,7 +265,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     // ones pinned by hand).
                     let pinned = matches!(item.section, Section::Pinned)
                         && !matches!(item.origin, Origin::Device(_));
-                    let lock = match app.icons {
+                    let lock = match app.settings.icons {
                         icons::IconSet::Nerd => "\u{f023}",
                         icons::IconSet::UnicodeIcons | icons::IconSet::UnicodeStd => "⊘",
                         icons::IconSet::None => "!",

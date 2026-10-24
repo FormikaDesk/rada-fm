@@ -105,8 +105,8 @@ fn basic_screen(h: &mut H, w: u16, rows: u16) -> String {
 #[test]
 fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
     let (mut h, dest) = files(120, 36);
-    h.app.basic = true;
-    h.app.icons = rada_tui::IconSet::None;
+    h.app.settings.basic = true;
+    h.app.settings.icons = rada_tui::IconSet::None;
     h.keys("j");
     let (x, y) = h.where_is(&Target::Row(h.app.cursor));
     h.mouse(

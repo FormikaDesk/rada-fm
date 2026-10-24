@@ -33,7 +33,7 @@ fn harness() -> H {
 fn ctrl_c_copies_and_never_quits() {
     for preset in [Preset::VimClassic, Preset::Vim, Preset::Classic] {
         let mut h = harness();
-        h.app.keymap = Keymap::new(preset, &HashMap::new());
+        h.app.settings.keymap = Keymap::new(preset, &HashMap::new());
         h.press("ctrl+c");
         h.press("ctrl+c");
         h.press("ctrl+c");
@@ -166,7 +166,9 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         }),
         ("refresh", "f5", |h| h.app.is_loading()),
         ("new tab", "ctrl+t", |h| h.app.tab_count() == 2),
-        ("details", "alt+p", |h| h.app.details == Some(false)),
+        ("details", "alt+p", |h| {
+            h.app.settings.details == Some(false)
+        }),
         ("view", "v", |h| h.app.view == rada_tui::ViewMode::Icons),
         ("commands", "ctrl+p", |h| h.app.address.is_some()),
         ("search", "/", |h| h.app.address.is_some()),
@@ -186,7 +188,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("quit", "q", |h| h.app.session.should_quit),
         ("quit", "ctrl+q", |h| h.app.session.should_quit),
         ("select all", "ctrl+a", |h| h.app.marked.len() == 6),
-        ("hidden", ".", |h| h.app.show_hidden),
+        ("hidden", ".", |h| h.app.settings.show_hidden),
         ("sort", "s", |h| h.app.sort_label().starts_with("size")),
     ];
     for (what, key, check) in cases {
@@ -212,7 +214,7 @@ fn redoing(h: &H) -> bool {
 #[test]
 fn presets_ignore_each_others_keys() {
     let mut h = harness();
-    h.app.keymap = Keymap::new(Preset::Vim, &HashMap::new());
+    h.app.settings.keymap = Keymap::new(Preset::Vim, &HashMap::new());
     h.press("ctrl+a");
     assert!(h.marked_names().is_empty());
     h.press("delete");
@@ -221,7 +223,7 @@ fn presets_ignore_each_others_keys() {
     assert!(h.app.ops.clipboard.is_some());
 
     let mut h = harness();
-    h.app.keymap = Keymap::new(Preset::Classic, &HashMap::new());
+    h.app.settings.keymap = Keymap::new(Preset::Classic, &HashMap::new());
     h.keys("y");
     assert!(h.app.ops.clipboard.is_none());
     h.keys("q");
@@ -236,13 +238,13 @@ fn keys_can_be_rebound_from_the_configuration() {
     let mut o = HashMap::new();
     o.insert("quit".to_string(), vec!["ctrl+w".to_string()]);
     o.insert("copy".to_string(), vec!["c".to_string()]);
-    h.app.keymap = Keymap::new(Preset::VimClassic, &o);
+    h.app.settings.keymap = Keymap::new(Preset::VimClassic, &o);
     h.keys("q");
     assert!(!h.app.session.should_quit, "q no longer quits");
     h.press("ctrl+w");
     assert!(h.app.session.should_quit);
     let mut h = harness();
-    h.app.keymap = Keymap::new(Preset::VimClassic, &o);
+    h.app.settings.keymap = Keymap::new(Preset::VimClassic, &o);
     h.keys("c");
     assert!(h.app.ops.clipboard.is_some());
     h.app.ops.clipboard = None;
@@ -381,7 +383,7 @@ fn a_slow_second_click_is_not_a_double_click() {
     let mut h = harness();
     // Two clicks are a double click when the second comes within this long after the first:
     // a short time here, and a pause well beyond it, whatever the speed of the machine.
-    h.app.double_click = std::time::Duration::from_millis(30);
+    h.app.settings.double_click = std::time::Duration::from_millis(30);
     let dir_row = Target::Row(0);
     h.click(&dir_row);
     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -633,7 +635,7 @@ fn places_are_offered_too_and_a_click_goes_there() {
 #[test]
 fn with_the_mouse_off_nothing_reacts() {
     let mut h = harness();
-    h.app.mouse = false;
+    h.app.settings.mouse = false;
     let (x, y) = h.where_is(&Target::Row(3));
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),

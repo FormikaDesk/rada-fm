@@ -31,7 +31,7 @@ struct Hint {
 
 impl Hint {
     fn act(app: &App, action: Action, what: Key) -> Option<Hint> {
-        app.keymap.hint(action).map(|key| Hint {
+        app.settings.keymap.hint(action).map(|key| Hint {
             key,
             what,
             click: Some(Target::Act(action)),
@@ -217,7 +217,7 @@ pub(super) fn count_text(app: &App) -> String {
 }
 
 fn status_left<'a>(app: &App) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let mut b = Bar::default();
     b.push(Span::styled(" ", band));
@@ -228,7 +228,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         ));
         b.push(Span::styled("  │  ", th.faint().patch(band)));
     }
-    if app.layout == LayoutKind::Compact {
+    if app.settings.layout == LayoutKind::Compact {
         b.push(Span::styled(
             match app.view_title() {
                 Some(title) => title,
@@ -247,7 +247,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
             .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
-        let tick = icons::ui(app.icons, Glyph::Checked);
+        let tick = icons::ui(app.settings.icons, Glyph::Checked);
         b.push(Span::styled("  │  ", th.faint().patch(band)));
         b.push(Span::styled(
             format!(
@@ -265,7 +265,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         ));
     }
     if let Some(c) = &app.ops.clipboard {
-        let icon = icons::ui(app.icons, Glyph::Clipboard);
+        let icon = icons::ui(app.settings.icons, Glyph::Clipboard);
         let verb = if c.mode == rada_core::ops::TransferMode::Copy {
             Key::ReadyPaste
         } else {
@@ -287,7 +287,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
             th.fg(th.kinds.vector).patch(band),
         ));
     }
-    if app.show_hidden {
+    if app.settings.show_hidden {
         b.push(Span::styled("  │  ", th.faint().patch(band)));
         b.push(Span::styled(
             Key::HiddenShown.tr(),
@@ -301,7 +301,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
 /// the rest of the status (which gives way, down to a few cells).
 pub(super) fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -> Option<Bar<'a>> {
     let (variants, clickable) = app.update_notice()?;
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let failed = matches!(app.updates.update, crate::app::UpdateStatus::Failed { .. });
     let keep_for_count = 12.min(left_width);
@@ -330,7 +330,7 @@ pub(super) fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -
 /// The free space of the disk the current folder is on, with a bar of ten segments for how
 /// full it is.
 pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let mut b = Bar::default();
     let Some(v) = app
@@ -349,7 +349,8 @@ pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
     ));
     if with_bar && let Some(total) = v.total.filter(|t| *t > 0) {
         let used = 1.0 - avail as f64 / total as f64;
-        b.spans.extend(segment_bar(th, used, app.basic, band.bg));
+        b.spans
+            .extend(segment_bar(th, used, app.settings.basic, band.bg));
         b.push(Span::styled(" ", band));
     }
     b
@@ -357,7 +358,7 @@ pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
 
 /// The buttons that switch between Details, Icons and Columns: the one in use is a pill.
 fn view_buttons<'a>(app: &App) -> Bar<'a> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let look = Look::of(app);
     let mut b = Bar::default();
@@ -366,7 +367,7 @@ fn view_buttons<'a>(app: &App) -> Bar<'a> {
         (ViewMode::Icons, Glyph::Icons),
         (ViewMode::Columns, Glyph::Columns),
     ] {
-        let g = icons::ui(app.icons, glyph);
+        let g = icons::ui(app.settings.icons, glyph);
         if app.view == mode {
             b.push_hits(
                 soft::pill(th, look, g, th.accent, th.pill(), band),
@@ -384,7 +385,7 @@ fn view_buttons<'a>(app: &App) -> Bar<'a> {
 }
 
 pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
@@ -435,12 +436,12 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
 /// rounded with Nerd Font glyphs, a plain rectangle with a space on each side otherwise —
 /// and its description faint after it.
 pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let strip = Style::default().bg(th.panel);
     let w = area.width as usize;
     let inner = if area.height >= 3 {
         // The basic profile has ASCII only: there the edge rows are the strip's colour itself.
-        let basic = app.basic;
+        let basic = app.settings.basic;
         let edge = |glyph: &str| {
             let (glyph, style) = if basic {
                 (" ", strip)

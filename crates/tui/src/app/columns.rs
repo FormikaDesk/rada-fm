@@ -93,7 +93,7 @@ impl App {
         c.listing
             .all()
             .iter()
-            .filter(|e| self.show_hidden || !e.hidden)
+            .filter(|e| self.settings.show_hidden || !e.hidden)
             .collect()
     }
 

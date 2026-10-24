@@ -75,8 +75,8 @@ fn scene(w: u16, h: u16) -> H {
     // ... and the volumes: a late answer would put the real ones back after they are cleared.
     h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(fixed_now());
-    h.app.tz = jiff::tz::TimeZone::UTC;
-    h.app.details = Some(false);
+    h.app.settings.tz = jiff::tz::TimeZone::UTC;
+    h.app.settings.details = Some(false);
     h.app.devices.volumes.clear();
     h
 }
@@ -361,7 +361,7 @@ fn every_colour_on_screen_is_a_theme_token_in_every_theme() {
         let th = Theme::named(name, rada_tui::theme::ColorDepth::True).unwrap();
         let allowed = tokens_of(&th);
         let mut h = scene(120, 30);
-        h.app.th = th.clone();
+        h.app.settings.th = th.clone();
         // The scene was drawn with the first theme: the second cell of a wide glyph keeps what
         // it had unless the frame is drawn from nothing.
         on(&mut h, "README.md");
@@ -478,7 +478,7 @@ fn main_screen_token_map_in_a_light_theme() {
     use ratatui::style::Color;
     let th = Theme::named("rada-light", ColorDepth::True).unwrap();
     let mut h = scene(100, 26);
-    h.app.th = th.clone();
+    h.app.settings.th = th.clone();
     on(&mut h, "README.md");
     // Drawn from nothing: the second cell of a wide glyph (the folder has CJK and emoji
     // names) keeps what earlier frames put there, and that depends on timing.

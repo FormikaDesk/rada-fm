@@ -34,7 +34,7 @@ fn place_hue(th: &Theme, kind: PlaceKind) -> Color {
 }
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     // The rows of the way shown are as many as fit, so the box's height comes first.
     app.frame.nav_area = area;
@@ -93,7 +93,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         ..area
     };
     let w = rows_area.width as usize;
-    let pin = icons::ui(app.icons, Glyph::Pin);
+    let pin = icons::ui(app.settings.icons, Glyph::Pin);
     for (y, i) in placed {
         let r = Rect {
             y: area.y + y,
@@ -161,7 +161,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                         Mark::TagDot
                     };
                     spans.push(Span::styled(
-                        format!("{} ", icons::mark(app.icons, dot)),
+                        format!("{} ", icons::mark(app.settings.icons, dot)),
                         Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
                     ));
                     let path = rada_core::tagsearch::view_path(hue.label(&app.tags.lang));
@@ -190,9 +190,11 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         // The arrow, the icon, the name, and the number of items on the right.
         let indent = "  ".repeat(row.depth);
         let (arrow, toggles) = match row.kind {
-            NavKind::Folder { open: Some(true) } => (icons::mark(app.icons, Mark::TreeOpen), true),
+            NavKind::Folder { open: Some(true) } => {
+                (icons::mark(app.settings.icons, Mark::TreeOpen), true)
+            }
             NavKind::Folder { open: Some(false) } => {
-                (icons::mark(app.icons, Mark::TreeClosed), true)
+                (icons::mark(app.settings.icons, Mark::TreeClosed), true)
             }
             _ => (" ", false),
         };
@@ -203,19 +205,20 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                     Origin::Place(k) => place_hue(&th, *k),
                     _ => th.hues.yellow,
                 };
-                (item.glyph(app.icons).to_string(), hue)
+                (item.glyph(app.settings.icons).to_string(), hue)
             }
             NavKind::Trash => (
                 items
                     .iter()
                     .find(|it| it.path == row.path)
-                    .map(|it| it.glyph(app.icons).to_string())
+                    .map(|it| it.glyph(app.settings.icons).to_string())
                     .unwrap_or_default(),
                 th.text_dim,
             ),
-            _ if row.depth == 0 && row.path == app.home() => {
-                (icons::ui(app.icons, Glyph::Home).to_string(), th.hues.blue)
-            }
+            _ if row.depth == 0 && row.path == app.home() => (
+                icons::ui(app.settings.icons, Glyph::Home).to_string(),
+                th.hues.blue,
+            ),
             _ => {
                 let kind = app
                     .places
@@ -225,8 +228,12 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                     .find(|p| p.path == row.path)
                     .map(|p| p.kind);
                 // The glyph and the colour of a folder in the list of the middle box.
-                let (glyph, folder) =
-                    icons::icon_for(&row.name, rada_core::fs::FileKind::Dir, app.icons, &th);
+                let (glyph, folder) = icons::icon_for(
+                    &row.name,
+                    rada_core::fs::FileKind::Dir,
+                    app.settings.icons,
+                    &th,
+                );
                 (
                     glyph.to_string(),
                     kind.map_or(folder, |k| place_hue(&th, k)),
@@ -330,7 +337,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 (Mark::ScrollTrack, th.faint())
             };
-            let ch = icons::mark(app.icons, mark);
+            let ch = icons::mark(app.settings.icons, mark);
             f.buffer_mut().set_string(x, area.y + y as u16, ch, style);
         }
     }

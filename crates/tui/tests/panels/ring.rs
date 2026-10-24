@@ -12,7 +12,7 @@ fn ring_scene(theme: &str) -> H {
         ratatui_image::picker::ProtocolType::Kitty,
         (10, 20),
     ));
-    h.app.th = Theme::named(theme, ColorDepth::True).unwrap();
+    h.app.settings.th = Theme::named(theme, ColorDepth::True).unwrap();
     h
 }
 
@@ -88,7 +88,7 @@ fn without_pictures_or_true_colours_the_main_disk_stays_a_bar() {
     assert!(s.contains("■"), "a bar");
     // Pictures, but a theme in 256 colours.
     let mut h = ring_scene("neon");
-    h.app.th = Theme::named("neon", ColorDepth::Ansi256).unwrap();
+    h.app.settings.th = Theme::named("neon", ColorDepth::Ansi256).unwrap();
     let s = h.screen();
     assert!(h.app.frame.ring.is_none());
     assert!(s.contains("■"), "a bar");

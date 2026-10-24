@@ -30,7 +30,7 @@ const SEP: &str = " › ";
 
 /// The first segment of a path: the home folder, or the root of the disk.
 fn home_label(app: &App) -> String {
-    let mark = icons::ui(app.icons, Glyph::Home);
+    let mark = icons::ui(app.settings.icons, Glyph::Home);
     if mark.is_empty() {
         Key::HomeLabel.tr().to_string()
     } else {
@@ -96,7 +96,7 @@ fn natural_width(segs: &[(String, PathBuf)]) -> usize {
 /// The path as spans fitting in `budget` cells: all of it, or the first segment, a "…" for
 /// the middle (clickable: it lists what it hides) and as many of the last segments as fit.
 fn crumbs(app: &App, budget: usize, field: Style) -> Vec<(Span<'static>, Option<Target>)> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let segs = segments(app);
     let n = segs.len();
     let sep = || (Span::styled(SEP, th.faint().patch(field)), None);
@@ -191,7 +191,7 @@ fn idle_crumbs(app: &App, budget: usize, field: Style, bar: &mut Bar<'static>) {
     if spin > 0 {
         bar.push(Span::styled(
             format!(" {}", SPIN[app.redraw.spinner % SPIN.len()]),
-            app.th.fg(app.th.warn).patch(field),
+            app.settings.th.fg(app.settings.th.warn).patch(field),
         ));
     }
 }
@@ -204,7 +204,7 @@ fn key_chip(
     field: Style,
     target: Option<Target>,
 ) -> Vec<Span<'static>> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let _ = target;
     soft::pill(
         th,
@@ -220,7 +220,7 @@ fn key_chip(
 
 /// The field: a pill of exactly `width` cells.
 fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
-    let th = &app.th;
+    let th = &app.settings.th;
     let band = th.band();
     let field = Style::default().bg(th.field);
     let mut out = Bar::default();
@@ -238,7 +238,7 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
         (Span::styled(" ", field), Span::styled(" ", field))
     };
     let inner = width - 2;
-    let icon = icons::ui(app.icons, Glyph::Search);
+    let icon = icons::ui(app.settings.icons, Glyph::Search);
     let lead = if icon.is_empty() {
         String::new()
     } else {
@@ -300,7 +300,11 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
         body.push(Span::styled(" ", field));
     } else {
         // Idle: the crumbs, a thin rule, what to search for, and Ctrl+P.
-        let key = app.keymap.hint(Action::Palette).unwrap_or_default();
+        let key = app
+            .settings
+            .keymap
+            .hint(Action::Palette)
+            .unwrap_or_default();
         let chip = if key.is_empty() {
             Vec::new()
         } else {
@@ -329,7 +333,7 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
             body.push(Span::styled(" │ ", th.faint().patch(field)));
             let (text, style) = match &app.filter {
                 Some(f) => (
-                    format!("{}{}", icons::ui(app.icons, Glyph::Filter), f.text),
+                    format!("{}{}", icons::ui(app.settings.icons, Glyph::Filter), f.text),
                     th.base().add_modifier(Modifier::BOLD),
                 ),
                 None => (format!("{lead}{}", Key::BarPlaceholder.tr()), th.dim()),
@@ -371,12 +375,12 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
 }
 
 pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
-    let set = app.icons;
+    let set = app.settings.icons;
 
     // The line under the field is the second row of the area, when there is one.
     let row = Rect { height: 1, ..area };
@@ -473,7 +477,7 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     if names.is_empty() || row.y + row.height >= screen.height {
         return;
     }
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let widest = names.iter().map(|n| n.width()).max().unwrap_or(8);
     let w = (widest + 4).clamp(24, 60).min(screen.width as usize) as u16;
     // Under the field: after the buttons.
@@ -522,7 +526,7 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
 }
 
 fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
-    let th = app.th.clone();
+    let th = app.settings.th.clone();
     let look = Look::of(app);
     let Some(a) = &app.address else { return };
     if a.hits.is_empty() || row.y + row.height >= screen.height {
@@ -534,7 +538,7 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
         .map(|h| match &h.item {
             BarItem::Command(action) => (
                 action.label().to_string(),
-                app.keymap.hint(*action).unwrap_or_default(),
+                app.settings.keymap.hint(*action).unwrap_or_default(),
                 Key::BarCommand.tr().to_string(),
                 h.label_pos.clone(),
             ),
