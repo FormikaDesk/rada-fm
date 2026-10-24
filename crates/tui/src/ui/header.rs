@@ -226,7 +226,7 @@ fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
     }
     if app.is_loading() {
         b.push(Span::styled(
-            format!(" {}", SPIN[app.spinner % SPIN.len()]),
+            format!(" {}", SPIN[app.redraw.spinner % SPIN.len()]),
             th.fg(th.warn).patch(band),
         ));
     }

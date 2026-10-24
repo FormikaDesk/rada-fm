@@ -266,22 +266,22 @@ fn event_loop(
         // From nothing: the screen is cleared and every cell is sent again, so that what
         // another program wrote on the terminal does not stay.
         if app.take_full_redraw() {
-            app.dirty = true;
+            app.redraw.dirty = true;
             if let Err(e) = clear_screen(terminal, &gate, &mut asks_cursor) {
                 survive(e, "clear the screen", &mut failed)?;
-                app.full_redraw = true;
+                app.redraw.full_redraw = true;
             }
         }
-        if app.dirty {
+        if app.redraw.dirty {
             match terminal.draw(|f| ui::draw(f, &mut app)).map(|_| ()) {
                 Ok(()) => {
-                    app.dirty = false;
+                    app.redraw.dirty = false;
                     failed = 0;
                 }
                 Err(e) => {
                     survive(e, "draw the screen", &mut failed)?;
                     // What the terminal shows is unknown now: from nothing, next time.
-                    app.full_redraw = true;
+                    app.redraw.full_redraw = true;
                 }
             }
         }

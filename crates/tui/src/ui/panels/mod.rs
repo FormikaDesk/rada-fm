@@ -245,7 +245,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         let before = app.scroll;
         app.ensure_visible();
         if app.scroll != before {
-            app.dirty = true;
+            app.redraw.dirty = true;
         }
     }
     frame::settle(f.buffer_mut(), inner, &th);

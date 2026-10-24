@@ -320,7 +320,7 @@ impl App {
         if filtering {
             self.set_filter(None);
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The text changed: in a path, ask for its subfolders; in words, filter the files and
@@ -440,7 +440,7 @@ impl App {
         }
         a.zoxide = dirs;
         self.refresh_bar_hits();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Run the `i`-th suggestion of the search mode: the bar closes, the filter it made goes.

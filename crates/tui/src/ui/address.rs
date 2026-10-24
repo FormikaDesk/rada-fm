@@ -190,7 +190,7 @@ fn idle_crumbs(app: &App, budget: usize, field: Style, bar: &mut Bar<'static>) {
     }
     if spin > 0 {
         bar.push(Span::styled(
-            format!(" {}", SPIN[app.spinner % SPIN.len()]),
+            format!(" {}", SPIN[app.redraw.spinner % SPIN.len()]),
             app.th.fg(app.th.warn).patch(field),
         ));
     }

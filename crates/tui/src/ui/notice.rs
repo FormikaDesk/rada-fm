@@ -139,7 +139,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
         out.push(Card {
             id: 0,
             tone: Tone::Accent,
-            mark: SPIN[app.spinner % SPIN.len()].to_string(),
+            mark: SPIN[app.redraw.spinner % SPIN.len()].to_string(),
             title: super::plan::shorten_title(&r.title, app.home()),
             data: data.join(" · "),
             links: vec![

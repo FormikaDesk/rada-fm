@@ -617,7 +617,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
             }
         }
         Kind::Decoding => {
-            let spin = SPIN[app.spinner % SPIN.len()];
+            let spin = SPIN[app.redraw.spinner % SPIN.len()];
             f.render_widget(
                 Paragraph::new(Span::styled(tf(Key::PvDecoding, &[&spin]), th.dim())),
                 Rect {

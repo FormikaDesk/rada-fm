@@ -160,7 +160,7 @@ impl App {
         self.rebuild_visible();
         self.ensure_visible();
         self.request_preview();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     pub fn tab_count(&self) -> usize {
@@ -285,7 +285,7 @@ impl App {
                 self.active_tab -= 1;
             }
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
         self.save_ui_state();
     }
 

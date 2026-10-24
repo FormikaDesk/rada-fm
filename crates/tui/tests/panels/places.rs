@@ -100,7 +100,7 @@ fn with_trash(h: &mut H) {
         .paths
         .places
         .push(rada_core::places::Place { kind, path: t });
-    h.app.dirty = true;
+    h.app.redraw.dirty = true;
 }
 
 #[test]

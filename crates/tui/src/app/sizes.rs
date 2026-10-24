@@ -79,7 +79,7 @@ impl App {
         s.outstanding = 0;
         s.epoch += 1;
         self.svc.sizes.newest(s.epoch);
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The folder in front changed: what was being counted for the old one is dropped.

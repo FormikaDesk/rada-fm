@@ -397,7 +397,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let before = app.scroll;
         app.ensure_visible();
         if app.scroll != before {
-            app.dirty = true;
+            app.redraw.dirty = true;
         }
     }
     if dmode == DetailsMode::Overlay && !preview_instead {

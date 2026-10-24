@@ -63,7 +63,7 @@ fn the_ring_is_made_again_only_when_the_percentage_changes() {
     let mut h = ring_scene("neon");
     let _ = h.screen();
     let _ = h.screen();
-    h.app.dirty = true;
+    h.app.redraw.dirty = true;
     let _ = h.screen();
     assert_eq!(
         h.app.ring.as_ref().unwrap().made,

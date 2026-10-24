@@ -191,7 +191,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
         basic: app.basic,
     };
     let home = app.home().to_path_buf();
-    let spinner = SPIN[app.spinner % SPIN.len()];
+    let spinner = SPIN[app.redraw.spinner % SPIN.len()];
     let Some(modal) = &app.modal else { return };
     match modal {
         Modal::Scanning {

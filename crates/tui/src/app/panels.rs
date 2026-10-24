@@ -170,7 +170,7 @@ impl App {
         }
         self.saved_ui.layout = Some(pref.id().to_string());
         self.save_ui_state();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The folder the NAV tree starts at.
@@ -205,7 +205,7 @@ impl App {
     pub fn want_git(&mut self) {
         if !self.svc.git.enabled() || self.archive.is_some() || self.view_title().is_some() {
             if self.git.take().is_some() {
-                self.dirty = true;
+                self.redraw.dirty = true;
             }
             return;
         }
@@ -228,7 +228,7 @@ impl App {
             self.git = status.map(|status| GitView { dir, status });
         }
         // The folder may have changed while git was thinking: the next frame asks again.
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// What git says about the folder shown, when it is the one it was asked about.
@@ -520,7 +520,7 @@ impl App {
         if !self.side_on {
             self.toggle_sidebar();
             self.left_preview = true;
-            self.dirty = true;
+            self.redraw.dirty = true;
             return;
         }
         let had_focus = self.side_focus || self.preview_focus;
@@ -529,7 +529,7 @@ impl App {
             self.side_focus = !self.left_preview;
             self.preview_focus = self.left_preview;
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Tab in the panels view: the folder, NAV, ANTEPRIMA, the folder. With two columns the
@@ -578,13 +578,13 @@ impl App {
         } else {
             self.nav_scroll.saturating_sub(STEP)
         };
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// An arrow clicked or pressed on a folder of the tree: open or close it.
     pub fn toggle_tree(&mut self, dir: &Path) {
         self.tree.toggle(dir);
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Left and right in NAV: they open and close the folders of the tree and move between

@@ -650,7 +650,7 @@ fn with_the_mouse_off_nothing_reacts() {
 fn mouse_motion_never_triggers_a_redraw() {
     let mut h = harness();
     let _ = h.screen();
-    h.app.dirty = false;
+    h.app.redraw.dirty = false;
     // (In the list, not on a sidebar item: those redraw when the pointer enters them.)
     h.mouse(MouseEventKind::Moved, 60, 10, KeyModifiers::NONE);
     h.mouse(
@@ -665,7 +665,7 @@ fn mouse_motion_never_triggers_a_redraw() {
         10,
         KeyModifiers::NONE,
     );
-    assert!(!h.app.dirty);
+    assert!(!h.app.redraw.dirty);
 }
 
 #[test]

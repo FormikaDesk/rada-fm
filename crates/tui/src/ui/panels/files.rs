@@ -133,7 +133,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
 
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
-            tf(Key::ListLoading, &[&SPIN[app.spinner % SPIN.len()]])
+            tf(Key::ListLoading, &[&SPIN[app.redraw.spinner % SPIN.len()]])
         } else if app.filter.is_some() {
             Key::ListNoMatch.tr().to_string()
         } else if app.listing.is_empty() {

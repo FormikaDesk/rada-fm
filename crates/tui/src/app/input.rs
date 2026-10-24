@@ -269,14 +269,14 @@ impl App {
     // ------------------------------------------------------------------ keyboard
 
     pub fn on_key(&mut self, key: KeyEvent) {
-        self.dirty = true;
+        self.redraw.dirty = true;
         if key.kind == KeyEventKind::Release {
             return;
         }
         // Ctrl+L, wherever it is pressed: the screen is drawn again from nothing (the key still
         // does what it does: it starts the editing of the address).
         if key.code == KeyCode::Char('l') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.full_redraw = true;
+            self.redraw.full_redraw = true;
         }
         // The card at the bottom right goes at the first key (the key still does its job); an
         // error stays until Esc, which it takes when nothing else is open.
@@ -321,7 +321,7 @@ impl App {
             && self.keymap.action_for(&key) == Some(Action::Open)
         {
             self.columns_right();
-            self.dirty = true;
+            self.redraw.dirty = true;
             return;
         }
         if let Some(action) = self.keymap.action_for(&key) {
@@ -336,15 +336,15 @@ impl App {
                 }
                 && self.on_nav_arrow(right)
             {
-                self.dirty = true;
+                self.redraw.dirty = true;
                 return;
             }
             if self.panels_shown && self.preview_focus && self.on_preview_action(action) {
-                self.dirty = true;
+                self.redraw.dirty = true;
                 return;
             }
             if self.side_focus && self.on_side_action(action) {
-                self.dirty = true;
+                self.redraw.dirty = true;
                 return;
             }
             // In the Icons view the arrows and h j k l move across the grid.
@@ -360,7 +360,7 @@ impl App {
                 self.sel_anchor = None;
                 let to = (self.cursor as isize + step).max(0) as usize;
                 self.set_cursor(to);
-                self.dirty = true;
+                self.redraw.dirty = true;
                 return;
             }
             self.dispatch(action);
@@ -370,7 +370,7 @@ impl App {
     /// Do what an action says. Keys, clicks on hints and menu entries all end here.
     pub fn dispatch(&mut self, action: Action) {
         use Action::*;
-        self.dirty = true;
+        self.redraw.dirty = true;
         // A file chooser does what looks and moves, and nothing that changes a file.
         if self.chooser.is_some() {
             if !self.chooser.as_ref().is_some_and(|c| c.allows(action)) {
@@ -561,7 +561,7 @@ impl App {
         self.dir_gen += 1;
         self.load = LoadState::Loading(self.cwd.clone());
         self.svc.loader.load(self.cwd.clone(), self.dir_gen);
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     pub fn set_view(&mut self, mode: ViewMode) {
@@ -571,7 +571,7 @@ impl App {
         self.view = mode;
         self.ensure_visible();
         self.save_ui_state();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Show or hide the Tag column of the list, and remember it.
@@ -579,7 +579,7 @@ impl App {
         self.show_tags = !self.show_tags;
         self.saved_ui.tags_column = Some(self.show_tags);
         self.save_ui_state();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Whether the last frame showed the details pane.
@@ -815,7 +815,7 @@ impl App {
             };
             if over != self.hover {
                 self.hover = over;
-                self.dirty = true;
+                self.redraw.dirty = true;
             }
             return;
         }
@@ -830,7 +830,7 @@ impl App {
         ) {
             return;
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
         let target = self.hits.at(m.column, m.row).cloned();
         if self.panels_shown
             && self.modal.is_none()

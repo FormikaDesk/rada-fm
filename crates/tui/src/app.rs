@@ -464,6 +464,18 @@ pub struct Demo {
     pub dest: Option<PathBuf>,
 }
 
+/// When the screen is drawn again, and the step of the spinner that moves between frames.
+pub struct Redraw {
+    /// Something changed: the next pass of the event loop draws a frame.
+    pub dirty: bool,
+    /// The whole screen is drawn again from nothing at the next frame (Ctrl+L, and after a
+    /// program was started): whatever something else wrote on the terminal is put right.
+    pub full_redraw: bool,
+    /// When to do that again after a program was started: they say things a while after.
+    redraw_at: Vec<Instant>,
+    pub spinner: usize,
+}
+
 /// What only tests and screenshots use: a ready-made scene, made-up disks, a clock that can
 /// be set and moved on.
 #[derive(Default)]
@@ -592,13 +604,7 @@ pub struct App {
     pub chooser: Option<crate::chooser::Chooser>,
     /// What was chosen, when the person chose: the paths to hand over. `None` is a cancel.
     pub chosen: Option<Vec<PathBuf>>,
-    pub dirty: bool,
-    /// The whole screen is drawn again from nothing at the next frame (Ctrl+L, and after a
-    /// program was started): whatever something else wrote on the terminal is put right.
-    pub full_redraw: bool,
-    /// When to do that again after a program was started: they say things a while after.
-    redraw_at: Vec<Instant>,
-    pub spinner: usize,
+    pub redraw: Redraw,
     plan_job: Option<JobId>,
 
     pub keymap: Keymap,
@@ -809,10 +815,12 @@ impl App {
             should_quit: false,
             chooser: cfg.chooser.clone(),
             chosen: None,
-            dirty: true,
-            full_redraw: false,
-            redraw_at: Vec::new(),
-            spinner: 0,
+            redraw: Redraw {
+                dirty: true,
+                full_redraw: false,
+                redraw_at: Vec::new(),
+                spinner: 0,
+            },
             plan_job: None,
             keymap: cfg.keymap,
             mouse: cfg.mouse,
@@ -957,7 +965,7 @@ impl App {
     fn tick_notices(&mut self) {
         let now = self.notice_now();
         if self.notices.tick(now) {
-            self.dirty = true;
+            self.redraw.dirty = true;
         }
     }
 
@@ -978,13 +986,13 @@ impl App {
     pub fn notify(&mut self, notice: Notice) {
         let now = self.notice_now();
         self.notices.push(notice, now);
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// Take every notification away (tests: so that what comes next is not a left-over).
     pub fn clear_notices(&mut self) {
         self.notices = NoticeQueue::default();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The oldest notification on screen.
@@ -1006,9 +1014,9 @@ impl App {
     /// nothing now and a few times in the seconds after.
     pub fn after_launch(&mut self) {
         let now = Instant::now();
-        self.full_redraw = true;
-        self.dirty = true;
-        self.redraw_at.extend(
+        self.redraw.full_redraw = true;
+        self.redraw.dirty = true;
+        self.redraw.redraw_at.extend(
             [300u64, 1500, 4000]
                 .into_iter()
                 .map(|ms| now + Duration::from_millis(ms)),
@@ -1017,17 +1025,17 @@ impl App {
 
     /// Whether the screen is to be cleared and drawn again; asking resets it.
     pub fn take_full_redraw(&mut self) -> bool {
-        std::mem::take(&mut self.full_redraw)
+        std::mem::take(&mut self.redraw.full_redraw)
     }
 
     pub fn tick(&mut self) {
-        self.spinner = self.spinner.wrapping_add(1);
-        if !self.redraw_at.is_empty() {
+        self.redraw.spinner = self.redraw.spinner.wrapping_add(1);
+        if !self.redraw.redraw_at.is_empty() {
             let now = Instant::now();
-            if self.redraw_at.iter().any(|t| *t <= now) {
-                self.redraw_at.retain(|t| *t > now);
-                self.full_redraw = true;
-                self.dirty = true;
+            if self.redraw.redraw_at.iter().any(|t| *t <= now) {
+                self.redraw.redraw_at.retain(|t| *t > now);
+                self.redraw.full_redraw = true;
+                self.redraw.dirty = true;
             }
         }
         self.tick_notices();
@@ -1036,7 +1044,7 @@ impl App {
             || matches!(self.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
         {
-            self.dirty = true; // spinner / elapsed time
+            self.redraw.dirty = true; // spinner / elapsed time
         }
     }
 
@@ -1144,7 +1152,7 @@ impl App {
         }
         self.ensure_visible();
         self.request_preview();
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     fn cursor_name(&self) -> Option<OsString> {
@@ -1179,7 +1187,7 @@ impl App {
         if let Some(cell) = crate::images::system_cell_px() {
             self.use_cell_px(cell);
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The cell is `cell` pixels now. If that is not what the pictures were made for, they
@@ -1193,8 +1201,8 @@ impl App {
             self.ring = None;
             self.previewed = None;
             self.request_preview();
-            self.full_redraw = true;
-            self.dirty = true;
+            self.redraw.full_redraw = true;
+            self.redraw.dirty = true;
         }
     }
 
@@ -1492,7 +1500,7 @@ impl App {
     // ------------------------------------------------------------------ core events
 
     pub fn on_core_event(&mut self, ev: CoreEvent) {
-        self.dirty = true;
+        self.redraw.dirty = true;
         match ev {
             CoreEvent::Dir(d) => self.on_dir(d),
             CoreEvent::Watch(w) => self.on_watch(w),
@@ -1525,7 +1533,7 @@ impl App {
             CoreEvent::Git { dir, status } => self.on_git(dir, status),
             CoreEvent::Tree { dir, hidden, kids } => {
                 self.tree.answer(dir, hidden, kids);
-                self.dirty = true;
+                self.redraw.dirty = true;
             }
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
@@ -1772,7 +1780,7 @@ impl App {
         if let Some(ui) = &mut self.image_ui {
             ui.on_resized(r);
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     fn on_job(&mut self, ev: JobEvent) {

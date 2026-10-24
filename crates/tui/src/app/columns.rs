@@ -81,7 +81,7 @@ impl App {
             }
             Err(_) => self.columns.columns_parent = None,
         }
-        self.dirty = true;
+        self.redraw.dirty = true;
     }
 
     /// The entries of the folder above in the order of the first column: what the list would

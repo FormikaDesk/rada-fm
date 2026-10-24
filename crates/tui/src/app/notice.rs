@@ -708,7 +708,7 @@ impl App {
         use crate::hits::NoticeHit;
         let now = self.notice_now();
         let shown = self.notices.get(id).cloned();
-        self.dirty = true;
+        self.redraw.dirty = true;
         match hit {
             NoticeHit::CancelRun => {
                 // The same as Esc: the operation that is running is cancelled.

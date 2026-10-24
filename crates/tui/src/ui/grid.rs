@@ -88,7 +88,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
         let msg = if app.is_loading() {
             rada_core::i18n::tf(
                 rada_core::i18n::Key::ListLoading,
-                &[&SPIN[app.spinner % SPIN.len()]],
+                &[&SPIN[app.redraw.spinner % SPIN.len()]],
             )
         } else if app.filter.is_some() {
             rada_core::i18n::Key::ListNoMatch.tr().to_string()
