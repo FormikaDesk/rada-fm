@@ -5,7 +5,6 @@
 mod common;
 
 use common::*;
-use crossterm::event::KeyCode;
 use rada_core::foldersize::{SizeLimits, SizeMode, SizeSettings};
 use rada_core::testutil::*;
 use rada_tui::fmt;
@@ -150,9 +149,7 @@ fn the_details_pane_says_how_many_items_and_how_big() {
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
     counted(&mut h);
     h.keys("g");
-    while h.cursor_name() != "big" {
-        h.key(KeyCode::Down);
-    }
+    h.cursor_to("big");
     // The pane asks for the count of the folder under the cursor when it is drawn, and hears it a
     // moment later: draw until the figure is there, not for a fixed time.
     let want = format!("2 items · {}", fmt::size(300_000));

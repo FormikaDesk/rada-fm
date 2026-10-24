@@ -386,6 +386,27 @@ impl H {
             .unwrap_or_default()
     }
 
+    /// Wait until the folder shown lists `name`, then put the cursor on it with the Down key,
+    /// at most once per entry: an empty list would never get there.
+    pub fn cursor_to(&mut self, name: &str) {
+        self.wait(&format!("{name} in the folder"), |a| {
+            (0..a.visible.len()).any(|i| a.entry_at(i).is_some_and(|e| e.display == name))
+        });
+        for _ in 0..self.app.visible.len() {
+            if self.cursor_name() == name {
+                return;
+            }
+            self.key(KeyCode::Down);
+        }
+        let on = self.cursor_name();
+        assert_eq!(
+            on,
+            name,
+            "the cursor never reached {name}\n{}",
+            self.screen()
+        );
+    }
+
     pub fn screen(&mut self) -> String {
         self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
         let buf = self.term.backend().buffer().clone();

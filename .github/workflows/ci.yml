@@ -38,6 +38,8 @@ jobs:
       - name: Build workspace
         run: cargo build --workspace --all-targets --locked
       - name: Test workspace (core, interface and the program)
+        # A test that hangs fails the job here, not after the 45 minutes of the whole job.
+        timeout-minutes: 15
         run: cargo test --workspace --no-fail-fast --locked
 
   # Lints on the two systems whose code the Linux run does not compile.

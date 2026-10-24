@@ -77,6 +77,23 @@ fn menu_selected(h: &mut H) -> String {
         .unwrap_or_default()
 }
 
+/// Down in the open menu until the selected entry starts with `label`, as many presses as
+/// there are entries.
+fn select_entry(h: &mut H, label: &str) {
+    let entries = match &h.app.modal {
+        Some(Modal::Menu(m)) => m.items.len(),
+        _ => 0,
+    };
+    for _ in 0..entries {
+        if menu_selected(h).starts_with(label) {
+            return;
+        }
+        h.key(KeyCode::Down);
+    }
+    let on = menu_selected(h);
+    assert!(on.starts_with(label), "{label}: on {on:?}\n{}", h.screen());
+}
+
 fn confirm(h: &mut H) {
     plan_modal(h);
     h.key(KeyCode::Enter);
@@ -262,9 +279,7 @@ fn the_menu_ticks_what_the_item_has_and_offers_to_take_it_all_off() {
         y,
         crossterm::event::KeyModifiers::NONE,
     );
-    while !menu_selected(&mut h).starts_with("Tags") {
-        h.key(KeyCode::Down);
-    }
+    select_entry(&mut h, "Tags");
     h.key(KeyCode::Enter);
     let Some(Modal::Menu(m)) = &h.app.modal else {
         panic!("{}", h.screen())
@@ -371,9 +386,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
         y,
         crossterm::event::KeyModifiers::NONE,
     );
-    while !menu_selected(&mut h).starts_with("Tags") {
-        h.key(KeyCode::Down);
-    }
+    select_entry(&mut h, "Tags");
     h.key(KeyCode::Enter);
     let Some(Modal::Menu(m)) = &h.app.modal else {
         panic!("{}", h.screen())

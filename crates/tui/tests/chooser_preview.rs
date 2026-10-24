@@ -41,9 +41,7 @@ fn chooser(w: u16, h: u16, pref: LayoutPref) -> H {
     h.app.hooks.clock = Some(fixed_now());
     h.app.tz = jiff::tz::TimeZone::UTC;
     h.app.devices.volumes.clear();
-    while h.cursor_name() != "README.md" {
-        h.keys("j");
-    }
+    h.cursor_to("README.md");
     h.wait("the preview", |a| a.preview.name == "README.md");
     h
 }
