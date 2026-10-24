@@ -10,8 +10,6 @@ pub struct Windows {
     pub modal: Option<Modal>,
     /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
     pub notices: NoticeQueue,
-    /// What the live updates of the folder said last (they are degraded or off).
-    pub watch_note: Option<String>,
     pub help_scroll: usize,
     /// The address bar while its text is being edited.
     pub address: Option<AddressEdit>,

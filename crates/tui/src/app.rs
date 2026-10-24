@@ -1420,9 +1420,9 @@ impl App {
                     self.svc.loader.patch(dir, paths, self.dir_gen);
                 }
             }
-            WatchEvent::Degraded(msg) => self.windows.watch_note = Some(msg),
+            // Polling still shows the changes: there is nothing to tell.
+            WatchEvent::Degraded(_) => {}
             WatchEvent::Failed(msg) => {
-                self.windows.watch_note = Some(msg.clone());
                 self.toast(ToastKind::Warn, tf(Key::TLiveOff, &[&msg]), 6);
             }
         }
