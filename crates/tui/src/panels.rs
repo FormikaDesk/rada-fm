@@ -257,8 +257,14 @@ pub enum NavKind {
     More,
     /// One of the favourites, by its index among the items of the sidebar.
     Favorite(usize),
-    /// The row of the seven tag colours.
-    Tags,
+    /// A line of tag dots: those from `first` on, `len` of them, of the seven colours and
+    /// then the user's own tags (the items of the TAGS section). `more` is how many tags the
+    /// box has no room for, on the last line only.
+    Tags {
+        first: usize,
+        len: usize,
+        more: usize,
+    },
     Trash,
 }
 
@@ -274,6 +280,50 @@ pub struct NavRow {
     pub count: Option<usize>,
 }
 
+/// The width of the title (" TAGS ") before the first dot of a line, and of a dot with the
+/// space after it.
+pub const TAG_TITLE: usize = 6;
+const TAG_DOT: usize = 2;
+/// How many lines of dots the box has at most.
+pub const TAG_LINES_MOST: usize = 3;
+/// The dots that are always there: the seven colours.
+const TAG_COLOURS: usize = 7;
+
+/// How `total` dots go in a box `width` wide, in `lines` lines at the most: the `(first, len)`
+/// of each line, and how many dots are left out. The seven colours are never left out (they
+/// take more lines than asked for if the box is narrow), and no dot is cut: one that does not
+/// fit goes to the next line. Where some are left out the last line ends with "+N".
+pub fn tag_lines(total: usize, width: usize, lines: usize) -> (Vec<(usize, usize)>, usize) {
+    // The column of the scroll thumb is not for dots; a dot needs its glyph, not the space.
+    let width = if width == 0 {
+        TAG_TITLE + TAG_COLOURS * TAG_DOT
+    } else {
+        width - 1
+    };
+    let per_line = width.saturating_sub(TAG_TITLE).div_ceil(TAG_DOT).max(1);
+    let allowed = lines
+        .clamp(1, TAG_LINES_MOST)
+        .max(TAG_COLOURS.min(total).div_ceil(per_line));
+    let used = total.div_ceil(per_line).clamp(1, allowed);
+    let before_last = (used - 1) * per_line;
+    let mut last = (total - before_last).min(per_line);
+    if total > before_last + last {
+        // Room for "+N" after the last dot, without taking one of the seven colours.
+        let room = width.saturating_sub(TAG_TITLE);
+        let fits = |k: usize| k * TAG_DOT + 1 + (total - before_last - k).to_string().len() <= room;
+        last = (0..=per_line)
+            .rev()
+            .find(|k| fits(*k))
+            .unwrap_or(0)
+            .max(TAG_COLOURS.saturating_sub(before_last))
+            .min(per_line);
+    }
+    let layout = (0..used)
+        .map(|i| (i * per_line, if i + 1 == used { last } else { per_line }))
+        .collect();
+    (layout, total - before_last - last)
+}
+
 impl NavRow {
     /// Whether the keyboard can stop on this row.
     pub fn selectable(&self) -> bool {
@@ -284,6 +334,63 @@ impl NavRow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The dots on each line, and what is left out.
+    fn dots(total: usize, width: usize, lines: usize) -> (Vec<usize>, usize) {
+        let (l, more) = tag_lines(total, width, lines);
+        (l.into_iter().map(|(_, n)| n).collect(), more)
+    }
+
+    #[test]
+    fn the_seven_colours_fit_one_line_as_they_always_did() {
+        assert_eq!(dots(7, 24, 3), (vec![7], 0));
+        assert_eq!(dots(7, 21, 1), (vec![7], 0));
+        // 6 for the title, 7 dots of 2: a box of 20 has the last glyph on its last column, and
+        // the column of the thumb is for the thumb.
+        assert_eq!(dots(7, 20, 1), (vec![7], 0));
+        assert_eq!(dots(7, 19, 1), (vec![6, 1], 0));
+    }
+
+    #[test]
+    fn the_users_tags_follow_on_lines_of_their_own_and_none_is_cut() {
+        // 28 wide: 11 dots to a line; 7 colours and 4 of the user's.
+        let (layout, more) = tag_lines(11, 28, 3);
+        assert_eq!((layout, more), (vec![(0, 11)], 0));
+        // Nine of the user's own: a second line, from where the first ends.
+        let (layout, more) = tag_lines(16, 24, 3);
+        assert_eq!(layout, vec![(0, 9), (9, 7)]);
+        assert_eq!(more, 0);
+        for width in 8..60 {
+            for total in 7..70 {
+                for lines in 1..=3 {
+                    let (layout, more) = tag_lines(total, width, lines);
+                    let shown: usize = layout.iter().map(|(_, n)| n).sum();
+                    assert_eq!(shown + more, total, "{total} dots in {width}");
+                    assert!(shown >= 7, "the colours stay: {total} in {width}");
+                    let per = (width - 1).saturating_sub(6).div_ceil(2).max(1);
+                    assert!(layout.len() <= 3.max(7_usize.div_ceil(per)), "{layout:?}");
+                    let mut next = 0;
+                    for (first, len) in &layout {
+                        assert_eq!(*first, next, "lines follow each other");
+                        next = first + len;
+                        assert!(6 + len * 2 - 1 < width, "{len} dots in {width}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn what_does_not_fit_is_counted_and_gives_way_to_the_plus() {
+        // 24 wide, one line: 9 dots would fit, but two give their place to "+5".
+        let (layout, more) = tag_lines(12, 24, 1);
+        assert_eq!(layout, vec![(0, 7)]);
+        assert_eq!(more, 5);
+        // The colours are not given up for it.
+        let (layout, more) = tag_lines(30, 20, 1);
+        assert_eq!(layout, vec![(0, 7)]);
+        assert_eq!(more, 23);
+    }
 
     #[test]
     fn the_names_of_the_layouts_parse_in_both_languages() {

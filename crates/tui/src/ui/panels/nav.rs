@@ -1,10 +1,10 @@
 //! The NAV box: the tree of folders from Home (an arrow for each folder that has folders in
-//! it, a coloured icon, the number of items on the right), the favourites, the seven tag
-//! colours as dots in a row, and the trash.
+//! it, a coloured icon, the number of items on the right), the favourites, the tags as dots
+//! (the seven colours, then the user's own, on more lines where there is room), and the trash.
 //!
 //! The folder you are in is a pill; the row the keyboard is on is a stronger one.
 
-use rada_core::platform::{PlaceKind, TagColor as Hue};
+use rada_core::platform::PlaceKind;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -15,7 +15,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::App;
 use crate::hits::Target;
 use crate::icons::{self, Glyph, Mark};
-use crate::panels::NavKind;
+use crate::panels::{NavKind, TAG_TITLE};
 use crate::sidebar::Origin;
 use crate::theme::Theme;
 use crate::ui::soft::{self, Look, RowTone};
@@ -30,6 +30,81 @@ fn place_hue(th: &Theme, kind: PlaceKind) -> Color {
         PlaceKind::Pictures | PlaceKind::Videos => th.hues.pink,
         PlaceKind::Music => th.hues.orange,
         _ => th.hues.yellow,
+    }
+}
+
+/// A line of tag dots as it is drawn.
+struct TagsLine<'a> {
+    r: Rect,
+    /// The width the line may use (the box's, less the column of the thumb).
+    w: usize,
+    /// "TAGS" on the first line, nothing on the others.
+    title: &'a str,
+    focus: bool,
+    bg: Style,
+    /// The style of text on the row the keyboard is on.
+    text: Style,
+}
+
+/// A line of tag dots: the title on the first, then a dot for each tag from `first` on, in its
+/// colour (gray for a tag with none), and "+N" where the box had no room for `more` others. A
+/// click on a dot lists what carries the tag, as in the classic sidebar.
+fn draw_tags(
+    f: &mut Frame,
+    app: &mut App,
+    th: &Theme,
+    look: Look,
+    line: &TagsLine,
+    (first, len, more): (usize, usize, usize),
+) {
+    let (r, bg) = (line.r, line.bg);
+    let title_style = if line.focus {
+        line.text.add_modifier(Modifier::BOLD)
+    } else {
+        th.faint().add_modifier(Modifier::BOLD)
+    };
+    let mut spans = vec![Span::styled(
+        pad(&format!(" {}", line.title), TAG_TITLE),
+        title_style.patch(bg),
+    )];
+    let mut x = r.x + TAG_TITLE as u16;
+    for (n, item) in crate::sidebar::tag_items(app)
+        .into_iter()
+        .enumerate()
+        .skip(first)
+        .take(len)
+    {
+        let Origin::Tag(hue) = item.origin else {
+            continue;
+        };
+        let dot = if line.focus && app.side_nav.nav_tag == n {
+            Mark::TagDotFocused
+        } else {
+            Mark::TagDot
+        };
+        spans.push(Span::styled(
+            format!("{} ", icons::mark(app.settings.icons, dot)),
+            Style::default().fg(th.tag_color(hue)).patch(bg),
+        ));
+        let cell = Rect {
+            x,
+            y: r.y,
+            width: 2,
+            height: 1,
+        };
+        app.frame.hits.add(cell, Target::Place(item.path));
+        x += 2;
+    }
+    let mut used: usize = spans.iter().map(|s| s.content.width()).sum();
+    let plus = format!("+{more}");
+    if more > 0 && used + plus.width() <= line.w {
+        used += plus.width();
+        spans.push(Span::styled(plus, th.faint().patch(bg)));
+    }
+    spans.push(Span::styled(" ".repeat(line.w.saturating_sub(used)), bg));
+    f.render_widget(Paragraph::new(Line::from(spans)), r);
+    if line.focus {
+        soft::tint_row(f.buffer_mut(), r, th, look, RowTone::Focus);
     }
 }
 
@@ -143,45 +218,16 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 );
                 continue;
             }
-            NavKind::Tags => {
-                let mut spans = vec![Span::styled(
-                    pad(&format!(" {}", row.name), 6),
-                    if is_focus {
-                        text_style.add_modifier(Modifier::BOLD).patch(bg)
-                    } else {
-                        th.faint().add_modifier(Modifier::BOLD).patch(bg)
-                    },
-                )];
-                let mut x = r.x + 6;
-                for (n, hue) in Hue::ALL.iter().enumerate() {
-                    let on = is_focus && app.side_nav.nav_tag == n;
-                    let dot = if on {
-                        Mark::TagDotFocused
-                    } else {
-                        Mark::TagDot
-                    };
-                    spans.push(Span::styled(
-                        format!("{} ", icons::mark(app.settings.icons, dot)),
-                        Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
-                    ));
-                    let path = rada_core::tagsearch::view_path(hue.label(&app.tags.lang));
-                    app.frame.hits.add(
-                        Rect {
-                            x,
-                            y: r.y,
-                            width: 2,
-                            height: 1,
-                        },
-                        Target::Place(path),
-                    );
-                    x += 2;
-                }
-                let used: usize = spans.iter().map(|s| s.content.width()).sum();
-                spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), bg));
-                f.render_widget(Paragraph::new(Line::from(spans)), r);
-                if is_focus {
-                    soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
-                }
+            NavKind::Tags { first, len, more } => {
+                let line = TagsLine {
+                    r,
+                    w,
+                    title: &row.name,
+                    focus: is_focus,
+                    bg,
+                    text: text_style,
+                };
+                draw_tags(f, app, &th, look, &line, (*first, *len, *more));
                 continue;
             }
             _ => {}

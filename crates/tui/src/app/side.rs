@@ -127,17 +127,6 @@ impl SideNav {
         }
         true
     }
-
-    /// Left and Right on the row of the tags: from one of the seven dots to the next.
-    pub(super) fn step_tag(&mut self, right: bool) {
-        use rada_core::platform::TagColor as Hue;
-        let last = Hue::ALL.len() - 1;
-        self.nav_tag = if right {
-            (self.nav_tag + 1).min(last)
-        } else {
-            self.nav_tag.saturating_sub(1)
-        };
-    }
 }
 
 /// The tags the sidebar and the tag menu know.

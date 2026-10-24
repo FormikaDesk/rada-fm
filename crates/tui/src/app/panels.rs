@@ -3,11 +3,11 @@
 //!
 //! Tab takes the keyboard from the folder to NAV, from NAV to ANTEPRIMA and back to the folder.
 
-use rada_core::platform::{PlaceKind, TagColor as Hue};
+use rada_core::platform::PlaceKind;
 
 use super::{App, ToastKind};
 use crate::keymap::Action;
-use crate::panels::{NavKind, NavMode, NavRow};
+use crate::panels::{NavKind, NavMode, NavRow, TAG_LINES_MOST, tag_lines};
 use crate::sidebar::{self, Origin, Section};
 use rada_core::i18n::{Key, tf};
 use std::path::{Path, PathBuf};
@@ -70,6 +70,14 @@ const GIT_WAIT: Duration = Duration::from_secs(6);
 const WAY_MIN: usize = 4;
 /// The least it is cut down to.
 const WAY_LEAST: usize = WAY_MIN - 1;
+
+/// The dots a line of tags has: where they start in the TAGS section, and how many.
+pub(crate) fn tag_range(kind: &NavKind) -> Option<(usize, usize)> {
+    match kind {
+        NavKind::Tags { first, len, .. } => Some((*first, *len)),
+        _ => None,
+    }
+}
 
 fn plain_row(kind: NavKind, name: String, path: PathBuf) -> NavRow {
     NavRow {
@@ -357,16 +365,7 @@ impl App {
                 });
             }
         }
-        if self.tags_supported() {
-            rows.push(gap());
-            rows.push(NavRow {
-                kind: NavKind::Tags,
-                depth: 0,
-                path: PathBuf::new(),
-                name: Key::SecTags.tr().to_string(),
-                count: None,
-            });
-        }
+        rows.extend(self.tags_rows(TAG_LINES_MOST));
         if let Some(t) = items.iter().find(|i| i.section == Section::Trash) {
             rows.push(gap());
             rows.push(NavRow {
@@ -390,7 +389,7 @@ impl App {
         let items = sidebar::items(self, false);
         let places = favorite_rows(&items, |s| matches!(s, Section::Home | Section::Pinned));
         let mut devices = favorite_rows(&items, |s| s == Section::Devices);
-        let mut tags = self.tags_rows();
+        let mut tags = self.tags_rows(1);
         let trash = items
             .iter()
             .find(|i| i.section == Section::Trash)
@@ -400,6 +399,12 @@ impl App {
         let rest = places.len() + trash.iter().len();
         let min_way = if chain.is_empty() { 0 } else { WAY_LEAST };
         if height > 0 {
+            // The lines of the user's own tags come after everything else: they take what is
+            // left over the places, the disks, the least of the way and the first line of dots.
+            let spare = height.saturating_sub(rest + min_way + block_len(&devices) + tags.len());
+            if spare > 0 {
+                tags = self.tags_rows(tags.len() - 1 + spare.min(TAG_LINES_MOST - 1));
+            }
             devices = squeeze(devices, &mut tags, rest + min_way, height);
         }
         let room = match height {
@@ -418,13 +423,26 @@ impl App {
         rows
     }
 
-    /// The blank row and the row of the seven tag colours, or nothing where tags are not kept.
-    fn tags_rows(&self) -> Vec<NavRow> {
+    /// The blank row and the lines of tag dots, or nothing where tags are not kept: the seven
+    /// colours, then the user's own tags, in `lines` lines if they fit (the colours are
+    /// always there, and the box's width says how many dots a line has).
+    fn tags_rows(&self, lines: usize) -> Vec<NavRow> {
         if !self.tags_supported() {
             return Vec::new();
         }
-        let tags = plain_row(NavKind::Tags, Key::SecTags.tr().to_string(), PathBuf::new());
-        vec![gap_row(), tags]
+        let total = sidebar::tag_items(self).len();
+        let (layout, more) = tag_lines(total, self.frame.nav_area.width as usize, lines);
+        let last = layout.len() - 1;
+        let lines = layout.into_iter().enumerate().map(|(i, (first, len))| {
+            let title = if i == 0 { Key::SecTags.tr() } else { "" };
+            let more = if i == last { more } else { 0 };
+            plain_row(
+                NavKind::Tags { first, len, more },
+                title.to_string(),
+                PathBuf::new(),
+            )
+        });
+        std::iter::once(gap_row()).chain(lines).collect()
     }
 
     /// The folders of the way to the folder shown (see [`Self::nav_rows_path`]) and its
@@ -680,12 +698,78 @@ impl App {
                 }
                 true
             }
-            NavKind::Tags => {
-                self.side_nav.step_tag(right);
+            NavKind::Tags { .. } => {
+                self.step_tag(right, &rows);
                 true
             }
             _ => false,
         }
+    }
+
+    /// Left and Right on the lines of tag dots: from one dot to the next, and on to the next
+    /// line when the line ends.
+    fn step_tag(&mut self, right: bool, rows: &[NavRow]) {
+        let shown = rows
+            .iter()
+            .filter_map(|r| tag_range(&r.kind))
+            .map(|(first, len)| first + len)
+            .max()
+            .unwrap_or(1);
+        let now = self.side_nav.nav_tag.min(shown - 1);
+        self.side_nav.nav_tag = if right {
+            (now + 1).min(shown - 1)
+        } else {
+            now.saturating_sub(1)
+        };
+        let dot = self.side_nav.nav_tag;
+        if let Some(at) = rows
+            .iter()
+            .position(|r| tag_range(&r.kind).is_some_and(|(f, n)| (f..f + n).contains(&dot)))
+        {
+            self.side_nav.nav_cursor = at;
+        }
+    }
+
+    /// The cursor of NAV has moved onto a line of tag dots: the dot is the one in the same
+    /// column as before, or the last that line has.
+    fn keep_tag_column(&mut self, rows: &[NavRow]) {
+        let Some((first, len)) = rows
+            .get(self.side_nav.nav_cursor)
+            .and_then(|r| tag_range(&r.kind))
+        else {
+            return;
+        };
+        let dot = self.side_nav.nav_tag;
+        let column = rows
+            .iter()
+            .filter_map(|r| tag_range(&r.kind))
+            .find(|(f, n)| (*f..f + n).contains(&dot))
+            .map_or(0, |(f, _)| dot - f);
+        self.side_nav.nav_tag = first + column.min(len - 1);
+    }
+
+    /// The name of the tag whose dot the keyboard or the pointer is on in NAV: the dots have
+    /// no names of their own.
+    pub fn nav_tag_name(&self) -> Option<String> {
+        if !self.frame.panels_shown {
+            return None;
+        }
+        if self.side_nav.focus {
+            let rows = self.nav_rows();
+            let (first, len) = tag_range(&rows.get(self.side_nav.nav_cursor)?.kind)?;
+            let path = self.nav_tag_path(first, len);
+            return rada_core::tagsearch::view_name(&path);
+        }
+        rada_core::tagsearch::view_name(self.side_nav.hover.as_ref()?)
+    }
+
+    /// Where the dot of the keyboard goes, among the `len` dots of a line from `first`.
+    fn nav_tag_path(&self, first: usize, len: usize) -> PathBuf {
+        let dot = self.side_nav.nav_tag.clamp(first, first + len.max(1) - 1);
+        sidebar::tag_items(self)
+            .get(dot)
+            .map(|i| i.path.clone())
+            .unwrap_or_default()
     }
 
     /// A key while the NAV box has the focus (the classic pane's keys, on the rows of this
@@ -721,10 +805,7 @@ impl App {
             Open => {
                 if let Some(row) = here {
                     let path = match row.kind {
-                        NavKind::Tags => {
-                            let c = Hue::ALL[self.side_nav.nav_tag.min(Hue::ALL.len() - 1)];
-                            rada_core::tagsearch::view_path(c.label(&self.tags.lang))
-                        }
+                        NavKind::Tags { first, len, .. } => self.nav_tag_path(first, len),
                         NavKind::Heading | NavKind::Gap | NavKind::More => return true,
                         _ => row.path,
                     };
@@ -769,6 +850,7 @@ impl App {
                 self.toast(ToastKind::Info, tf(Key::TSidebarFocus, &[&back]), 3);
             }
         }
+        self.keep_tag_column(&rows);
         true
     }
 

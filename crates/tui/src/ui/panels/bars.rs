@@ -94,6 +94,13 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
 
     let mut left = Bar::default();
     left.push(Span::styled(" ", band));
+    if let Some(name) = app.nav_tag_name() {
+        left.push(Span::styled(
+            name,
+            th.base().add_modifier(Modifier::BOLD).patch(band),
+        ));
+        left.push(sep());
+    }
     left.push_hits(
         soft::pill(
             &th,

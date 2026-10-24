@@ -262,7 +262,7 @@ fn the_panels_view_draws_only_standard_glyphs_with_unicode_std() {
                     .app
                     .nav_rows()
                     .iter()
-                    .position(|r| r.kind == rada_tui::panels::NavKind::Tags);
+                    .position(|r| matches!(r.kind, rada_tui::panels::NavKind::Tags { .. }));
                 // A system with no tags (Windows) has no such row: the focus stays on NAV.
                 if let Some(row) = tags {
                     h.app.side_nav.nav_cursor = row;

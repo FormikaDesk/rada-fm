@@ -16,6 +16,7 @@ mod pills;
 mod places;
 mod ring;
 mod screens;
+mod tags;
 mod tree;
 mod two_columns;
 mod way;

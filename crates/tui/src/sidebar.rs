@@ -322,25 +322,26 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
         });
     }
     if app.tags_supported() {
-        // The seven colours always, in the Finder's order and called what the system calls
-        // them; then the user's own tags seen in the folders opened so far.
-        let tag = |name: String, color: Option<Hue>| Item {
-            section: Section::Tags,
-            origin: Origin::Tag(color),
-            path: rada_core::tagsearch::view_path(&name),
-            name,
-            usage: None,
-            locked: false,
-        };
-        for c in Hue::ALL {
-            out.push(tag(c.label(&app.tags.lang).to_string(), Some(c)));
-        }
-        for t in &app.tags.known {
-            out.push(tag(t.name.clone(), t.color));
-        }
+        out.extend(tag_items(app));
     }
     trash(&mut out);
     out
+}
+
+/// The items of the TAGS section: the seven colours always, in the Finder's order and called
+/// what the system calls them; then the user's own tags seen in the folders opened so far.
+pub fn tag_items(app: &App) -> Vec<Item> {
+    let tag = |name: String, color: Option<Hue>| Item {
+        section: Section::Tags,
+        origin: Origin::Tag(color),
+        path: rada_core::tagsearch::view_path(&name),
+        name,
+        usage: None,
+        locked: false,
+    };
+    let colours = Hue::ALL.map(|c| tag(c.label(&app.tags.lang).to_string(), Some(c)));
+    let own = app.tags.known.iter().map(|t| tag(t.name.clone(), t.color));
+    colours.into_iter().chain(own).collect()
 }
 
 /// A disk's name in the sidebar: its label, "System" for the root, else its mount folder.
