@@ -3,7 +3,9 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0-rc.16] - 2026-10-24
+
+Tags on a Mac show the colours of the Finder, and the panels view lists your own tags. Still a **pre-release**.
 
 ### Fixed
 - **On a Mac a tag named after one of the seven colours shows that colour even when the file carries another number**, as in the Finder: a file tagged `Verde` with the number 1 (gray) was drawn gray in the list, the TAG column and the details, and the Finder shows it green. Tags of your own keep the colour of their number. Nothing changes on Linux and Windows.
