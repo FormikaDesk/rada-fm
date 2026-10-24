@@ -36,13 +36,13 @@ impl App {
 
     /// The entries an action applies to: the marked ones, else the one under the cursor.
     fn target_entries(&self) -> Vec<&Entry> {
-        if !self.tab.marked.is_empty() {
+        if !self.tab.sel.marked.is_empty() {
             return self
                 .tab
                 .listing
                 .all()
                 .iter()
-                .filter(|e| self.tab.marked.contains(&e.name))
+                .filter(|e| self.tab.sel.marked.contains(&e.name))
                 .collect();
         }
         self.current().into_iter().collect()
@@ -55,7 +55,7 @@ impl App {
         }
         // Inside an archive: the marked members, or everything. The folder is the archive's.
         if let Some(view) = self.tab.archive.clone() {
-            let only: Vec<PathBuf> = if self.tab.marked.is_empty() {
+            let only: Vec<PathBuf> = if self.tab.sel.marked.is_empty() {
                 Vec::new()
             } else {
                 self.targets()

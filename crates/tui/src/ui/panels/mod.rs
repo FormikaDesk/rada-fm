@@ -246,9 +246,9 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         ViewMode::Icons => grid::draw_grid(f, app, list),
     }
     if notice_h > 0 {
-        let before = app.tab.scroll;
+        let before = app.tab.sel.scroll;
         app.ensure_visible();
-        if app.tab.scroll != before {
+        if app.tab.sel.scroll != before {
             app.redraw.dirty = true;
         }
     }

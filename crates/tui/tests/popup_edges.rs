@@ -195,7 +195,7 @@ fn assert_no_shadow(before: &Buffer, after: &Buffer, rs: &[Rect], what: &str) {
 
 fn open_context_menu(h: &mut H, row: usize) {
     let target = Target::Row(row);
-    h.app.tab.cursor = row;
+    h.app.tab.sel.cursor = row;
     h.right_click(&target);
     assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
 }
@@ -413,7 +413,7 @@ fn submenu_touches_its_menu() {
             let mut h = scene(name, 140, 30, 12);
             let th = h.app.settings.th.clone();
             // The cursor is on a row that the menu and its submenu both cover.
-            h.app.tab.cursor = 8;
+            h.app.tab.sel.cursor = 8;
             let before = buffer(&mut h);
             right_click_at(&mut h, click_x, 24);
             open_a_submenu(&mut h);

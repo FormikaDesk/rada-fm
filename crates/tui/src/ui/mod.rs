@@ -392,9 +392,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     // A shorter list may have left the cursor below its last row: bring it back in view.
     if notice_h > 0 {
-        let before = app.tab.scroll;
+        let before = app.tab.sel.scroll;
         app.ensure_visible();
-        if app.tab.scroll != before {
+        if app.tab.sel.scroll != before {
             app.redraw.dirty = true;
         }
     }

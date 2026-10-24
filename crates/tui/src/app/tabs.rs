@@ -6,13 +6,14 @@
 
 use rada_core::uistate::SavedTab;
 
+use super::selection::Selection;
 use super::{App, FilterState, LoadState, ToastKind, Viewport};
 use crate::nav::NavMove;
 use crate::view::ViewMode;
 use rada_core::archive::ArchiveView;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{DirListing, SortKey, SortSpec};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -28,9 +29,7 @@ pub struct TabState {
     pub listing: DirListing,
     pub load: LoadState,
     pub visible: Vec<usize>,
-    pub cursor: usize,
-    pub scroll: usize,
-    pub marked: BTreeSet<OsString>,
+    pub sel: Selection,
     pub sort: SortSpec,
     /// The order of this tab was chosen by the person (a click on a column title, the Sort
     /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
@@ -41,7 +40,6 @@ pub struct TabState {
     pub nav: crate::nav::NavHistory,
     pub(super) nav_move: Option<NavMove>,
     pub filter: Option<FilterState>,
-    pub(super) sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     /// How the folder is shown.
     pub view: ViewMode,
     /// Number of rows the list can show; set by the renderer.

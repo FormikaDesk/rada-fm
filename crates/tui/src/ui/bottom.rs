@@ -142,7 +142,7 @@ fn hints(app: &App) -> Vec<Hint> {
         v.extend(Hint::act(app, ToggleSidebar, Key::HHide));
         return v;
     }
-    let mut v = if app.tab.marked.is_empty() && app.in_archive() {
+    let mut v = if app.tab.sel.marked.is_empty() && app.in_archive() {
         acts(&[
             (Open, Key::HOpen),
             (Copy, Key::HCopyOut),
@@ -152,7 +152,7 @@ fn hints(app: &App) -> Vec<Hint> {
             (Undo, Key::HUndo),
             (Help, Key::HHelp),
         ])
-    } else if app.tab.marked.is_empty() {
+    } else if app.tab.sel.marked.is_empty() {
         let mut first = if app.on_archive_item() {
             acts(&[
                 (ExtractHere, Key::HExtract),
@@ -194,7 +194,7 @@ fn hints(app: &App) -> Vec<Hint> {
         v.extend(acts(&[(ClearSelection, Key::HDeselect)]));
         v
     };
-    if app.tab.filter.is_some() && app.tab.marked.is_empty() {
+    if app.tab.filter.is_some() && app.tab.sel.marked.is_empty() {
         v.insert(0, Hint::fixed("Esc", Key::HClearSearch));
     }
     v
@@ -239,13 +239,13 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled("  │  ", th.faint().patch(band)));
     }
     b.push(Span::styled(count_text(app), th.base().patch(band)));
-    if !app.tab.marked.is_empty() {
+    if !app.tab.sel.marked.is_empty() {
         let size: u64 = app
             .tab
             .listing
             .all()
             .iter()
-            .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
+            .filter(|e| app.tab.sel.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
         let tick = icons::ui(app.settings.icons, Glyph::Checked);
@@ -253,12 +253,12 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             format!(
                 "{tick} {}",
-                if app.tab.marked.len() == 1 {
+                if app.tab.sel.marked.len() == 1 {
                     tf(Key::SelectedSizeOne, &[&fmt::size(size)])
                 } else {
                     tf(
                         Key::SelectedSizeMany,
-                        &[&app.tab.marked.len(), &fmt::size(size)],
+                        &[&app.tab.sel.marked.len(), &fmt::size(size)],
                     )
                 }
             ),

@@ -432,6 +432,7 @@ mod ops;
 mod panels;
 mod preview;
 mod props;
+mod selection;
 mod settings;
 mod side;
 mod sizes;
@@ -767,7 +768,7 @@ impl App {
     }
 
     pub fn current(&self) -> Option<&Entry> {
-        self.entry_at(self.tab.cursor)
+        self.entry_at(self.tab.sel.cursor)
     }
 
     fn rebuild_visible(&mut self) {
@@ -816,13 +817,13 @@ impl App {
 
     /// Paths an operation applies to: the marked entries, or else the one under the cursor.
     pub fn targets(&self) -> Vec<PathBuf> {
-        if !self.tab.marked.is_empty() {
+        if !self.tab.sel.marked.is_empty() {
             return self
                 .tab
                 .listing
                 .all()
                 .iter()
-                .filter(|e| self.tab.marked.contains(&e.name))
+                .filter(|e| self.tab.sel.marked.contains(&e.name))
                 .map(|e| e.path.clone())
                 .collect();
         }
@@ -832,37 +833,14 @@ impl App {
     }
 
     pub(crate) fn ensure_visible(&mut self) {
-        if self.tab.view == ViewMode::Icons {
-            // `scroll` is the first tile shown, always the start of a row.
-            let cols = self.tab.viewport.grid_cols.max(1);
-            let rows = self.tab.viewport.grid_rows.max(1);
-            let cursor_row = self.tab.cursor / cols;
-            let mut first = self.tab.scroll / cols;
-            if cursor_row < first {
-                first = cursor_row;
-            } else if cursor_row >= first + rows {
-                first = cursor_row + 1 - rows;
-            }
-            let last_row = self.tab.visible.len().saturating_sub(1) / cols;
-            first = first.min(last_row.saturating_sub(rows - 1));
-            self.tab.scroll = first * cols;
-            return;
-        }
-        let rows = self.tab.viewport.rows.max(1);
-        if self.tab.cursor < self.tab.scroll {
-            self.tab.scroll = self.tab.cursor;
-        } else if self.tab.cursor >= self.tab.scroll + rows {
-            self.tab.scroll = self.tab.cursor + 1 - rows;
-        }
-        let max_scroll = self.tab.visible.len().saturating_sub(rows);
-        self.tab.scroll = self.tab.scroll.min(max_scroll);
+        let (view, viewport) = (self.tab.view, self.tab.viewport);
+        self.tab
+            .sel
+            .keep_visible(view, viewport, self.tab.visible.len());
     }
 
     fn set_cursor(&mut self, to: usize) {
-        let max = self.tab.visible.len().saturating_sub(1);
-        let to = to.min(max);
-        if to != self.tab.cursor {
-            self.tab.cursor = to;
+        if self.tab.sel.move_to(to, self.tab.visible.len()) {
             self.preview.scroll = 0;
         }
         self.ensure_visible();
@@ -882,10 +860,11 @@ impl App {
                 .position(|&i| self.tab.listing.all()[i].name == n)
         });
         match idx {
-            Some(i) => self.tab.cursor = i,
+            Some(i) => self.tab.sel.cursor = i,
             None => {
-                self.tab.cursor = self
+                self.tab.sel.cursor = self
                     .tab
+                    .sel
                     .cursor
                     .min(self.tab.visible.len().saturating_sub(1))
             }
@@ -896,7 +875,7 @@ impl App {
     fn request_dir(&mut self, path: PathBuf) {
         if path != self.tab.cwd {
             self.tab.filter = None;
-            self.tab.sel_anchor = None;
+            self.tab.sel.drop_anchor();
         }
         let generation = self.tabs.next_generation();
         self.tab.load = LoadState::Loading(path.clone());
@@ -1310,9 +1289,9 @@ impl App {
                                 _ => self.tab.nav.visit(path.clone()),
                             }
                             self.tab.cwd = path.clone();
-                            self.clear_marks();
-                            self.tab.cursor = 0;
-                            self.tab.scroll = 0;
+                            self.tab.sel.clear_marks();
+                            self.tab.sel.cursor = 0;
+                            self.tab.sel.scroll = 0;
                             // An archive's folders are not on the disk: nothing to watch, and
                             // not a place to come back to.
                             if !virtual_dir {
@@ -1329,7 +1308,7 @@ impl App {
                                 .iter()
                                 .map(|e| e.name.clone())
                                 .collect();
-                            self.tab.marked.retain(|n| existing.contains(n));
+                            self.tab.sel.marked.retain(|n| existing.contains(n));
                         }
                         self.sync_folder_sizes();
                         self.rebuild_visible();
@@ -1366,7 +1345,7 @@ impl App {
                     .iter()
                     .map(|e| e.name.clone())
                     .collect();
-                self.tab.marked.retain(|n| existing.contains(n));
+                self.tab.sel.marked.retain(|n| existing.contains(n));
                 self.rebuild_visible();
                 self.restore_cursor(keep);
                 self.preview.invalidate(); // contents may have changed
@@ -1861,7 +1840,7 @@ impl App {
             reversible,
             outcome,
         });
-        self.clear_marks();
+        self.tab.sel.clear_marks();
     }
 
     fn submit_input(&mut self, iv: InputView) {
@@ -2000,19 +1979,12 @@ impl App {
         }
     }
 
-    fn clear_marks(&mut self) {
-        self.tab.marked.clear();
-        self.tab.sel_anchor = None;
-    }
-
     fn toggle_mark(&mut self) {
         if let Some(e) = self.current() {
             let name = e.name.clone();
-            if !self.tab.marked.remove(&name) {
-                self.tab.marked.insert(name);
-            }
+            self.tab.sel.toggle(name);
         }
-        self.set_cursor(self.tab.cursor + 1);
+        self.set_cursor(self.tab.sel.cursor + 1);
     }
 
     fn mark_all(&mut self) {
@@ -2022,11 +1994,7 @@ impl App {
             .iter()
             .map(|&i| self.tab.listing.all()[i].name.clone())
             .collect();
-        if self.tab.marked.len() == all.len() {
-            self.clear_marks();
-        } else {
-            self.tab.marked = all.into_iter().collect();
-        }
+        self.tab.sel.toggle_all(all);
     }
 
     fn yank(&mut self, mode: TransferMode) {
@@ -2039,7 +2007,7 @@ impl App {
         }
         let n = paths.len();
         self.ops.clipboard = Some(Clip { mode, paths });
-        self.clear_marks();
+        self.tab.sel.clear_marks();
         let verb = match (mode == TransferMode::Copy, n == 1) {
             (true, true) => Key::TYankCopiedOne,
             (true, false) => Key::TYankCopiedMany,
@@ -2271,7 +2239,7 @@ impl App {
                     .filter_map(|&i| self.tab.listing.all().get(i))
                     .map(|e| e.path.clone())
                     .collect();
-                self.tab.marked = self
+                self.tab.sel.marked = self
                     .tab
                     .visible
                     .iter()
@@ -2304,7 +2272,7 @@ impl App {
                     .filter(|e| !e.is_dir())
                     .map(|e| (e.name.clone(), e.path.clone()))
                     .collect();
-                self.tab.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
+                self.tab.sel.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
                 self.ops.clipboard = Some(Clip {
                     mode: TransferMode::Copy,
                     paths: files
@@ -2330,7 +2298,7 @@ impl App {
                     .iter()
                     .filter_map(|n| by_name(self, n))
                     .collect();
-                self.tab.marked = chosen.iter().map(|(n, _)| n.clone()).collect();
+                self.tab.sel.marked = chosen.iter().map(|(n, _)| n.clone()).collect();
                 let waiting: Vec<PathBuf> = ["data.json", "main.rs"]
                     .iter()
                     .filter_map(|n| by_name(self, n))
@@ -2416,7 +2384,7 @@ impl App {
                 }
                 self.notify(done);
                 let names = ["archive.tar.gz", "backup.zip"];
-                self.tab.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                self.tab.sel.marked = names.iter().map(|n| OsString::from(*n)).collect();
                 let paths: Vec<PathBuf> = names
                     .iter()
                     .filter_map(|n| {
@@ -2438,7 +2406,7 @@ impl App {
             // name, on three marked items.
             "delete" | "conflict" => {
                 let names = ["archive.tar.gz", "backup.zip", "Cargo.toml"];
-                self.tab.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                self.tab.sel.marked = names.iter().map(|n| OsString::from(*n)).collect();
                 self.restore_cursor(Some(OsString::from("photo.jpg")));
                 self.ensure_visible();
                 if scene == "delete" {

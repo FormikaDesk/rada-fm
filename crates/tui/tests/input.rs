@@ -193,7 +193,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("redo", "ctrl+y", |h| redoing(h)),
         ("quit", "q", |h| h.app.session.should_quit),
         ("quit", "ctrl+q", |h| h.app.session.should_quit),
-        ("select all", "ctrl+a", |h| h.app.tab.marked.len() == 6),
+        ("select all", "ctrl+a", |h| h.app.tab.sel.marked.len() == 6),
         ("hidden", ".", |h| h.app.settings.show_hidden),
         ("sort", "s", |h| h.app.sort_label().starts_with("size")),
     ];

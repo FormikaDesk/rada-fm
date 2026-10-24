@@ -86,7 +86,7 @@ impl App {
             .listing
             .all()
             .iter()
-            .filter(|e| self.tab.marked.contains(&e.name) && keep(e))
+            .filter(|e| self.tab.sel.marked.contains(&e.name) && keep(e))
             .map(|e| e.path.clone())
             .collect()
     }
@@ -102,7 +102,7 @@ impl App {
             .map(|e| (e.path.clone(), e.is_dir(), e.is_navigable_dir()));
         match ch.kind {
             Kind::File => {
-                if by_key && ch.multiple && !self.tab.marked.is_empty() {
+                if by_key && ch.multiple && !self.tab.sel.marked.is_empty() {
                     let files = self.marked_paths(|e| !e.is_dir() && e.error.is_none());
                     if files.is_empty() {
                         self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
@@ -136,7 +136,7 @@ impl App {
                     }
                     return;
                 }
-                if ch.multiple && !here && !self.tab.marked.is_empty() {
+                if ch.multiple && !here && !self.tab.sel.marked.is_empty() {
                     let dirs = self.marked_paths(|e| e.is_dir());
                     self.chooser_finish(dirs);
                     return;
@@ -193,7 +193,7 @@ impl App {
                 .is_some_and(|c| c.kind == Kind::File)
         {
             self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
-            self.set_cursor(self.tab.cursor + 1);
+            self.set_cursor(self.tab.sel.cursor + 1);
             return false;
         }
         true

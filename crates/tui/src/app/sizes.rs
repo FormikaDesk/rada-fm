@@ -181,7 +181,7 @@ impl App {
 
     /// The folder under the cursor, as an index into the listing.
     pub fn current_index(&self) -> Option<usize> {
-        self.tab.visible.get(self.tab.cursor).copied()
+        self.tab.visible.get(self.tab.sel.cursor).copied()
     }
 
     /// "12 items · 4.8 MB" for the details pane, once the folder has been counted; while it

@@ -16,7 +16,7 @@ pub struct PropsView {
 
 impl App {
     pub fn open_properties(&mut self) {
-        let view = if self.tab.marked.len() > 1 {
+        let view = if self.tab.sel.marked.len() > 1 {
             self.selection_properties()
         } else {
             let Some(e) = self.current() else { return };
@@ -31,7 +31,7 @@ impl App {
             .listing
             .all()
             .iter()
-            .filter(|e| self.tab.marked.contains(&e.name))
+            .filter(|e| self.tab.sel.marked.contains(&e.name))
             .collect();
         let size: u64 = chosen.iter().filter(|e| !e.is_dir()).map(|e| e.size).sum();
         let folders = chosen.iter().filter(|e| e.is_dir()).count();

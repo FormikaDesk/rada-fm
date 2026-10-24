@@ -251,7 +251,7 @@ fn help_lists_both_schemes() {
 fn context_menu() {
     let mut h = scene(110, 30);
     on(&mut h, "main.rs");
-    let row = rada_tui::hits::Target::Row(h.app.tab.cursor);
+    let row = rada_tui::hits::Target::Row(h.app.tab.sel.cursor);
     h.right_click(&row);
     insta::assert_snapshot!("menu_110x30", shot(&mut h));
 }

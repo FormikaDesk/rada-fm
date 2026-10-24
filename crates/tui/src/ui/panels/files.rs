@@ -156,35 +156,37 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    app.tab.scroll = app.tab.scroll.min(count.saturating_sub(1));
+    app.tab.sel.scroll = app.tab.sel.scroll.min(count.saturating_sub(1));
     let rows = body.height as usize;
-    let last = (app.tab.scroll + rows).min(count);
-    let shown: Vec<usize> = (app.tab.scroll..last).map(|v| app.tab.visible[v]).collect();
+    let last = (app.tab.sel.scroll + rows).min(count);
+    let shown: Vec<usize> = (app.tab.sel.scroll..last)
+        .map(|v| app.tab.visible[v])
+        .collect();
     app.warm_dates(shown.iter().copied());
     app.want_folder_sizes(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
-    for vis in app.tab.scroll..last {
+    for vis in app.tab.sel.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
         lines.push(row(
             app,
             e,
             app.tab.visible[vis],
-            vis == app.tab.cursor,
+            vis == app.tab.sel.cursor,
             &cols,
             area.width as usize,
         ));
     }
     f.render_widget(Paragraph::new(lines), body);
-    for vis in app.tab.scroll..last {
+    for vis in app.tab.sel.scroll..last {
         let r = Rect {
-            y: body.y + (vis - app.tab.scroll) as u16,
+            y: body.y + (vis - app.tab.sel.scroll) as u16,
             height: 1,
             ..body
         };
         let marked = app
             .entry_at(vis)
-            .is_some_and(|e| app.tab.marked.contains(&e.name));
-        if vis == app.tab.cursor {
+            .is_some_and(|e| app.tab.sel.marked.contains(&e.name));
+        if vis == app.tab.sel.cursor {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Focus);
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Panel);
@@ -202,7 +204,7 @@ fn row<'a>(
     width: usize,
 ) -> Line<'a> {
     let th = &app.settings.th;
-    let marked = app.tab.marked.contains(&e.name);
+    let marked = app.tab.sel.marked.contains(&e.name);
     // The selected row is filled with the selection colour and its text is the theme's text
     // for it, in every column (a quieter tone would not read on it).
     let row_style = if is_cursor {

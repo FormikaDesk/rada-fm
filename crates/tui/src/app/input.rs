@@ -13,7 +13,7 @@ use rada_core::events::CoreEvent;
 use rada_core::i18n::Key;
 use rada_core::model::{SortKey, SortSpec};
 use rada_core::ops::TransferMode;
-use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -356,8 +356,8 @@ impl App {
                     _ => None,
                 }
             {
-                self.tab.sel_anchor = None;
-                let to = (self.tab.cursor as isize + step).max(0) as usize;
+                self.tab.sel.drop_anchor();
+                let to = (self.tab.sel.cursor as isize + step).max(0) as usize;
                 self.set_cursor(to);
                 self.redraw.dirty = true;
                 return;
@@ -405,7 +405,7 @@ impl App {
                 | HalfPageUp
                 | HalfPageDown
         ) {
-            self.tab.sel_anchor = None;
+            self.tab.sel.drop_anchor();
         }
         // In the Icons view, up and down are a whole row, and a page is the tiles on screen.
         let (line, page, half) = if self.tab.view == ViewMode::Icons {
@@ -418,18 +418,18 @@ impl App {
             (1, page, page / 2)
         };
         match action {
-            Up => self.set_cursor(self.tab.cursor.saturating_sub(line)),
-            Down => self.set_cursor(self.tab.cursor + line),
+            Up => self.set_cursor(self.tab.sel.cursor.saturating_sub(line)),
+            Down => self.set_cursor(self.tab.sel.cursor + line),
             Parent => self.go_parent(),
             Back => self.go_history(true),
             Forward => self.go_history(false),
             Open => self.enter(),
             First => self.set_cursor(0),
             Last => self.set_cursor(usize::MAX),
-            PageUp => self.set_cursor(self.tab.cursor.saturating_sub(page)),
-            PageDown => self.set_cursor(self.tab.cursor + page),
-            HalfPageUp => self.set_cursor(self.tab.cursor.saturating_sub(half)),
-            HalfPageDown => self.set_cursor(self.tab.cursor + half),
+            PageUp => self.set_cursor(self.tab.sel.cursor.saturating_sub(page)),
+            PageDown => self.set_cursor(self.tab.sel.cursor + page),
+            HalfPageUp => self.set_cursor(self.tab.sel.cursor.saturating_sub(half)),
+            HalfPageDown => self.set_cursor(self.tab.sel.cursor + half),
             GoHome => {
                 let home = self.svc.home.clone();
                 self.open_dir(home);
@@ -437,15 +437,15 @@ impl App {
 
             ToggleMark => self.toggle_mark(),
             SelectAll => self.mark_all(),
-            SelectUp => self.extend_selection(self.tab.cursor.saturating_sub(line)),
-            SelectDown => self.extend_selection(self.tab.cursor + line),
+            SelectUp => self.extend_selection(self.tab.sel.cursor.saturating_sub(line)),
+            SelectDown => self.extend_selection(self.tab.sel.cursor + line),
             SelectToFirst => self.extend_selection(0),
             SelectToLast => self.extend_selection(usize::MAX),
             ClearSelection => {
                 if self.ops.cancel() {
                     self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
-                } else if !self.tab.marked.is_empty() {
-                    self.clear_marks();
+                } else if !self.tab.sel.marked.is_empty() {
+                    self.tab.sel.clear_marks();
                 } else if self.tab.filter.is_some() {
                     self.set_filter(None);
                 } else if self.frame.size_notice_visible {
@@ -693,7 +693,7 @@ impl App {
         let at = self
             .frame
             .hits
-            .find(&Target::Row(self.tab.cursor))
+            .find(&Target::Row(self.tab.sel.cursor))
             .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
             .unwrap_or((8, 6));
         let on_item = self.current().is_some();
@@ -732,8 +732,8 @@ impl App {
         if found {
             self.restore_cursor(keep);
         } else {
-            self.tab.cursor = 0;
-            self.tab.scroll = 0;
+            self.tab.sel.cursor = 0;
+            self.tab.sel.scroll = 0;
         }
         self.ensure_visible();
         self.request_preview();
@@ -783,21 +783,15 @@ impl App {
         if self.tab.visible.is_empty() {
             return;
         }
-        if self.tab.sel_anchor.is_none() {
-            self.tab.sel_anchor = Some((self.tab.cursor, self.tab.marked.clone()));
-        }
+        self.tab.sel.begin_extend();
         self.set_cursor(to);
-        let Some((anchor, base)) = self.tab.sel_anchor.clone() else {
+        let Some(span) = self.tab.sel.span() else {
             return;
         };
-        let (lo, hi) = (anchor.min(self.tab.cursor), anchor.max(self.tab.cursor));
-        let mut marked = base;
-        for v in lo..=hi {
-            if let Some(e) = self.entry_at(v) {
-                marked.insert(e.name.clone());
-            }
-        }
-        self.tab.marked = marked;
+        let names: Vec<OsString> = span
+            .filter_map(|v| self.entry_at(v).map(|e| e.name.clone()))
+            .collect();
+        self.tab.sel.mark_span(names);
     }
 
     // ------------------------------------------------------------------ mouse
@@ -914,7 +908,7 @@ impl App {
             }
             return;
         }
-        self.tab.sel_anchor = None;
+        self.tab.sel.drop_anchor();
         // A turn of the wheel is three rows of the list, or one row of tiles.
         let step = if self.tab.view == ViewMode::Icons {
             self.tab.viewport.grid_cols.max(1)
@@ -922,9 +916,9 @@ impl App {
             WHEEL_STEP
         };
         let to = if down {
-            self.tab.cursor + step
+            self.tab.sel.cursor + step
         } else {
-            self.tab.cursor.saturating_sub(step)
+            self.tab.sel.cursor.saturating_sub(step)
         };
         self.set_cursor(to);
     }
@@ -962,12 +956,7 @@ impl App {
                 if i < self.tab.visible.len() {
                     self.side_nav.focus = false;
                     self.set_cursor(i);
-                    if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
-                        && !self.tab.marked.remove(&name)
-                    {
-                        self.tab.marked.insert(name);
-                    }
-                    self.tab.sel_anchor = Some((i, self.tab.marked.clone()));
+                    self.toggle_mark_at(i);
                 }
             }
             Some(Target::Tab(i)) => self.switch_tab(i),
@@ -1018,9 +1007,17 @@ impl App {
                 };
                 self.set_sort(spec);
             }
-            Some(Target::List) => self.clear_marks(),
+            Some(Target::List) => self.tab.sel.clear_marks(),
             _ => {}
         }
+    }
+
+    /// Mark or unmark row `i`, which becomes where a selection extended next starts.
+    fn toggle_mark_at(&mut self, i: usize) {
+        if let Some(name) = self.entry_at(i).map(|e| e.name.clone()) {
+            self.tab.sel.toggle(name);
+        }
+        self.tab.sel.anchor_at(i);
     }
 
     fn click_row(&mut self, i: usize, mods: KeyModifiers) {
@@ -1032,12 +1029,7 @@ impl App {
         if mods.contains(KeyModifiers::CONTROL) {
             // Ctrl+click adds or removes one item and becomes the new anchor.
             self.set_cursor(i);
-            if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
-                && !self.tab.marked.remove(&name)
-            {
-                self.tab.marked.insert(name);
-            }
-            self.tab.sel_anchor = Some((i, self.tab.marked.clone()));
+            self.toggle_mark_at(i);
         } else if mods.contains(KeyModifiers::SHIFT) {
             self.extend_selection(i);
         } else if double {
@@ -1045,9 +1037,9 @@ impl App {
             self.set_cursor(i);
             self.enter();
         } else {
-            self.clear_marks();
+            self.tab.sel.clear_marks();
             self.set_cursor(i);
-            self.tab.sel_anchor = Some((i, BTreeSet::new()));
+            self.tab.sel.anchor_alone(i);
         }
     }
 
@@ -1130,9 +1122,9 @@ impl App {
             Some(Target::Row(i) | Target::Check(i)) if i < self.tab.visible.len() => {
                 let already = self
                     .entry_at(i)
-                    .is_some_and(|e| self.tab.marked.contains(&e.name));
+                    .is_some_and(|e| self.tab.sel.marked.contains(&e.name));
                 if !already {
-                    self.clear_marks();
+                    self.tab.sel.clear_marks();
                 }
                 self.set_cursor(i);
                 true

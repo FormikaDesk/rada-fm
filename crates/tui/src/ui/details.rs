@@ -144,12 +144,12 @@ fn draw_marked_summary(f: &mut Frame, app: &App, inner: Rect) {
         .listing
         .all()
         .iter()
-        .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
+        .filter(|e| app.tab.sel.marked.contains(&e.name) && !e.is_dir())
         .map(|e| e.size)
         .sum();
     let lines = vec![
         Line::from(Span::styled(
-            fmt::selected_items(app.tab.marked.len() as u64),
+            fmt::selected_items(app.tab.sel.marked.len() as u64),
             th.base().add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
@@ -201,7 +201,7 @@ fn draw_name_and_type(f: &mut Frame, app: &mut App, inner: Rect, e: &Entry) {
 
 /// What comes before the preview. The item it is about, when there is one to preview.
 fn draw_header(f: &mut Frame, app: &mut App, inner: Rect) -> Option<Entry> {
-    if app.tab.marked.len() > 1 {
+    if app.tab.sel.marked.len() > 1 {
         draw_marked_summary(f, app, inner);
         return None;
     }

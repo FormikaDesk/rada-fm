@@ -165,33 +165,33 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
         );
         return;
     }
-    app.tab.scroll = app.tab.scroll.min(count.saturating_sub(1));
-    let last = (app.tab.scroll + rows).min(count);
+    app.tab.sel.scroll = app.tab.sel.scroll.min(count.saturating_sub(1));
+    let last = (app.tab.sel.scroll + rows).min(count);
     let mut lines: Vec<Line> = Vec::new();
-    for vis in app.tab.scroll..last {
+    for vis in app.tab.sel.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
-        let marked = app.tab.marked.contains(&e.name);
-        let style = if vis == app.tab.cursor {
+        let marked = app.tab.sel.marked.contains(&e.name);
+        let style = if vis == app.tab.sel.cursor {
             th.cursor_row()
         } else if marked {
             th.marked()
         } else {
             Style::default()
         };
-        let glyph_style = (vis == app.tab.cursor).then(Style::default);
+        let glyph_style = (vis == app.tab.sel.cursor).then(Style::default);
         lines.push(line_of(app, e, area.width as usize, style, glyph_style));
     }
     f.render_widget(Paragraph::new(lines), area);
-    for vis in app.tab.scroll..last {
+    for vis in app.tab.sel.scroll..last {
         let r = Rect {
-            y: area.y + (vis - app.tab.scroll) as u16,
+            y: area.y + (vis - app.tab.sel.scroll) as u16,
             height: 1,
             ..area
         };
         let marked = app
             .entry_at(vis)
-            .is_some_and(|e| app.tab.marked.contains(&e.name));
-        if vis == app.tab.cursor {
+            .is_some_and(|e| app.tab.sel.marked.contains(&e.name));
+        if vis == app.tab.sel.cursor {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);

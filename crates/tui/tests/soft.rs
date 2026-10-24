@@ -37,7 +37,7 @@ fn cursor_cells(h: &mut H) -> Vec<ratatui::buffer::Cell> {
         .app
         .frame
         .hits
-        .find(&Target::Row(h.app.tab.cursor))
+        .find(&Target::Row(h.app.tab.sel.cursor))
         .unwrap();
     let buf = h.term.backend().buffer().clone();
     (r.x..r.x + r.width)

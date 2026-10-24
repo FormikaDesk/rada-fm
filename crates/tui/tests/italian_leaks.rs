@@ -88,7 +88,7 @@ fn sandbox() -> (H, std::path::PathBuf, std::path::PathBuf) {
 }
 
 fn right_click_row(h: &mut H) {
-    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.sel.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,

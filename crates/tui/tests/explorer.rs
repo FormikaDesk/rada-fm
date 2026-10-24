@@ -196,7 +196,7 @@ fn the_icons_view() {
 )]
 fn the_context_menus() {
     let mut h = scene(120, 35);
-    h.right_click(&Target::Row(h.app.tab.cursor));
+    h.right_click(&Target::Row(h.app.tab.sel.cursor));
     insta::assert_snapshot!("context_menu_item_120x30", shot(&mut h));
     h.press("esc");
     // On empty space.
@@ -286,7 +286,7 @@ fn tabs_keep_their_own_folder_cursor_selection_and_sort() {
         "a new tab starts in the current folder"
     );
     assert!(
-        h.app.tab.marked.is_empty(),
+        h.app.tab.sel.marked.is_empty(),
         "the selection is the tab's own"
     );
     // Tab 2: another folder and another order.
@@ -720,8 +720,8 @@ fn checkbox_selects_double_click_opens() {
     let _ = h.screen();
     // Click a name: the cursor moves, nothing is selected.
     h.click(&Target::Row(7));
-    assert_eq!(h.app.tab.cursor, 7);
-    assert!(h.app.tab.marked.is_empty());
+    assert_eq!(h.app.tab.sel.cursor, 7);
+    assert!(h.app.tab.sel.marked.is_empty());
     // Click the box of another row: it is selected, and the selection grows.
     let r = h
         .app
@@ -760,7 +760,7 @@ fn checkbox_selects_double_click_opens() {
     });
     // The title's box selects everything.
     h.click(&Target::Act(Action::SelectAll));
-    assert!(h.app.tab.marked.is_empty() || !h.app.tab.visible.is_empty());
+    assert!(h.app.tab.sel.marked.is_empty() || !h.app.tab.visible.is_empty());
 }
 
 #[test]
@@ -773,7 +773,7 @@ fn cursor_row_solid_selected_rows_quiet() {
         .app
         .frame
         .hits
-        .find(&Target::Row(h.app.tab.cursor))
+        .find(&Target::Row(h.app.tab.sel.cursor))
         .unwrap();
     // The cursor row: the solid colour, white text, and a bar in the leftmost cell.
     let cell = &buf[(cursor_row.x + 6, cursor_row.y)];
@@ -800,9 +800,15 @@ fn cursor_row_solid_selected_rows_quiet() {
         .app
         .frame
         .hits
-        .find(&Target::Row(h.app.tab.cursor))
+        .find(&Target::Row(h.app.tab.sel.cursor))
         .unwrap();
-    assert!(h.app.tab.marked.contains(&h.app.current().unwrap().name));
+    assert!(
+        h.app
+            .tab
+            .sel
+            .marked
+            .contains(&h.app.current().unwrap().name)
+    );
     assert_eq!(buf[(r.x + 6, r.y)].bg, th.cursor);
     assert_eq!(buf[(r.x + 1, r.y)].symbol(), "☑");
 }
@@ -817,21 +823,25 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
     let _ = h.screen();
     let cols = h.app.tab.viewport.grid_cols;
     assert!(cols >= 4, "{cols}");
-    let start = h.app.tab.cursor;
+    let start = h.app.tab.sel.cursor;
     h.press("l");
-    assert_eq!(h.app.tab.cursor, start + 1, "l moves across");
+    assert_eq!(h.app.tab.sel.cursor, start + 1, "l moves across");
     h.press("right");
-    assert_eq!(h.app.tab.cursor, start + 2);
+    assert_eq!(h.app.tab.sel.cursor, start + 2);
     h.press("h");
     h.press("left");
-    assert_eq!(h.app.tab.cursor, start);
+    assert_eq!(h.app.tab.sel.cursor, start);
     h.press("j");
-    assert_eq!(h.app.tab.cursor, start + cols, "j moves a whole row down");
+    assert_eq!(
+        h.app.tab.sel.cursor,
+        start + cols,
+        "j moves a whole row down"
+    );
     h.press("down");
-    assert_eq!(h.app.tab.cursor, start + 2 * cols);
+    assert_eq!(h.app.tab.sel.cursor, start + 2 * cols);
     h.press("k");
     h.press("up");
-    assert_eq!(h.app.tab.cursor, start);
+    assert_eq!(h.app.tab.sel.cursor, start);
     // Space selects, Enter opens, names are cut with …
     h.press("space");
     assert_eq!(h.marked_names().len(), 1);
@@ -873,16 +883,17 @@ fn icons_view_cuts_names_and_follows_cursor() {
     }
     let _ = h.screen();
     assert!(
-        h.app.tab.scroll > 0,
+        h.app.tab.sel.scroll > 0,
         "the view scrolled to keep the cursor in sight"
     );
     assert!(
-        h.app.tab.scroll <= h.app.tab.cursor && h.app.tab.cursor < h.app.tab.scroll + rows * cols
+        h.app.tab.sel.scroll <= h.app.tab.sel.cursor
+            && h.app.tab.sel.cursor < h.app.tab.sel.scroll + rows * cols
     );
     h.press("G");
     let _ = h.screen();
-    assert_eq!(h.app.tab.cursor, 59);
-    assert!(h.app.tab.cursor < h.app.tab.scroll + rows * cols);
+    assert_eq!(h.app.tab.sel.cursor, 59);
+    assert!(h.app.tab.sel.cursor < h.app.tab.sel.scroll + rows * cols);
 }
 
 // ---------------------------------------------------------------------------- details
@@ -955,7 +966,7 @@ fn pane_rows(h: &mut H) -> Vec<String> {
 #[test]
 fn blank_rows_between_bars_and_status() {
     let mut h = scene(170, 35);
-    h.app.tab.marked.clear();
+    h.app.tab.sel.marked.clear();
     let rows = pane_rows(&mut h);
     let open = rows
         .iter()
@@ -992,7 +1003,7 @@ fn blank_rows_between_bars_and_status() {
 #[test]
 fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
     let mut h = scene(170, 35);
-    h.app.tab.marked.clear();
+    h.app.tab.sel.marked.clear();
     h.app.settings.icons = rada_tui::IconSet::Nerd;
     let rows = pane_rows(&mut h);
     let with_caps = |needle: &str| {
@@ -1160,7 +1171,7 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
 fn the_item_menu_has_extract_on_archives_and_pin_on_folders() {
     let mut h = scene(120, 30);
     put_cursor(&mut h, "docs");
-    h.right_click(&Target::Row(h.app.tab.cursor));
+    h.right_click(&Target::Row(h.app.tab.sel.cursor));
     let s = h.screen();
     assert!(s.contains("Pin to navigation"), "{s}");
     // "Open with…" is for files: on a folder it is there but cannot be chosen.
@@ -1234,13 +1245,13 @@ fn nothing_the_explorer_draws_leaves_the_screen_or_breaks_a_wide_glyph() {
 fn key_events_that_are_releases_do_nothing() {
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
     let mut h = scene(120, 30);
-    let before = h.app.tab.cursor;
+    let before = h.app.tab.sel.cursor;
     let mut ev = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
     ev.kind = KeyEventKind::Release;
     ev.state = KeyEventState::NONE;
     h.app.on_key(ev);
-    assert_eq!(h.app.tab.cursor, before);
+    assert_eq!(h.app.tab.sel.cursor, before);
     ev.kind = KeyEventKind::Press;
     h.app.on_key(ev);
-    assert_eq!(h.app.tab.cursor, before + 1);
+    assert_eq!(h.app.tab.sel.cursor, before + 1);
 }

@@ -152,8 +152,12 @@ impl App {
     pub(super) fn submenu_title(&self, kind: MenuKind) -> Option<MenuTitle> {
         match kind {
             MenuKind::Tags => {
-                let what = if self.tab.marked.len() > 1 {
-                    crate::fmt::count(self.tab.marked.len() as u64, Key::ItemOne, Key::ItemMany)
+                let what = if self.tab.sel.marked.len() > 1 {
+                    crate::fmt::count(
+                        self.tab.sel.marked.len() as u64,
+                        Key::ItemOne,
+                        Key::ItemMany,
+                    )
                 } else {
                     self.current()
                         .map(|e| e.display.clone())
@@ -174,11 +178,15 @@ impl App {
     /// several items selected, how many.
     fn item_menu_title(&self) -> Option<MenuTitle> {
         let th = &self.settings.th;
-        if self.tab.marked.len() > 1 {
+        if self.tab.sel.marked.len() > 1 {
             return Some(MenuTitle {
                 icon: crate::icons::ui(self.settings.icons, crate::icons::Glyph::Checked),
                 icon_color: th.accent,
-                name: crate::fmt::count(self.tab.marked.len() as u64, Key::ItemOne, Key::ItemMany),
+                name: crate::fmt::count(
+                    self.tab.sel.marked.len() as u64,
+                    Key::ItemOne,
+                    Key::ItemMany,
+                ),
                 kind: String::new(),
             });
         }
@@ -323,12 +331,12 @@ impl App {
 
     /// The entries the tag menu is about: the selection, or the item under the cursor.
     fn tag_targets(&self) -> Vec<&Entry> {
-        if !self.tab.marked.is_empty() {
+        if !self.tab.sel.marked.is_empty() {
             self.tab
                 .listing
                 .all()
                 .iter()
-                .filter(|e| self.tab.marked.contains(&e.name))
+                .filter(|e| self.tab.sel.marked.contains(&e.name))
                 .collect()
         } else {
             self.current().into_iter().collect()

@@ -99,18 +99,18 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let w = inner.width as usize;
 
-    if app.tab.marked.len() > 1 {
+    if app.tab.sel.marked.len() > 1 {
         let size: u64 = app
             .tab
             .listing
             .all()
             .iter()
-            .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
+            .filter(|e| app.tab.sel.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
         let lines = vec![
             Line::from(Span::styled(
-                fmt::selected_items(app.tab.marked.len() as u64),
+                fmt::selected_items(app.tab.sel.marked.len() as u64),
                 th.base().add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::styled(

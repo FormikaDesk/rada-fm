@@ -108,7 +108,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let first = app.tab.scroll / cols * cols;
+    let first = app.tab.sel.scroll / cols * cols;
     let x0 = area.x + (area.width as usize - cols * TILE_W).min(2) as u16 / 2;
     let mut lines: Vec<Line> = Vec::with_capacity(rows * TILE_H);
     for r in 0..rows {
@@ -121,8 +121,8 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 }
                 continue;
             };
-            let cursor = vis == app.tab.cursor;
-            let marked = app.tab.marked.contains(&e.name);
+            let cursor = vis == app.tab.sel.cursor;
+            let marked = app.tab.sel.marked.contains(&e.name);
             let bg = if cursor {
                 th.cursor_row()
             } else if marked {

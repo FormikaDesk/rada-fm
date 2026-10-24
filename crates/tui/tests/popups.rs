@@ -28,7 +28,7 @@ fn menus_windows_and_cards_fit_every_size_without_panicking() {
         let (mut hh, dest) = files(w, h);
         hh.keys("j");
         // The menu of an item, and the one beside it.
-        let (x, y) = hh.where_is(&Target::Row(hh.app.tab.cursor));
+        let (x, y) = hh.where_is(&Target::Row(hh.app.tab.sel.cursor));
         hh.mouse(
             MouseEventKind::Down(MouseButton::Right),
             x,
@@ -108,7 +108,7 @@ fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
     h.app.settings.basic = true;
     h.app.settings.icons = rada_tui::IconSet::None;
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.sel.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
@@ -156,7 +156,7 @@ fn hint_row(h: &mut H) -> String {
 fn the_key_hints_of_a_menu_name_only_the_keys_that_work_now() {
     let (mut h, _dest) = files(150, 40);
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.sel.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,

@@ -389,6 +389,7 @@ impl H {
     pub fn marked_names(&self) -> Vec<String> {
         self.app
             .tab
+            .sel
             .marked
             .iter()
             .map(|n| n.to_string_lossy().into_owned())
