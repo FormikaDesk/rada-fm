@@ -2,10 +2,10 @@
 //!
 //! * **macOS**: the Finder's tags, in the extended attribute `com.apple.metadata:_kMDItemUserTags`,
 //!   a binary property list holding strings of the form `Name` or `Name\n<colour number>`. The
-//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The colour is the number;
-//!   the name of a standard colour is written in the language of the system (`Blu\n4` on an
-//!   Italian Mac), because the Finder knows its colour tags by those names and gives a tag of
-//!   another name no colour.
+//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The name of a standard
+//!   colour is written in the language of the system (`Blu\n4` on an Italian Mac). The colour
+//!   a tag is drawn in is the one the Finder's own list of tags gives its name; the number in
+//!   the file only counts for a tag that is not in the list (see [`FinderTagList::color_of`]).
 //! * **Linux**: `user.xdg.tags`, the freedesktop convention that Dolphin and Baloo use: tag
 //!   names in UTF-8, separated by commas. It has no colours; a tag called "Red" is drawn red.
 //! * **Windows**: not supported; the interface offers nothing there.
@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 use crate::Result;
 use crate::tagsearch::{self, ScanLimits, TagQuery};
+
+pub use super::finderlist::FinderTagList;
 
 /// The Finder's colours, as the menu lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -273,26 +275,27 @@ pub fn encode_finder(tags: &[Tag]) -> Vec<u8> {
     crate::platform::bplist::encode_string_array(&items)
 }
 
-/// The tags in the value of `com.apple.metadata:_kMDItemUserTags`; `None` when it is not a
-/// list of strings.
+/// The tags in the value of `com.apple.metadata:_kMDItemUserTags`, coloured by the numbers
+/// of the file alone; `None` when it is not a list of strings.
 pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
+    decode_finder_with(bytes, &FinderTagList::empty())
+}
+
+/// As [`decode_finder`], with the colours the Finder's list of tags gives.
+pub fn decode_finder_with(bytes: &[u8], list: &FinderTagList) -> Option<Vec<Tag>> {
     let items = crate::platform::bplist::decode_string_array(bytes)?;
     Some(
         items
             .into_iter()
             .map(|s| {
-                let (name, index) = match s.rsplit_once('\n') {
+                let (name, number) = match s.rsplit_once('\n') {
                     Some((n, i)) => (n.to_string(), i.trim().parse::<u8>().ok()),
                     None => (s, None),
                 };
-                // The colour is the number the Finder wrote (0: none), whatever the name says: a
-                // Finder in Italian calls blue "Blu". Only a tag with no number at all is
-                // given the colour of its name, if it has one.
-                let color = match index {
-                    Some(i) => TagColor::from_finder_index(i),
-                    None => TagColor::from_name(&name),
-                };
-                Tag { name, color }
+                Tag {
+                    color: list.color_of(&name, number),
+                    name,
+                }
             })
             .filter(|t| !t.name.is_empty())
             .collect(),
@@ -361,6 +364,8 @@ pub struct XattrTags {
     format: Format,
     /// Where to look for the search tool (`mdfind`, `baloosearch`); `None`: in `PATH`.
     tool_dir: Option<std::path::PathBuf>,
+    /// The Finder's list of tags, which has the colours (the Finder's format only).
+    finder_list: Option<super::finderlist::FinderListFile>,
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -377,7 +382,14 @@ impl XattrTags {
         XattrTags {
             format: Format::Finder,
             tool_dir: None,
+            finder_list: None,
         }
+    }
+
+    /// The colours of the tags come from the Finder's list in `file`.
+    pub fn with_finder_list(mut self, file: std::path::PathBuf) -> XattrTags {
+        self.finder_list = Some(super::finderlist::FinderListFile::new(file));
+        self
     }
 
     /// `user.xdg.tags`.
@@ -385,6 +397,7 @@ impl XattrTags {
         XattrTags {
             format: Format::Freedesktop,
             tool_dir: None,
+            finder_list: None,
         }
     }
 
@@ -433,6 +446,14 @@ impl XattrTags {
         Some(tagsearch::paths_from_output(&out))
     }
 
+    /// The Finder's tags in the value of the attribute, with the colours of its list.
+    fn decode(&self, bytes: &[u8]) -> Option<Vec<Tag>> {
+        match &self.finder_list {
+            Some(file) => decode_finder_with(bytes, &file.current()),
+            None => decode_finder(bytes),
+        }
+    }
+
     fn attribute(&self) -> &'static str {
         match self.format {
             Format::Finder => "com.apple.metadata:_kMDItemUserTags",
@@ -450,7 +471,7 @@ impl TagStore for XattrTags {
             return Ok(Vec::new());
         };
         match self.format {
-            Format::Finder => decode_finder(&bytes).ok_or_else(|| {
+            Format::Finder => self.decode(&bytes).ok_or_else(|| {
                 Error::Invalid(format!(
                     "the tags of {} are in a form rada does not read",
                     crate::display::path(path)
@@ -923,6 +944,45 @@ mod tests {
         );
         assert!(decode_xdg(b"").is_empty());
         assert_eq!(decode_xdg(&encode_xdg(&tags)), tags);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_files_tags_are_drawn_in_the_colours_of_the_finders_list() {
+        use crate::platform::finderlist::sample_plist;
+        let d = tempfile::tempdir().unwrap();
+        let list = d.path().join("com.apple.finder.plist");
+        std::fs::write(
+            &list,
+            sample_plist(&[("Verde", 2), ("Clienti", 4), ("Arancio", 7)]),
+        )
+        .unwrap();
+        let store = XattrTags::finder().with_finder_list(list);
+        // What the Finder wrote for a real file: "Verde" with the number 1 (gray), and yet the
+        // Finder draws it green; a tag of the person's own that the file numbers 0; one the
+        // list does not have, which keeps the file's number; one with no number.
+        let bytes = crate::platform::bplist::encode_string_array(&[
+            "Verde\n1".into(),
+            "Clienti\n0".into(),
+            "Altro\n3".into(),
+            "Rosso".into(),
+            "Lavoro".into(),
+        ]);
+        assert_eq!(
+            store.decode(&bytes).unwrap(),
+            [
+                t("Verde", Some(TagColor::Green)),
+                t("Clienti", Some(TagColor::Blue)),
+                t("Altro", Some(TagColor::Purple)),
+                t("Rosso", Some(TagColor::Red)),
+                t("Lavoro", None),
+            ]
+        );
+        // Without the list the number of the file is all there is.
+        assert_eq!(
+            decode_finder(&bytes).unwrap()[0],
+            t("Verde", Some(TagColor::Gray))
+        );
     }
 
     #[cfg(target_os = "linux")]

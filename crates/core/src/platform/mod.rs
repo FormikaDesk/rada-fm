@@ -12,12 +12,14 @@ pub mod dirs;
 pub mod dirtrash;
 pub mod eject;
 pub mod fidelity;
+pub mod finderlist;
 pub mod foldernames;
 #[cfg(unix)]
 pub mod freedesktop;
 pub mod launch;
 pub mod macos;
 pub mod openwith;
+pub mod plist;
 pub mod spawn;
 pub mod tags;
 pub mod trash;

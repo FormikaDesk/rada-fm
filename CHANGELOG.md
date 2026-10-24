@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **On a Mac a file's tag is drawn in the colour the Finder gives it.** A file tagged `Verde` with the number 1 in it is green in the Finder, but rada drew it gray in the list, the TAG column and the details, because it took the colour from the number written in the file. The colour now comes from the Finder's own list of tags, then from the number in the file, then from the name (the seven colours, in any language), and the sidebar and the files use the same rule. Nothing changes on Linux and Windows.
+
 ## [0.6.0-rc.15] - 2026-10-24
 
 The terminal's background takes the theme's colour while rada runs, so the margin around the window has no frame, the ring and the preview follow a zoom of the font, and the interface's code is split into groups. Still a **pre-release**.
