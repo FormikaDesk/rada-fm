@@ -109,7 +109,7 @@ fn details_mode_of(app: &App, width: u16) -> DetailsMode {
 
 /// The navigation pane, narrowed to its icons when a file chooser's preview needs the room.
 fn side_mode_of(app: &App, width: u16, details: DetailsMode) -> Mode {
-    match Mode::for_width(width, app.side_on) {
+    match Mode::for_width(width, app.side_nav.wanted) {
         Mode::Full if app.session.chooser.is_some() && details == DetailsMode::Column => Mode::Rail,
         mode => mode,
     }
@@ -312,7 +312,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     app.details_shown = dmode;
     app.side_mode = side_mode_of(app, area.width, dmode);
     if app.side_mode == Mode::Hidden {
-        app.side_focus = false;
+        app.side_nav.focus = false;
     }
     let carded = explorer && body.height >= 3;
     let mut rest = body;
@@ -330,7 +330,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .areas(rest);
         let mode = app.side_mode;
         if carded {
-            let inner = soft::card(f, side_area, &th, app.side_focus);
+            let inner = soft::card(f, side_area, &th, app.side_nav.focus);
             sidebar::draw_sidebar(f, app, inner, mode);
         } else {
             sidebar::draw_sidebar(f, app, side_area, mode);

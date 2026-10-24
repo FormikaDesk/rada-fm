@@ -47,7 +47,7 @@ impl App {
                 }
                 true
             }
-            KeyCode::Enter if !self.side_focus && !ctrl => {
+            KeyCode::Enter if !self.side_nav.focus && !ctrl => {
                 self.chooser_enter(alt, true);
                 true
             }

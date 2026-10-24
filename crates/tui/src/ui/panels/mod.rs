@@ -84,7 +84,11 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         side_widths(area.width)
     };
     // Ctrl+B takes the left column away.
-    let (left_w, left_gap) = if app.side_on { (left_w, 1) } else { (0, 0) };
+    let (left_w, left_gap) = if app.side_nav.wanted {
+        (left_w, 1)
+    } else {
+        (0, 0)
+    };
     let right_gap = u16::from(!two);
     let [left, _, middle, _, right] = Layout::horizontal([
         Constraint::Length(left_w),
@@ -98,20 +102,20 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     app.want_tree();
     app.want_git();
     if left.width > 0 {
-        if two && app.left_preview {
+        if two && app.side_nav.left_preview {
             draw_right(f, app, left);
         } else {
             draw_left(f, app, left);
         }
     } else {
-        app.side_focus = false;
+        app.side_nav.focus = false;
         app.preview.focus = false;
     }
-    if two && !app.left_preview {
+    if two && !app.side_nav.left_preview {
         app.preview.focus = false;
     }
-    if two && app.left_preview {
-        app.side_focus = false;
+    if two && app.side_nav.left_preview {
+        app.side_nav.focus = false;
     }
     let main = draw_middle(f, app, middle);
     if !two {
@@ -177,7 +181,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
             (top, Some(bottom))
         }
     };
-    let focused = app.side_focus;
+    let focused = app.side_nav.focus;
     let inner = frame::draw(
         f,
         nav_area,
@@ -218,7 +222,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         &th,
         &title,
         &edge,
-        !app.side_focus && !app.preview.focus,
+        !app.side_nav.focus && !app.preview.focus,
     );
     // The cards never cover the text: the list is made shorter while they are there.
     let now = app.notice_now();

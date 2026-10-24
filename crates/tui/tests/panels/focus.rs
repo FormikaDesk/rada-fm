@@ -25,14 +25,14 @@ fn tab_takes_the_keyboard_from_the_folder_to_nav_to_the_preview_and_back() {
     assert_eq!(border_of(&mut h, folder), th.accent);
     assert_eq!(border_of(&mut h, "[ NAV ]"), th.muted);
     h.press("tab");
-    assert!(h.app.side_focus && !h.app.preview.focus);
+    assert!(h.app.side_nav.focus && !h.app.preview.focus);
     assert_eq!(border_of(&mut h, "[ NAV ]"), th.accent);
     assert_eq!(border_of(&mut h, folder), th.muted);
     h.press("tab");
-    assert!(!h.app.side_focus && h.app.preview.focus);
+    assert!(!h.app.side_nav.focus && h.app.preview.focus);
     assert_eq!(border_of(&mut h, "[ PREVIEW ]"), th.accent);
     h.press("tab");
-    assert!(!h.app.side_focus && !h.app.preview.focus);
+    assert!(!h.app.side_nav.focus && !h.app.preview.focus);
     assert_eq!(border_of(&mut h, folder), th.accent);
 }
 
@@ -40,7 +40,8 @@ fn tab_takes_the_keyboard_from_the_folder_to_nav_to_the_preview_and_back() {
 fn the_tree_follows_the_folder_and_its_arrows_open_and_close() {
     let mut h = tree_scene(160, 46, "rada", false);
     h.wait("the tree", |a| {
-        a.tree.kids(a.home()).is_some() && a.tree.kids(&a.home().join("projects")).is_some()
+        a.side_nav.tree.kids(a.home()).is_some()
+            && a.side_nav.tree.kids(&a.home().join("projects")).is_some()
     });
     let s = h.screen();
     // Home is open, projects is open on the way to demo, which is the folder shown.
@@ -65,18 +66,18 @@ fn the_tree_follows_the_folder_and_its_arrows_open_and_close() {
 #[test]
 fn nav_is_driven_from_the_keyboard() {
     let mut h = tree_scene(160, 46, "rada", false);
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     h.press("tab");
-    assert!(h.app.side_focus);
+    assert!(h.app.side_nav.focus);
     let rows = h.app.nav_rows();
     assert_eq!(
-        rows[h.app.nav_cursor].path, h.app.cwd,
+        rows[h.app.side_nav.nav_cursor].path, h.app.cwd,
         "starts on the folder shown"
     );
     // Up to Home's children, and Enter opens the one under the cursor.
     h.press("up");
     h.press("up");
-    let target = h.app.nav_rows()[h.app.nav_cursor].path.clone();
+    let target = h.app.nav_rows()[h.app.side_nav.nav_cursor].path.clone();
     assert_ne!(target, h.app.cwd);
     h.press("enter");
     h.wait("the folder", {
@@ -84,18 +85,18 @@ fn nav_is_driven_from_the_keyboard() {
         move |a| a.cwd == t && !a.is_loading()
     });
     assert!(
-        !h.app.side_focus,
+        !h.app.side_nav.focus,
         "Enter goes into the folder and takes the keyboard there"
     );
     // Left closes an open folder, Right opens it again.
     h.press("tab");
     let home = h.app.home().to_path_buf();
     h.press("g");
-    assert_eq!(h.app.nav_rows()[h.app.nav_cursor].path, home);
+    assert_eq!(h.app.nav_rows()[h.app.side_nav.nav_cursor].path, home);
     h.press("left");
-    assert!(!h.app.tree.is_open(&home));
+    assert!(!h.app.side_nav.tree.is_open(&home));
     h.press("right");
-    assert!(h.app.tree.is_open(&home));
+    assert!(h.app.side_nav.tree.is_open(&home));
 }
 
 #[test]

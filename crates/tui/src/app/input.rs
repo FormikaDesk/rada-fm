@@ -314,7 +314,7 @@ impl App {
         // In the Columns view Right goes into the folder under the cursor and does nothing on a
         // file; Left (the parent action) already goes to the folder above.
         if self.view == ViewMode::Columns
-            && !self.side_focus
+            && !self.side_nav.focus
             && key.modifiers.is_empty()
             && matches!(key.code, KeyCode::Right | KeyCode::Char('l'))
             && self.keymap.action_for(&key) == Some(Action::Open)
@@ -326,7 +326,7 @@ impl App {
         if let Some(action) = self.keymap.action_for(&key) {
             // In NAV of the panels view the sideways arrows open and close the folders.
             if self.panels_shown
-                && self.side_focus
+                && self.side_nav.focus
                 && key.modifiers.is_empty()
                 && let Some(right) = match (action, key.code) {
                     (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(true),
@@ -342,13 +342,13 @@ impl App {
                 self.redraw.dirty = true;
                 return;
             }
-            if self.side_focus && self.on_side_action(action) {
+            if self.side_nav.focus && self.on_side_action(action) {
                 self.redraw.dirty = true;
                 return;
             }
             // In the Icons view the arrows and h j k l move across the grid.
             if self.view == ViewMode::Icons
-                && !self.side_focus
+                && !self.side_nav.focus
                 && key.modifiers.is_empty()
                 && let Some(step) = match (action, key.code) {
                     (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(-1isize),
@@ -811,8 +811,7 @@ impl App {
                 Some(Target::Place(p)) => Some(p.clone()),
                 _ => None,
             };
-            if over != self.hover {
-                self.hover = over;
+            if self.side_nav.hover_over(over) {
                 self.redraw.dirty = true;
             }
             return;
@@ -948,17 +947,17 @@ impl App {
         match target {
             Some(Target::TreeToggle(dir)) => self.toggle_tree(&dir),
             Some(Target::Row(i)) => {
-                self.side_focus = false;
+                self.side_nav.focus = false;
                 self.click_row(i, mods)
             }
             Some(Target::Place(path)) => {
-                self.side_focus = false;
+                self.side_nav.focus = false;
                 self.open_dir(path)
             }
             Some(Target::Crumb(path)) => self.open_dir(path),
             Some(Target::Check(i)) => {
                 if i < self.visible.len() {
-                    self.side_focus = false;
+                    self.side_nav.focus = false;
                     self.set_cursor(i);
                     if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
                         && !self.marked.remove(&name)

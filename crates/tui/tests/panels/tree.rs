@@ -9,7 +9,7 @@ fn a_click_on_a_folder_of_the_tree_shows_it_in_the_middle_box() {
     let mut h = scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     go_and_wait(&mut h, &home);
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     let docs = home.join("Documents");
     h.click(&rada_tui::hits::Target::Place(docs.clone()));
     h.wait("Documents", {
@@ -37,7 +37,7 @@ fn tree_enter_shows_arrow_only_opens() {
     let mut h = tree_scene(160, 46, "rada", false);
     let home = h.app.home().to_path_buf();
     go_and_wait(&mut h, &home);
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     h.press("tab");
     let docs = home.join("Documents");
     let at = h
@@ -46,7 +46,7 @@ fn tree_enter_shows_arrow_only_opens() {
         .iter()
         .position(|r| r.path == docs)
         .unwrap();
-    h.app.nav_cursor = at;
+    h.app.side_nav.nav_cursor = at;
     h.press("enter");
     h.wait("Documents", {
         let d = docs.clone();
@@ -55,9 +55,9 @@ fn tree_enter_shows_arrow_only_opens() {
     // A click on the arrow of a folder opens its branch and goes nowhere.
     let projects = home.join("projects");
     go_and_wait(&mut h, &home);
-    let was_open = h.app.tree.is_open(&projects);
+    let was_open = h.app.side_nav.tree.is_open(&projects);
     h.click(&rada_tui::hits::Target::TreeToggle(projects.clone()));
-    assert_ne!(h.app.tree.is_open(&projects), was_open);
+    assert_ne!(h.app.side_nav.tree.is_open(&projects), was_open);
     assert_eq!(h.app.cwd, home);
 }
 
@@ -74,7 +74,8 @@ fn long_tree_scene() -> (H, std::path::PathBuf) {
     std::fs::create_dir_all(home.join("folder-02/inner")).unwrap();
     go_and_wait(&mut h, &home);
     h.wait("the new folders in the tree", |a| {
-        a.tree
+        a.side_nav
+            .tree
             .kids(a.home())
             .is_some_and(|k| k.iter().any(|k| k.name == "folder-59"))
     });
@@ -85,7 +86,7 @@ fn long_tree_scene() -> (H, std::path::PathBuf) {
 #[test]
 fn long_tree_scrolls_to_a_deep_folder() {
     let (mut h, deep) = long_tree_scene();
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     assert!(
         !nav_text(&mut h).contains("folder-57"),
         "off the box at first"
@@ -102,13 +103,13 @@ fn long_tree_scrolls_to_a_deep_folder() {
             d.ancestors()
                 .skip(1)
                 .take_while(|p| p.starts_with(a.home()))
-                .all(|p| a.tree.kids(p).is_some())
+                .all(|p| a.side_nav.tree.kids(p).is_some())
         }
     });
     h.settle();
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).expect("the folder is a row of the tree");
-    assert!(h.app.tree.is_open(deep.parent().unwrap()));
+    assert!(h.app.side_nav.tree.is_open(deep.parent().unwrap()));
     let a = h.app.nav_area;
     assert!(
         at >= h.app.nav_scroll && at < h.app.nav_scroll + a.height as usize,
@@ -127,7 +128,7 @@ fn long_tree_scrolls_to_a_deep_folder() {
 #[test]
 fn the_wheel_and_the_arrows_scroll_a_long_tree() {
     let (mut h, _) = long_tree_scene();
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     h.settle();
     let a = h.app.nav_area;
     let (x, y) = (a.x + 2, a.y + 2);
@@ -159,11 +160,12 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
         h.press("down");
     }
     let _ = h.screen();
-    assert!(h.app.nav_cursor >= height);
+    assert!(h.app.side_nav.nav_cursor >= height);
     assert!(
-        h.app.nav_cursor >= h.app.nav_scroll && h.app.nav_cursor < h.app.nav_scroll + height,
+        h.app.side_nav.nav_cursor >= h.app.nav_scroll
+            && h.app.side_nav.nav_cursor < h.app.nav_scroll + height,
         "cursor {} scroll {}",
-        h.app.nav_cursor,
+        h.app.side_nav.nav_cursor,
         h.app.nav_scroll
     );
 }
@@ -171,7 +173,7 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
 #[test]
 fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
     let (mut h, _) = long_tree_scene();
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     let a = h.app.nav_area;
     h.mouse(
         ratatui::crossterm::event::MouseEventKind::ScrollDown,
@@ -214,7 +216,8 @@ fn nav_click_opens_folder() {
     std::fs::write(dl.join("fattura.pdf"), "x").unwrap();
     go_and_wait(&mut h, &home);
     h.wait("Scaricati in the tree", |a| {
-        a.tree
+        a.side_nav
+            .tree
             .kids(a.home())
             .is_some_and(|k| k.iter().any(|k| k.name == "Scaricati"))
     });
@@ -250,7 +253,7 @@ fn nav_click_opens_folder() {
     // The same with Enter, from NAV.
     go_and_wait(&mut h, &home);
     h.press("tab");
-    h.app.nav_cursor = h.app.nav_rows().iter().position(|r| r.path == dl).unwrap();
+    h.app.side_nav.nav_cursor = h.app.nav_rows().iter().position(|r| r.path == dl).unwrap();
     h.press("enter");
     h.wait("Scaricati again", move |a| a.cwd == dl && !a.is_loading());
     assert!(h.screen().contains("fattura.pdf"));

@@ -60,13 +60,13 @@ pub fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
 pub fn tree_scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
     let mut h = scene(w, hh, theme, nerd);
     h.app.nav_mode = NavMode::Tree;
-    h.app.tree = Default::default();
+    h.app.side_nav.tree = Default::default();
     h.wait("the way down in the tree", |a| {
         a.cwd
             .ancestors()
             .skip(1)
             .take_while(|p| p.starts_with(a.home()))
-            .all(|p| a.tree.kids(p).is_some())
+            .all(|p| a.side_nav.tree.kids(p).is_some())
     });
     h.settle();
     h
@@ -192,7 +192,7 @@ pub fn path_scene() -> (H, std::path::PathBuf) {
     }
     go_and_wait(&mut h, &c);
     h.wait("the subfolders of c", |a| {
-        a.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
+        a.side_nav.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
     });
     h.settle();
     (h, c)

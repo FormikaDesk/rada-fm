@@ -208,7 +208,7 @@ impl App {
         }
         self.layout_pref = pref;
         if pref == crate::panels::LayoutPref::Classic {
-            self.side_focus = false;
+            self.side_nav.focus = false;
             self.preview.focus = false;
         }
         self.saved_ui.layout = Some(pref.id().to_string());
@@ -227,17 +227,17 @@ impl App {
         if self.nav_mode == NavMode::Path {
             // Only the folder shown is asked about: its subfolders are what the box lists.
             let want = self.view_title().is_none().then(|| self.cwd.clone());
-            if self.tree.open.iter().ne(want.iter()) {
-                self.tree.open = want.into_iter().collect();
+            if self.side_nav.tree.open.iter().ne(want.iter()) {
+                self.side_nav.tree.open = want.into_iter().collect();
             }
-            for dir in self.tree.wanted(self.show_hidden, self.dir_gen) {
+            for dir in self.side_nav.tree.wanted(self.show_hidden, self.dir_gen) {
                 self.svc.tree_dirs(dir, self.show_hidden);
             }
             return;
         }
         let root = self.svc.home.clone();
-        self.tree.follow(&root, &self.cwd);
-        for dir in self.tree.wanted(self.show_hidden, self.dir_gen) {
+        self.side_nav.tree.follow(&root, &self.cwd);
+        for dir in self.side_nav.tree.wanted(self.show_hidden, self.dir_gen) {
             self.svc.tree_dirs(dir, self.show_hidden);
         }
     }
@@ -302,7 +302,7 @@ impl App {
             .find(|p| p.kind == PlaceKind::Home)
             .map(|p| p.name())
             .unwrap_or_else(|| Key::HomeLabel.tr().to_string());
-        let open = self.tree.is_open(&home);
+        let open = self.side_nav.tree.is_open(&home);
         rows.push(NavRow {
             kind: NavKind::Folder { open: Some(open) },
             depth: 0,
@@ -500,7 +500,7 @@ impl App {
     /// The subfolders of the folder shown, as rows `depth` levels in.
     fn kid_rows(&self, depth: usize) -> Vec<NavRow> {
         let depth = depth.min(crate::panels::NAV_INDENT_MAX);
-        let kids = self.tree.kids(&self.cwd).unwrap_or(&[]);
+        let kids = self.side_nav.tree.kids(&self.cwd).unwrap_or(&[]);
         kids.iter()
             .map(|k| NavRow {
                 kind: NavKind::Folder { open: None },
@@ -533,11 +533,11 @@ impl App {
         if depth > 24 {
             return;
         }
-        let Some(kids) = self.tree.kids(dir) else {
+        let Some(kids) = self.side_nav.tree.kids(dir) else {
             return;
         };
         for k in kids {
-            let open = k.has_dirs.then(|| self.tree.is_open(&k.path));
+            let open = k.has_dirs.then(|| self.side_nav.tree.is_open(&k.path));
             rows.push(NavRow {
                 kind: NavKind::Folder { open },
                 depth,
@@ -567,17 +567,17 @@ impl App {
     /// the view of two columns it puts ANTEPRIMA in the place of NAV, and NAV back. The
     /// keyboard follows the box it was in.
     pub(super) fn toggle_left_preview(&mut self) {
-        if !self.side_on {
+        if !self.side_nav.wanted {
             self.toggle_sidebar();
-            self.left_preview = true;
+            self.side_nav.left_preview = true;
             self.redraw.dirty = true;
             return;
         }
-        let had_focus = self.side_focus || self.preview.focus;
-        self.left_preview = !self.left_preview;
+        let had_focus = self.side_nav.focus || self.preview.focus;
+        self.side_nav.left_preview = !self.side_nav.left_preview;
         if had_focus {
-            self.side_focus = !self.left_preview;
-            self.preview.focus = self.left_preview;
+            self.side_nav.focus = !self.side_nav.left_preview;
+            self.preview.focus = self.side_nav.left_preview;
         }
         self.redraw.dirty = true;
     }
@@ -586,25 +586,25 @@ impl App {
     /// box on the left is the only one after the folder, whichever of the two it is.
     pub(super) fn switch_pane_panels(&mut self) {
         if self.panels_two {
-            if self.side_focus || self.preview.focus {
-                self.side_focus = false;
+            if self.side_nav.focus || self.preview.focus {
+                self.side_nav.focus = false;
                 self.preview.focus = false;
                 return;
             }
-            if !self.side_on {
+            if !self.side_nav.wanted {
                 self.toggle_sidebar();
             }
-            if self.left_preview {
+            if self.side_nav.left_preview {
                 self.preview.focus = true;
             } else {
                 let rows = self.nav_rows();
-                self.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
-                self.side_focus = true;
+                self.side_nav.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+                self.side_nav.focus = true;
             }
             return;
         }
-        if self.side_focus {
-            self.side_focus = false;
+        if self.side_nav.focus {
+            self.side_nav.focus = false;
             self.preview.focus = self.details_shown != crate::ui::DetailsMode::Hidden;
             return;
         }
@@ -612,12 +612,12 @@ impl App {
             self.preview.focus = false;
             return;
         }
-        if !self.side_on {
+        if !self.side_nav.wanted {
             self.toggle_sidebar();
         }
         let rows = self.nav_rows();
-        self.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
-        self.side_focus = true;
+        self.side_nav.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+        self.side_nav.focus = true;
     }
 
     /// The wheel over the NAV box: it scrolls the rows, three at a time, and not the cursor.
@@ -633,7 +633,7 @@ impl App {
 
     /// An arrow clicked or pressed on a folder of the tree: open or close it.
     pub fn toggle_tree(&mut self, dir: &Path) {
-        self.tree.toggle(dir);
+        self.side_nav.tree.toggle(dir);
         self.redraw.dirty = true;
     }
 
@@ -641,30 +641,30 @@ impl App {
     /// the dots of the tags. `true`: dealt with.
     pub(super) fn on_nav_arrow(&mut self, right: bool) -> bool {
         let rows = self.nav_rows();
-        let Some(row) = rows.get(self.nav_cursor).cloned() else {
+        let Some(row) = rows.get(self.side_nav.nav_cursor).cloned() else {
             return false;
         };
         match row.kind {
             NavKind::Folder { open } => {
                 match (right, open) {
-                    (true, Some(false)) => self.tree.toggle(&row.path),
+                    (true, Some(false)) => self.side_nav.tree.toggle(&row.path),
                     (true, Some(true)) => {
                         // Into the folder: its first child.
                         if rows
-                            .get(self.nav_cursor + 1)
+                            .get(self.side_nav.nav_cursor + 1)
                             .is_some_and(|r| r.depth > row.depth)
                         {
-                            self.nav_cursor += 1;
+                            self.side_nav.nav_cursor += 1;
                         }
                     }
-                    (false, Some(true)) => self.tree.toggle(&row.path),
+                    (false, Some(true)) => self.side_nav.tree.toggle(&row.path),
                     (false, _) => {
                         // To the folder this one is in.
-                        if let Some(up) = rows[..self.nav_cursor]
+                        if let Some(up) = rows[..self.side_nav.nav_cursor]
                             .iter()
                             .rposition(|r| r.depth < row.depth)
                         {
-                            self.nav_cursor = up;
+                            self.side_nav.nav_cursor = up;
                         }
                     }
                     (true, None) => {}
@@ -672,12 +672,7 @@ impl App {
                 true
             }
             NavKind::Tags => {
-                let last = Hue::ALL.len() - 1;
-                self.nav_tag = if right {
-                    (self.nav_tag + 1).min(last)
-                } else {
-                    self.nav_tag.saturating_sub(1)
-                };
+                self.side_nav.step_tag(right);
                 true
             }
             _ => false,
@@ -690,7 +685,7 @@ impl App {
         use Action::*;
         let rows = self.nav_rows();
         let last = rows.len().saturating_sub(1);
-        self.nav_cursor = self.nav_cursor.min(last);
+        self.side_nav.nav_cursor = self.side_nav.nav_cursor.min(last);
         let step = |from: usize, down: bool| -> usize {
             let mut i = from;
             loop {
@@ -708,23 +703,23 @@ impl App {
                 }
             }
         };
-        let here = rows.get(self.nav_cursor).cloned();
+        let here = rows.get(self.side_nav.nav_cursor).cloned();
         match action {
-            Up => self.nav_cursor = step(self.nav_cursor, false),
-            Down => self.nav_cursor = step(self.nav_cursor, true),
-            First => self.nav_cursor = 0,
-            Last => self.nav_cursor = last,
+            Up => self.side_nav.nav_cursor = step(self.side_nav.nav_cursor, false),
+            Down => self.side_nav.nav_cursor = step(self.side_nav.nav_cursor, true),
+            First => self.side_nav.nav_cursor = 0,
+            Last => self.side_nav.nav_cursor = last,
             Open => {
                 if let Some(row) = here {
                     let path = match row.kind {
                         NavKind::Tags => {
-                            let c = Hue::ALL[self.nav_tag.min(Hue::ALL.len() - 1)];
+                            let c = Hue::ALL[self.side_nav.nav_tag.min(Hue::ALL.len() - 1)];
                             rada_core::tagsearch::view_path(c.label(&self.tags.lang))
                         }
                         NavKind::Heading | NavKind::Gap | NavKind::More => return true,
                         _ => row.path,
                     };
-                    self.side_focus = false;
+                    self.side_nav.focus = false;
                     self.open_dir(path);
                 }
             }
@@ -732,7 +727,7 @@ impl App {
                 if action == SwitchPane {
                     self.switch_pane_panels();
                 } else {
-                    self.side_focus = false;
+                    self.side_nav.focus = false;
                 }
             }
             Bookmark => {
@@ -756,7 +751,7 @@ impl App {
                 }
             }
             Filter => {
-                self.side_focus = false;
+                self.side_nav.focus = false;
                 return false;
             }
             a if super::side::PASS_THROUGH.contains(&a) => return false,

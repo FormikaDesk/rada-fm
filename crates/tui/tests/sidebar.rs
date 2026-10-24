@@ -149,10 +149,10 @@ fn tab_focuses_the_sidebar_enter_opens() {
     let mut h = italian(150, 30);
     let _ = h.screen();
     h.key(KeyCode::Tab);
-    assert!(h.app.side_focus);
+    assert!(h.app.side_nav.focus);
     let _ = h.screen();
     let items = h.app.side_items();
-    let cur = h.app.side_cursor;
+    let cur = h.app.side_nav.side_cursor;
     assert_eq!(
         items[cur].path,
         place(&h, "Scaricati"),
@@ -169,16 +169,16 @@ fn tab_focuses_the_sidebar_enter_opens() {
     // Up to the previous item (Documenti), and open it.
     h.key(KeyCode::Up);
     let docs = place(&h, "Documenti");
-    assert_eq!(h.app.side_items()[h.app.side_cursor].path, docs);
+    assert_eq!(h.app.side_items()[h.app.side_nav.side_cursor].path, docs);
     h.key(KeyCode::Enter);
-    assert!(!h.app.side_focus, "the focus goes back to the list");
+    assert!(!h.app.side_nav.focus, "the focus goes back to the list");
     h.wait("Documenti", move |a| a.cwd == docs && !a.is_loading());
 
     // Tab again and Esc: out.
     h.key(KeyCode::Tab);
-    assert!(h.app.side_focus);
+    assert!(h.app.side_nav.focus);
     h.key(KeyCode::Esc);
-    assert!(!h.app.side_focus);
+    assert!(!h.app.side_nav.focus);
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn file_operations_are_not_done_behind_the_sidebars_back() {
     h.press("ctrl+c");
     assert!(h.app.ops.clipboard.is_none(), "nothing was copied");
     assert!(h.app.current_notice().is_some(), "and it was said why");
-    assert!(h.app.side_focus);
+    assert!(h.app.side_nav.focus);
 }
 
 #[test]
@@ -262,7 +262,7 @@ fn below_sixty_columns_the_navigation_pane_is_gone() {
             .is_none()
     );
     h.key(KeyCode::Tab);
-    assert!(!h.app.side_focus, "no focus on what is not there");
+    assert!(!h.app.side_nav.focus, "no focus on what is not there");
     assert!(h.app.current_notice().is_some(), "and it says why");
 }
 
@@ -338,7 +338,7 @@ fn bookmark_key_and_delete_in_sidebar() {
     h.key(KeyCode::Tab);
     h.key(KeyCode::Up);
     let docs = place(&h, "Documenti");
-    assert_eq!(h.app.side_items()[h.app.side_cursor].path, docs);
+    assert_eq!(h.app.side_items()[h.app.side_nav.side_cursor].path, docs);
     h.press("B");
     h.wait("bookmarked", {
         let d = docs.clone();
@@ -514,11 +514,11 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
             .iter()
             .position(|i| i.path == second)
             .unwrap();
-        let from = h.app.side_cursor;
+        let from = h.app.side_nav.side_cursor;
         for _ in from..at {
             h.key(KeyCode::Down);
         }
-        assert_eq!(h.app.side_cursor, at, "{density:?} {height}");
+        assert_eq!(h.app.side_nav.side_cursor, at, "{density:?} {height}");
         h.key(KeyCode::Enter);
         let want = second.clone();
         h.wait("the second folder", move |a| {
@@ -616,7 +616,7 @@ fn on_a_short_terminal_no_entry_is_cut_off_whatever_the_density() {
         let n = h.app.side_items().len();
         // Walk the whole list: the entry the keyboard is on is always on screen.
         for k in 0..n {
-            let item = h.app.side_items()[h.app.side_cursor].clone();
+            let item = h.app.side_items()[h.app.side_nav.side_cursor].clone();
             assert!(
                 try_row_of(&mut h, item.path.clone()).is_some(),
                 "{density:?}: entry {k} ({}) is on screen when the keyboard is on it",
@@ -672,8 +672,8 @@ fn icon_column_marks_the_current_place() {
                     .iter()
                     .position(|i| i.path == want)
                     .unwrap();
-                h.app.side_focus = true;
-                h.app.side_cursor = at;
+                h.app.side_nav.focus = true;
+                h.app.side_nav.side_cursor = at;
             }
 
             let y = row_of(&mut h, want.clone());

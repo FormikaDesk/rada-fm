@@ -7,7 +7,7 @@ use rada_tui::app::App;
 #[test]
 fn the_favourites_are_only_the_folders_the_person_added() {
     let mut h = tree_scene(160, 46, "rada", false);
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     let is_favorite = |a: &App| {
         a.nav_rows()
             .iter()
@@ -21,7 +21,7 @@ fn the_favourites_are_only_the_folders_the_person_added() {
     let added = h.app.home().join("projects");
     // B in NAV, on the folder.
     h.press("tab");
-    h.app.nav_cursor = h
+    h.app.side_nav.nav_cursor = h
         .app
         .nav_rows()
         .iter()
@@ -116,7 +116,7 @@ fn in_a_place_there_is_no_way_and_the_place_is_the_highlighted_row() {
         h.app.devices.volumes[0].mount_point.clone(),
     ] {
         go_and_wait(&mut h, &place);
-        h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+        h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
         h.settle();
         let rows = h.app.nav_rows();
         assert!(
@@ -149,7 +149,7 @@ fn the_trash_is_the_last_row_of_nav_in_every_view() {
     ] {
         h.term.backend_mut().resize(w, hh);
         go_and_wait(&mut h, &dir);
-        h.wait("the subfolders", |a| a.tree.kids(&a.cwd).is_some());
+        h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
         h.settle();
         // The places are read again now and then: the demo's trash with them.
         with_trash(&mut h);

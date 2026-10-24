@@ -109,8 +109,9 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
     let rail = mode == Mode::Rail;
     let current = current_index(&items, &app.cwd);
     let focused = app
-        .side_focus
-        .then_some(app.side_cursor.min(items.len() - 1));
+        .side_nav
+        .focus
+        .then_some(app.side_nav.side_cursor.min(items.len() - 1));
     let height = area.height as usize;
     let air = choose_air(&items, rail, height, app.sidebar_density);
     let mut rows = layout(&items, rail, air);
@@ -169,7 +170,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 let item = &items[*i];
                 let is_current = current == Some(*i);
                 let is_focus = focused == Some(*i);
-                let is_hover = app.hover.as_ref() == Some(&item.path);
+                let is_hover = app.side_nav.hover.as_ref() == Some(&item.path);
                 let row_style = if is_focus {
                     Style::default().bg(th.cursor)
                 } else if is_current {

@@ -267,11 +267,11 @@ fn disallowed_folder_explains_how_to_allow() {
     assert!(h.app.modal.is_none());
 
     // The sidebar carries the same words for that place.
-    h.app.side_focus = true;
+    h.app.side_nav.focus = true;
     let items = h.app.side_items();
     let i = items.iter().position(|i| i.path == docs).unwrap();
     assert!(items[i].locked);
-    h.app.side_cursor = i;
+    h.app.side_nav.side_cursor = i;
     h.app.side_mode = rada_tui::sidebar::Mode::Rail;
     assert_eq!(
         h.app.side_description().unwrap(),
@@ -401,7 +401,7 @@ fn delete_in_sidebar_ejects_a_disk() {
     h.wait("in the disk", |a| a.cwd == v.mount_point && !a.is_loading());
     h.press("tab");
     let items = h.app.side_items();
-    h.app.side_cursor = items.iter().position(|i| i.path == v.mount_point).unwrap();
+    h.app.side_nav.side_cursor = items.iter().position(|i| i.path == v.mount_point).unwrap();
     h.press("delete");
     assert!(matches!(h.app.modal, Some(Modal::Eject(_))));
     h.key(KeyCode::Enter);

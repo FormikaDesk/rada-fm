@@ -223,7 +223,7 @@ fn panels_std_scene(w: u16, hh: u16) -> H {
         cfg.nav_mode = rada_tui::panels::NavMode::Tree;
     });
     h.wait("the places", |a| !a.places.paths.places.is_empty());
-    h.wait("the tree", |a| a.tree.kids(a.home()).is_some());
+    h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     h.app.notify(
         rada_tui::app::Notice::new(rada_tui::app::NoticeKind::Ok, "1 item copied")
             .with_action(rada_tui::app::NoticeAction::Undo),
@@ -265,8 +265,8 @@ fn the_panels_view_draws_only_standard_glyphs_with_unicode_std() {
                     .position(|r| r.kind == rada_tui::panels::NavKind::Tags);
                 // A system with no tags (Windows) has no such row: the focus stays on NAV.
                 if let Some(row) = tags {
-                    h.app.nav_cursor = row;
-                    h.app.nav_tag = 2;
+                    h.app.side_nav.nav_cursor = row;
+                    h.app.side_nav.nav_tag = 2;
                 }
             }
             let (drawn, sent) = std_screen_glyphs(&mut h, w, hh);

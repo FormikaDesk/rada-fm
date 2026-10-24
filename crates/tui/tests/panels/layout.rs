@@ -64,14 +64,14 @@ fn the_preview_command_puts_the_preview_in_the_place_of_nav_and_back() {
     assert_eq!(on_screen(&mut h), (false, true));
     // Tab takes the keyboard to the box on the left, whichever it is, and back.
     h.press("tab");
-    assert!(h.app.preview.focus && !h.app.side_focus);
+    assert!(h.app.preview.focus && !h.app.side_nav.focus);
     h.press("alt+p");
     assert!(
-        h.app.side_focus && !h.app.preview.focus,
+        h.app.side_nav.focus && !h.app.preview.focus,
         "the keyboard follows the box"
     );
     h.press("tab");
-    assert!(!h.app.side_focus && !h.app.preview.focus);
+    assert!(!h.app.side_nav.focus && !h.app.preview.focus);
     // Where there are three columns the command is left as it was: both boxes are there.
     h.term.backend_mut().resize(160, 46);
     assert!(h.screen().contains("[ NAV ]") && h.screen().contains("[ PREVIEW ]"));

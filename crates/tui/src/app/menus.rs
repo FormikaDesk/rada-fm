@@ -93,7 +93,12 @@ impl App {
                     self.show_hidden,
                     false,
                 ),
-                MenuItem::toggle(ToggleSidebar, Key::MenuNavPane.tr(), self.side_on, false),
+                MenuItem::toggle(
+                    ToggleSidebar,
+                    Key::MenuNavPane.tr(),
+                    self.side_nav.wanted,
+                    false,
+                ),
                 MenuItem::toggle(ToggleTags, Key::MenuTagColumn.tr(), self.show_tags, false),
                 MenuItem::choice(
                     MenuCmd::Layout(LayoutPref::Auto),

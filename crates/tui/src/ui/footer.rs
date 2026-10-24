@@ -72,7 +72,7 @@ fn hints(app: &App) -> Vec<Hint> {
     {
         return vec![Hint::fixed("Enter", "keep"), Hint::fixed("Esc", "clear")];
     }
-    if app.side_focus {
+    if app.side_nav.focus {
         let mut v = vec![Hint::fixed("Enter", "open")];
         v.extend(Hint::act(app, SwitchPane, "list"));
         v.extend(Hint::act(app, Bookmark, "bookmark"));

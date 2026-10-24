@@ -44,7 +44,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     }
     let items = crate::sidebar::items(app, false);
     let current = App::nav_current(&rows, &app.cwd);
-    let cursor = app.side_focus.then_some(app.nav_cursor.min(rows.len() - 1));
+    let cursor = app
+        .side_nav
+        .focus
+        .then_some(app.side_nav.nav_cursor.min(rows.len() - 1));
 
     // The trash is always the last row of the box: the rest scrolls above it.
     let mut body: Vec<usize> = (0..rows.len()).collect();
@@ -100,7 +103,8 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         let row = &rows[i];
         let is_current = current == Some(i);
         let is_focus = cursor == Some(i);
-        let hover = !row.path.as_os_str().is_empty() && app.hover.as_ref() == Some(&row.path);
+        let hover =
+            !row.path.as_os_str().is_empty() && app.side_nav.hover.as_ref() == Some(&row.path);
         let bg = if is_focus {
             Style::default().bg(th.cursor)
         } else if is_current {
@@ -150,7 +154,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                 )];
                 let mut x = r.x + 6;
                 for (n, hue) in Hue::ALL.iter().enumerate() {
-                    let on = is_focus && app.nav_tag == n;
+                    let on = is_focus && app.side_nav.nav_tag == n;
                     let dot = if on {
                         Mark::TagDotFocused
                     } else {

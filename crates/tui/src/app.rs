@@ -530,15 +530,10 @@ pub struct App {
     pub keymap: Keymap,
     pub mouse: bool,
     pub show_hints: bool,
-    /// The sidebar is wanted (the user's choice; the width decides how much of it shows).
-    pub side_on: bool,
+    /// The sidebar and the NAV box: the keyboard in them, their cursors and the tree.
+    pub side_nav: side::SideNav,
     /// What the last frame showed of it.
     pub side_mode: crate::sidebar::Mode,
-    /// The keyboard is in the sidebar, on item `side_cursor`.
-    pub side_focus: bool,
-    pub side_cursor: usize,
-    /// The sidebar item under the mouse.
-    pub hover: Option<PathBuf>,
     pub term_width: u16,
     /// Where the field of the bar at the top was drawn (what is offered under it lines up
     /// with it).
@@ -567,13 +562,6 @@ pub struct App {
     pub panels_shown: bool,
     /// ...with two columns (NAV or the preview, and the folder).
     pub panels_two: bool,
-    /// In the two columns, the left one shows ANTEPRIMA in the place of NAV.
-    pub left_preview: bool,
-    /// The folders of the NAV box of the panels view.
-    pub tree: crate::panels::Tree,
-    /// The row of the NAV box the keyboard is on, and which of the seven tag dots of its row.
-    pub nav_cursor: usize,
-    pub nav_tag: usize,
     /// The first row of the NAV box that is shown, where the box was last drawn, and what the
     /// scrolling was last made to show (the folder, the keyboard's row, how many rows there
     /// are): the box scrolls to the folder only when one of those changes, so that the wheel
@@ -698,11 +686,8 @@ impl App {
             keymap: cfg.keymap,
             mouse: cfg.mouse,
             show_hints: cfg.show_hints,
-            side_on: cfg.sidebar,
+            side_nav: side::SideNav::new(cfg.sidebar),
             side_mode: crate::sidebar::Mode::Hidden,
-            side_focus: false,
-            side_cursor: 0,
-            hover: None,
             term_width: 0,
             bar_field: ratatui::layout::Rect::default(),
             popup_covers: Vec::new(),
@@ -718,10 +703,6 @@ impl App {
             layout_pref: cfg.layout_pref,
             panels_shown: false,
             panels_two: false,
-            left_preview: false,
-            tree: Default::default(),
-            nav_cursor: 0,
-            nav_tag: 0,
             nav_scroll: 0,
             ring: None,
             nav_area: Default::default(),
@@ -1348,7 +1329,7 @@ impl App {
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
             CoreEvent::Git { dir, status } => self.on_git(dir, status),
             CoreEvent::Tree { dir, hidden, kids } => {
-                self.tree.answer(dir, hidden, kids);
+                self.side_nav.tree.answer(dir, hidden, kids);
                 self.redraw.dirty = true;
             }
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),

@@ -71,6 +71,75 @@ impl Places {
     }
 }
 
+/// The sidebar and the NAV box of the panels view: where the keyboard is in them, and what
+/// they show of the folders.
+pub struct SideNav {
+    /// The sidebar is wanted (the user's choice; the width decides how much of it shows).
+    pub wanted: bool,
+    /// The keyboard is in the sidebar, on item `side_cursor`, or in the NAV box.
+    pub focus: bool,
+    pub side_cursor: usize,
+    /// The sidebar item under the mouse.
+    pub hover: Option<PathBuf>,
+    /// In the two columns, the left one shows ANTEPRIMA in the place of NAV.
+    pub left_preview: bool,
+    /// The folders of the NAV box of the panels view.
+    pub tree: crate::panels::Tree,
+    /// The row of the NAV box the keyboard is on, and which of the seven tag dots of its row.
+    pub nav_cursor: usize,
+    pub nav_tag: usize,
+}
+
+impl SideNav {
+    pub fn new(wanted: bool) -> SideNav {
+        SideNav {
+            wanted,
+            focus: false,
+            side_cursor: 0,
+            hover: None,
+            left_preview: false,
+            tree: Default::default(),
+            nav_cursor: 0,
+            nav_tag: 0,
+        }
+    }
+
+    /// The mouse is over `over`; true when that is not what it was over.
+    pub(super) fn hover_over(&mut self, over: Option<PathBuf>) -> bool {
+        let changed = over != self.hover;
+        if changed {
+            self.hover = over;
+        }
+        changed
+    }
+
+    /// Up, Down, First and Last in the sidebar, which has items up to `last`; false for any
+    /// other key. The cursor is kept inside the list either way.
+    fn move_side(&mut self, action: Action, last: usize) -> bool {
+        use Action::*;
+        self.side_cursor = self.side_cursor.min(last);
+        match action {
+            Up => self.side_cursor = self.side_cursor.saturating_sub(1),
+            Down => self.side_cursor = (self.side_cursor + 1).min(last),
+            First => self.side_cursor = 0,
+            Last => self.side_cursor = last,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Left and Right on the row of the tags: from one of the seven dots to the next.
+    pub(super) fn step_tag(&mut self, right: bool) {
+        use rada_core::platform::TagColor as Hue;
+        let last = Hue::ALL.len() - 1;
+        self.nav_tag = if right {
+            (self.nav_tag + 1).min(last)
+        } else {
+            self.nav_tag.saturating_sub(1)
+        };
+    }
+}
+
 /// The tags the sidebar and the tag menu know.
 pub struct Tags {
     /// The language the names of the seven tag colours are written in (the system's).
@@ -157,10 +226,10 @@ impl App {
             return None;
         }
         let items = self.side_items();
-        let item = if self.side_focus {
-            items.get(self.side_cursor)
+        let item = if self.side_nav.focus {
+            items.get(self.side_nav.side_cursor)
         } else {
-            let h = self.hover.as_ref()?;
+            let h = self.side_nav.hover.as_ref()?;
             items.iter().find(|i| &i.path == h)
         }?;
         if item.locked
@@ -175,13 +244,13 @@ impl App {
     }
 
     pub(super) fn toggle_sidebar(&mut self) {
-        self.side_on = !self.side_on;
-        if !self.side_on {
-            self.side_focus = false;
+        self.side_nav.wanted = !self.side_nav.wanted;
+        if !self.side_nav.wanted {
+            self.side_nav.focus = false;
         }
-        self.saved_ui.sidebar = Some(self.side_on);
+        self.saved_ui.sidebar = Some(self.side_nav.wanted);
         self.save_ui_state();
-        if self.side_on && Mode::for_width(self.term_width, true) == Mode::Hidden {
+        if self.side_nav.wanted && Mode::for_width(self.term_width, true) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarOnNarrow.tr(), 3);
         }
     }
@@ -191,25 +260,25 @@ impl App {
         if self.panels_shown {
             return self.switch_pane_panels();
         }
-        if self.side_focus {
-            self.side_focus = false;
+        if self.side_nav.focus {
+            self.side_nav.focus = false;
             return;
         }
-        if !self.side_on {
+        if !self.side_nav.wanted {
             self.toggle_sidebar();
         }
-        if Mode::for_width(self.term_width, self.side_on) == Mode::Hidden {
+        if Mode::for_width(self.term_width, self.side_nav.wanted) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarNarrow.tr(), 3);
             return;
         }
         // Make the next frame's mode current before looking at the items.
-        self.side_mode = Mode::for_width(self.term_width, self.side_on);
+        self.side_mode = Mode::for_width(self.term_width, self.side_nav.wanted);
         let items = self.side_items();
         if items.is_empty() {
             return;
         }
-        self.side_cursor = sidebar::current_index(&items, &self.cwd).unwrap_or(0);
-        self.side_focus = true;
+        self.side_nav.side_cursor = sidebar::current_index(&items, &self.cwd).unwrap_or(0);
+        self.side_nav.focus = true;
     }
 
     /// A key while the sidebar has the focus. `true`: dealt with here.
@@ -220,44 +289,44 @@ impl App {
         }
         let items = self.side_items();
         let last = items.len().saturating_sub(1);
-        self.side_cursor = self.side_cursor.min(last);
+        if self.side_nav.move_side(action, last) {
+            return true;
+        }
         match action {
-            Up => self.side_cursor = self.side_cursor.saturating_sub(1),
-            Down => self.side_cursor = (self.side_cursor + 1).min(last),
-            First => self.side_cursor = 0,
-            Last => self.side_cursor = last,
             Open => {
-                if let Some(item) = items.get(self.side_cursor) {
-                    self.side_focus = false;
+                if let Some(item) = items.get(self.side_nav.side_cursor) {
+                    self.side_nav.focus = false;
                     self.open_dir(item.path.clone());
                 }
             }
-            Parent | ClearSelection | SwitchPane => self.side_focus = false,
+            Parent | ClearSelection | SwitchPane => self.side_nav.focus = false,
             Bookmark => {
-                if let Some(item) = items.get(self.side_cursor)
+                if let Some(item) = items.get(self.side_nav.side_cursor)
                     && !matches!(item.origin, Origin::Unmounted(_))
                 {
                     let add = !self.places.paths.bookmarks.contains(&item.path);
                     self.set_bookmark(item.path.clone(), add);
                 }
             }
-            Trash | DeletePermanently => match items.get(self.side_cursor).map(|i| &i.origin) {
-                Some(Origin::Device(_)) => {
-                    let mount = items[self.side_cursor].path.clone();
-                    self.start_eject(&mount);
+            Trash | DeletePermanently => {
+                match items.get(self.side_nav.side_cursor).map(|i| &i.origin) {
+                    Some(Origin::Device(_)) => {
+                        let mount = items[self.side_nav.side_cursor].path.clone();
+                        self.start_eject(&mount);
+                    }
+                    Some(Origin::Unmounted(_)) => {
+                        self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3)
+                    }
+                    Some(Origin::Bookmark { removable: true }) => {
+                        let path = items[self.side_nav.side_cursor].path.clone();
+                        self.set_bookmark(path, false);
+                    }
+                    _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
                 }
-                Some(Origin::Unmounted(_)) => {
-                    self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3)
-                }
-                Some(Origin::Bookmark { removable: true }) => {
-                    let path = items[self.side_cursor].path.clone();
-                    self.set_bookmark(path, false);
-                }
-                _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
-            },
+            }
             Filter => {
                 // Typing a filter is about the list.
-                self.side_focus = false;
+                self.side_nav.focus = false;
                 return false;
             }
             a if PASS_THROUGH.contains(&a) => return false,
