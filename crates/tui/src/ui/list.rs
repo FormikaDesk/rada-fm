@@ -421,7 +421,7 @@ fn row<'a>(
     let gap = || Span::styled(" ".repeat(cols.gap), with(Style::default()));
     if cols.date > 0 {
         spans.push(gap());
-        let text = display::truncate(app.date_text(listing_index), cols.date);
+        let text = display::truncate(app.folder_info.date_text(listing_index), cols.date);
         spans.push(Span::styled(pad(&text, cols.date), with(dim)));
     }
     if cols.kind > 0 {

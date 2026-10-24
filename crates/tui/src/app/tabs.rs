@@ -156,7 +156,7 @@ impl App {
             self.svc.watcher.watch(cwd);
         }
         self.previewed = None;
-        self.date_cache.clear();
+        self.folder_info.date_cache.clear();
         self.rebuild_visible();
         self.ensure_visible();
         self.request_preview();

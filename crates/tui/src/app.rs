@@ -667,11 +667,6 @@ pub struct App {
     pub nav_seen: Option<(PathBuf, Option<usize>, usize, usize)>,
     /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
     pub preview_focus: bool,
-    /// What git said about the folder shown (panels view), with the folder it was about.
-    pub git: Option<GitView>,
-    /// The folder and the generation of its listing git was last asked about, and when.
-    git_asked: Option<(PathBuf, u64)>,
-    git_busy: Option<Instant>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
@@ -682,8 +677,8 @@ pub struct App {
     pub basic: bool,
     /// The Tag column of the list is shown.
     pub show_tags: bool,
-    /// What is known of the size of folders (see `sizes.rs`).
-    pub(crate) folder_sizes: sizes::Sizes,
+    /// What is worked out about the folder shown.
+    pub folder_info: panels::FolderInfo,
     /// The time zone dates are shown in (the system's; tests pin it).
     pub tz: jiff::tz::TimeZone,
     pub remember_tabs: bool,
@@ -696,10 +691,6 @@ pub struct App {
     pub address: Option<AddressEdit>,
     /// Text for the system clipboard (the "copy path" command); the event loop takes it.
     pub copied_text: Option<String>,
-    /// Date strings of the visible rows, worked out once and kept until the folder, the
-    /// clock's hour or the style changes.
-    date_cache: Vec<Option<String>>,
-    date_cache_key: (u64, usize),
     /// What the last frame showed of the details pane.
     pub details_shown: crate::ui::DetailsMode,
     /// Where tabs are saved and the rest of what is remembered between sessions.
@@ -851,16 +842,13 @@ impl App {
             nav_area: Default::default(),
             nav_seen: None,
             preview_focus: false,
-            git: None,
-            git_asked: None,
-            git_busy: None,
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
             nav_mode: cfg.nav_mode,
             basic: cfg.basic,
             show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
-            folder_sizes: Default::default(),
+            folder_info: Default::default(),
             tz: jiff::tz::TimeZone::system(),
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
@@ -868,8 +856,6 @@ impl App {
             undo_label: None,
             address: None,
             copied_text: None,
-            date_cache: Vec::new(),
-            date_cache_key: (0, 0),
             details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
@@ -1054,7 +1040,7 @@ impl App {
     }
 
     fn rebuild_visible(&mut self) {
-        self.date_cache.clear();
+        self.folder_info.date_cache.clear();
         let show = self.show_hidden;
         // Choosing a folder: only folders are listed.
         let dirs_only = self
@@ -1237,9 +1223,7 @@ impl App {
     /// give it a repository of their own to look at and a git kept from the person's settings).
     pub fn use_git(&mut self, git: rada_core::git::Git) {
         self.svc.git = git;
-        self.git = None;
-        self.git_asked = None;
-        self.git_busy = None;
+        self.folder_info.forget_git();
     }
 
     pub fn open_dir(&mut self, path: PathBuf) {
@@ -1511,7 +1495,8 @@ impl App {
                 } else {
                     v
                 };
-                self.folder_sizes
+                self.folder_info
+                    .sizes
                     .set_volumes(&self.volumes, self.svc.platform.device_root());
                 self.refresh_palette();
             }
@@ -3212,7 +3197,7 @@ impl App {
     // ------------------------------------------------------------------ dates for the list
 
     /// Work out the date text of these entries (indices into the listing), once; the list
-    /// reads them with [`date_text`](Self::date_text).
+    /// reads them with [`FolderInfo::date_text`].
     pub fn warm_dates(&mut self, indices: impl Iterator<Item = usize>) {
         let hour = self
             .now()
@@ -3220,14 +3205,10 @@ impl App {
             .map(|d| d.as_secs() / 3600)
             .unwrap_or(0);
         let key = (hour, self.listing.all().len());
-        if self.date_cache_key != key || self.date_cache.len() != key.1 {
-            self.date_cache.clear();
-            self.date_cache.resize(key.1, None);
-            self.date_cache_key = key;
-        }
+        self.folder_info.dates_for(key);
         let now = self.now();
         for i in indices {
-            if let Some(slot @ None) = self.date_cache.get_mut(i)
+            if let Some(slot @ None) = self.folder_info.date_cache.get_mut(i)
                 && let Some(e) = self.listing.all().get(i)
             {
                 *slot = Some(fmt::explorer_date_in(
@@ -3239,14 +3220,6 @@ impl App {
                 ));
             }
         }
-    }
-
-    /// The date text of an entry that [`warm_dates`](Self::warm_dates) has seen.
-    pub fn date_text(&self, listing_index: usize) -> &str {
-        self.date_cache
-            .get(listing_index)
-            .and_then(|s| s.as_deref())
-            .unwrap_or("")
     }
 
     /// Take the text waiting for the system clipboard, if any.

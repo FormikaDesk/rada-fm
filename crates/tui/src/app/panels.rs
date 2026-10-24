@@ -19,6 +19,49 @@ pub struct GitView {
     pub status: rada_core::git::GitStatus,
 }
 
+/// What is worked out about the folder shown, and again when it changes.
+#[derive(Default)]
+pub struct FolderInfo {
+    /// What git said about the folder shown (panels view), with the folder it was about.
+    pub git: Option<GitView>,
+    /// The folder and the generation of its listing git was last asked about, and when.
+    pub(super) git_asked: Option<(PathBuf, u64)>,
+    pub(super) git_busy: Option<Instant>,
+    /// What is known of the size of folders (see `sizes.rs`).
+    pub(crate) sizes: super::sizes::Sizes,
+    /// Date strings of the visible rows, worked out once and kept until the folder, the
+    /// clock's hour or the style changes.
+    pub(super) date_cache: Vec<Option<String>>,
+    date_cache_key: (u64, usize),
+}
+
+impl FolderInfo {
+    /// Forget what git said and what was asked of it.
+    pub(super) fn forget_git(&mut self) {
+        self.git = None;
+        self.git_asked = None;
+        self.git_busy = None;
+    }
+
+    /// Keep the dates worked out only while they are for this hour and this many entries
+    /// (`key`).
+    pub(super) fn dates_for(&mut self, key: (u64, usize)) {
+        if self.date_cache_key != key || self.date_cache.len() != key.1 {
+            self.date_cache.clear();
+            self.date_cache.resize(key.1, None);
+            self.date_cache_key = key;
+        }
+    }
+
+    /// The date text of an entry that [`App::warm_dates`] has seen.
+    pub fn date_text(&self, listing_index: usize) -> &str {
+        self.date_cache
+            .get(listing_index)
+            .and_then(|s| s.as_deref())
+            .unwrap_or("")
+    }
+}
+
 /// A question to git that has had no answer after this long is not waited for.
 const GIT_WAIT: Duration = Duration::from_secs(6);
 
@@ -204,28 +247,32 @@ impl App {
     /// event. A virtual folder (a tag, the recent files, an archive) is not in a repository.
     pub fn want_git(&mut self) {
         if !self.svc.git.enabled() || self.archive.is_some() || self.view_title().is_some() {
-            if self.git.take().is_some() {
+            if self.folder_info.git.take().is_some() {
                 self.redraw.dirty = true;
             }
             return;
         }
         let key = (self.cwd.clone(), self.dir_gen);
-        if self.git_asked.as_ref() == Some(&key) {
+        if self.folder_info.git_asked.as_ref() == Some(&key) {
             return;
         }
-        if self.git_busy.is_some_and(|t| t.elapsed() < GIT_WAIT) {
+        if self
+            .folder_info
+            .git_busy
+            .is_some_and(|t| t.elapsed() < GIT_WAIT)
+        {
             return;
         }
-        self.git_asked = Some(key);
-        self.git_busy = Some(Instant::now());
+        self.folder_info.git_asked = Some(key);
+        self.folder_info.git_busy = Some(Instant::now());
         self.svc.git_status(&self.cwd);
     }
 
     /// What git said about a folder.
     pub(super) fn on_git(&mut self, dir: PathBuf, status: Option<rada_core::git::GitStatus>) {
-        self.git_busy = None;
+        self.folder_info.git_busy = None;
         if dir == self.cwd {
-            self.git = status.map(|status| GitView { dir, status });
+            self.folder_info.git = status.map(|status| GitView { dir, status });
         }
         // The folder may have changed while git was thinking: the next frame asks again.
         self.redraw.dirty = true;
@@ -233,7 +280,8 @@ impl App {
 
     /// What git says about the folder shown, when it is the one it was asked about.
     pub fn git_here(&self) -> Option<&rada_core::git::GitStatus> {
-        self.git
+        self.folder_info
+            .git
             .as_ref()
             .filter(|g| g.dir == self.cwd)
             .map(|g| &g.status)

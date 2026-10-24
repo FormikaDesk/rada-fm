@@ -299,7 +299,7 @@ fn row<'a>(
     spans.push(Span::styled(pad_left(&size, cols.size), with(dim)));
     if cols.date > 0 {
         spans.push(gap());
-        let text = display::truncate(app.date_text(listing_index), cols.date);
+        let text = display::truncate(app.folder_info.date_text(listing_index), cols.date);
         spans.push(Span::styled(pad(&text, cols.date), with(dim)));
     }
     if cols.tags > 0 {

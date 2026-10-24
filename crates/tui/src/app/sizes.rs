@@ -72,7 +72,7 @@ impl App {
     /// Count folders as `settings` say from now on (what was counted is forgotten).
     pub fn set_folder_size_settings(&mut self, settings: rada_core::foldersize::SizeSettings) {
         self.svc.size_settings = settings;
-        let s = &mut self.folder_sizes;
+        let s = &mut self.folder_info.sizes;
         s.cache.clear();
         s.wanted.clear();
         s.asked.clear();
@@ -84,10 +84,10 @@ impl App {
 
     /// The folder in front changed: what was being counted for the old one is dropped.
     fn follow_folder_for_sizes(&mut self) {
-        if self.folder_sizes.dir == self.cwd {
+        if self.folder_info.sizes.dir == self.cwd {
             return;
         }
-        let s = &mut self.folder_sizes;
+        let s = &mut self.folder_info.sizes;
         s.dir = self.cwd.clone();
         s.epoch += 1;
         s.wanted.clear();
@@ -116,22 +116,22 @@ impl App {
             if e.kind != FileKind::Dir {
                 continue;
             }
-            if self.folder_sizes.cache.lookup(&e.path, e.mtime, now) == Lookup::Unknown {
+            if self.folder_info.sizes.cache.lookup(&e.path, e.mtime, now) == Lookup::Unknown {
                 wanted.push((e.path.clone(), e.mtime));
             }
         }
         // The counted size of a folder that changed is shown as unknown until it is counted
         // again (a stale figure would be a false one).
         for (path, mtime) in wanted {
-            self.folder_sizes.cache.mark_pending(path.clone());
-            self.folder_sizes.asked.insert(path.clone(), mtime);
-            self.folder_sizes.wanted.push(path);
+            self.folder_info.sizes.cache.mark_pending(path.clone());
+            self.folder_info.sizes.asked.insert(path.clone(), mtime);
+            self.folder_info.sizes.wanted.push(path);
         }
         self.send_wanted_sizes();
     }
 
     fn send_wanted_sizes(&mut self) {
-        let s = &mut self.folder_sizes;
+        let s = &mut self.folder_info.sizes;
         if s.wanted.is_empty() {
             return;
         }
@@ -148,7 +148,8 @@ impl App {
             return FolderSizeView::Nothing;
         }
         match self
-            .folder_sizes
+            .folder_info
+            .sizes
             .cache
             .lookup(&e.path, e.mtime, Instant::now())
         {
@@ -205,7 +206,7 @@ impl App {
 
     /// An answer of the worker.
     pub(super) fn on_size_event(&mut self, ev: SizeEvent) {
-        let s = &mut self.folder_sizes;
+        let s = &mut self.folder_info.sizes;
         let mtime = s.asked.remove(&ev.path).flatten();
         s.outstanding = s.outstanding.saturating_sub(1);
         s.cache.store(ev.path, ev.outcome, mtime, Instant::now());
@@ -218,7 +219,7 @@ impl App {
 
     /// Give the listing the sizes counted so far (it is ordered again if it goes by size).
     pub(super) fn sync_folder_sizes(&mut self) {
-        let cache = &self.folder_sizes.cache;
+        let cache = &self.folder_info.sizes.cache;
         let keep = self.cursor_name();
         let moved = self
             .listing
@@ -234,7 +235,7 @@ impl App {
 
     /// The watcher heard of a change in `dir`: what was counted there may be false now.
     pub(super) fn forget_folder_sizes(&mut self, dir: &Path, paths: &[PathBuf], rescan: bool) {
-        let cache = &mut self.folder_sizes.cache;
+        let cache = &mut self.folder_info.sizes.cache;
         if rescan {
             cache.invalidate_children(dir);
         } else {

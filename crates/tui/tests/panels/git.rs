@@ -109,7 +109,7 @@ fn leaving_the_repository_takes_the_branch_away() {
     h.app.open_dir(docs.clone());
     h.wait("Documents", |a| a.cwd == docs && !a.is_loading());
     // The answer for the new folder is that it is in no repository.
-    h.wait("no git here", |a| a.git.is_none());
+    h.wait("no git here", |a| a.folder_info.git.is_none());
     let s = h.screen();
     assert!(!s.contains('●') || !s.contains("main"), "{s}");
     assert!(
@@ -123,7 +123,7 @@ fn git_is_never_called_when_it_is_off() {
     // The harness gives the program no git at all, as the configuration `git = false` does.
     let mut h = scene(160, 46, "rada", false);
     h.pump(300);
-    assert!(h.app.git.is_none());
+    assert!(h.app.folder_info.git.is_none());
     let s = h.screen();
     let title = s
         .lines()
