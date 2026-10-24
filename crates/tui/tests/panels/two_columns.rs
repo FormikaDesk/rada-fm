@@ -1,6 +1,7 @@
 //! The two-column arrangement: the preview in the place of NAV, the bars, the box titles.
 
 use crate::common::*;
+use rada_tui::panels::AIRY_FROM;
 
 /// The rows of the box titled `title` in the left column of a screen, as they are drawn.
 fn left_box(screen: &str, title: &str) -> Vec<String> {
@@ -116,24 +117,27 @@ fn bars_of(hh: u16) -> (Vec<String>, usize, usize) {
 }
 
 #[test]
-fn from_42_rows_all_blank_rows_stay() {
-    let (lines, first_box, last_box) = bars_of(42);
-    // Tabs, navigation, buttons: each on its own row with a blank one after it.
-    assert_eq!(first_box, 6);
-    assert!(
-        lines[last_box + 1].trim().is_empty(),
-        "above the status bar"
-    );
-    assert!(lines[last_box + 2].contains("items"));
-    assert!(
-        lines[last_box + 3].trim().is_empty(),
-        "under the status bar"
-    );
+fn from_40_rows_all_blank_rows_stay() {
+    // 41 rows is a Mac window in Ghostty with its title bar and one more.
+    for hh in [AIRY_FROM, 41, 42] {
+        let (lines, first_box, last_box) = bars_of(hh);
+        // Tabs, navigation, buttons: each on its own row with a blank one after it.
+        assert_eq!(first_box, 6, "{hh} rows");
+        assert!(
+            lines[last_box + 1].trim().is_empty(),
+            "{hh} rows: above the status bar"
+        );
+        assert!(lines[last_box + 2].contains("items"), "{hh} rows");
+        assert!(
+            lines[last_box + 3].trim().is_empty(),
+            "{hh} rows: under the status bar"
+        );
+    }
 }
 
 #[test]
 fn from_30_rows_two_blank_rows_stay() {
-    for hh in [41, 34, 30] {
+    for hh in [AIRY_FROM - 1, 34, 30] {
         let (lines, first_box, last_box) = bars_of(hh);
         assert_eq!(
             first_box, 4,
