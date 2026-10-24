@@ -1,9 +1,8 @@
 //! Tabs. Each one has its own folder, history, cursor, selection, sort order and view; the
 //! clipboard, the journal and the undo are the same for all of them.
 //!
-//! The front tab's state lives in the fields of [`App`] itself, so that everything that
-//! works on "the folder" keeps doing so. The other tabs sit in `tabs.slots` as [`TabState`]s;
-//! switching swaps the two.
+//! The front tab's state is `App::tab`, so that everything that works on "the folder" reads it
+//! there. The other tabs sit in `tabs.slots` as [`TabState`]s; switching swaps the two.
 
 use rada_core::uistate::SavedTab;
 
@@ -52,8 +51,7 @@ pub struct TabState {
 /// The tabs behind the front one, which one is in front, and what is remembered between
 /// sessions.
 pub struct Tabs {
-    /// One slot per tab; the one of the front tab is empty, its state lives in the fields of
-    /// [`App`].
+    /// One slot per tab; the one of the front tab is empty, its state is `App::tab`.
     pub(super) slots: Vec<TabState>,
     pub active: usize,
     /// The tabs are saved with the rest of `saved_ui` and come back at the next start.
@@ -125,6 +123,21 @@ impl Tabs {
 }
 
 impl TabState {
+    /// What a tab gives up when another one comes to the front: a navigation that was still on
+    /// its way is given up with it.
+    fn leave(&mut self) {
+        self.load = LoadState::Ready;
+        self.nav_move = None;
+    }
+
+    /// The tab a new one beside this starts as: the same folder, view and order, and what is
+    /// remembered about the folders, with a history and a cursor of its own.
+    fn opened_beside(&self) -> TabState {
+        let mut fresh = TabState::fresh(self.cwd.clone(), self.view, self.sort, self.sort_chosen);
+        fresh.remembered = self.remembered.clone();
+        fresh
+    }
+
     /// A tab that has not been looked at yet: it loads its folder when it comes to the front.
     pub fn fresh(cwd: PathBuf, view: ViewMode, sort: SortSpec, sort_chosen: bool) -> TabState {
         TabState {
@@ -181,49 +194,21 @@ pub(super) fn sort_from_saved(t: &SavedTab, base: SortSpec) -> (SortSpec, bool) 
 }
 
 impl App {
-    /// Move the front tab's state out of the fields, leaving them empty.
-    fn put_away(&mut self) -> TabState {
-        TabState {
-            cwd: std::mem::take(&mut self.tab.cwd),
-            archive: self.tab.archive.take(),
-            listing: std::mem::take(&mut self.tab.listing),
-            // A navigation that was still on its way is given up with the tab.
-            load: LoadState::Ready,
-            visible: std::mem::take(&mut self.tab.visible),
-            cursor: std::mem::take(&mut self.tab.cursor),
-            scroll: std::mem::take(&mut self.tab.scroll),
-            marked: std::mem::take(&mut self.tab.marked),
-            sort: self.tab.sort,
-            sort_chosen: self.tab.sort_chosen,
-            remembered: std::mem::take(&mut self.tab.remembered),
-            nav: std::mem::take(&mut self.tab.nav),
-            nav_move: None,
-            filter: self.tab.filter.take(),
-            sel_anchor: self.tab.sel_anchor.take(),
-            view: self.tab.view,
-            viewport: self.tab.viewport,
-        }
+    /// Make `incoming` the front tab. The one that was in front is handed back, to be put in
+    /// its slot.
+    fn bring_to_front(&mut self, incoming: TabState) -> TabState {
+        let mut out = std::mem::replace(&mut self.tab, incoming);
+        out.leave();
+        out
     }
 
-    /// Make `t` the front tab.
-    fn bring_in(&mut self, t: TabState) {
-        self.tab.cwd = t.cwd;
-        self.tab.archive = t.archive;
-        self.tab.listing = t.listing;
-        self.tab.load = t.load;
-        self.tab.visible = t.visible;
-        self.tab.cursor = t.cursor;
-        self.tab.scroll = t.scroll;
-        self.tab.marked = t.marked;
-        self.tab.sort = t.sort;
-        self.tab.sort_chosen = t.sort_chosen;
-        self.tab.remembered = t.remembered;
-        self.tab.nav = t.nav;
-        self.tab.nav_move = t.nav_move;
-        self.tab.filter = t.filter;
-        self.tab.sel_anchor = t.sel_anchor;
-        self.tab.view = t.view;
-        self.tab.viewport = t.viewport;
+    /// Tab `i`, wherever its state is.
+    fn tab_at(&self, i: usize) -> Option<&TabState> {
+        if i == self.tabs.active {
+            Some(&self.tab)
+        } else {
+            self.tabs.slots.get(i)
+        }
     }
 
     /// Read the front tab's folder again, keeping the cursor and the selection.
@@ -246,15 +231,7 @@ impl App {
 
     /// The folder of tab `i`.
     pub fn tab_cwd(&self, i: usize) -> &Path {
-        if i == self.tabs.active {
-            &self.tab.cwd
-        } else {
-            self.tabs
-                .slots
-                .get(i)
-                .map(|t| t.cwd.as_path())
-                .unwrap_or(&self.tab.cwd)
-        }
+        self.tab_at(i).map_or(&self.tab.cwd, |t| &t.cwd)
     }
 
     /// The name on the tab: the folder's name, "Home" for the home folder.
@@ -286,10 +263,9 @@ impl App {
         if to == self.tabs.active || to >= self.tabs.count() {
             return;
         }
-        let out = self.put_away();
-        self.tabs.slots[self.tabs.active] = out;
         let incoming = std::mem::take(&mut self.tabs.slots[to]);
-        self.bring_in(incoming);
+        let out = self.bring_to_front(incoming);
+        self.tabs.slots[self.tabs.active] = out;
         self.tabs.active = to;
         self.after_switch();
         self.save_ui_state();
@@ -316,21 +292,12 @@ impl App {
         if let Some(name) = self.cursor_name() {
             self.tab.remembered.insert(self.tab.cwd.clone(), name);
         }
-        let (cwd, view, sort, chosen, remembered) = (
-            self.tab.cwd.clone(),
-            self.tab.view,
-            self.tab.sort,
-            self.tab.sort_chosen,
-            self.tab.remembered.clone(),
-        );
-        let out = self.put_away();
-        self.tabs.slots[self.tabs.active] = out;
+        let fresh = self.tab.opened_beside();
+        let out = self.bring_to_front(fresh);
         let at = self.tabs.active + 1;
+        self.tabs.slots[self.tabs.active] = out;
         self.tabs.slots.insert(at, TabState::default());
         self.tabs.active = at;
-        let mut fresh = TabState::fresh(cwd, view, sort, chosen);
-        fresh.remembered = remembered;
-        self.bring_in(fresh);
         self.after_switch();
         self.save_ui_state();
     }
@@ -348,11 +315,11 @@ impl App {
             return;
         }
         if idx == self.tabs.active {
-            let _ = self.put_away();
             self.tabs.slots.remove(idx);
             let now = idx.min(self.tabs.count() - 1);
             let incoming = std::mem::take(&mut self.tabs.slots[now]);
-            self.bring_in(incoming);
+            // The tab that was in front is closed: what comes back is dropped.
+            let _ = self.bring_to_front(incoming);
             self.tabs.active = now;
             self.after_switch();
         } else {
@@ -373,18 +340,9 @@ impl App {
     pub fn saved_tabs(&self) -> Vec<SavedTab> {
         (0..self.tabs.count())
             .map(|i| {
-                let (cwd, archive, view, sort, chosen) = if i == self.tabs.active {
-                    (
-                        &self.tab.cwd,
-                        &self.tab.archive,
-                        self.tab.view,
-                        self.tab.sort,
-                        self.tab.sort_chosen,
-                    )
-                } else {
-                    let t = &self.tabs.slots[i];
-                    (&t.cwd, &t.archive, t.view, t.sort, t.sort_chosen)
-                };
+                let t = self.tab_at(i).expect("a tab for each index");
+                let (cwd, archive) = (&t.cwd, &t.archive);
+                let (view, sort, chosen) = (t.view, t.sort, t.sort_chosen);
                 // Inside an archive the folder is not on the disk: remember where the archive is.
                 let path = match archive {
                     Some(a) => a
