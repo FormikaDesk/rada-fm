@@ -211,7 +211,7 @@ impl App {
             self.side_nav.focus = false;
             self.preview.focus = false;
         }
-        self.saved_ui.layout = Some(pref.id().to_string());
+        self.tabs.saved_ui.layout = Some(pref.id().to_string());
         self.save_ui_state();
         self.redraw.dirty = true;
     }
@@ -233,7 +233,7 @@ impl App {
             for dir in self
                 .side_nav
                 .tree
-                .wanted(self.settings.show_hidden, self.dir_gen)
+                .wanted(self.settings.show_hidden, self.tabs.generation())
             {
                 self.svc.tree_dirs(dir, self.settings.show_hidden);
             }
@@ -244,7 +244,7 @@ impl App {
         for dir in self
             .side_nav
             .tree
-            .wanted(self.settings.show_hidden, self.dir_gen)
+            .wanted(self.settings.show_hidden, self.tabs.generation())
         {
             self.svc.tree_dirs(dir, self.settings.show_hidden);
         }
@@ -260,7 +260,7 @@ impl App {
             }
             return;
         }
-        let key = (self.cwd.clone(), self.dir_gen);
+        let key = (self.cwd.clone(), self.tabs.generation());
         if self.folder_info.git_asked.as_ref() == Some(&key) {
             return;
         }

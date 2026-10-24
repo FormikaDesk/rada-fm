@@ -36,7 +36,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(Block::default().style(band), area);
     let w = area.width as usize;
     let set = app.settings.icons;
-    let n = app.tab_count();
+    let n = app.tabs.count();
 
     let mut right = Bar::default();
     // A newer version waits: a pill in the accent colour, a click (or the key) opens the notes.
@@ -111,7 +111,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     // The full row, if it fits.
     let mut tabs = Bar::default();
     for i in 0..n {
-        let active = i == app.active_tab;
+        let active = i == app.tabs.active;
         let title = title_of(app, i);
         if active {
             // A pill: the half circle, the name, the close mark, the half circle.
@@ -168,14 +168,14 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
         bar.append(tabs);
     } else {
         // Folded: ‹ 2/3 › and the tab in front, then +.
-        let count = format!(" {}/{} ", app.active_tab + 1, n);
+        let count = format!(" {}/{} ", app.tabs.active + 1, n);
         let arrows = 4 + count.width();
         bar.push_hit(Span::styled(" ‹", th.dim().patch(band)), Target::TabPrev);
         bar.push(Span::styled(count, th.base().patch(band)));
         bar.push_hit(Span::styled("› ", th.dim().patch(band)), Target::TabNext);
         let room = budget.saturating_sub(arrows + 5);
         if room >= 6 {
-            let t = display::truncate_name(&app.tab_title(app.active_tab), room.min(max_title));
+            let t = display::truncate_name(&app.tab_title(app.tabs.active), room.min(max_title));
             bar.push_hits(
                 soft::pill(
                     &th,
@@ -185,7 +185,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
                     th.base().add_modifier(Modifier::BOLD),
                     band,
                 ),
-                Target::Tab(app.active_tab),
+                Target::Tab(app.tabs.active),
             );
         }
         if budget > arrows + 4 {

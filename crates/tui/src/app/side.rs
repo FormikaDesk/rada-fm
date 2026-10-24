@@ -248,7 +248,7 @@ impl App {
         if !self.side_nav.wanted {
             self.side_nav.focus = false;
         }
-        self.saved_ui.sidebar = Some(self.side_nav.wanted);
+        self.tabs.saved_ui.sidebar = Some(self.side_nav.wanted);
         self.save_ui_state();
         if self.side_nav.wanted && Mode::for_width(self.frame.term_width(), true) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarOnNarrow.tr(), 3);

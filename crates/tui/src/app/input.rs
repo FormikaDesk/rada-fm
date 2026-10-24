@@ -538,7 +538,7 @@ impl App {
             OpenTerminal => self.open_terminal_here(),
             ContextMenu => self.open_context_menu_at_cursor(),
             NewTab => self.new_tab(),
-            CloseTab => self.close_tab(self.active_tab),
+            CloseTab => self.close_tab(self.tabs.active),
             NextTab => self.next_tab(),
             PrevTab => self.prev_tab(),
 
@@ -558,9 +558,9 @@ impl App {
 
     /// Read the folder again.
     pub fn refresh(&mut self) {
-        self.dir_gen += 1;
+        let generation = self.tabs.next_generation();
         self.load = LoadState::Loading(self.cwd.clone());
-        self.svc.loader.load(self.cwd.clone(), self.dir_gen);
+        self.svc.loader.load(self.cwd.clone(), generation);
         self.redraw.dirty = true;
     }
 
@@ -577,7 +577,7 @@ impl App {
     /// Show or hide the Tag column of the list, and remember it.
     pub fn toggle_tags_column(&mut self) {
         self.settings.show_tags = !self.settings.show_tags;
-        self.saved_ui.tags_column = Some(self.settings.show_tags);
+        self.tabs.saved_ui.tags_column = Some(self.settings.show_tags);
         self.save_ui_state();
         self.redraw.dirty = true;
     }
@@ -596,7 +596,7 @@ impl App {
         }
         let want = !self.details_visible();
         self.settings.details = Some(want);
-        self.saved_ui.details = Some(want);
+        self.tabs.saved_ui.details = Some(want);
         self.save_ui_state();
         if want && self.frame.term_width() < 60 {
             self.toast(ToastKind::Info, Key::TDetailsOnNarrow.tr(), 3);

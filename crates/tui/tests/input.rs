@@ -165,7 +165,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
             matches!(h.app.windows.modal, Some(Modal::Properties(_)))
         }),
         ("refresh", "f5", |h| h.app.is_loading()),
-        ("new tab", "ctrl+t", |h| h.app.tab_count() == 2),
+        ("new tab", "ctrl+t", |h| h.app.tabs.count() == 2),
         ("details", "alt+p", |h| {
             h.app.settings.details == Some(false)
         }),

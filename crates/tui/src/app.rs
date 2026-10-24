@@ -488,7 +488,6 @@ pub struct App {
     pub archive: Option<ArchiveView>,
     pub listing: DirListing,
     pub load: LoadState,
-    dir_gen: u64,
     pub visible: Vec<usize>,
     pub cursor: usize,
     pub scroll: usize,
@@ -498,8 +497,6 @@ pub struct App {
     /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
     /// `config.toml` at every start.
     pub sort_chosen: bool,
-    /// The order of the folders, put away while the list of recent files has its own.
-    sort_outside_recents: Option<SortSpec>,
     remembered: HashMap<PathBuf, OsString>,
     /// Folders visited, for back and forward.
     pub nav: crate::nav::NavHistory,
@@ -519,6 +516,9 @@ pub struct App {
     /// The open window, the notification cards, the address bar and the other things put over
     /// the explorer.
     pub windows: windows::Windows,
+    /// The tabs behind the front one, which one is in front, and what is remembered between
+    /// sessions.
+    pub tabs: tabs::Tabs,
     pub columns: columns::ColumnsView,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
@@ -539,12 +539,6 @@ pub struct App {
     pub view: ViewMode,
     /// What is worked out about the folder shown.
     pub folder_info: panels::FolderInfo,
-    pub remember_tabs: bool,
-    /// The tabs; the slot of the front one is empty, its state lives in the fields above.
-    tabs: Vec<TabState>,
-    pub active_tab: usize,
-    /// Where tabs are saved and the rest of what is remembered between sessions.
-    saved_ui: rada_core::uistate::UiState,
     pub updates: Updates,
 }
 
@@ -615,14 +609,12 @@ impl App {
             archive: None,
             listing: DirListing::new(start_dir.clone(), Vec::new(), sort),
             load: LoadState::Loading(start_dir.clone()),
-            dir_gen: 0,
             visible: Vec::new(),
             cursor: 0,
             scroll: 0,
             marked: BTreeSet::new(),
             sort,
             sort_chosen,
-            sort_outside_recents: None,
             remembered: HashMap::new(),
             nav: crate::nav::NavHistory::new(start_dir.clone()),
             nav_move: None,
@@ -632,6 +624,7 @@ impl App {
             tags: side::Tags::new(svc_tag_language(&svc)),
             ops: Default::default(),
             windows: Default::default(),
+            tabs: tabs::Tabs::new(tab_slots, active, cfg.remember_tabs, cfg.saved_ui),
             columns: columns::ColumnsView::default(),
             viewport: Viewport::default(),
             session: chooser::Session::new(cfg.chooser.clone()),
@@ -648,10 +641,6 @@ impl App {
             last_click: None,
             view,
             folder_info: Default::default(),
-            remember_tabs: cfg.remember_tabs,
-            tabs: tab_slots,
-            active_tab: active,
-            saved_ui: cfg.saved_ui,
             updates: Updates {
                 version: svc.updater.as_ref().map_or_else(
                     || env!("CARGO_PKG_VERSION").to_string(),
@@ -935,9 +924,9 @@ impl App {
             self.filter = None;
             self.sel_anchor = None;
         }
-        self.dir_gen += 1;
+        let generation = self.tabs.next_generation();
         self.load = LoadState::Loading(path.clone());
-        self.svc.loader.load(path, self.dir_gen);
+        self.svc.loader.load(path, generation);
     }
 
     /// The terminal changed size, which is also what a zoom of its font looks like.
@@ -1302,7 +1291,7 @@ impl App {
                 if generation & columns::PARENT_GEN != 0 {
                     return self.on_parent_loaded(generation, path, result);
                 }
-                if generation != self.dir_gen {
+                if generation != self.tabs.generation() {
                     return; // an answer to a request that has been superseded
                 }
                 match result {
@@ -1323,9 +1312,9 @@ impl App {
                         let into_recents = rada_core::recents::is_view(&path);
                         if into_recents != self.recents_view() {
                             if into_recents {
-                                self.sort_outside_recents = Some(self.sort);
+                                self.tabs.sort_outside_recents = Some(self.sort);
                                 self.sort = Self::RECENT_SORT;
-                            } else if let Some(before) = self.sort_outside_recents.take() {
+                            } else if let Some(before) = self.tabs.sort_outside_recents.take() {
                                 self.sort = before;
                             }
                         }
@@ -1410,14 +1399,14 @@ impl App {
                 if matches!(&self.load, LoadState::Loading(target) if *target != dir) {
                     return;
                 }
-                self.dir_gen += 1;
+                let generation = self.tabs.next_generation();
                 // A full read in progress is answered only for the newest request: a patch
                 // would supersede it and leave the folder "loading" for good, so a change
                 // that arrives meanwhile asks for another full read instead.
                 if rescan || matches!(self.load, LoadState::Loading(_)) {
-                    self.svc.loader.load(dir, self.dir_gen);
+                    self.svc.loader.load(dir, generation);
                 } else {
-                    self.svc.loader.patch(dir, paths, self.dir_gen);
+                    self.svc.loader.patch(dir, paths, generation);
                 }
             }
             // Polling still shows the changes: there is nothing to tell.
@@ -1523,8 +1512,8 @@ impl App {
                 if let Some(done) = self.ops.finish(job) {
                     self.finish(title, report, journal_errors, Some(done));
                     // Refresh even if live updates are unavailable.
-                    self.dir_gen += 1;
-                    self.svc.loader.load(self.cwd.clone(), self.dir_gen);
+                    let generation = self.tabs.next_generation();
+                    self.svc.loader.load(self.cwd.clone(), generation);
                     self.svc.jobs.load_undo_label();
                 }
             }
