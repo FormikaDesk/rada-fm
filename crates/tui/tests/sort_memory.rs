@@ -99,9 +99,9 @@ fn plain_date_sort_is_newest_first() {
 fn a_tab_that_was_saved_without_a_choice_follows_the_configuration() {
     let tab = saved_tab(std::path::Path::new("/x"), None, false, Some(false));
     let (h, _, _) = start_with(state_with(tab), config_sort(SortKey::Modified, false));
-    assert_eq!(h.app.sort.key, SortKey::Modified);
-    assert!(!h.app.sort.reverse);
-    assert!(!h.app.sort_chosen);
+    assert_eq!(h.app.tab.sort.key, SortKey::Modified);
+    assert!(!h.app.tab.sort.reverse);
+    assert!(!h.app.tab.sort_chosen);
     assert_eq!(
         h.names()[1],
         "c-new.txt",
@@ -114,8 +114,11 @@ fn a_tab_that_was_saved_without_a_choice_follows_the_configuration() {
 fn a_tab_with_a_choice_keeps_it_over_the_configuration() {
     let tab = saved_tab(std::path::Path::new("/x"), Some("size"), true, Some(true));
     let (h, _, _) = start_with(state_with(tab), config_sort(SortKey::Modified, false));
-    assert_eq!((h.app.sort.key, h.app.sort.reverse), (SortKey::Size, true));
-    assert!(h.app.sort_chosen);
+    assert_eq!(
+        (h.app.tab.sort.key, h.app.tab.sort.reverse),
+        (SortKey::Size, true)
+    );
+    assert!(h.app.tab.sort_chosen);
     // The biggest first.
     assert_eq!(h.names(), ["zdir", "b-mid.txt", "c-new.txt", "a-old.txt"]);
 }
@@ -125,16 +128,22 @@ fn old_state_file_means_no_sort_choice() {
     // What the older versions wrote for every tab, chosen or not.
     let name = saved_tab(std::path::Path::new("/x"), Some("name"), false, None);
     let (h, _, _) = start_with(state_with(name), config_sort(SortKey::Modified, false));
-    assert_eq!(h.app.sort.key, SortKey::Modified, "follows config.toml");
-    assert!(!h.app.sort_chosen);
+    assert_eq!(h.app.tab.sort.key, SortKey::Modified, "follows config.toml");
+    assert!(!h.app.tab.sort_chosen);
     // Any other is taken for a choice, and kept.
     let size = saved_tab(std::path::Path::new("/x"), Some("size"), false, None);
     let (h, _, _) = start_with(state_with(size), config_sort(SortKey::Modified, false));
-    assert_eq!((h.app.sort.key, h.app.sort.reverse), (SortKey::Size, false));
-    assert!(h.app.sort_chosen);
+    assert_eq!(
+        (h.app.tab.sort.key, h.app.tab.sort.reverse),
+        (SortKey::Size, false)
+    );
+    assert!(h.app.tab.sort_chosen);
     let reversed = saved_tab(std::path::Path::new("/x"), Some("name"), true, None);
     let (h, _, _) = start_with(state_with(reversed), config_sort(SortKey::Modified, false));
-    assert_eq!((h.app.sort.key, h.app.sort.reverse), (SortKey::Name, true));
+    assert_eq!(
+        (h.app.tab.sort.key, h.app.tab.sort.reverse),
+        (SortKey::Name, true)
+    );
 }
 
 #[test]
@@ -143,13 +152,16 @@ fn an_old_date_that_was_reversed_still_shows_the_newest_first() {
     // newest first. It still is what that tab shows.
     let old = saved_tab(std::path::Path::new("/x"), Some("date"), true, None);
     let (h, _, _) = start_with(state_with(old), config_sort(SortKey::Name, false));
-    assert_eq!(h.app.sort.key, SortKey::Modified);
-    assert!(!h.app.sort.reverse, "newest first is the plain date now");
+    assert_eq!(h.app.tab.sort.key, SortKey::Modified);
+    assert!(
+        !h.app.tab.sort.reverse,
+        "newest first is the plain date now"
+    );
     assert_eq!(h.names()[1], "c-new.txt");
     // And "date, not reversed" (the oldest first) is still the oldest first.
     let old = saved_tab(std::path::Path::new("/x"), Some("date"), false, None);
     let (h, _, _) = start_with(state_with(old), config_sort(SortKey::Name, false));
-    assert!(h.app.sort.reverse);
+    assert!(h.app.tab.sort.reverse);
     assert_eq!(h.names()[1], "a-old.txt");
 }
 
@@ -248,19 +260,19 @@ fn new_config_wins_unless_a_choice_was_made() {
     });
     assert_eq!(h.app.tabs.count(), 2);
     assert_eq!(
-        h.app.sort.key,
+        h.app.tab.sort.key,
         SortKey::Modified,
         "the untouched tab follows the new configuration"
     );
-    assert!(!h.app.sort_chosen);
+    assert!(!h.app.tab.sort_chosen);
     h.press("alt+2");
     h.wait("tab 2", |a| a.tabs.active == 1 && !a.is_loading());
     assert_eq!(
-        (h.app.sort.key, h.app.sort.reverse),
+        (h.app.tab.sort.key, h.app.tab.sort.reverse),
         (SortKey::Name, true),
         "the chosen one is kept"
     );
-    assert!(h.app.sort_chosen);
+    assert!(h.app.tab.sort_chosen);
 }
 
 #[test]
@@ -271,11 +283,11 @@ fn a_new_tab_has_the_order_of_the_one_it_came_from_and_the_same_choice() {
     });
     h.press("ctrl+t");
     h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
-    assert!(!h.app.sort_chosen, "nothing was chosen in the first");
+    assert!(!h.app.tab.sort_chosen, "nothing was chosen in the first");
     h.app.dispatch(Action::SortReverse);
     h.press("ctrl+t");
     h.wait("tab 3", |a| a.tabs.count() == 3 && !a.is_loading());
-    assert!(h.app.sort.reverse && h.app.sort_chosen);
+    assert!(h.app.tab.sort.reverse && h.app.tab.sort_chosen);
 }
 
 #[test]
@@ -287,11 +299,11 @@ fn changing_the_key_keeps_the_arrow() {
     // Name ↑ → date ↑: the oldest first.
     h.app.dispatch(Action::Sort); // size
     h.app.dispatch(Action::Sort); // date
-    assert_eq!(h.app.sort.key, SortKey::Modified);
-    assert!(!h.app.sort.descending());
+    assert_eq!(h.app.tab.sort.key, SortKey::Modified);
+    assert!(!h.app.tab.sort.descending());
     assert_eq!(h.names()[1], "a-old.txt");
     // And the other way round.
     h.app.dispatch(Action::SortReverse);
-    assert!(h.app.sort.descending());
+    assert!(h.app.tab.sort.descending());
     assert_eq!(h.names()[1], "c-new.txt");
 }

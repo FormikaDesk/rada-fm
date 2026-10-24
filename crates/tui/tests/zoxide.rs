@@ -123,7 +123,7 @@ fn what_matches_nothing_else_is_offered_from_zoxide_and_enter_goes_there() {
     h.key(KeyCode::Enter);
     h.settle();
     let want = fake.known[1].clone();
-    h.wait("the folder opens", |a| a.cwd == want);
+    h.wait("the folder opens", |a| a.tab.cwd == want);
     assert!(h.app.windows.address.is_none());
 }
 
@@ -141,7 +141,7 @@ fn enter_with_nothing_picked_opens_the_first_folder() {
     );
     h.key(KeyCode::Enter);
     let want = fake.known[0].clone();
-    h.wait("the folder opens", |a| a.cwd == want);
+    h.wait("the folder opens", |a| a.tab.cwd == want);
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn without_zoxide_nothing_happens_and_nothing_is_shown() {
     assert!(h.app.windows.notices.is_empty(), "no error is shown");
     h.key(KeyCode::Enter);
     h.settle();
-    assert_eq!(h.app.cwd, work);
+    assert_eq!(h.app.tab.cwd, work);
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn rada_tells_zoxide_about_the_folders_it_enters() {
         .use_zoxide(Zoxide::new(true, Some(fake.program.clone())));
     let target = fake.known[0].clone();
     h.app.open_dir(target.clone());
-    h.wait("the folder opens", |a| a.cwd == target);
+    h.wait("the folder opens", |a| a.tab.cwd == target);
     let want = format!("add -- {}", target.display());
     assert!(
         until(&mut h, 10, |_| logged(&fake).contains(&want)),
@@ -210,7 +210,7 @@ fn switched_off_rada_never_calls_zoxide() {
         .use_zoxide(Zoxide::new(false, Some(fake.program.clone())));
     let target = fake.known[0].clone();
     h.app.open_dir(target.clone());
-    h.wait("the folder opens", |a| a.cwd == target);
+    h.wait("the folder opens", |a| a.tab.cwd == target);
     h.press("ctrl+p");
     h.keys("qzx");
     std::thread::sleep(Duration::from_millis(400));

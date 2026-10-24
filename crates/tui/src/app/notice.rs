@@ -618,7 +618,7 @@ impl App {
                 ..Outcome::default()
             },
             OpKind::SetTags => Outcome {
-                folder: Some(self.cwd.clone()),
+                folder: Some(self.tab.cwd.clone()),
                 ..Outcome::default()
             },
             OpKind::Delete | OpKind::Undo => Outcome::default(),
@@ -732,7 +732,7 @@ impl App {
                 }) = shown
                 {
                     if let Some(name) = select {
-                        self.remembered.insert(folder.clone(), name);
+                        self.tab.remembered.insert(folder.clone(), name);
                     }
                     self.open_dir(folder);
                 }

@@ -78,9 +78,11 @@ fn unusable_buttons_are_not_clickable_and_usable_ones_are() {
     );
 
     h.key(KeyCode::Enter); // into sub
-    h.wait("sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     h.click(&Target::Act(Action::Back));
-    h.wait("back", |a| a.cwd.ends_with("proj.v1") && !a.is_loading());
+    h.wait("back", |a| {
+        a.tab.cwd.ends_with("proj.v1") && !a.is_loading()
+    });
     assert!(
         h.app
             .frame
@@ -89,9 +91,11 @@ fn unusable_buttons_are_not_clickable_and_usable_ones_are() {
             .is_some()
     );
     h.click(&Target::Act(Action::Forward));
-    h.wait("forward", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("forward", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     h.click(&Target::Act(Action::Parent));
-    h.wait("parent", |a| a.cwd.ends_with("proj.v1") && !a.is_loading());
+    h.wait("parent", |a| {
+        a.tab.cwd.ends_with("proj.v1") && !a.is_loading()
+    });
 }
 
 #[test]
@@ -191,7 +195,7 @@ fn the_folded_part_of_a_path_opens_a_list_to_pick_from() {
     h.key(KeyCode::Enter);
     let first = hidden[0].clone();
     h.wait("the chosen folder", move |a| {
-        a.cwd == first && !a.is_loading()
+        a.tab.cwd == first && !a.is_loading()
     });
 }
 

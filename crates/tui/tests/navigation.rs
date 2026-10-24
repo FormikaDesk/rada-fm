@@ -8,7 +8,7 @@ use crossterm::event::KeyCode;
 fn at(h: &mut H, name: &str) {
     let n = name.to_string();
     h.wait(&format!("in {name}"), move |a| {
-        a.cwd.ends_with(&n) && !a.is_loading()
+        a.tab.cwd.ends_with(&n) && !a.is_loading()
     });
 }
 
@@ -17,15 +17,15 @@ fn back_and_forward_walk_through_the_visited_folders() {
     let (sb, dir) = sandbox_with_files();
     let start = dir.file_name().unwrap().to_string_lossy().into_owned();
     let mut h = H::new(sb, dir, 120, 30);
-    assert!(!h.app.nav.can_back() && !h.app.nav.can_forward());
+    assert!(!h.app.tab.nav.can_back() && !h.app.tab.nav.can_forward());
 
     h.key(KeyCode::Enter); // into sub
     at(&mut h, "sub");
-    assert!(h.app.nav.can_back() && !h.app.nav.can_forward());
+    assert!(h.app.tab.nav.can_back() && !h.app.tab.nav.can_forward());
 
     h.press("alt+left");
     at(&mut h, &start);
-    assert!(!h.app.nav.can_back() && h.app.nav.can_forward());
+    assert!(!h.app.tab.nav.can_back() && h.app.tab.nav.can_forward());
     assert_eq!(
         h.app.current().map(|e| e.display.clone()).as_deref(),
         Some("sub"),
@@ -34,7 +34,7 @@ fn back_and_forward_walk_through_the_visited_folders() {
 
     h.press("alt+right");
     at(&mut h, "sub");
-    assert!(h.app.nav.can_back() && !h.app.nav.can_forward());
+    assert!(h.app.tab.nav.can_back() && !h.app.tab.nav.can_forward());
 }
 
 #[test]
@@ -58,10 +58,10 @@ fn going_somewhere_new_after_back_drops_the_forward_history() {
     at(&mut h, "sub");
     h.press("alt+left");
     at(&mut h, &start);
-    assert!(h.app.nav.can_forward());
+    assert!(h.app.tab.nav.can_forward());
     h.app.open_dir(dir.join("zother"));
     at(&mut h, "zother");
-    assert!(!h.app.nav.can_forward(), "forward is gone");
+    assert!(!h.app.tab.nav.can_forward(), "forward is gone");
     h.press("alt+left");
     at(&mut h, &start);
 }
@@ -78,8 +78,8 @@ fn a_folder_that_vanished_is_reported_and_the_history_stays_as_it_was() {
     std::fs::remove_dir_all(dir.join("sub")).unwrap();
     h.press("alt+right");
     h.wait("the error", |a| a.current_notice().is_some());
-    assert!(h.app.cwd.ends_with(&start), "still where we were");
-    assert!(h.app.nav.can_forward(), "the entry is still there");
+    assert!(h.app.tab.cwd.ends_with(&start), "still where we were");
+    assert!(h.app.tab.nav.can_forward(), "the entry is still there");
 }
 
 #[test]
@@ -112,7 +112,7 @@ fn change_behind_does_not_cancel_a_visit() {
         }));
     }
     h.wait("the folder asked for", |a| {
-        a.cwd == target && !a.is_loading()
+        a.tab.cwd == target && !a.is_loading()
     });
     assert_eq!(h.names(), ["inner.txt"]);
 }

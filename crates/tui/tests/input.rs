@@ -76,9 +76,11 @@ fn classic_navigation_and_selection_keys() {
     assert_eq!(h.cursor_name(), "dir");
     // Enter opens, Backspace goes up.
     h.press("enter");
-    h.wait("dir loaded", |a| a.cwd.ends_with("dir") && !a.is_loading());
+    h.wait("dir loaded", |a| {
+        a.tab.cwd.ends_with("dir") && !a.is_loading()
+    });
     h.press("backspace");
-    h.wait("back", |a| a.cwd.ends_with("w") && !a.is_loading());
+    h.wait("back", |a| a.tab.cwd.ends_with("w") && !a.is_loading());
     assert_eq!(
         h.cursor_name(),
         "dir",
@@ -169,7 +171,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("details", "alt+p", |h| {
             h.app.settings.details == Some(false)
         }),
-        ("view", "v", |h| h.app.view == rada_tui::ViewMode::Icons),
+        ("view", "v", |h| h.app.tab.view == rada_tui::ViewMode::Icons),
         ("commands", "ctrl+p", |h| h.app.windows.address.is_some()),
         ("search", "/", |h| h.app.windows.address.is_some()),
         ("search", "ctrl+f", |h| h.app.windows.address.is_some()),
@@ -191,7 +193,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("redo", "ctrl+y", |h| redoing(h)),
         ("quit", "q", |h| h.app.session.should_quit),
         ("quit", "ctrl+q", |h| h.app.session.should_quit),
-        ("select all", "ctrl+a", |h| h.app.marked.len() == 6),
+        ("select all", "ctrl+a", |h| h.app.tab.marked.len() == 6),
         ("hidden", ".", |h| h.app.settings.show_hidden),
         ("sort", "s", |h| h.app.sort_label().starts_with("size")),
     ];
@@ -268,7 +270,7 @@ fn the_filter_narrows_the_list_as_you_type_and_esc_restores_it() {
     );
     h.press("enter"); // keep the filter, back to the list
     assert_eq!(h.names(), ["b.txt"]);
-    assert!(h.app.filter.as_ref().is_some_and(|f| !f.editing));
+    assert!(h.app.tab.filter.as_ref().is_some_and(|f| !f.editing));
     h.press("esc");
     assert_eq!(h.names().len(), 6, "Esc clears the filter");
     // Several words must all match, case-insensitively.
@@ -281,14 +283,14 @@ fn the_filter_narrows_the_list_as_you_type_and_esc_restores_it() {
     h.press("backspace");
     h.press("backspace");
     h.press("backspace");
-    assert!(h.app.filter.is_none(), "an empty filter goes away");
+    assert!(h.app.tab.filter.is_none(), "an empty filter goes away");
     // Moving to another folder drops it.
     h.keys("/");
     h.keys("di");
     h.press("enter");
     h.press("enter");
-    h.wait("dir", |a| a.cwd.ends_with("dir") && !a.is_loading());
-    assert!(h.app.filter.is_none());
+    h.wait("dir", |a| a.tab.cwd.ends_with("dir") && !a.is_loading());
+    assert!(h.app.tab.filter.is_none());
 }
 
 #[test]
@@ -313,7 +315,7 @@ fn redo_replans_the_undone_operation_and_asks_for_confirmation_again() {
     h.press("down"); // a.txt
     h.press("ctrl+c");
     h.app.open_dir(dest.clone());
-    h.wait("dest", |a| a.cwd.ends_with("dest") && !a.is_loading());
+    h.wait("dest", |a| a.tab.cwd.ends_with("dest") && !a.is_loading());
     h.press("ctrl+v");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
@@ -379,7 +381,7 @@ fn click_selects_double_click_opens() {
     assert!(h.app.windows.modal.is_none());
     // A double click on the folder enters it.
     h.double_click(&Target::Row(0));
-    h.wait("dir", |a| a.cwd.ends_with("dir") && !a.is_loading());
+    h.wait("dir", |a| a.tab.cwd.ends_with("dir") && !a.is_loading());
 }
 
 #[test]
@@ -393,7 +395,7 @@ fn a_slow_second_click_is_not_a_double_click() {
     std::thread::sleep(std::time::Duration::from_millis(300));
     h.click(&dir_row);
     h.settle();
-    assert!(h.app.cwd.ends_with("w"));
+    assert!(h.app.tab.cwd.ends_with("w"));
 }
 
 #[test]
@@ -454,9 +456,9 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     let screen = h.screen();
     assert!(screen.contains("deep"), "{screen}");
     // Click the "dir" segment: go there.
-    let target = Target::Crumb(h.app.cwd.parent().unwrap().to_path_buf());
+    let target = Target::Crumb(h.app.tab.cwd.parent().unwrap().to_path_buf());
     h.click(&target);
-    h.wait("parent", |a| a.cwd.ends_with("dir") && !a.is_loading());
+    h.wait("parent", |a| a.tab.cwd.ends_with("dir") && !a.is_loading());
     // The top bar's "Go to" button and the bottom bar's hints run their action.
     h.click(&Target::Act(Action::Palette));
     assert!(h.app.windows.address.is_some(), "{}", h.screen());
@@ -553,7 +555,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     h.press("down");
     h.press("ctrl+c");
     h.app.open_dir(dest.clone());
-    h.wait("dest", |a| a.cwd.ends_with("dest") && !a.is_loading());
+    h.wait("dest", |a| a.tab.cwd.ends_with("dest") && !a.is_loading());
     h.press("ctrl+v");
     plan_modal(&mut h);
     let s = h.screen();
@@ -609,7 +611,7 @@ fn the_commands_offered_under_the_field_are_clickable() {
         h.screen()
     );
     assert!(h.app.windows.address.is_none(), "the field closed");
-    assert!(h.app.filter.is_none(), "and took its filter off");
+    assert!(h.app.tab.filter.is_none(), "and took its filter off");
 }
 
 #[test]
@@ -633,7 +635,7 @@ fn places_are_offered_too_and_a_click_goes_there() {
         .position(|hit| matches!(&hit.item, rada_tui::app::BarItem::Place(p) if p.path == target))
         .expect("the bookmark is among the suggestions");
     h.click(&Target::BarHit(row));
-    h.wait("moved", |a| a.cwd == target && !a.is_loading());
+    h.wait("moved", |a| a.tab.cwd == target && !a.is_loading());
     assert!(h.app.windows.address.is_none());
 }
 

@@ -296,7 +296,7 @@ impl App {
             self.on_address_key(key);
             return;
         }
-        if self.filter.as_ref().is_some_and(|f| f.editing) {
+        if self.tab.filter.as_ref().is_some_and(|f| f.editing) {
             self.on_filter_key(key);
             return;
         }
@@ -313,7 +313,7 @@ impl App {
         }
         // In the Columns view Right goes into the folder under the cursor and does nothing on a
         // file; Left (the parent action) already goes to the folder above.
-        if self.view == ViewMode::Columns
+        if self.tab.view == ViewMode::Columns
             && !self.side_nav.focus
             && key.modifiers.is_empty()
             && matches!(key.code, KeyCode::Right | KeyCode::Char('l'))
@@ -347,7 +347,7 @@ impl App {
                 return;
             }
             // In the Icons view the arrows and h j k l move across the grid.
-            if self.view == ViewMode::Icons
+            if self.tab.view == ViewMode::Icons
                 && !self.side_nav.focus
                 && key.modifiers.is_empty()
                 && let Some(step) = match (action, key.code) {
@@ -356,8 +356,8 @@ impl App {
                     _ => None,
                 }
             {
-                self.sel_anchor = None;
-                let to = (self.cursor as isize + step).max(0) as usize;
+                self.tab.sel_anchor = None;
+                let to = (self.tab.cursor as isize + step).max(0) as usize;
                 self.set_cursor(to);
                 self.redraw.dirty = true;
                 return;
@@ -390,7 +390,7 @@ impl App {
                 _ => {}
             }
         }
-        let page = self.viewport.rows.saturating_sub(1).max(1);
+        let page = self.tab.viewport.rows.saturating_sub(1).max(1);
         if matches!(
             action,
             Up | Down
@@ -405,12 +405,12 @@ impl App {
                 | HalfPageUp
                 | HalfPageDown
         ) {
-            self.sel_anchor = None;
+            self.tab.sel_anchor = None;
         }
         // In the Icons view, up and down are a whole row, and a page is the tiles on screen.
-        let (line, page, half) = if self.view == ViewMode::Icons {
-            let cols = self.viewport.grid_cols.max(1);
-            let screenful = (self.viewport.grid_rows.max(1) * cols)
+        let (line, page, half) = if self.tab.view == ViewMode::Icons {
+            let cols = self.tab.viewport.grid_cols.max(1);
+            let screenful = (self.tab.viewport.grid_rows.max(1) * cols)
                 .saturating_sub(cols)
                 .max(cols);
             (cols, screenful, screenful / 2)
@@ -418,18 +418,18 @@ impl App {
             (1, page, page / 2)
         };
         match action {
-            Up => self.set_cursor(self.cursor.saturating_sub(line)),
-            Down => self.set_cursor(self.cursor + line),
+            Up => self.set_cursor(self.tab.cursor.saturating_sub(line)),
+            Down => self.set_cursor(self.tab.cursor + line),
             Parent => self.go_parent(),
             Back => self.go_history(true),
             Forward => self.go_history(false),
             Open => self.enter(),
             First => self.set_cursor(0),
             Last => self.set_cursor(usize::MAX),
-            PageUp => self.set_cursor(self.cursor.saturating_sub(page)),
-            PageDown => self.set_cursor(self.cursor + page),
-            HalfPageUp => self.set_cursor(self.cursor.saturating_sub(half)),
-            HalfPageDown => self.set_cursor(self.cursor + half),
+            PageUp => self.set_cursor(self.tab.cursor.saturating_sub(page)),
+            PageDown => self.set_cursor(self.tab.cursor + page),
+            HalfPageUp => self.set_cursor(self.tab.cursor.saturating_sub(half)),
+            HalfPageDown => self.set_cursor(self.tab.cursor + half),
             GoHome => {
                 let home = self.svc.home.clone();
                 self.open_dir(home);
@@ -437,16 +437,16 @@ impl App {
 
             ToggleMark => self.toggle_mark(),
             SelectAll => self.mark_all(),
-            SelectUp => self.extend_selection(self.cursor.saturating_sub(line)),
-            SelectDown => self.extend_selection(self.cursor + line),
+            SelectUp => self.extend_selection(self.tab.cursor.saturating_sub(line)),
+            SelectDown => self.extend_selection(self.tab.cursor + line),
             SelectToFirst => self.extend_selection(0),
             SelectToLast => self.extend_selection(usize::MAX),
             ClearSelection => {
                 if self.ops.cancel() {
                     self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
-                } else if !self.marked.is_empty() {
+                } else if !self.tab.marked.is_empty() {
                     self.clear_marks();
-                } else if self.filter.is_some() {
+                } else if self.tab.filter.is_some() {
                     self.set_filter(None);
                 } else if self.frame.size_notice_visible {
                     // Nothing else for Esc to do: it closes the advice about the window size,
@@ -488,10 +488,10 @@ impl App {
 
             Filter => self.start_bar(true),
             Palette => self.start_bar(false),
-            Sort => self.set_sort(self.sort.with_key(self.sort.key.next())),
+            Sort => self.set_sort(self.tab.sort.with_key(self.tab.sort.key.next())),
             SortReverse => self.set_sort(SortSpec {
-                reverse: !self.sort.reverse,
-                ..self.sort
+                reverse: !self.tab.sort.reverse,
+                ..self.tab.sort
             }),
             ToggleHidden => {
                 let keep = self.cursor_name();
@@ -531,7 +531,7 @@ impl App {
             ViewIcons => self.set_view(ViewMode::Icons),
             ViewColumns => self.set_view(ViewMode::Columns),
             ToggleTags => self.toggle_tags_column(),
-            ToggleView => self.set_view(self.view.other()),
+            ToggleView => self.set_view(self.tab.view.other()),
             Properties => self.open_properties(),
             OpenWith => self.start_open_with(),
             CopyPath => self.copy_path(),
@@ -559,16 +559,16 @@ impl App {
     /// Read the folder again.
     pub fn refresh(&mut self) {
         let generation = self.tabs.next_generation();
-        self.load = LoadState::Loading(self.cwd.clone());
-        self.svc.loader.load(self.cwd.clone(), generation);
+        self.tab.load = LoadState::Loading(self.tab.cwd.clone());
+        self.svc.loader.load(self.tab.cwd.clone(), generation);
         self.redraw.dirty = true;
     }
 
     pub fn set_view(&mut self, mode: ViewMode) {
-        if self.view == mode {
+        if self.tab.view == mode {
             return;
         }
-        self.view = mode;
+        self.tab.view = mode;
         self.ensure_visible();
         self.save_ui_state();
         self.redraw.dirty = true;
@@ -613,9 +613,9 @@ impl App {
 
     /// The renderer tells how many tiles fit across and down in the Icons view.
     pub fn set_grid(&mut self, cols: usize, rows: usize) {
-        self.viewport.grid_cols = cols;
-        self.viewport.grid_rows = rows;
-        if self.view == ViewMode::Icons {
+        self.tab.viewport.grid_cols = cols;
+        self.tab.viewport.grid_rows = rows;
+        if self.tab.view == ViewMode::Icons {
             self.ensure_visible();
         }
     }
@@ -658,7 +658,7 @@ impl App {
     }
 
     fn open_terminal_here(&mut self) {
-        let dir = match &self.archive {
+        let dir = match &self.tab.archive {
             Some(a) => a.archive.parent().map(Path::to_path_buf),
             None if self.tag_view().is_some() => {
                 // Where the item under the cursor is.
@@ -672,7 +672,7 @@ impl App {
                     ),
                 )
             }
-            None => Some(self.cwd.clone()),
+            None => Some(self.tab.cwd.clone()),
         };
         let Some(dir) = dir else { return };
         let platform = self.svc.platform.clone();
@@ -693,7 +693,7 @@ impl App {
         let at = self
             .frame
             .hits
-            .find(&Target::Row(self.cursor))
+            .find(&Target::Row(self.tab.cursor))
             .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
             .unwrap_or((8, 6));
         let on_item = self.current().is_some();
@@ -721,18 +721,19 @@ impl App {
     /// Set (or clear) the folder filter and keep the cursor where it makes sense.
     pub(super) fn set_filter(&mut self, f: Option<FilterState>) {
         let keep = self.cursor_name();
-        self.filter = f;
+        self.tab.filter = f;
         self.rebuild_visible();
         let found = keep.as_ref().is_some_and(|n| {
-            self.visible
+            self.tab
+                .visible
                 .iter()
-                .any(|&i| &self.listing.all()[i].name == n)
+                .any(|&i| &self.tab.listing.all()[i].name == n)
         });
         if found {
             self.restore_cursor(keep);
         } else {
-            self.cursor = 0;
-            self.scroll = 0;
+            self.tab.cursor = 0;
+            self.tab.scroll = 0;
         }
         self.ensure_visible();
         self.request_preview();
@@ -741,7 +742,7 @@ impl App {
     fn on_filter_key(&mut self, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
-        let Some(mut f) = self.filter.take() else {
+        let Some(mut f) = self.tab.filter.take() else {
             return;
         };
         match key.code {
@@ -751,7 +752,7 @@ impl App {
                 if f.text.is_empty() {
                     return self.set_filter(None);
                 }
-                self.filter = Some(f);
+                self.tab.filter = Some(f);
                 return;
             }
             KeyCode::Backspace => {
@@ -761,11 +762,11 @@ impl App {
             }
             KeyCode::Char('u') if ctrl => f.text.clear(),
             KeyCode::Down => {
-                self.filter = Some(f);
+                self.tab.filter = Some(f);
                 return self.dispatch(Action::Down);
             }
             KeyCode::Up => {
-                self.filter = Some(f);
+                self.tab.filter = Some(f);
                 return self.dispatch(Action::Up);
             }
             KeyCode::Char(c) if !ctrl && !alt => f.text.push(c),
@@ -779,24 +780,24 @@ impl App {
     /// Shift+arrows and Shift+click: select everything between where the selection
     /// started and `to`, on top of what was already selected before it started.
     pub(super) fn extend_selection(&mut self, to: usize) {
-        if self.visible.is_empty() {
+        if self.tab.visible.is_empty() {
             return;
         }
-        if self.sel_anchor.is_none() {
-            self.sel_anchor = Some((self.cursor, self.marked.clone()));
+        if self.tab.sel_anchor.is_none() {
+            self.tab.sel_anchor = Some((self.tab.cursor, self.tab.marked.clone()));
         }
         self.set_cursor(to);
-        let Some((anchor, base)) = self.sel_anchor.clone() else {
+        let Some((anchor, base)) = self.tab.sel_anchor.clone() else {
             return;
         };
-        let (lo, hi) = (anchor.min(self.cursor), anchor.max(self.cursor));
+        let (lo, hi) = (anchor.min(self.tab.cursor), anchor.max(self.tab.cursor));
         let mut marked = base;
         for v in lo..=hi {
             if let Some(e) = self.entry_at(v) {
                 marked.insert(e.name.clone());
             }
         }
-        self.marked = marked;
+        self.tab.marked = marked;
     }
 
     // ------------------------------------------------------------------ mouse
@@ -913,17 +914,17 @@ impl App {
             }
             return;
         }
-        self.sel_anchor = None;
+        self.tab.sel_anchor = None;
         // A turn of the wheel is three rows of the list, or one row of tiles.
-        let step = if self.view == ViewMode::Icons {
-            self.viewport.grid_cols.max(1)
+        let step = if self.tab.view == ViewMode::Icons {
+            self.tab.viewport.grid_cols.max(1)
         } else {
             WHEEL_STEP
         };
         let to = if down {
-            self.cursor + step
+            self.tab.cursor + step
         } else {
-            self.cursor.saturating_sub(step)
+            self.tab.cursor.saturating_sub(step)
         };
         self.set_cursor(to);
     }
@@ -958,15 +959,15 @@ impl App {
             }
             Some(Target::Crumb(path)) => self.open_dir(path),
             Some(Target::Check(i)) => {
-                if i < self.visible.len() {
+                if i < self.tab.visible.len() {
                     self.side_nav.focus = false;
                     self.set_cursor(i);
                     if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
-                        && !self.marked.remove(&name)
+                        && !self.tab.marked.remove(&name)
                     {
-                        self.marked.insert(name);
+                        self.tab.marked.insert(name);
                     }
-                    self.sel_anchor = Some((i, self.marked.clone()));
+                    self.tab.sel_anchor = Some((i, self.tab.marked.clone()));
                 }
             }
             Some(Target::Tab(i)) => self.switch_tab(i),
@@ -1007,13 +1008,13 @@ impl App {
             }
             Some(Target::Act(a)) => self.dispatch(a),
             Some(Target::SortBy(key)) => {
-                let spec = if self.sort.key == key {
+                let spec = if self.tab.sort.key == key {
                     SortSpec {
-                        reverse: !self.sort.reverse,
-                        ..self.sort
+                        reverse: !self.tab.sort.reverse,
+                        ..self.tab.sort
                     }
                 } else {
-                    self.sort.with_key(key)
+                    self.tab.sort.with_key(key)
                 };
                 self.set_sort(spec);
             }
@@ -1023,7 +1024,7 @@ impl App {
     }
 
     fn click_row(&mut self, i: usize, mods: KeyModifiers) {
-        if i >= self.visible.len() {
+        if i >= self.tab.visible.len() {
             return;
         }
         let double = matches!(self.last_click, Some((t, r)) if r == i && t.elapsed() < self.settings.double_click);
@@ -1032,11 +1033,11 @@ impl App {
             // Ctrl+click adds or removes one item and becomes the new anchor.
             self.set_cursor(i);
             if let Some(name) = self.entry_at(i).map(|e| e.name.clone())
-                && !self.marked.remove(&name)
+                && !self.tab.marked.remove(&name)
             {
-                self.marked.insert(name);
+                self.tab.marked.insert(name);
             }
-            self.sel_anchor = Some((i, self.marked.clone()));
+            self.tab.sel_anchor = Some((i, self.tab.marked.clone()));
         } else if mods.contains(KeyModifiers::SHIFT) {
             self.extend_selection(i);
         } else if double {
@@ -1046,7 +1047,7 @@ impl App {
         } else {
             self.clear_marks();
             self.set_cursor(i);
-            self.sel_anchor = Some((i, BTreeSet::new()));
+            self.tab.sel_anchor = Some((i, BTreeSet::new()));
         }
     }
 
@@ -1126,10 +1127,10 @@ impl App {
             return;
         }
         let on_item = match target {
-            Some(Target::Row(i) | Target::Check(i)) if i < self.visible.len() => {
+            Some(Target::Row(i) | Target::Check(i)) if i < self.tab.visible.len() => {
                 let already = self
                     .entry_at(i)
-                    .is_some_and(|e| self.marked.contains(&e.name));
+                    .is_some_and(|e| self.tab.marked.contains(&e.name));
                 if !already {
                     self.clear_marks();
                 }

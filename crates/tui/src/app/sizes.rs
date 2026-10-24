@@ -84,11 +84,11 @@ impl App {
 
     /// The folder in front changed: what was being counted for the old one is dropped.
     fn follow_folder_for_sizes(&mut self) {
-        if self.folder_info.sizes.dir == self.cwd {
+        if self.folder_info.sizes.dir == self.tab.cwd {
             return;
         }
         let s = &mut self.folder_info.sizes;
-        s.dir = self.cwd.clone();
+        s.dir = self.tab.cwd.clone();
         s.epoch += 1;
         s.wanted.clear();
         s.asked.clear();
@@ -101,7 +101,7 @@ impl App {
     /// Called while drawing: it only notes what is wanted and sends it to the worker.
     pub fn want_folder_sizes(&mut self, indices: impl Iterator<Item = usize>) {
         if self.folder_size_mode() == SizeMode::Off
-            || self.archive.is_some()
+            || self.tab.archive.is_some()
             || self.tag_view().is_some()
         {
             return;
@@ -110,7 +110,7 @@ impl App {
         let now = Instant::now();
         let mut wanted = Vec::new();
         for i in indices {
-            let Some(e) = self.listing.all().get(i) else {
+            let Some(e) = self.tab.listing.all().get(i) else {
                 continue;
             };
             if e.kind != FileKind::Dir {
@@ -181,7 +181,7 @@ impl App {
 
     /// The folder under the cursor, as an index into the listing.
     pub fn current_index(&self) -> Option<usize> {
-        self.visible.get(self.cursor).copied()
+        self.tab.visible.get(self.tab.cursor).copied()
     }
 
     /// "12 items · 4.8 MB" for the details pane, once the folder has been counted; while it
@@ -222,6 +222,7 @@ impl App {
         let cache = &self.folder_info.sizes.cache;
         let keep = self.cursor_name();
         let moved = self
+            .tab
             .listing
             .set_folder_sizes(|e| match cache.last(&e.path) {
                 Some(SizeOutcome::Counted(FolderSize { bytes: Some(b), .. })) => Some(b),

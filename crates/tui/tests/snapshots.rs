@@ -173,7 +173,9 @@ fn plan_window_names_the_folders_once() {
     h.press("space");
     h.press("ctrl+c");
     h.app.open_dir(home.join("demo/backup"));
-    h.wait("backup", |a| a.cwd.ends_with("backup") && !a.is_loading());
+    h.wait("backup", |a| {
+        a.tab.cwd.ends_with("backup") && !a.is_loading()
+    });
     h.press("ctrl+v");
     plan_modal(&mut h);
     h.app.hooks.clock = Some(fixed_now());
@@ -249,7 +251,7 @@ fn help_lists_both_schemes() {
 fn context_menu() {
     let mut h = scene(110, 30);
     on(&mut h, "main.rs");
-    let row = rada_tui::hits::Target::Row(h.app.cursor);
+    let row = rada_tui::hits::Target::Row(h.app.tab.cursor);
     h.right_click(&row);
     insta::assert_snapshot!("menu_110x30", shot(&mut h));
 }

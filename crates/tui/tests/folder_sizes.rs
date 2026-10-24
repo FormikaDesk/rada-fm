@@ -26,7 +26,7 @@ fn scene(w: u16, h: u16) -> H {
     sb.write("d/f", "x");
     let dir = sb.path("d");
     let mut h = H::new(sb, dir, w, h);
-    h.wait("the listing", |a| a.listing.len() == 3);
+    h.wait("the listing", |a| a.tab.listing.len() == 3);
     h.app.settings.details = Some(false); // the pane would cover the right of the list
     h
 }
@@ -41,7 +41,7 @@ fn row_of(h: &mut H, name: &str) -> String {
 
 fn counted(h: &mut H) {
     h.wait("the sizes", |a| {
-        a.listing.all().iter().filter(|e| e.is_dir()).all(|e| {
+        a.tab.listing.all().iter().filter(|e| e.is_dir()).all(|e| {
             !matches!(
                 a.folder_size_view(e),
                 rada_tui::app::FolderSizeView::Counting
@@ -130,7 +130,7 @@ fn ordering_by_size_uses_the_counted_size_of_folders() {
     // The list is sorted again when the sizes have been heard, a moment after they are read:
     // wait for that, not for a fixed time.
     h.wait("the order", |a| {
-        let names: Vec<String> = (0..a.visible.len())
+        let names: Vec<String> = (0..a.tab.visible.len())
             .filter_map(|i| a.entry_at(i))
             .map(|e| e.display.clone())
             .collect();
@@ -177,12 +177,12 @@ fn leaving_a_folder_drops_what_was_being_counted_and_the_next_is_counted() {
     let mut h = H::new(sb, dir, 120, 30);
     h.app.settings.details = Some(false);
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
-    h.wait("the listing", |a| a.listing.len() == 1);
+    h.wait("the listing", |a| a.tab.listing.len() == 1);
     let _ = h.screen();
     // Away before the answer is read.
     h.app.open_dir(other);
     h.wait("the other folder", |a| {
-        a.listing.all().iter().any(|e| e.display == "two")
+        a.tab.listing.all().iter().any(|e| e.display == "two")
     });
     counted(&mut h);
     let row = row_of(&mut h, "two");
@@ -194,7 +194,7 @@ fn a_folder_that_appears_is_counted_and_one_that_changes_is_counted_again() {
     let mut h = scene(120, 30);
     h.app.set_folder_size_settings(settings(SizeMode::Auto));
     counted(&mut h);
-    let dir = h.app.cwd.clone();
+    let dir = h.app.tab.cwd.clone();
     // A new folder arrives through the watcher.
     h.wait_making(
         "the new folder",
@@ -202,7 +202,7 @@ fn a_folder_that_appears_is_counted_and_one_that_changes_is_counted_again() {
             std::fs::create_dir_all(dir.join("fresh")).unwrap();
             std::fs::write(dir.join("fresh/n"), vec![0u8; 4000]).unwrap();
         },
-        |a| a.listing.all().iter().any(|e| e.display == "fresh"),
+        |a| a.tab.listing.all().iter().any(|e| e.display == "fresh"),
     );
     counted(&mut h);
     let row = row_of(&mut h, "fresh");
@@ -212,7 +212,7 @@ fn a_folder_that_appears_is_counted_and_one_that_changes_is_counted_again() {
     std::fs::create_dir_all(dir.join("small")).unwrap();
     std::fs::write(dir.join("small/a"), vec![0u8; 9000]).unwrap();
     h.wait("the new figure", |a| {
-        a.listing.all().iter().any(|e| {
+        a.tab.listing.all().iter().any(|e| {
             e.display == "small"
                 && matches!(
                     a.folder_size_view(e),

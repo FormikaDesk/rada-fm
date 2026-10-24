@@ -71,18 +71,18 @@ fn nav_is_driven_from_the_keyboard() {
     assert!(h.app.side_nav.focus);
     let rows = h.app.nav_rows();
     assert_eq!(
-        rows[h.app.side_nav.nav_cursor].path, h.app.cwd,
+        rows[h.app.side_nav.nav_cursor].path, h.app.tab.cwd,
         "starts on the folder shown"
     );
     // Up to Home's children, and Enter opens the one under the cursor.
     h.press("up");
     h.press("up");
     let target = h.app.nav_rows()[h.app.side_nav.nav_cursor].path.clone();
-    assert_ne!(target, h.app.cwd);
+    assert_ne!(target, h.app.tab.cwd);
     h.press("enter");
     h.wait("the folder", {
         let t = target.clone();
-        move |a| a.cwd == t && !a.is_loading()
+        move |a| a.tab.cwd == t && !a.is_loading()
     });
     assert!(
         !h.app.side_nav.focus,

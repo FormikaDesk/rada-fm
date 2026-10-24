@@ -388,6 +388,7 @@ impl H {
 
     pub fn marked_names(&self) -> Vec<String> {
         self.app
+            .tab
             .marked
             .iter()
             .map(|n| n.to_string_lossy().into_owned())
@@ -405,9 +406,9 @@ impl H {
     /// at most once per entry: an empty list would never get there.
     pub fn cursor_to(&mut self, name: &str) {
         self.wait(&format!("{name} in the folder"), |a| {
-            (0..a.visible.len()).any(|i| a.entry_at(i).is_some_and(|e| e.display == name))
+            (0..a.tab.visible.len()).any(|i| a.entry_at(i).is_some_and(|e| e.display == name))
         });
-        for _ in 0..self.app.visible.len() {
+        for _ in 0..self.app.tab.visible.len() {
             if self.cursor_name() == name {
                 return;
             }
@@ -456,7 +457,7 @@ impl H {
     }
 
     pub fn names(&self) -> Vec<String> {
-        (0..self.app.visible.len())
+        (0..self.app.tab.visible.len())
             .filter_map(|i| self.app.entry_at(i))
             .map(|e| e.display.clone())
             .collect()
@@ -564,8 +565,8 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     h.app.settings.details = None;
     h.app.settings.tz = jiff::tz::TimeZone::UTC;
     // Creation times are the real ones of the sandbox: leave them out of the screenshots.
-    let entries: Vec<rada_core::model::Entry> = h.app.listing.all().to_vec();
-    h.app.listing.apply(
+    let entries: Vec<rada_core::model::Entry> = h.app.tab.listing.all().to_vec();
+    h.app.tab.listing.apply(
         entries
             .into_iter()
             .map(|mut e| {
@@ -579,6 +580,7 @@ pub fn demo_scene(w: u16, h: u16) -> H {
         let gb = 1_000_000_000u64;
         let system_root = h
             .app
+            .tab
             .cwd
             .ancestors()
             .last()

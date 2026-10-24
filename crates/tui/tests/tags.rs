@@ -31,6 +31,7 @@ fn scene(tags: &[(&str, &[&str])]) -> Option<(Sandbox, std::path::PathBuf)> {
 
 fn tags_of(h: &H, name: &str) -> Vec<String> {
     h.app
+        .tab
         .listing
         .all()
         .iter()
@@ -41,7 +42,7 @@ fn tags_of(h: &H, name: &str) -> Vec<String> {
 
 /// Walk the context menu to Tags and choose `label` in it.
 fn choose_tag(h: &mut H, label: &str) {
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right),
         x,
@@ -272,7 +273,7 @@ fn the_menu_ticks_what_the_item_has_and_offers_to_take_it_all_off() {
     };
     let mut h = H::new(sb, dir, 140, 36);
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right),
         x,
@@ -353,7 +354,7 @@ fn a_system_without_tags_has_no_tags_menu() {
         |_| {},
     );
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right),
         x,
@@ -379,7 +380,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
         h.app.current().unwrap().tags[0].color,
         Some(rada_core::platform::TagColor::Red)
     );
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Right),
         x,

@@ -17,7 +17,7 @@ fn no_date_shows_a_dash_not_1970() {
     set_mtime(&nodate, SystemTime::UNIX_EPOCH);
     let dir = sb.path("d");
     let mut h = H::new(sb, dir, 150, 34);
-    h.wait("the files", |a| a.listing.all().len() == 2);
+    h.wait("the files", |a| a.tab.listing.all().len() == 2);
     let screen = h.screen();
     assert!(!screen.contains("1970"), "{screen}");
     let row = |name: &str| {

@@ -116,7 +116,9 @@ fn in_a_place_there_is_no_way_and_the_place_is_the_highlighted_row() {
         h.app.devices.volumes[0].mount_point.clone(),
     ] {
         go_and_wait(&mut h, &place);
-        h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+        h.wait("the subfolders", |a| {
+            a.side_nav.tree.kids(&a.tab.cwd).is_some()
+        });
         h.settle();
         let rows = h.app.nav_rows();
         assert!(
@@ -149,7 +151,9 @@ fn the_trash_is_the_last_row_of_nav_in_every_view() {
     ] {
         h.term.backend_mut().resize(w, hh);
         go_and_wait(&mut h, &dir);
-        h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+        h.wait("the subfolders", |a| {
+            a.side_nav.tree.kids(&a.tab.cwd).is_some()
+        });
         h.settle();
         // The places are read again now and then: the demo's trash with them.
         with_trash(&mut h);
@@ -168,7 +172,7 @@ fn the_trash_is_the_last_row_of_nav_in_every_view() {
     if h.app.tags_supported() {
         let view = rada_core::tagsearch::view_path("Red");
         h.app.open_dir(view.clone());
-        h.wait("the view", |a| a.cwd == view);
+        h.wait("the view", |a| a.tab.cwd == view);
         h.settle();
         with_trash(&mut h);
         let text = nav_text(&mut h);
@@ -188,7 +192,7 @@ fn in_the_trash_folder_only_the_trash_is_the_current_place() {
     // (The places are read again now and then: the demo's trash with them.)
     with_trash(&mut h);
     let items = h.app.side_items();
-    let at = rada_tui::sidebar::current_index(&items, &h.app.cwd).expect("a current place");
+    let at = rada_tui::sidebar::current_index(&items, &h.app.tab.cwd).expect("a current place");
     assert_eq!(items[at].name, "Trash", "{:?}", items[at]);
     let _ = h.screen();
     let (t, d) = (row_bg(&mut h, "Trash", 4), row_bg(&mut h, "Downloads", 4));

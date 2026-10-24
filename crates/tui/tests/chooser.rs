@@ -35,7 +35,7 @@ fn enter_on_a_file_chooses_it_and_quits() {
 fn enter_on_a_folder_goes_in_and_chooses_nothing() {
     let (mut h, dir, _) = chooser_at(Chooser::file(false));
     h.key(KeyCode::Enter);
-    h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("in sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     assert!(h.app.session.chosen.is_none() && !h.app.session.should_quit);
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
@@ -62,7 +62,7 @@ fn a_double_click_chooses_a_file_and_enters_a_folder() {
     assert!(h.opened().is_empty());
     let (mut h, _, _) = chooser_at(Chooser::file(false));
     h.double_click(&Target::Row(0));
-    h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("in sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     assert!(h.app.session.chosen.is_none());
 }
 
@@ -121,7 +121,7 @@ fn alt_enter_chooses_the_folder_you_are_in() {
 fn a_folder_with_no_folders_in_it_is_chosen_by_enter() {
     let (mut h, dir, _) = chooser_at(Chooser::folder(false));
     h.key(KeyCode::Right); // into sub, which has no folders
-    h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("in sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     assert!(h.names().is_empty());
     h.key(KeyCode::Enter);
     assert_eq!(h.app.session.chosen, Some(vec![dir.join("sub")]));
@@ -132,7 +132,7 @@ fn a_double_click_on_a_folder_goes_in_when_a_folder_is_asked_for() {
     use rada_tui::hits::Target;
     let (mut h, _, _) = chooser_at(Chooser::folder(false));
     h.double_click(&Target::Row(0));
-    h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("in sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     assert!(h.app.session.chosen.is_none());
 }
 
@@ -168,7 +168,7 @@ fn saving_asks_for_a_name_with_the_suggested_one_filled_in() {
 fn saving_in_another_folder_and_under_another_name() {
     let (mut h, dir, _) = chooser_at(Chooser::save("report.pdf"));
     h.key(KeyCode::Enter); // into sub
-    h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("in sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
     alt_enter(&mut h);
     h.press("ctrl+u");
     h.keys("notes.md");
@@ -417,7 +417,7 @@ fn a_chooser_starts_with_the_newest_first_whatever_the_sort_setting() {
             "{key:?}"
         );
         assert_eq!(
-            (h.app.sort.key, h.app.sort.reverse),
+            (h.app.tab.sort.key, h.app.tab.sort.reverse),
             (SortKey::Modified, false)
         );
         // The first file is the one made last: Enter on it chooses it.
@@ -434,7 +434,7 @@ fn the_order_can_be_changed_while_choosing() {
     assert_eq!(h.names(), ["a-old.txt", "b-mid.txt", "c-new.txt"]);
     h.app.dispatch(Action::SortReverse);
     h.app.dispatch(Action::Sort); // the next key: type
-    assert_ne!(h.app.sort.key, rada_core::model::SortKey::Modified);
+    assert_ne!(h.app.tab.sort.key, rada_core::model::SortKey::Modified);
 }
 
 #[test]
@@ -447,7 +447,7 @@ fn without_a_chooser_the_sort_setting_is_left_alone() {
             ..SortSpec::default()
         }
     });
-    assert_eq!(h.app.sort.key, SortKey::Size);
+    assert_eq!(h.app.tab.sort.key, SortKey::Size);
 }
 
 #[test]

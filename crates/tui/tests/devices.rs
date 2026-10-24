@@ -119,11 +119,13 @@ fn an_open_phone_opens_like_a_folder_and_nothing_inside_is_counted() {
     let mut s = scene(None);
     let phone = s.phone.clone();
     s.h.click(&Target::Place(phone.clone()));
-    s.h.wait("the phone", move |a| a.cwd == phone && !a.is_loading());
+    s.h.wait("the phone", move |a| a.tab.cwd == phone && !a.is_loading());
     assert_eq!(s.h.names(), ["Internal storage"]);
     let storage = s.phone.join("Internal storage");
     s.h.app.open_dir(storage.clone());
-    s.h.wait("the storage", move |a| a.cwd == storage && !a.is_loading());
+    s.h.wait("the storage", move |a| {
+        a.tab.cwd == storage && !a.is_loading()
+    });
     assert_eq!(s.h.names(), ["DCIM"]);
     s.h.pump(300);
     let screen = s.h.screen();
@@ -299,12 +301,12 @@ fn eject_asks_first_and_needs_a_mount() {
 #[test]
 fn paste_to_phone_plan_shows_differences() {
     let mut s = scene(None);
-    s.h.wait("the file", |a| a.listing.all().len() == 1);
+    s.h.wait("the file", |a| a.tab.listing.all().len() == 1);
     s.h.press("ctrl+c");
     let storage = s.phone.join("Internal storage");
     let dest = storage.clone();
     s.h.app.open_dir(storage.clone());
-    s.h.wait("the storage", move |a| a.cwd == dest && !a.is_loading());
+    s.h.wait("the storage", move |a| a.tab.cwd == dest && !a.is_loading());
     s.h.press("ctrl+v");
     plan_modal(&mut s.h);
     let screen = s.h.screen();
@@ -437,7 +439,7 @@ Volume(0): motorola edge 40
         assert!(h.app.devices.pending().is_empty());
         // And it opens.
         h.click(&Target::Place(phone.clone()));
-        h.wait("the phone", move |a| a.cwd == phone && !a.is_loading());
+        h.wait("the phone", move |a| a.tab.cwd == phone && !a.is_loading());
         assert_eq!(h.names(), ["Internal shared storage"]);
     }
 }
@@ -448,7 +450,7 @@ fn phone_path_bar_names_the_device() {
     let storage = s.phone.join("Internal storage");
     s.h.app.open_dir(storage.clone());
     let dest = storage.clone();
-    s.h.wait("the storage", move |a| a.cwd == dest && !a.is_loading());
+    s.h.wait("the storage", move |a| a.tab.cwd == dest && !a.is_loading());
     let screen = s.h.screen();
     let bar = screen
         .lines()
@@ -465,19 +467,19 @@ fn phone_path_bar_names_the_device() {
     // The first crumb is the device itself: a click goes to it.
     s.h.click(&Target::Crumb(s.phone.clone()));
     let phone = s.phone.clone();
-    s.h.wait("the device", move |a| a.cwd == phone && !a.is_loading());
+    s.h.wait("the device", move |a| a.tab.cwd == phone && !a.is_loading());
     // The bar of the folder holding the phones is the plain one.
     s.h.app.open_dir(s.phone.parent().unwrap().to_path_buf());
     let root = s.phone.parent().unwrap().to_path_buf();
     s.h.wait("the folder of the devices", move |a| {
-        a.cwd == root && !a.is_loading()
+        a.tab.cwd == root && !a.is_loading()
     });
     assert!(s.h.app.device_head().is_none());
     // The details of an item still give the real folder.
     s.h.app.open_dir(storage.clone());
     let dest = storage.clone();
     s.h.wait("the storage again", move |a| {
-        a.cwd == dest && !a.is_loading()
+        a.tab.cwd == dest && !a.is_loading()
     });
     s.h.keys("j");
     s.h.wait("the details", |a| !a.preview.name.is_empty());

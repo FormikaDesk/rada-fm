@@ -285,7 +285,8 @@ impl App {
     /// word or a path.
     pub fn start_bar(&mut self, keep_filter: bool) {
         let text = if keep_filter {
-            self.filter
+            self.tab
+                .filter
                 .as_ref()
                 .map(|f| f.text.clone())
                 .unwrap_or_default()
@@ -298,7 +299,7 @@ impl App {
             self.svc.home.clone(),
         )));
         // A filter already on the folder is the bar's to take off.
-        edit.filtering = keep_filter && self.filter.is_some();
+        edit.filtering = keep_filter && self.tab.filter.is_some();
         self.windows.address = Some(edit);
         self.filter_editing_off();
         self.bar_changed();
@@ -306,11 +307,11 @@ impl App {
 
     /// The folder shown in the address bar: inside an archive, the archive's own path.
     fn address_base(&self) -> PathBuf {
-        self.cwd.clone()
+        self.tab.cwd.clone()
     }
 
     fn filter_editing_off(&mut self) {
-        if let Some(f) = &mut self.filter {
+        if let Some(f) = &mut self.tab.filter {
             f.editing = false;
         }
     }
@@ -365,7 +366,12 @@ impl App {
         let q = a.text.trim().to_string();
         let q_text = q.clone();
         // An entry of the folder with exactly that name is a path that exists.
-        let named_here = self.listing.all().iter().any(|e| e.name == q_text.as_str());
+        let named_here = self
+            .tab
+            .listing
+            .all()
+            .iter()
+            .any(|e| e.name == q_text.as_str());
         let mut commands: Vec<(i64, BarHit)> = Vec::new();
         for &action in Action::ALL
             .iter()
@@ -479,7 +485,7 @@ impl App {
         if a.text.trim().is_empty() {
             return self.cancel_address_edit();
         }
-        if !self.visible.is_empty() {
+        if !self.tab.visible.is_empty() {
             // The files that match stay: the bar is done, the filter stays on the folder.
             self.windows.address = None;
             return;
@@ -492,7 +498,7 @@ impl App {
 
     /// The text changed: ask for the subfolders of the folder it is in, if not asked yet.
     fn address_changed(&mut self) {
-        let (home, cwd) = (self.svc.home.clone(), self.cwd.clone());
+        let (home, cwd) = (self.svc.home.clone(), self.tab.cwd.clone());
         let Some(a) = &mut self.windows.address else {
             return;
         };
@@ -517,7 +523,7 @@ impl App {
     /// What is offered under the field right now.
     pub fn address_suggestions(&self) -> Vec<String> {
         match &self.windows.address {
-            Some(a) => a.suggestions(&self.cwd, &self.svc.home),
+            Some(a) => a.suggestions(&self.tab.cwd, &self.svc.home),
             None => Vec::new(),
         }
     }
@@ -650,8 +656,8 @@ impl App {
         if a.text.trim().is_empty() {
             return;
         }
-        let target = expand(&a.text, &self.cwd, &self.svc.home);
-        if target != self.cwd {
+        let target = expand(&a.text, &self.tab.cwd, &self.svc.home);
+        if target != self.tab.cwd {
             self.open_dir(target);
         }
     }

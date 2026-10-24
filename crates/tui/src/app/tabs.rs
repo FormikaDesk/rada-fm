@@ -24,6 +24,7 @@ pub const MAX_TABS: usize = 24;
 #[derive(Default)]
 pub struct TabState {
     pub cwd: PathBuf,
+    /// Set while looking inside an archive: the folder shown is a read-only virtual one.
     pub archive: Option<ArchiveView>,
     pub listing: DirListing,
     pub load: LoadState,
@@ -32,14 +33,19 @@ pub struct TabState {
     pub scroll: usize,
     pub marked: BTreeSet<OsString>,
     pub sort: SortSpec,
-    /// The order was chosen in this tab (see [`App::sort_chosen`]).
+    /// The order of this tab was chosen by the person (a click on a column title, the Sort
+    /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
+    /// `config.toml` at every start.
     pub sort_chosen: bool,
-    pub remembered: HashMap<PathBuf, OsString>,
+    pub(super) remembered: HashMap<PathBuf, OsString>,
+    /// Folders visited, for back and forward.
     pub nav: crate::nav::NavHistory,
-    pub nav_move: Option<NavMove>,
+    pub(super) nav_move: Option<NavMove>,
     pub filter: Option<FilterState>,
-    pub sel_anchor: Option<(usize, BTreeSet<OsString>)>,
+    pub(super) sel_anchor: Option<(usize, BTreeSet<OsString>)>,
+    /// How the folder is shown.
     pub view: ViewMode,
+    /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
 }
 
@@ -178,56 +184,56 @@ impl App {
     /// Move the front tab's state out of the fields, leaving them empty.
     fn put_away(&mut self) -> TabState {
         TabState {
-            cwd: std::mem::take(&mut self.cwd),
-            archive: self.archive.take(),
-            listing: std::mem::take(&mut self.listing),
+            cwd: std::mem::take(&mut self.tab.cwd),
+            archive: self.tab.archive.take(),
+            listing: std::mem::take(&mut self.tab.listing),
             // A navigation that was still on its way is given up with the tab.
             load: LoadState::Ready,
-            visible: std::mem::take(&mut self.visible),
-            cursor: std::mem::take(&mut self.cursor),
-            scroll: std::mem::take(&mut self.scroll),
-            marked: std::mem::take(&mut self.marked),
-            sort: self.sort,
-            sort_chosen: self.sort_chosen,
-            remembered: std::mem::take(&mut self.remembered),
-            nav: std::mem::take(&mut self.nav),
+            visible: std::mem::take(&mut self.tab.visible),
+            cursor: std::mem::take(&mut self.tab.cursor),
+            scroll: std::mem::take(&mut self.tab.scroll),
+            marked: std::mem::take(&mut self.tab.marked),
+            sort: self.tab.sort,
+            sort_chosen: self.tab.sort_chosen,
+            remembered: std::mem::take(&mut self.tab.remembered),
+            nav: std::mem::take(&mut self.tab.nav),
             nav_move: None,
-            filter: self.filter.take(),
-            sel_anchor: self.sel_anchor.take(),
-            view: self.view,
-            viewport: self.viewport,
+            filter: self.tab.filter.take(),
+            sel_anchor: self.tab.sel_anchor.take(),
+            view: self.tab.view,
+            viewport: self.tab.viewport,
         }
     }
 
     /// Make `t` the front tab.
     fn bring_in(&mut self, t: TabState) {
-        self.cwd = t.cwd;
-        self.archive = t.archive;
-        self.listing = t.listing;
-        self.load = t.load;
-        self.visible = t.visible;
-        self.cursor = t.cursor;
-        self.scroll = t.scroll;
-        self.marked = t.marked;
-        self.sort = t.sort;
-        self.sort_chosen = t.sort_chosen;
-        self.remembered = t.remembered;
-        self.nav = t.nav;
-        self.nav_move = t.nav_move;
-        self.filter = t.filter;
-        self.sel_anchor = t.sel_anchor;
-        self.view = t.view;
-        self.viewport = t.viewport;
+        self.tab.cwd = t.cwd;
+        self.tab.archive = t.archive;
+        self.tab.listing = t.listing;
+        self.tab.load = t.load;
+        self.tab.visible = t.visible;
+        self.tab.cursor = t.cursor;
+        self.tab.scroll = t.scroll;
+        self.tab.marked = t.marked;
+        self.tab.sort = t.sort;
+        self.tab.sort_chosen = t.sort_chosen;
+        self.tab.remembered = t.remembered;
+        self.tab.nav = t.nav;
+        self.tab.nav_move = t.nav_move;
+        self.tab.filter = t.filter;
+        self.tab.sel_anchor = t.sel_anchor;
+        self.tab.view = t.view;
+        self.tab.viewport = t.viewport;
     }
 
     /// Read the front tab's folder again, keeping the cursor and the selection.
     fn after_switch(&mut self) {
-        let cwd = self.cwd.clone();
+        let cwd = self.tab.cwd.clone();
         self.windows.address = None;
         let generation = self.tabs.next_generation();
-        self.load = LoadState::Loading(cwd.clone());
+        self.tab.load = LoadState::Loading(cwd.clone());
         self.svc.loader.load(cwd.clone(), generation);
-        if self.archive.is_none() && self.tag_view().is_none() {
+        if self.tab.archive.is_none() && self.tag_view().is_none() {
             self.svc.watcher.watch(cwd);
         }
         self.preview.invalidate();
@@ -241,13 +247,13 @@ impl App {
     /// The folder of tab `i`.
     pub fn tab_cwd(&self, i: usize) -> &Path {
         if i == self.tabs.active {
-            &self.cwd
+            &self.tab.cwd
         } else {
             self.tabs
                 .slots
                 .get(i)
                 .map(|t| t.cwd.as_path())
-                .unwrap_or(&self.cwd)
+                .unwrap_or(&self.tab.cwd)
         }
     }
 
@@ -308,14 +314,14 @@ impl App {
             return;
         }
         if let Some(name) = self.cursor_name() {
-            self.remembered.insert(self.cwd.clone(), name);
+            self.tab.remembered.insert(self.tab.cwd.clone(), name);
         }
         let (cwd, view, sort, chosen, remembered) = (
-            self.cwd.clone(),
-            self.view,
-            self.sort,
-            self.sort_chosen,
-            self.remembered.clone(),
+            self.tab.cwd.clone(),
+            self.tab.view,
+            self.tab.sort,
+            self.tab.sort_chosen,
+            self.tab.remembered.clone(),
         );
         let out = self.put_away();
         self.tabs.slots[self.tabs.active] = out;
@@ -336,7 +342,7 @@ impl App {
         }
         if self.tabs.count() == 1 {
             let home = self.svc.home.clone();
-            if self.cwd != home || self.archive.is_some() {
+            if self.tab.cwd != home || self.tab.archive.is_some() {
                 self.open_dir(home);
             }
             return;
@@ -369,11 +375,11 @@ impl App {
             .map(|i| {
                 let (cwd, archive, view, sort, chosen) = if i == self.tabs.active {
                     (
-                        &self.cwd,
-                        &self.archive,
-                        self.view,
-                        self.sort,
-                        self.sort_chosen,
+                        &self.tab.cwd,
+                        &self.tab.archive,
+                        self.tab.view,
+                        self.tab.sort,
+                        self.tab.sort_chosen,
                     )
                 } else {
                     let t = &self.tabs.slots[i];

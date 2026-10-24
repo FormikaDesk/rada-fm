@@ -16,7 +16,7 @@ pub struct PropsView {
 
 impl App {
     pub fn open_properties(&mut self) {
-        let view = if self.marked.len() > 1 {
+        let view = if self.tab.marked.len() > 1 {
             self.selection_properties()
         } else {
             let Some(e) = self.current() else { return };
@@ -27,10 +27,11 @@ impl App {
 
     fn selection_properties(&self) -> PropsView {
         let chosen: Vec<&Entry> = self
+            .tab
             .listing
             .all()
             .iter()
-            .filter(|e| self.marked.contains(&e.name))
+            .filter(|e| self.tab.marked.contains(&e.name))
             .collect();
         let size: u64 = chosen.iter().filter(|e| !e.is_dir()).map(|e| e.size).sum();
         let folders = chosen.iter().filter(|e| e.is_dir()).count();
@@ -57,11 +58,11 @@ impl App {
                 Key::PropLocation.tr().to_string(),
                 match self.view_title() {
                     Some(title) => title,
-                    None => fmt::short_path(&self.cwd, self.home()),
+                    None => fmt::short_path(&self.tab.cwd, self.home()),
                 },
             ),
         ];
-        if self.archive.is_some() {
+        if self.tab.archive.is_some() {
             rows.push((
                 Key::PropInside.tr().to_string(),
                 Key::PropInArchive.tr().to_string(),
@@ -94,7 +95,7 @@ impl App {
             ),
             (
                 Key::PropLocation.tr().into(),
-                fmt::short_path(e.path.parent().unwrap_or(&self.cwd), self.home()),
+                fmt::short_path(e.path.parent().unwrap_or(&self.tab.cwd), self.home()),
             ),
         ];
         if let Some(l) = &e.link {
@@ -141,7 +142,7 @@ impl App {
         if let Some(err) = &e.error {
             rows.push((Key::PropProblem.tr().into(), err.clone()));
         }
-        if self.archive.is_some() {
+        if self.tab.archive.is_some() {
             rows.push((Key::PropInside.tr().into(), Key::PropInArchive.tr().into()));
         }
         PropsView {

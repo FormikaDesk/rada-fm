@@ -277,7 +277,7 @@ impl App {
         if items.is_empty() {
             return;
         }
-        self.side_nav.side_cursor = sidebar::current_index(&items, &self.cwd).unwrap_or(0);
+        self.side_nav.side_cursor = sidebar::current_index(&items, &self.tab.cwd).unwrap_or(0);
         self.side_nav.focus = true;
     }
 

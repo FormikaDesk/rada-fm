@@ -213,7 +213,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let airy = is_airy(f);
     let title = match app.view_title() {
         Some(t) => t,
-        None => crate::fmt::short_path(&app.cwd, app.home()),
+        None => crate::fmt::short_path(&app.tab.cwd, app.home()),
     };
     let edge = bars::folder_edge(app);
     let inner = frame::draw(
@@ -240,15 +240,15 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     } else {
         padded
     };
-    match app.view {
+    match app.tab.view {
         ViewMode::Details => files::draw(f, app, list),
         ViewMode::Columns => columns::draw_columns(f, app, list),
         ViewMode::Icons => grid::draw_grid(f, app, list),
     }
     if notice_h > 0 {
-        let before = app.scroll;
+        let before = app.tab.scroll;
         app.ensure_visible();
-        if app.scroll != before {
+        if app.tab.scroll != before {
             app.redraw.dirty = true;
         }
     }
@@ -258,10 +258,10 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
 
 /// Whether the list has no room to spare for the cards: its rows reach into them.
 fn list_needs_room(app: &App, inner: Rect, cards_h: u16) -> bool {
-    match app.view {
+    match app.tab.view {
         ViewMode::Details => {
             // The titles, a blank row and the rows.
-            let rows = 2 + app.visible.len();
+            let rows = 2 + app.tab.visible.len();
             rows + cards_h as usize > inner.height as usize
         }
         _ => true,

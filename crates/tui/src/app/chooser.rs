@@ -39,7 +39,7 @@ impl App {
         match key.code {
             // Esc takes away what is in the way first (a filter), then it is "no thanks".
             KeyCode::Esc => {
-                if self.filter.is_some() {
+                if self.tab.filter.is_some() {
                     self.set_filter(None);
                 } else {
                     self.session.chosen = None;
@@ -76,16 +76,17 @@ impl App {
 
     /// The folder being shown, when it is a real one a choice can be about.
     fn chooser_here(&self) -> Option<PathBuf> {
-        (self.archive.is_none() && self.tag_view().is_none() && !self.recents_view())
-            .then(|| self.cwd.clone())
+        (self.tab.archive.is_none() && self.tag_view().is_none() && !self.recents_view())
+            .then(|| self.tab.cwd.clone())
     }
 
     /// The marked entries that satisfy `keep`, as paths.
     fn marked_paths(&self, keep: impl Fn(&Entry) -> bool) -> Vec<PathBuf> {
-        self.listing
+        self.tab
+            .listing
             .all()
             .iter()
-            .filter(|e| self.marked.contains(&e.name) && keep(e))
+            .filter(|e| self.tab.marked.contains(&e.name) && keep(e))
             .map(|e| e.path.clone())
             .collect()
     }
@@ -101,7 +102,7 @@ impl App {
             .map(|e| (e.path.clone(), e.is_dir(), e.is_navigable_dir()));
         match ch.kind {
             Kind::File => {
-                if by_key && ch.multiple && !self.marked.is_empty() {
+                if by_key && ch.multiple && !self.tab.marked.is_empty() {
                     let files = self.marked_paths(|e| !e.is_dir() && e.error.is_none());
                     if files.is_empty() {
                         self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
@@ -115,7 +116,7 @@ impl App {
                     Some((_, true, false)) => {}
                     Some((path, false, _)) => {
                         if self.current().is_some_and(|e| e.error.is_none())
-                            && self.archive.is_none()
+                            && self.tab.archive.is_none()
                         {
                             self.chooser_finish(vec![path]);
                         }
@@ -135,7 +136,7 @@ impl App {
                     }
                     return;
                 }
-                if ch.multiple && !here && !self.marked.is_empty() {
+                if ch.multiple && !here && !self.tab.marked.is_empty() {
                     let dirs = self.marked_paths(|e| e.is_dir());
                     self.chooser_finish(dirs);
                     return;
@@ -192,7 +193,7 @@ impl App {
                 .is_some_and(|c| c.kind == Kind::File)
         {
             self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
-            self.set_cursor(self.cursor + 1);
+            self.set_cursor(self.tab.cursor + 1);
             return false;
         }
         true

@@ -31,7 +31,7 @@ fn lists_sorted_hides_dotfiles_and_previews_the_selection() {
     h.wait("preview of b.txt", |a| a.preview.name == "b.txt");
     let s = h.screen();
     assert!(s.contains("second line"), "{s}");
-    assert_eq!(h.app.visible.len(), 3, "{s}");
+    assert_eq!(h.app.tab.visible.len(), 3, "{s}");
 }
 
 #[test]
@@ -57,10 +57,12 @@ fn navigating_into_a_folder_and_back_remembers_the_cursor() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir.clone(), 120, 30);
     h.key(KeyCode::Enter); // into sub
-    h.wait("sub loaded", |a| a.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("sub loaded", |a| {
+        a.tab.cwd.ends_with("sub") && !a.is_loading()
+    });
     assert_eq!(h.names(), ["inner.txt"]);
     h.keys("h");
-    h.wait("back", |a| a.cwd == dir && !a.is_loading());
+    h.wait("back", |a| a.tab.cwd == dir && !a.is_loading());
     assert_eq!(
         h.app.current().unwrap().display,
         "sub",
@@ -102,7 +104,7 @@ fn entering_an_unreadable_folder_shows_the_real_reason_and_stays_put() {
         flat.contains("permission denied") && flat.contains("locked"),
         "{s}"
     );
-    assert_eq!(h.app.cwd, dir);
+    assert_eq!(h.app.tab.cwd, dir);
 }
 
 #[test]
@@ -113,7 +115,7 @@ fn a_file_created_from_outside_appears_without_pressing_anything() {
         "live update",
         || std::fs::write(dir.join("ext_created.txt"), "hi").unwrap(),
         |a| {
-            (0..a.visible.len()).any(|i| {
+            (0..a.tab.visible.len()).any(|i| {
                 a.entry_at(i)
                     .is_some_and(|e| e.display == "ext_created.txt")
             })
@@ -129,7 +131,7 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     h.keys("j"); // a.txt
     h.keys("y");
     h.app.open_dir(dest.clone());
-    h.wait("destination", |a| a.cwd == dest && !a.is_loading());
+    h.wait("destination", |a| a.tab.cwd == dest && !a.is_loading());
     h.keys("p");
     plan_modal(&mut h);
     let s = h.screen();

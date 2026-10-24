@@ -93,7 +93,7 @@ fn properties(app: &App) -> Vec<(Key, String)> {
     }
     rows.push((
         Key::PropLocation,
-        fmt::short_path(e.path.parent().unwrap_or(&app.cwd), app.home()),
+        fmt::short_path(e.path.parent().unwrap_or(&app.tab.cwd), app.home()),
     ));
     if let Some(m) = e.mode {
         rows.push((Key::PropPermissions, rada_core::preview::mode_string(m)));
@@ -140,15 +140,16 @@ fn pane_inner(area: Rect) -> Option<Rect> {
 fn draw_marked_summary(f: &mut Frame, app: &App, inner: Rect) {
     let th = &app.settings.th;
     let size: u64 = app
+        .tab
         .listing
         .all()
         .iter()
-        .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
+        .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
         .map(|e| e.size)
         .sum();
     let lines = vec![
         Line::from(Span::styled(
-            fmt::selected_items(app.marked.len() as u64),
+            fmt::selected_items(app.tab.marked.len() as u64),
             th.base().add_modifier(Modifier::BOLD),
         )),
         Line::from(Span::styled(
@@ -200,7 +201,7 @@ fn draw_name_and_type(f: &mut Frame, app: &mut App, inner: Rect, e: &Entry) {
 
 /// What comes before the preview. The item it is about, when there is one to preview.
 fn draw_header(f: &mut Frame, app: &mut App, inner: Rect) -> Option<Entry> {
-    if app.marked.len() > 1 {
+    if app.tab.marked.len() > 1 {
         draw_marked_summary(f, app, inner);
         return None;
     }

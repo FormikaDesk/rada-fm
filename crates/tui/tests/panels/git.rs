@@ -43,7 +43,7 @@ fn git_scene() -> Option<H> {
         return None;
     }
     let mut h = scene(160, 46, "rada", false);
-    let dir = h.app.cwd.clone();
+    let dir = h.app.tab.cwd.clone();
     let home = h.app.home().to_path_buf();
     git(&dir, &home, &["init", "-q", "-b", "main"]);
     git(&dir, &home, &["add", "-A", "--", ".", ":!setup.sh"]);
@@ -107,7 +107,7 @@ fn leaving_the_repository_takes_the_branch_away() {
     let Some(mut h) = git_scene() else { return };
     let docs = h.app.home().join("Documents");
     h.app.open_dir(docs.clone());
-    h.wait("Documents", |a| a.cwd == docs && !a.is_loading());
+    h.wait("Documents", |a| a.tab.cwd == docs && !a.is_loading());
     // The answer for the new folder is that it is in no repository.
     h.wait("no git here", |a| a.folder_info.git.is_none());
     let s = h.screen();

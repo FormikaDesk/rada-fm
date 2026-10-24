@@ -31,7 +31,7 @@ impl App {
 
     pub(super) fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
         use Action::*;
-        let ro = self.archive.is_some();
+        let ro = self.tab.archive.is_some();
         // Nothing is made *in* a list of tagged items.
         let nowhere = ro || self.tag_view().is_some();
         match kind {
@@ -41,7 +41,7 @@ impl App {
             ],
             MenuKind::Sort => {
                 let key = |k: SortKey, label: &str, gap: bool| {
-                    MenuItem::choice(MenuCmd::SortBy(k), label, self.sort.key == k, gap)
+                    MenuItem::choice(MenuCmd::SortBy(k), label, self.tab.sort.key == k, gap)
                 };
                 vec![
                     key(SortKey::Name, Key::ColName.tr(), false),
@@ -51,13 +51,13 @@ impl App {
                     MenuItem::choice(
                         MenuCmd::SortOrder(false),
                         Key::Ascending.tr(),
-                        !self.sort.descending(),
+                        !self.tab.sort.descending(),
                         true,
                     ),
                     MenuItem::choice(
                         MenuCmd::SortOrder(true),
                         Key::Descending.tr(),
-                        self.sort.descending(),
+                        self.tab.sort.descending(),
                         false,
                     ),
                 ]
@@ -66,19 +66,19 @@ impl App {
                 MenuItem::choice(
                     MenuCmd::View(ViewMode::Details),
                     Key::ViewDetails.tr(),
-                    self.view == ViewMode::Details,
+                    self.tab.view == ViewMode::Details,
                     false,
                 ),
                 MenuItem::choice(
                     MenuCmd::View(ViewMode::Icons),
                     Key::ViewIcons.tr(),
-                    self.view == ViewMode::Icons,
+                    self.tab.view == ViewMode::Icons,
                     false,
                 ),
                 MenuItem::choice(
                     MenuCmd::View(ViewMode::Columns),
                     Key::ViewColumns.tr(),
-                    self.view == ViewMode::Columns,
+                    self.tab.view == ViewMode::Columns,
                     false,
                 ),
                 MenuItem::toggle(
@@ -152,8 +152,8 @@ impl App {
     pub(super) fn submenu_title(&self, kind: MenuKind) -> Option<MenuTitle> {
         match kind {
             MenuKind::Tags => {
-                let what = if self.marked.len() > 1 {
-                    crate::fmt::count(self.marked.len() as u64, Key::ItemOne, Key::ItemMany)
+                let what = if self.tab.marked.len() > 1 {
+                    crate::fmt::count(self.tab.marked.len() as u64, Key::ItemOne, Key::ItemMany)
                 } else {
                     self.current()
                         .map(|e| e.display.clone())
@@ -174,11 +174,11 @@ impl App {
     /// several items selected, how many.
     fn item_menu_title(&self) -> Option<MenuTitle> {
         let th = &self.settings.th;
-        if self.marked.len() > 1 {
+        if self.tab.marked.len() > 1 {
             return Some(MenuTitle {
                 icon: crate::icons::ui(self.settings.icons, crate::icons::Glyph::Checked),
                 icon_color: th.accent,
-                name: crate::fmt::count(self.marked.len() as u64, Key::ItemOne, Key::ItemMany),
+                name: crate::fmt::count(self.tab.marked.len() as u64, Key::ItemOne, Key::ItemMany),
                 kind: String::new(),
             });
         }
@@ -197,7 +197,7 @@ impl App {
         use Action::*;
         let has_clip = self.ops.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();
-        let ro = self.archive.is_some();
+        let ro = self.tab.archive.is_some();
         let nowhere = ro || self.tag_view().is_some();
         let on_archive = self.on_archive_item();
         if on_item {
@@ -295,13 +295,13 @@ impl App {
             MenuCmd::OpenWithList => self.dispatch(Action::OpenWith),
             MenuCmd::SortBy(key) => {
                 // Choosing the key that is already used leaves the order alone.
-                if key != self.sort.key {
-                    self.set_sort(self.sort.with_key(key));
+                if key != self.tab.sort.key {
+                    self.set_sort(self.tab.sort.with_key(key));
                 }
             }
             MenuCmd::SortOrder(descending) => {
-                if descending != self.sort.descending() {
-                    self.set_sort(self.sort.with_descending(descending));
+                if descending != self.tab.sort.descending() {
+                    self.set_sort(self.tab.sort.with_descending(descending));
                 }
             }
             MenuCmd::View(mode) => self.set_view(mode),
@@ -318,16 +318,17 @@ impl App {
 impl App {
     /// Whether this system keeps tags, and these items may have them.
     pub fn tags_available(&self) -> bool {
-        self.svc.platform.tags().is_some() && self.archive.is_none()
+        self.svc.platform.tags().is_some() && self.tab.archive.is_none()
     }
 
     /// The entries the tag menu is about: the selection, or the item under the cursor.
     fn tag_targets(&self) -> Vec<&Entry> {
-        if !self.marked.is_empty() {
-            self.listing
+        if !self.tab.marked.is_empty() {
+            self.tab
+                .listing
                 .all()
                 .iter()
-                .filter(|e| self.marked.contains(&e.name))
+                .filter(|e| self.tab.marked.contains(&e.name))
                 .collect()
         } else {
             self.current().into_iter().collect()

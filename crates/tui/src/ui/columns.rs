@@ -112,7 +112,7 @@ fn draw_parent(f: &mut Frame, app: &mut App, area: Rect) {
     let entries: Vec<(rada_core::model::Entry, bool)> = app
         .parent_entries()
         .into_iter()
-        .map(|e| (e.clone(), e.path == app.cwd))
+        .map(|e| (e.clone(), e.path == app.tab.cwd))
         .collect();
     let rows = area.height as usize;
     let here = entries
@@ -151,9 +151,9 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.settings.th.clone();
     let look = Look::of(app);
     let rows = area.height as usize;
-    app.viewport.rows = rows;
+    app.tab.viewport.rows = rows;
     app.frame.hits.add(area, Target::List);
-    let count = app.visible.len();
+    let count = app.tab.visible.len();
     if count == 0 {
         f.render_widget(
             Paragraph::new(Span::styled(rada_core::i18n::Key::ListEmpty.tr(), th.dim())),
@@ -165,33 +165,33 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
         );
         return;
     }
-    app.scroll = app.scroll.min(count.saturating_sub(1));
-    let last = (app.scroll + rows).min(count);
+    app.tab.scroll = app.tab.scroll.min(count.saturating_sub(1));
+    let last = (app.tab.scroll + rows).min(count);
     let mut lines: Vec<Line> = Vec::new();
-    for vis in app.scroll..last {
+    for vis in app.tab.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
-        let marked = app.marked.contains(&e.name);
-        let style = if vis == app.cursor {
+        let marked = app.tab.marked.contains(&e.name);
+        let style = if vis == app.tab.cursor {
             th.cursor_row()
         } else if marked {
             th.marked()
         } else {
             Style::default()
         };
-        let glyph_style = (vis == app.cursor).then(Style::default);
+        let glyph_style = (vis == app.tab.cursor).then(Style::default);
         lines.push(line_of(app, e, area.width as usize, style, glyph_style));
     }
     f.render_widget(Paragraph::new(lines), area);
-    for vis in app.scroll..last {
+    for vis in app.tab.scroll..last {
         let r = Rect {
-            y: area.y + (vis - app.scroll) as u16,
+            y: area.y + (vis - app.tab.scroll) as u16,
             height: 1,
             ..area
         };
         let marked = app
             .entry_at(vis)
-            .is_some_and(|e| app.marked.contains(&e.name));
-        if vis == app.cursor {
+            .is_some_and(|e| app.tab.marked.contains(&e.name));
+        if vis == app.tab.cursor {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);

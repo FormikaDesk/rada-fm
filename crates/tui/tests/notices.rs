@@ -34,7 +34,9 @@ fn copy_all_to(h: &mut H, dest: &std::path::Path) {
     h.press("ctrl+c");
     h.app.open_dir(dest.to_path_buf());
     let d = dest.to_path_buf();
-    h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
+    h.wait("the destination", move |a| {
+        a.tab.cwd == d && !a.is_loading()
+    });
     h.press("ctrl+v");
     confirm(h);
 }
@@ -84,7 +86,7 @@ fn the_card_goes_by_itself_after_about_six_seconds() {
 fn the_first_key_closes_it_and_still_does_its_job() {
     let (mut h, _dir, dest) = files();
     copy_all_to(&mut h, &dest);
-    h.wait("the copies are listed", |a| !a.visible.is_empty());
+    h.wait("the copies are listed", |a| !a.tab.visible.is_empty());
     // Typed at once, before the card has been seen: it stays.
     h.key(KeyCode::Down);
     assert!(
@@ -106,12 +108,14 @@ fn show_on_the_card_goes_to_the_result() {
     // Go elsewhere, then use the card: it brings us back to where the copies are.
     h.app.open_dir(dir.clone());
     let d = dir.clone();
-    h.wait("away", move |a| a.cwd == d && !a.is_loading());
+    h.wait("away", move |a| a.tab.cwd == d && !a.is_loading());
     let id = h.app.current_notice().unwrap().id;
     let _ = h.screen();
     h.click(&Target::Notice(id, NoticeHit::Show));
     let d = dest.clone();
-    h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
+    h.wait("the destination", move |a| {
+        a.tab.cwd == d && !a.is_loading()
+    });
     assert!(h.app.current_notice().is_none(), "a click closes the card");
 }
 

@@ -105,12 +105,13 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
         ),
         Target::Act(crate::keymap::Action::SelectAll),
     );
-    if !app.marked.is_empty() {
+    if !app.tab.marked.is_empty() {
         let size: u64 = app
+            .tab
             .listing
             .all()
             .iter()
-            .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
+            .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
         let tick = icons::ui(app.settings.icons, Glyph::Checked);
@@ -118,12 +119,12 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
         left.push(Span::styled(
             format!(
                 "{tick} {}",
-                if app.marked.len() == 1 {
+                if app.tab.marked.len() == 1 {
                     tf(Key::SelectedSizeOne, &[&fmt::size(size)])
                 } else {
                     tf(
                         Key::SelectedSizeMany,
-                        &[&app.marked.len(), &fmt::size(size)],
+                        &[&app.tab.marked.len(), &fmt::size(size)],
                     )
                 }
             ),

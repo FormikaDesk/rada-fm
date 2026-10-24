@@ -80,9 +80,9 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
     let cols = (area.width as usize / TILE_W).max(1);
     let rows = ((area.height as usize + 1) / TILE_H).max(1);
     app.set_grid(cols, rows);
-    app.viewport.rows = rows;
+    app.tab.viewport.rows = rows;
     app.frame.hits.add(area, Target::List);
-    let count = app.visible.len();
+    let count = app.tab.visible.len();
 
     if count == 0 {
         let msg = if app.is_loading() {
@@ -90,9 +90,9 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 rada_core::i18n::Key::ListLoading,
                 &[&SPIN[app.redraw.spinner % SPIN.len()]],
             )
-        } else if app.filter.is_some() {
+        } else if app.tab.filter.is_some() {
             rada_core::i18n::Key::ListNoMatch.tr().to_string()
-        } else if app.listing.is_empty() {
+        } else if app.tab.listing.is_empty() {
             rada_core::i18n::Key::ListEmpty.tr().to_string()
         } else {
             rada_core::i18n::Key::ListOnlyHidden.tr().to_string()
@@ -108,7 +108,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let first = app.scroll / cols * cols;
+    let first = app.tab.scroll / cols * cols;
     let x0 = area.x + (area.width as usize - cols * TILE_W).min(2) as u16 / 2;
     let mut lines: Vec<Line> = Vec::with_capacity(rows * TILE_H);
     for r in 0..rows {
@@ -121,8 +121,8 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                 }
                 continue;
             };
-            let cursor = vis == app.cursor;
-            let marked = app.marked.contains(&e.name);
+            let cursor = vis == app.tab.cursor;
+            let marked = app.tab.marked.contains(&e.name);
             let bg = if cursor {
                 th.cursor_row()
             } else if marked {

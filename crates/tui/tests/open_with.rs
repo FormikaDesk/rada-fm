@@ -159,7 +159,7 @@ fn the_window_lists_the_programs_the_default_first_and_other_program_last() {
     std::fs::write(w.dir.join("pic.png"), "\u{89}PNG").unwrap();
     w.h.app.refresh();
     w.h.wait("pic", |a| {
-        a.listing.all().iter().any(|e| e.display == "pic.png")
+        a.tab.listing.all().iter().any(|e| e.display == "pic.png")
     });
     open_window(&mut w.h, "pic.png");
     assert_eq!(names(&w.h), ["Viewer", "Other program…"]);

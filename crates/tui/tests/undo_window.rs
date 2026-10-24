@@ -11,7 +11,9 @@ fn copy_all(h: &mut H, dest: &std::path::Path) {
     h.press("ctrl+c");
     h.app.open_dir(dest.to_path_buf());
     let d = dest.to_path_buf();
-    h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
+    h.wait("the destination", move |a| {
+        a.tab.cwd == d && !a.is_loading()
+    });
     h.press("ctrl+v");
     plan_modal(h);
     run_plan_and_wait(h);

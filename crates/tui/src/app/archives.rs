@@ -26,22 +26,23 @@ impl App {
     }
 
     pub fn in_archive(&self) -> bool {
-        self.archive.is_some()
+        self.tab.archive.is_some()
     }
 
     /// The cursor is on an archive (outside one): extraction is on offer.
     pub fn on_archive_item(&self) -> bool {
-        self.archive.is_none() && self.current().is_some_and(|e| self.archive_candidate(e))
+        self.tab.archive.is_none() && self.current().is_some_and(|e| self.archive_candidate(e))
     }
 
     /// The entries an action applies to: the marked ones, else the one under the cursor.
     fn target_entries(&self) -> Vec<&Entry> {
-        if !self.marked.is_empty() {
+        if !self.tab.marked.is_empty() {
             return self
+                .tab
                 .listing
                 .all()
                 .iter()
-                .filter(|e| self.marked.contains(&e.name))
+                .filter(|e| self.tab.marked.contains(&e.name))
                 .collect();
         }
         self.current().into_iter().collect()
@@ -53,8 +54,8 @@ impl App {
             return;
         }
         // Inside an archive: the marked members, or everything. The folder is the archive's.
-        if let Some(view) = self.archive.clone() {
-            let only: Vec<PathBuf> = if self.marked.is_empty() {
+        if let Some(view) = self.tab.archive.clone() {
+            let only: Vec<PathBuf> = if self.tab.marked.is_empty() {
                 Vec::new()
             } else {
                 self.targets()
@@ -66,7 +67,7 @@ impl App {
                 .archive
                 .parent()
                 .map(Path::to_path_buf)
-                .unwrap_or_else(|| self.cwd.clone());
+                .unwrap_or_else(|| self.tab.cwd.clone());
             if !only.is_empty() && !here {
                 self.toast(
                     ToastKind::Info,
@@ -167,7 +168,8 @@ impl App {
                     .into_owned()
             }
         } else {
-            self.cwd
+            self.tab
+                .cwd
                 .file_name()
                 .filter(|_| self.tag_view().is_none())
                 .map(|n| n.to_string_lossy().into_owned())

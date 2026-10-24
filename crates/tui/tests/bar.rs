@@ -91,7 +91,7 @@ fn enter_runs_the_command_picked_with_the_arrows() {
     );
     h.key(KeyCode::Enter);
     assert!(h.app.windows.address.is_none(), "the field closed");
-    assert!(h.app.filter.is_none(), "and took its filter off");
+    assert!(h.app.tab.filter.is_none(), "and took its filter off");
     // Rename needs a file under the cursor: with none it does nothing, but the command ran
     // (the bar is not left open holding words).
     let mut h = files();
@@ -140,7 +140,7 @@ fn enter_keeps_the_filter_when_files_match_and_esc_takes_it_off() {
     h.keys("gam");
     assert_eq!(h.names(), ["gamma.md"]);
     h.key(KeyCode::Esc);
-    assert!(h.app.windows.address.is_none() && h.app.filter.is_none());
+    assert!(h.app.windows.address.is_none() && h.app.tab.filter.is_none());
     assert_eq!(h.names().len(), 5);
     assert!(row(&mut h).contains("Search files"));
 }
@@ -154,7 +154,7 @@ fn enter_with_no_file_matching_runs_the_best_command() {
     h.key(KeyCode::Enter);
     // Nothing is selected and no file is under a filter: Compress asks for the files (or
     // does nothing), but the field is closed and the filter gone.
-    assert!(h.app.windows.address.is_none() && h.app.filter.is_none());
+    assert!(h.app.windows.address.is_none() && h.app.tab.filter.is_none());
 }
 
 #[test]
@@ -166,12 +166,14 @@ fn a_path_is_completed_and_gone_to_not_searched() {
         h.app.windows.address.as_ref().unwrap().mode(),
         BarMode::Path
     );
-    assert!(h.app.filter.is_none(), "a path filters nothing");
+    assert!(h.app.tab.filter.is_none(), "a path filters nothing");
     h.key(KeyCode::Esc);
     h.press("ctrl+l");
     h.keys("..");
     h.key(KeyCode::Enter);
-    h.wait("the parent", |a| a.cwd.ends_with("work") && !a.is_loading());
+    h.wait("the parent", |a| {
+        a.tab.cwd.ends_with("work") && !a.is_loading()
+    });
 }
 
 #[test]
@@ -185,7 +187,7 @@ fn backspace_on_an_empty_field_leaves_it() {
         h.app.windows.address.is_some(),
         "the field is empty but still open"
     );
-    assert!(h.app.filter.is_none(), "an empty field filters nothing");
+    assert!(h.app.tab.filter.is_none(), "an empty field filters nothing");
     h.key(KeyCode::Backspace);
     assert!(h.app.windows.address.is_none(), "one more leaves it");
 }

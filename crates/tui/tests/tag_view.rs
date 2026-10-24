@@ -70,7 +70,7 @@ fn open_tag(h: &mut H, name: &str) {
         h.app.open_dir(view_path(name));
     }
     h.wait("the tag list", |a| {
-        a.cwd == view_path(name) && !a.is_loading()
+        a.tab.cwd == view_path(name) && !a.is_loading()
     });
 }
 
@@ -89,7 +89,7 @@ fn sidebar_lists_seven_colours_then_tags() {
     h.app.tags.lang = "it".into();
     // The folder with a tag of the user's own is opened: it joins the list.
     h.app.open_dir(home.join("Work"));
-    h.wait("Work", |a| a.cwd.ends_with("Work") && !a.is_loading());
+    h.wait("Work", |a| a.tab.cwd.ends_with("Work") && !a.is_loading());
     h.settle();
     let s = h.screen();
     assert!(s.contains("TAGS"), "{s}");
@@ -141,7 +141,7 @@ fn a_colour_lists_what_carries_it_wherever_it_is() {
     assert!(row_with(&s, "a.txt").contains("Documents"), "{s}");
     assert!(row_with(&s, "b.txt").contains("Work/deep"), "{s}");
     // The sidebar marks the tag as the place.
-    assert!(h.app.cwd == view_path("Blu"));
+    assert!(h.app.tab.cwd == view_path("Blu"));
     // A tab is named after it.
     assert_eq!(h.app.tab_title(0), "Tag: Blu");
     // A tag of the user's own is found by its name only.
@@ -183,7 +183,12 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     h.wait("the renamed item in the list", |a| {
-        a.tag_view().is_some() && a.listing.all().iter().any(|e| e.display == "renamed.txt")
+        a.tag_view().is_some()
+            && a.tab
+                .listing
+                .all()
+                .iter()
+                .any(|e| e.display == "renamed.txt")
     });
     let renamed = first.parent().unwrap().join("renamed.txt");
     assert!(renamed.exists(), "{}", h.screen());
@@ -196,7 +201,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     // Up leaves the list the way one came: the home folder here.
     h.press("alt+up");
     h.wait("the folder", |a| a.tag_view().is_none() && !a.is_loading());
-    assert_eq!(h.app.cwd, home);
+    assert_eq!(h.app.tab.cwd, home);
 }
 
 #[test]

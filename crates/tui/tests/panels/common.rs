@@ -37,7 +37,7 @@ pub fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
     put_cursor(&mut h, "photo.jpg");
     let paths: Vec<_> = ["data.json", "main.rs"]
         .iter()
-        .filter_map(|n| h.app.listing.all().iter().find(|e| e.display == *n))
+        .filter_map(|n| h.app.tab.listing.all().iter().find(|e| e.display == *n))
         .map(|e| e.path.clone())
         .collect();
     h.app.ops.clipboard = Some(rada_tui::app::Clip {
@@ -62,7 +62,8 @@ pub fn tree_scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
     h.app.settings.nav_mode = NavMode::Tree;
     h.app.side_nav.tree = Default::default();
     h.wait("the way down in the tree", |a| {
-        a.cwd
+        a.tab
+            .cwd
             .ancestors()
             .skip(1)
             .take_while(|p| p.starts_with(a.home()))
@@ -154,7 +155,7 @@ pub fn assert_pills(buf: &ratatui::buffer::Buffer, what: &str, behind: &[Color])
 pub fn go_and_wait(h: &mut H, dir: &std::path::Path) {
     h.app.open_dir(dir.to_path_buf());
     let d = dir.to_path_buf();
-    h.wait("the folder", move |a| a.cwd == d && !a.is_loading());
+    h.wait("the folder", move |a| a.tab.cwd == d && !a.is_loading());
     h.settle();
 }
 
@@ -192,7 +193,10 @@ pub fn path_scene() -> (H, std::path::PathBuf) {
     }
     go_and_wait(&mut h, &c);
     h.wait("the subfolders of c", |a| {
-        a.side_nav.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
+        a.side_nav
+            .tree
+            .kids(&a.tab.cwd)
+            .is_some_and(|k| k.len() == 3)
     });
     h.settle();
     (h, c)

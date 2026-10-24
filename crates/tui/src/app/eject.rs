@@ -53,7 +53,7 @@ impl App {
             (_, KeyCode::Esc | KeyCode::Char('q')) => return,
             (_, KeyCode::Enter | KeyCode::Char('y')) => {
                 // The disk the folder in view is on cannot be ejected from under it.
-                if self.cwd.starts_with(&view.volume.mount_point) {
+                if self.tab.cwd.starts_with(&view.volume.mount_point) {
                     let home = self.svc.home.clone();
                     self.open_dir(home);
                 }

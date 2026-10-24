@@ -226,7 +226,7 @@ impl App {
     pub fn want_tree(&mut self) {
         if self.settings.nav_mode == NavMode::Path {
             // Only the folder shown is asked about: its subfolders are what the box lists.
-            let want = self.view_title().is_none().then(|| self.cwd.clone());
+            let want = self.view_title().is_none().then(|| self.tab.cwd.clone());
             if self.side_nav.tree.open.iter().ne(want.iter()) {
                 self.side_nav.tree.open = want.into_iter().collect();
             }
@@ -240,7 +240,7 @@ impl App {
             return;
         }
         let root = self.svc.home.clone();
-        self.side_nav.tree.follow(&root, &self.cwd);
+        self.side_nav.tree.follow(&root, &self.tab.cwd);
         for dir in self
             .side_nav
             .tree
@@ -254,13 +254,13 @@ impl App {
     /// is still out. Called by the drawing: it only sends a request, the answer arrives as an
     /// event. A virtual folder (a tag, the recent files, an archive) is not in a repository.
     pub fn want_git(&mut self) {
-        if !self.svc.git.enabled() || self.archive.is_some() || self.view_title().is_some() {
+        if !self.svc.git.enabled() || self.tab.archive.is_some() || self.view_title().is_some() {
             if self.folder_info.git.take().is_some() {
                 self.redraw.dirty = true;
             }
             return;
         }
-        let key = (self.cwd.clone(), self.tabs.generation());
+        let key = (self.tab.cwd.clone(), self.tabs.generation());
         if self.folder_info.git_asked.as_ref() == Some(&key) {
             return;
         }
@@ -273,13 +273,13 @@ impl App {
         }
         self.folder_info.git_asked = Some(key);
         self.folder_info.git_busy = Some(Instant::now());
-        self.svc.git_status(&self.cwd);
+        self.svc.git_status(&self.tab.cwd);
     }
 
     /// What git said about a folder.
     pub(super) fn on_git(&mut self, dir: PathBuf, status: Option<rada_core::git::GitStatus>) {
         self.folder_info.git_busy = None;
-        if dir == self.cwd {
+        if dir == self.tab.cwd {
             self.folder_info.git = status.map(|status| GitView { dir, status });
         }
         // The folder may have changed while git was thinking: the next frame asks again.
@@ -291,7 +291,7 @@ impl App {
         self.folder_info
             .git
             .as_ref()
-            .filter(|g| g.dir == self.cwd)
+            .filter(|g| g.dir == self.tab.cwd)
             .map(|g| &g.status)
     }
 
@@ -446,7 +446,7 @@ impl App {
             .collect();
         if places
             .iter()
-            .any(|n| rada_core::places::same_folder(&items[*n].path, &self.cwd))
+            .any(|n| rada_core::places::same_folder(&items[*n].path, &self.tab.cwd))
         {
             return Default::default();
         }
@@ -461,13 +461,14 @@ impl App {
         let place = places
             .iter()
             .copied()
-            .filter(|n| self.cwd.starts_with(&items[*n].path))
+            .filter(|n| self.tab.cwd.starts_with(&items[*n].path))
             .max_by_key(|n| items[*n].path.components().count());
         let root = match place {
             Some(n) => items[n].path.clone(),
             None => self.path_root(),
         };
         let mut chain: Vec<&Path> = self
+            .tab
             .cwd
             .ancestors()
             .take_while(|a| a.starts_with(&root))
@@ -501,14 +502,14 @@ impl App {
             depth: depth.min(crate::panels::NAV_INDENT_MAX),
             path: dir.to_path_buf(),
             name: self.places.shown_name(dir, on_disk),
-            count: here.then(|| self.listing.all().len()),
+            count: here.then(|| self.tab.listing.all().len()),
         }
     }
 
     /// The subfolders of the folder shown, as rows `depth` levels in.
     fn kid_rows(&self, depth: usize) -> Vec<NavRow> {
         let depth = depth.min(crate::panels::NAV_INDENT_MAX);
-        let kids = self.side_nav.tree.kids(&self.cwd).unwrap_or(&[]);
+        let kids = self.side_nav.tree.kids(&self.tab.cwd).unwrap_or(&[]);
         kids.iter()
             .map(|k| NavRow {
                 kind: NavKind::Folder { open: None },
@@ -522,18 +523,18 @@ impl App {
 
     /// Where the way shown in NAV starts: Home, or the root of the disk the folder is on.
     fn path_root(&self) -> PathBuf {
-        if self.cwd.starts_with(self.home()) {
+        if self.tab.cwd.starts_with(self.home()) {
             return self.home().to_path_buf();
         }
         self.devices
             .volumes
             .iter()
             .map(|v| &v.mount_point)
-            .filter(|m| self.cwd.starts_with(m))
+            .filter(|m| self.tab.cwd.starts_with(m))
             .max_by_key(|m| m.components().count())
             .cloned()
-            .or_else(|| self.cwd.ancestors().last().map(Path::to_path_buf))
-            .unwrap_or_else(|| self.cwd.clone())
+            .or_else(|| self.tab.cwd.ancestors().last().map(Path::to_path_buf))
+            .unwrap_or_else(|| self.tab.cwd.clone())
     }
 
     fn tree_rows(&self, rows: &mut Vec<NavRow>, dir: &Path, depth: usize) {
@@ -606,7 +607,7 @@ impl App {
                 self.preview.focus = true;
             } else {
                 let rows = self.nav_rows();
-                self.side_nav.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+                self.side_nav.nav_cursor = Self::nav_current(&rows, &self.tab.cwd).unwrap_or(0);
                 self.side_nav.focus = true;
             }
             return;
@@ -624,7 +625,7 @@ impl App {
             self.toggle_sidebar();
         }
         let rows = self.nav_rows();
-        self.side_nav.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
+        self.side_nav.nav_cursor = Self::nav_current(&rows, &self.tab.cwd).unwrap_or(0);
         self.side_nav.focus = true;
     }
 

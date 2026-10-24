@@ -87,9 +87,9 @@ fn enter_opens_a_package_with_its_program_instead_of_going_inside() {
     h.key(KeyCode::Enter);
     h.pump(300);
     assert!(
-        h.app.cwd.ends_with("d"),
+        h.app.tab.cwd.ends_with("d"),
         "still in the folder: {:?}",
-        h.app.cwd
+        h.app.tab.cwd
     );
     let calls = p.calls();
     assert!(
@@ -117,7 +117,7 @@ fn show_package_contents_goes_inside_from_the_menu_and_the_key() {
     h.key(KeyCode::Esc);
     h.press("alt+down");
     h.wait("inside the package", |a| {
-        a.cwd.ends_with("Mail.app") && !a.is_loading()
+        a.tab.cwd.ends_with("Mail.app") && !a.is_loading()
     });
     assert_eq!(h.names(), ["Contents"]);
 }
@@ -217,7 +217,7 @@ fn icloud_drive_is_in_the_sidebar_when_it_is_there() {
     });
     assert!(h.screen().contains("iCloud Drive"));
     h.click(&Target::Place(cloud.clone()));
-    h.wait("iCloud", |a| a.cwd == cloud && !a.is_loading());
+    h.wait("iCloud", |a| a.tab.cwd == cloud && !a.is_loading());
 }
 
 // ------------------------------------------------------------------ the system says no
@@ -295,7 +295,7 @@ fn disallowed_folder_explains_how_to_allow() {
     // Once the person has allowed it, the folder opens and the lock goes away.
     fs.clear();
     h.app.open_dir(docs.clone());
-    h.wait("opened", |a| a.cwd == docs && !a.is_loading());
+    h.wait("opened", |a| a.tab.cwd == docs && !a.is_loading());
     assert!(h.app.devices.denied.is_empty());
 }
 
@@ -400,7 +400,9 @@ fn delete_in_sidebar_ejects_a_disk() {
     let (mut h, p, v) = with_usb(None);
     // Looking inside the disk: ejecting it moves out first.
     h.app.open_dir(v.mount_point.clone());
-    h.wait("in the disk", |a| a.cwd == v.mount_point && !a.is_loading());
+    h.wait("in the disk", |a| {
+        a.tab.cwd == v.mount_point && !a.is_loading()
+    });
     h.press("tab");
     let items = h.app.side_items();
     h.app.side_nav.side_cursor = items.iter().position(|i| i.path == v.mount_point).unwrap();
@@ -409,7 +411,7 @@ fn delete_in_sidebar_ejects_a_disk() {
     h.key(KeyCode::Enter);
     h.wait("done", |a| a.windows.modal.is_none());
     h.wait("out of the disk", |a| {
-        !a.cwd.starts_with(&v.mount_point) && !a.is_loading()
+        !a.tab.cwd.starts_with(&v.mount_point) && !a.is_loading()
     });
     assert!(p.calls().iter().any(|c| c.starts_with("eject")));
 }
@@ -531,13 +533,13 @@ fn cmd_shift_dot_shows_the_hidden_files_and_cmd_i_the_properties() {
 fn cmd_up_goes_to_the_parent_and_cmd_brackets_go_back_and_forward() {
     use crossterm::event::KeyModifiers as M;
     let mut h = with_cmd_keys();
-    let start = h.app.cwd.clone();
+    let start = h.app.tab.cwd.clone();
     cmd(&mut h, KeyCode::Up, M::NONE);
-    h.wait("parent", |a| a.cwd != start && !a.is_loading());
+    h.wait("parent", |a| a.tab.cwd != start && !a.is_loading());
     cmd(&mut h, KeyCode::Char('['), M::NONE);
-    h.wait("back", |a| a.cwd == start && !a.is_loading());
+    h.wait("back", |a| a.tab.cwd == start && !a.is_loading());
     cmd(&mut h, KeyCode::Char(']'), M::NONE);
-    h.wait("forward", |a| a.cwd != start && !a.is_loading());
+    h.wait("forward", |a| a.tab.cwd != start && !a.is_loading());
 }
 
 #[test]

@@ -125,7 +125,7 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
 pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let th = app.settings.th.clone();
     let look = Look::of(app);
-    let count = app.visible.len();
+    let count = app.tab.visible.len();
     let cols = columns(
         area.width as usize,
         opts,
@@ -135,9 +135,13 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
 
     // Column titles, in a pill of their own; the sorted one carries an arrow.
     let head_bg = Style::default().bg(th.field);
-    let arrow = if app.sort.descending() { "↓" } else { "↑" };
+    let arrow = if app.tab.sort.descending() {
+        "↓"
+    } else {
+        "↑"
+    };
     let label = |text: &str, k: SortKey| {
-        let sorted = app.sort.key == k;
+        let sorted = app.tab.sort.key == k;
         let t = if sorted {
             format!("{text} {arrow}")
         } else {
@@ -154,7 +158,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let mut head: Vec<Span> = Vec::new();
     let mut head_hits: Vec<(usize, Target)> = Vec::new();
     head_hits.push((head.len(), Target::Act(Action::SelectAll)));
-    let all_marked = !app.visible.is_empty() && app.marked.len() == app.visible.len();
+    let all_marked = !app.tab.visible.is_empty() && app.tab.marked.len() == app.tab.visible.len();
     head.push(Span::styled(
         format!(
             " {} ",
@@ -231,18 +235,18 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         height: area.height - 1 - air,
         ..area
     };
-    app.viewport.rows = body.height as usize;
+    app.tab.viewport.rows = body.height as usize;
     if body.height == 0 {
         return;
     }
     app.frame.hits.add(body, Target::List);
 
-    if app.visible.is_empty() {
+    if app.tab.visible.is_empty() {
         let msg = if app.is_loading() {
             tf(Key::ListLoading, &[&SPIN[app.redraw.spinner % SPIN.len()]])
-        } else if app.filter.is_some() {
+        } else if app.tab.filter.is_some() {
             Key::ListNoMatch.tr().to_string()
-        } else if app.listing.is_empty() {
+        } else if app.tab.listing.is_empty() {
             Key::ListEmpty.tr().to_string()
         } else {
             Key::ListOnlyHidden.tr().to_string()
@@ -258,29 +262,29 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         return;
     }
 
-    app.scroll = app.scroll.min(count.saturating_sub(1));
+    app.tab.scroll = app.tab.scroll.min(count.saturating_sub(1));
     let rows = body.height as usize;
-    let last = (app.scroll + rows).min(count);
-    let shown: Vec<usize> = (app.scroll..last).map(|v| app.visible[v]).collect();
+    let last = (app.tab.scroll + rows).min(count);
+    let shown: Vec<usize> = (app.tab.scroll..last).map(|v| app.tab.visible[v]).collect();
     app.warm_dates(shown.iter().copied());
     app.want_folder_sizes(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
-    for vis in app.scroll..last {
+    for vis in app.tab.scroll..last {
         let Some(e) = app.entry_at(vis) else { continue };
         lines.push(row(
             app,
             e,
-            app.visible[vis],
-            vis == app.cursor,
+            app.tab.visible[vis],
+            vis == app.tab.cursor,
             &cols,
             area.width as usize,
             look,
         ));
     }
     f.render_widget(Paragraph::new(lines), body);
-    for vis in app.scroll..last {
+    for vis in app.tab.scroll..last {
         let r = Rect {
-            y: body.y + (vis - app.scroll) as u16,
+            y: body.y + (vis - app.tab.scroll) as u16,
             height: 1,
             ..body
         };
@@ -288,8 +292,8 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         // tinted; both have round ends where the font allows.
         let marked = app
             .entry_at(vis)
-            .is_some_and(|e| app.marked.contains(&e.name));
-        if vis == app.cursor {
+            .is_some_and(|e| app.tab.marked.contains(&e.name));
+        if vis == app.tab.cursor {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);
@@ -315,7 +319,7 @@ fn row<'a>(
     look: Look,
 ) -> Line<'a> {
     let th = &app.settings.th;
-    let marked = app.marked.contains(&e.name);
+    let marked = app.tab.marked.contains(&e.name);
     // The cursor row is solid with white text; selected rows are a quiet tone; the cursor on
     // a selected row wins, but its tick stays.
     let row_style = if is_cursor {

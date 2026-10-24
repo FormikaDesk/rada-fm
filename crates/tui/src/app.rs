@@ -3,7 +3,7 @@
 //! event and changes state here.
 
 use rada_core::i18n::{Key, tf};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use rada_core::archive::{ArchiveKind, ArchiveView};
+use rada_core::archive::ArchiveKind;
 use rada_core::events::{
     CoreEvent, DirEvent, FailureInfo, JobEvent, JobId, PreviewEvent, WatchEvent,
 };
@@ -483,24 +483,9 @@ pub struct App {
     /// What only tests and screenshots use.
     pub hooks: TestHooks,
 
-    pub cwd: PathBuf,
-    /// Set while looking inside an archive: the folder shown is a read-only virtual one.
-    pub archive: Option<ArchiveView>,
-    pub listing: DirListing,
-    pub load: LoadState,
-    pub visible: Vec<usize>,
-    pub cursor: usize,
-    pub scroll: usize,
-    pub marked: BTreeSet<OsString>,
-    pub sort: SortSpec,
-    /// The order of this tab was chosen by the person (a click on a column title, the Sort
-    /// menu, the keys). Only then is it remembered with the tab: otherwise it follows
-    /// `config.toml` at every start.
-    pub sort_chosen: bool,
-    remembered: HashMap<PathBuf, OsString>,
-    /// Folders visited, for back and forward.
-    pub nav: crate::nav::NavHistory,
-    nav_move: Option<crate::nav::NavMove>,
+    /// The front tab: its folder, cursor, selection, order and view. The others are in
+    /// `tabs.slots`.
+    pub tab: TabState,
 
     /// The preview of the item under the cursor, its picture, and the keyboard focus in it.
     pub preview: preview::PreviewPane,
@@ -520,8 +505,6 @@ pub struct App {
     /// sessions.
     pub tabs: tabs::Tabs,
     pub columns: columns::ColumnsView,
-    /// Number of rows the list can show; set by the renderer.
-    pub viewport: Viewport,
     /// How the session ends, and whether it is a file chooser.
     pub session: chooser::Session,
     pub redraw: Redraw,
@@ -530,13 +513,9 @@ pub struct App {
     pub side_nav: side::SideNav,
     /// What the last frame drew, for the keyboard, the mouse and the tests.
     pub frame: crate::ui::LastFrame,
-    pub filter: Option<FilterState>,
-    sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
 
     // ---- the explorer interface
-    /// How the folder of the front tab is shown.
-    pub view: ViewMode,
     /// What is worked out about the folder shown.
     pub folder_info: panels::FolderInfo,
     pub updates: Updates,
@@ -578,12 +557,13 @@ impl App {
         } else {
             saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
         }
-        let (start_dir, view, sort, sort_chosen) = saved[active].clone();
         let mut tab_slots: Vec<TabState> = saved
             .iter()
             .map(|(p, v, s, c)| TabState::fresh(p.clone(), *v, *s, *c))
             .collect();
-        tab_slots[active] = TabState::default();
+        let mut tab = std::mem::take(&mut tab_slots[active]);
+        let start_dir = tab.cwd.clone();
+        tab.load = LoadState::Loading(start_dir.clone());
 
         let mut app = App {
             settings: settings::Settings {
@@ -605,19 +585,7 @@ impl App {
                 layout_pref: cfg.layout_pref,
                 details: cfg.details_pane,
             },
-            cwd: start_dir.clone(),
-            archive: None,
-            listing: DirListing::new(start_dir.clone(), Vec::new(), sort),
-            load: LoadState::Loading(start_dir.clone()),
-            visible: Vec::new(),
-            cursor: 0,
-            scroll: 0,
-            marked: BTreeSet::new(),
-            sort,
-            sort_chosen,
-            remembered: HashMap::new(),
-            nav: crate::nav::NavHistory::new(start_dir.clone()),
-            nav_move: None,
+            tab,
             preview: preview::PreviewPane::new(image_ui, cfg.limits),
             devices: Default::default(),
             places: side::Places::new(cfg.bookmarks),
@@ -626,7 +594,6 @@ impl App {
             windows: Default::default(),
             tabs: tabs::Tabs::new(tab_slots, active, cfg.remember_tabs, cfg.saved_ui),
             columns: columns::ColumnsView::default(),
-            viewport: Viewport::default(),
             session: chooser::Session::new(cfg.chooser.clone()),
             redraw: Redraw {
                 dirty: true,
@@ -636,10 +603,7 @@ impl App {
             },
             side_nav: side::SideNav::new(cfg.sidebar),
             frame: Default::default(),
-            filter: None,
-            sel_anchor: None,
             last_click: None,
-            view,
             folder_info: Default::default(),
             updates: Updates {
                 version: svc.updater.as_ref().map_or_else(
@@ -663,7 +627,7 @@ impl App {
             app.toast(ToastKind::Warn, Key::TJournalDown.tr(), 8);
         }
         if let Some(name) = cfg.select {
-            app.remembered.insert(start_dir.clone(), name);
+            app.tab.remembered.insert(start_dir.clone(), name);
         }
         app.svc.places.load();
         app.svc.places.visit(start_dir.clone());
@@ -789,20 +753,21 @@ impl App {
         if self.ops.is_busy()
             || self.windows.notices.has_clock()
             || matches!(self.windows.modal, Some(Modal::Scanning { .. }))
-            || matches!(self.load, LoadState::Loading(_))
+            || matches!(self.tab.load, LoadState::Loading(_))
         {
             self.redraw.dirty = true; // spinner / elapsed time
         }
     }
 
     pub fn entry_at(&self, vis_index: usize) -> Option<&Entry> {
-        self.visible
+        self.tab
+            .visible
             .get(vis_index)
-            .and_then(|&i| self.listing.all().get(i))
+            .and_then(|&i| self.tab.listing.all().get(i))
     }
 
     pub fn current(&self) -> Option<&Entry> {
-        self.entry_at(self.cursor)
+        self.entry_at(self.tab.cursor)
     }
 
     fn rebuild_visible(&mut self) {
@@ -815,6 +780,7 @@ impl App {
             .as_ref()
             .is_some_and(|c| c.folders_only());
         let terms: Vec<String> = self
+            .tab
             .filter
             .as_ref()
             .map(|f| f.text.split_whitespace().map(str::to_lowercase).collect())
@@ -824,7 +790,8 @@ impl App {
         let (tag_terms, name_terms): (Vec<&String>, Vec<&String>) =
             terms.iter().partition(|t| t.starts_with("tag:"));
         let tag_terms: Vec<&str> = tag_terms.iter().map(|t| &t["tag:".len()..]).collect();
-        self.visible = self
+        self.tab.visible = self
+            .tab
             .listing
             .all()
             .iter()
@@ -849,12 +816,13 @@ impl App {
 
     /// Paths an operation applies to: the marked entries, or else the one under the cursor.
     pub fn targets(&self) -> Vec<PathBuf> {
-        if !self.marked.is_empty() {
+        if !self.tab.marked.is_empty() {
             return self
+                .tab
                 .listing
                 .all()
                 .iter()
-                .filter(|e| self.marked.contains(&e.name))
+                .filter(|e| self.tab.marked.contains(&e.name))
                 .map(|e| e.path.clone())
                 .collect();
         }
@@ -864,37 +832,37 @@ impl App {
     }
 
     pub(crate) fn ensure_visible(&mut self) {
-        if self.view == ViewMode::Icons {
+        if self.tab.view == ViewMode::Icons {
             // `scroll` is the first tile shown, always the start of a row.
-            let cols = self.viewport.grid_cols.max(1);
-            let rows = self.viewport.grid_rows.max(1);
-            let cursor_row = self.cursor / cols;
-            let mut first = self.scroll / cols;
+            let cols = self.tab.viewport.grid_cols.max(1);
+            let rows = self.tab.viewport.grid_rows.max(1);
+            let cursor_row = self.tab.cursor / cols;
+            let mut first = self.tab.scroll / cols;
             if cursor_row < first {
                 first = cursor_row;
             } else if cursor_row >= first + rows {
                 first = cursor_row + 1 - rows;
             }
-            let last_row = self.visible.len().saturating_sub(1) / cols;
+            let last_row = self.tab.visible.len().saturating_sub(1) / cols;
             first = first.min(last_row.saturating_sub(rows - 1));
-            self.scroll = first * cols;
+            self.tab.scroll = first * cols;
             return;
         }
-        let rows = self.viewport.rows.max(1);
-        if self.cursor < self.scroll {
-            self.scroll = self.cursor;
-        } else if self.cursor >= self.scroll + rows {
-            self.scroll = self.cursor + 1 - rows;
+        let rows = self.tab.viewport.rows.max(1);
+        if self.tab.cursor < self.tab.scroll {
+            self.tab.scroll = self.tab.cursor;
+        } else if self.tab.cursor >= self.tab.scroll + rows {
+            self.tab.scroll = self.tab.cursor + 1 - rows;
         }
-        let max_scroll = self.visible.len().saturating_sub(rows);
-        self.scroll = self.scroll.min(max_scroll);
+        let max_scroll = self.tab.visible.len().saturating_sub(rows);
+        self.tab.scroll = self.tab.scroll.min(max_scroll);
     }
 
     fn set_cursor(&mut self, to: usize) {
-        let max = self.visible.len().saturating_sub(1);
+        let max = self.tab.visible.len().saturating_sub(1);
         let to = to.min(max);
-        if to != self.cursor {
-            self.cursor = to;
+        if to != self.tab.cursor {
+            self.tab.cursor = to;
             self.preview.scroll = 0;
         }
         self.ensure_visible();
@@ -908,24 +876,30 @@ impl App {
 
     fn restore_cursor(&mut self, name: Option<OsString>) {
         let idx = name.and_then(|n| {
-            self.visible
+            self.tab
+                .visible
                 .iter()
-                .position(|&i| self.listing.all()[i].name == n)
+                .position(|&i| self.tab.listing.all()[i].name == n)
         });
         match idx {
-            Some(i) => self.cursor = i,
-            None => self.cursor = self.cursor.min(self.visible.len().saturating_sub(1)),
+            Some(i) => self.tab.cursor = i,
+            None => {
+                self.tab.cursor = self
+                    .tab
+                    .cursor
+                    .min(self.tab.visible.len().saturating_sub(1))
+            }
         }
         self.ensure_visible();
     }
 
     fn request_dir(&mut self, path: PathBuf) {
-        if path != self.cwd {
-            self.filter = None;
-            self.sel_anchor = None;
+        if path != self.tab.cwd {
+            self.tab.filter = None;
+            self.tab.sel_anchor = None;
         }
         let generation = self.tabs.next_generation();
-        self.load = LoadState::Loading(path.clone());
+        self.tab.load = LoadState::Loading(path.clone());
         self.svc.loader.load(path, generation);
     }
 
@@ -981,19 +955,19 @@ impl App {
             return;
         }
         if let Some(name) = self.cursor_name() {
-            self.remembered.insert(self.cwd.clone(), name);
+            self.tab.remembered.insert(self.tab.cwd.clone(), name);
         }
         self.request_dir(path);
     }
 
     /// The tag whose items the list shows, when it is not a folder but the view of a tag.
     pub fn tag_view(&self) -> Option<String> {
-        rada_core::tagsearch::view_name(&self.cwd)
+        rada_core::tagsearch::view_name(&self.tab.cwd)
     }
 
     /// Whether the list shows the files used lately (the "Recent" entry of the sidebar).
     pub fn recents_view(&self) -> bool {
-        rada_core::recents::is_view(&self.cwd)
+        rada_core::recents::is_view(&self.tab.cwd)
     }
 
     /// What the list is when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
@@ -1024,7 +998,7 @@ impl App {
     pub fn tags_column_wanted(&self) -> bool {
         self.settings.show_tags
             && self.tags_supported()
-            && self.listing.all().iter().any(|e| !e.tags.is_empty())
+            && self.tab.listing.all().iter().any(|e| !e.tags.is_empty())
     }
 
     /// Say why nothing can be made here when the list is a tag's items, not a folder.
@@ -1053,7 +1027,8 @@ impl App {
         let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
             return;
         };
-        self.remembered
+        self.tab
+            .remembered
             .insert(dir.to_path_buf(), name.to_os_string());
         self.open_dir(dir.to_path_buf());
     }
@@ -1067,20 +1042,20 @@ impl App {
             }
             return self.svc.home.clone();
         }
-        self.cwd.clone()
+        self.tab.cwd.clone()
     }
 
     /// Back to the previous folder of the history (or forward to the next one).
     fn go_history(&mut self, back: bool) {
         let target = if back {
-            self.nav.back_target()
+            self.tab.nav.back_target()
         } else {
-            self.nav.forward_target()
+            self.tab.nav.forward_target()
         };
         let Some(target) = target.map(Path::to_path_buf) else {
             return;
         };
-        self.nav_move = Some(if back {
+        self.tab.nav_move = Some(if back {
             NavMove::Back(target.clone())
         } else {
             NavMove::Forward(target.clone())
@@ -1091,19 +1066,21 @@ impl App {
     fn go_parent(&mut self) {
         // A tag's items have no parent: leave the way one came.
         if self.tag_view().is_some() {
-            if self.nav.back_target().is_some() {
+            if self.tab.nav.back_target().is_some() {
                 self.go_history(true);
             } else {
                 self.request_dir(self.svc.home.clone());
             }
             return;
         }
-        let Some(parent) = self.cwd.parent().map(|p| p.to_path_buf()) else {
+        let Some(parent) = self.tab.cwd.parent().map(|p| p.to_path_buf()) else {
             self.toast(ToastKind::Info, Key::TAtTop.tr(), 2);
             return;
         };
-        if let Some(name) = self.cwd.file_name() {
-            self.remembered.insert(parent.clone(), name.to_os_string());
+        if let Some(name) = self.tab.cwd.file_name() {
+            self.tab
+                .remembered
+                .insert(parent.clone(), name.to_os_string());
         }
         self.request_dir(parent);
     }
@@ -1116,7 +1093,7 @@ impl App {
         if e.is_navigable_dir() {
             let target = e.path.clone();
             self.open_dir(target);
-        } else if self.archive.is_some() {
+        } else if self.tab.archive.is_some() {
             self.toast(
                 ToastKind::Info,
                 tf(
@@ -1298,42 +1275,44 @@ impl App {
                     Ok(entries) => {
                         self.devices.allow(&path);
                         self.tags.note(&entries);
-                        let same_dir = path == self.cwd;
+                        let same_dir = path == self.tab.cwd;
                         let keep = if same_dir {
                             // Before the first listing there is no cursor yet: use the
                             // remembered entry (the file given on the command line).
                             self.cursor_name()
-                                .or_else(|| self.remembered.get(&path).cloned())
+                                .or_else(|| self.tab.remembered.get(&path).cloned())
                         } else {
-                            self.remembered.get(&path).cloned()
+                            self.tab.remembered.get(&path).cloned()
                         };
                         // The list of recent files has an order of its own while it is open;
                         // the folders get theirs back when it is left.
                         let into_recents = rada_core::recents::is_view(&path);
                         if into_recents != self.recents_view() {
                             if into_recents {
-                                self.tabs.sort_outside_recents = Some(self.sort);
-                                self.sort = Self::RECENT_SORT;
+                                self.tabs.sort_outside_recents = Some(self.tab.sort);
+                                self.tab.sort = Self::RECENT_SORT;
                             } else if let Some(before) = self.tabs.sort_outside_recents.take() {
-                                self.sort = before;
+                                self.tab.sort = before;
                             }
                         }
-                        self.listing = DirListing::new(path.clone(), entries, self.sort);
+                        self.tab.listing = DirListing::new(path.clone(), entries, self.tab.sort);
                         let virtual_dir =
                             archive.is_some() || rada_core::tagsearch::view_name(&path).is_some();
-                        self.archive = archive;
+                        self.tab.archive = archive;
                         if !same_dir {
-                            match self.nav_move.take() {
-                                Some(NavMove::Back(to)) if to == path => self.nav.stepped_back(),
-                                Some(NavMove::Forward(to)) if to == path => {
-                                    self.nav.stepped_forward()
+                            match self.tab.nav_move.take() {
+                                Some(NavMove::Back(to)) if to == path => {
+                                    self.tab.nav.stepped_back()
                                 }
-                                _ => self.nav.visit(path.clone()),
+                                Some(NavMove::Forward(to)) if to == path => {
+                                    self.tab.nav.stepped_forward()
+                                }
+                                _ => self.tab.nav.visit(path.clone()),
                             }
-                            self.cwd = path.clone();
+                            self.tab.cwd = path.clone();
                             self.clear_marks();
-                            self.cursor = 0;
-                            self.scroll = 0;
+                            self.tab.cursor = 0;
+                            self.tab.scroll = 0;
                             // An archive's folders are not on the disk: nothing to watch, and
                             // not a place to come back to.
                             if !virtual_dir {
@@ -1343,20 +1322,25 @@ impl App {
                             }
                             self.preview.invalidate();
                         } else {
-                            let existing: BTreeSet<OsString> =
-                                self.listing.all().iter().map(|e| e.name.clone()).collect();
-                            self.marked.retain(|n| existing.contains(n));
+                            let existing: BTreeSet<OsString> = self
+                                .tab
+                                .listing
+                                .all()
+                                .iter()
+                                .map(|e| e.name.clone())
+                                .collect();
+                            self.tab.marked.retain(|n| existing.contains(n));
                         }
                         self.sync_folder_sizes();
                         self.rebuild_visible();
                         self.restore_cursor(keep);
-                        self.load = LoadState::Ready;
+                        self.tab.load = LoadState::Ready;
                         self.request_preview();
                         self.run_demo();
                     }
                     Err(msg) => {
-                        self.nav_move = None;
-                        self.load = LoadState::Ready;
+                        self.tab.nav_move = None;
+                        self.tab.load = LoadState::Ready;
                         match denied {
                             Some(d) => self.on_access_denied(*d),
                             None => self.toast(ToastKind::Error, msg, 6),
@@ -1365,7 +1349,7 @@ impl App {
                 }
             }
             DirEvent::Patched { dir, updates, .. } => {
-                if dir != self.cwd {
+                if dir != self.tab.cwd {
                     return;
                 }
                 let keep = self.cursor_name();
@@ -1373,11 +1357,16 @@ impl App {
                     rada_core::model::EntryUpdate::Upsert(e) => Some(e),
                     _ => None,
                 }));
-                self.listing.apply(updates);
+                self.tab.listing.apply(updates);
                 self.sync_folder_sizes();
-                let existing: BTreeSet<OsString> =
-                    self.listing.all().iter().map(|e| e.name.clone()).collect();
-                self.marked.retain(|n| existing.contains(n));
+                let existing: BTreeSet<OsString> = self
+                    .tab
+                    .listing
+                    .all()
+                    .iter()
+                    .map(|e| e.name.clone())
+                    .collect();
+                self.tab.marked.retain(|n| existing.contains(n));
                 self.rebuild_visible();
                 self.restore_cursor(keep);
                 self.preview.invalidate(); // contents may have changed
@@ -1389,21 +1378,21 @@ impl App {
     fn on_watch(&mut self, ev: WatchEvent) {
         match ev {
             WatchEvent::Changed { dir, paths, rescan } => {
-                if dir != self.cwd {
+                if dir != self.tab.cwd {
                     return;
                 }
                 self.forget_folder_sizes(&dir, &paths, rescan);
                 // Going to another folder (or into an archive) is on its way: reading this one
                 // again now would take the place of that request, and the person would be left
                 // where they were. The folder that is opened is read as it is then.
-                if matches!(&self.load, LoadState::Loading(target) if *target != dir) {
+                if matches!(&self.tab.load, LoadState::Loading(target) if *target != dir) {
                     return;
                 }
                 let generation = self.tabs.next_generation();
                 // A full read in progress is answered only for the newest request: a patch
                 // would supersede it and leave the folder "loading" for good, so a change
                 // that arrives meanwhile asks for another full read instead.
-                if rescan || matches!(self.load, LoadState::Loading(_)) {
+                if rescan || matches!(self.tab.load, LoadState::Loading(_)) {
                     self.svc.loader.load(dir, generation);
                 } else {
                     self.svc.loader.patch(dir, paths, generation);
@@ -1513,7 +1502,7 @@ impl App {
                     self.finish(title, report, journal_errors, Some(done));
                     // Refresh even if live updates are unavailable.
                     let generation = self.tabs.next_generation();
-                    self.svc.loader.load(self.cwd.clone(), generation);
+                    self.svc.loader.load(self.tab.cwd.clone(), generation);
                     self.svc.jobs.load_undo_label();
                 }
             }
@@ -1735,7 +1724,7 @@ impl App {
 
     /// Archives are read-only: say so, with the way to do what was meant.
     pub(super) fn refuse_in_archive(&mut self, what: &str) -> bool {
-        if self.archive.is_none() {
+        if self.tab.archive.is_none() {
             return false;
         }
         self.toast(
@@ -1773,7 +1762,7 @@ impl App {
         let h = self
             .svc
             .jobs
-            .plan_transfer(clip.paths, self.cwd.clone(), opts);
+            .plan_transfer(clip.paths, self.tab.cwd.clone(), opts);
         self.begin_plan(
             if clip.mode == TransferMode::Copy {
                 Key::PlanningCopy.tr()
@@ -1886,7 +1875,10 @@ impl App {
             }
             InputKind::SaveAs => self.submit_save_as(iv),
             InputKind::NewDir => {
-                let h = self.svc.jobs.plan_mkdir(self.cwd.clone(), iv.text.clone());
+                let h = self
+                    .svc
+                    .jobs
+                    .plan_mkdir(self.tab.cwd.clone(), iv.text.clone());
                 self.begin_plan(Key::PlanningGeneric.tr(), h);
             }
             InputKind::ExtractTo {
@@ -1937,7 +1929,10 @@ impl App {
                 self.begin_plan(Key::PlanningCompress.tr(), h);
             }
             InputKind::NewFile => {
-                let h = self.svc.jobs.plan_mkfile(self.cwd.clone(), iv.text.clone());
+                let h = self
+                    .svc
+                    .jobs
+                    .plan_mkfile(self.tab.cwd.clone(), iv.text.clone());
                 self.begin_plan(Key::PlanningGeneric.tr(), h);
             }
             InputKind::NewTag { items } => match rada_core::platform::tags::validate_name(&iv.text)
@@ -2006,30 +2001,31 @@ impl App {
     }
 
     fn clear_marks(&mut self) {
-        self.marked.clear();
-        self.sel_anchor = None;
+        self.tab.marked.clear();
+        self.tab.sel_anchor = None;
     }
 
     fn toggle_mark(&mut self) {
         if let Some(e) = self.current() {
             let name = e.name.clone();
-            if !self.marked.remove(&name) {
-                self.marked.insert(name);
+            if !self.tab.marked.remove(&name) {
+                self.tab.marked.insert(name);
             }
         }
-        self.set_cursor(self.cursor + 1);
+        self.set_cursor(self.tab.cursor + 1);
     }
 
     fn mark_all(&mut self) {
         let all: Vec<OsString> = self
+            .tab
             .visible
             .iter()
-            .map(|&i| self.listing.all()[i].name.clone())
+            .map(|&i| self.tab.listing.all()[i].name.clone())
             .collect();
-        if self.marked.len() == all.len() {
+        if self.tab.marked.len() == all.len() {
             self.clear_marks();
         } else {
-            self.marked = all.into_iter().collect();
+            self.tab.marked = all.into_iter().collect();
         }
     }
 
@@ -2067,11 +2063,11 @@ impl App {
 
     fn set_sort(&mut self, spec: SortSpec) {
         let keep = self.cursor_name();
-        self.sort = spec;
+        self.tab.sort = spec;
         // From now on this tab keeps its order, whatever the configuration says.
-        self.sort_chosen = true;
+        self.tab.sort_chosen = true;
         self.save_ui_state();
-        self.listing.set_sort(spec); // immediate, in memory
+        self.tab.listing.set_sort(spec); // immediate, in memory
         self.rebuild_visible();
         self.restore_cursor(keep);
         let arrow = if spec.descending() { "↓" } else { "↑" };
@@ -2132,7 +2128,7 @@ impl App {
         let mut items: Vec<PaletteItem> = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let home = self.svc.home.clone();
-        let cwd = self.cwd.clone();
+        let cwd = self.tab.cwd.clone();
         // A mount point is listed once, as a disk (so "/" is not both "System" and a disk).
         let mounts: std::collections::HashSet<PathBuf> = self
             .devices
@@ -2217,6 +2213,7 @@ impl App {
             }
         }
         let dirs: Vec<PathBuf> = self
+            .tab
             .listing
             .all()
             .iter()
@@ -2268,15 +2265,17 @@ impl App {
             }
             "plan" | "progress" => {
                 let paths: Vec<PathBuf> = self
+                    .tab
                     .visible
                     .iter()
-                    .filter_map(|&i| self.listing.all().get(i))
+                    .filter_map(|&i| self.tab.listing.all().get(i))
                     .map(|e| e.path.clone())
                     .collect();
-                self.marked = self
+                self.tab.marked = self
+                    .tab
                     .visible
                     .iter()
-                    .filter_map(|&i| self.listing.all().get(i))
+                    .filter_map(|&i| self.tab.listing.all().get(i))
                     .map(|e| e.name.clone())
                     .collect();
                 let Some(dest) = d.dest else { return };
@@ -2298,13 +2297,14 @@ impl App {
             // A selection and something on the clipboard, to show the bottom bar at work.
             "selection" => {
                 let files: Vec<_> = self
+                    .tab
                     .listing
                     .all()
                     .iter()
                     .filter(|e| !e.is_dir())
                     .map(|e| (e.name.clone(), e.path.clone()))
                     .collect();
-                self.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
+                self.tab.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
                 self.ops.clipboard = Some(Clip {
                     mode: TransferMode::Copy,
                     paths: files
@@ -2319,7 +2319,8 @@ impl App {
             // clipboard, the cursor on a picture, and a card saying the last copy went through.
             "vetrina" => {
                 let by_name = |app: &App, name: &str| {
-                    app.listing
+                    app.tab
+                        .listing
                         .all()
                         .iter()
                         .find(|e| e.display == name)
@@ -2329,7 +2330,7 @@ impl App {
                     .iter()
                     .filter_map(|n| by_name(self, n))
                     .collect();
-                self.marked = chosen.iter().map(|(n, _)| n.clone()).collect();
+                self.tab.marked = chosen.iter().map(|(n, _)| n.clone()).collect();
                 let waiting: Vec<PathBuf> = ["data.json", "main.rs"]
                     .iter()
                     .filter_map(|n| by_name(self, n))
@@ -2415,11 +2416,12 @@ impl App {
                 }
                 self.notify(done);
                 let names = ["archive.tar.gz", "backup.zip"];
-                self.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                self.tab.marked = names.iter().map(|n| OsString::from(*n)).collect();
                 let paths: Vec<PathBuf> = names
                     .iter()
                     .filter_map(|n| {
-                        self.listing
+                        self.tab
+                            .listing
                             .all()
                             .iter()
                             .find(|e| e.display == *n)
@@ -2436,7 +2438,7 @@ impl App {
             // name, on three marked items.
             "delete" | "conflict" => {
                 let names = ["archive.tar.gz", "backup.zip", "Cargo.toml"];
-                self.marked = names.iter().map(|n| OsString::from(*n)).collect();
+                self.tab.marked = names.iter().map(|n| OsString::from(*n)).collect();
                 self.restore_cursor(Some(OsString::from("photo.jpg")));
                 self.ensure_visible();
                 if scene == "delete" {
@@ -2445,7 +2447,8 @@ impl App {
                     let paths: Vec<PathBuf> = names
                         .iter()
                         .filter_map(|n| {
-                            self.listing
+                            self.tab
+                                .listing
                                 .all()
                                 .iter()
                                 .find(|e| e.display == *n)
@@ -2465,7 +2468,7 @@ impl App {
         if self.refuse_in_tag_view(Key::WhatBookmark.tr()) {
             return;
         }
-        let cwd = self.cwd.clone();
+        let cwd = self.tab.cwd.clone();
         let add = !self.places.paths.bookmarks.contains(&cwd);
         self.set_bookmark(cwd, add);
     }
@@ -2858,12 +2861,12 @@ impl App {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() / 3600)
             .unwrap_or(0);
-        let key = (hour, self.listing.all().len());
+        let key = (hour, self.tab.listing.all().len());
         self.folder_info.dates_for(key);
         let now = self.now();
         for i in indices {
             if let Some(slot @ None) = self.folder_info.date_cache.get_mut(i)
-                && let Some(e) = self.listing.all().get(i)
+                && let Some(e) = self.tab.listing.all().get(i)
             {
                 *slot = Some(self.settings.explorer_date(e.used.or(e.mtime), now));
             }
@@ -2873,15 +2876,19 @@ impl App {
     // ------------------------------------------------------------------ for the renderer
 
     pub fn sort_label(&self) -> String {
-        let arrow = if self.sort.descending() { "↓" } else { "↑" };
-        format!("{} {arrow}", self.sort.key.label())
+        let arrow = if self.tab.sort.descending() {
+            "↓"
+        } else {
+            "↑"
+        };
+        format!("{} {arrow}", self.tab.sort.key.label())
     }
 
     pub fn is_loading(&self) -> bool {
-        matches!(self.load, LoadState::Loading(_))
+        matches!(self.tab.load, LoadState::Loading(_))
     }
 
     pub fn sort_key(&self) -> SortKey {
-        self.sort.key
+        self.tab.sort.key
     }
 }

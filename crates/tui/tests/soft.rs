@@ -33,7 +33,12 @@ fn scene(icons: IconSet) -> H {
 /// The cells of the row of the cursor, as the list drew them.
 fn cursor_cells(h: &mut H) -> Vec<ratatui::buffer::Cell> {
     let _ = h.screen();
-    let r = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
+    let r = h
+        .app
+        .frame
+        .hits
+        .find(&Target::Row(h.app.tab.cursor))
+        .unwrap();
     let buf = h.term.backend().buffer().clone();
     (r.x..r.x + r.width)
         .map(|x| buf[(x, r.y)].clone())

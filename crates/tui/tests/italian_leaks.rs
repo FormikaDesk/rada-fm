@@ -88,7 +88,7 @@ fn sandbox() -> (H, std::path::PathBuf, std::path::PathBuf) {
 }
 
 fn right_click_row(h: &mut H) {
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
@@ -131,7 +131,9 @@ fn the_plan_windows_speak_italian() {
         h.press("ctrl+c");
         h.app.open_dir(dest.clone());
         let d = dest.clone();
-        h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
+        h.wait("the destination", move |a| {
+            a.tab.cwd == d && !a.is_loading()
+        });
         h.press("ctrl+v");
         plan_modal(&mut h);
         leaks(&mut h, "the copy plan");
@@ -145,7 +147,7 @@ fn the_plan_windows_speak_italian() {
         // The trash, and a permanent deletion.
         h.app.open_dir(dir.clone());
         let d = dir.clone();
-        h.wait("back", move |a| a.cwd == d && !a.is_loading());
+        h.wait("back", move |a| a.tab.cwd == d && !a.is_loading());
         h.keys("j");
         h.press("delete");
         plan_modal(&mut h);
@@ -186,7 +188,9 @@ fn the_cards_speak_italian() {
         h.press("ctrl+c");
         h.app.open_dir(dest.clone());
         let d = dest.clone();
-        h.wait("the destination", move |a| a.cwd == d && !a.is_loading());
+        h.wait("the destination", move |a| {
+            a.tab.cwd == d && !a.is_loading()
+        });
         h.press("ctrl+v");
         plan_modal(&mut h);
         h.key(KeyCode::Right);

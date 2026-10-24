@@ -138,11 +138,11 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
     );
     let docs = place(&h, "Documenti");
     h.click(&Target::Place(docs.clone()));
-    h.wait("Documenti", move |a| a.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
     // And a bookmark.
     let b = place(&h, "lavoro/progetto");
     h.click(&Target::Place(b.clone()));
-    h.wait("the bookmark", move |a| a.cwd == b && !a.is_loading());
+    h.wait("the bookmark", move |a| a.tab.cwd == b && !a.is_loading());
 }
 
 #[test]
@@ -178,7 +178,7 @@ fn tab_focuses_the_sidebar_enter_opens() {
     assert_eq!(h.app.side_items()[h.app.side_nav.side_cursor].path, docs);
     h.key(KeyCode::Enter);
     assert!(!h.app.side_nav.focus, "the focus goes back to the list");
-    h.wait("Documenti", move |a| a.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
 
     // Tab again and Esc: out.
     h.key(KeyCode::Tab);
@@ -337,7 +337,7 @@ fn the_menu_open_goes_there() {
     let docs = place(&h, "Documenti");
     h.right_click(&Target::Place(docs.clone()));
     h.key(KeyCode::Enter); // "Open" is first
-    h.wait("Documenti", move |a| a.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
 }
 
 #[test]
@@ -493,7 +493,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
             "{density:?} {height}: {ys:?}"
         );
         // A click on an empty line does nothing at all.
-        let cwd = h.app.cwd.clone();
+        let cwd = h.app.tab.cwd.clone();
         for y in (ys[0]..=*ys.last().unwrap()).filter(|y| !ys.contains(y)) {
             if h.app.frame.hits.at(3, y).is_some() {
                 continue; // the bar of a disk: not an empty line
@@ -505,7 +505,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
                 crossterm::event::KeyModifiers::NONE,
             );
             assert_eq!(
-                h.app.cwd, cwd,
+                h.app.tab.cwd, cwd,
                 "{density:?} {height}: a click on the empty row {y}"
             );
             assert!(h.app.windows.modal.is_none());
@@ -515,7 +515,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
         h.click(&Target::Place(first.clone()));
         let want = first.clone();
         h.wait("the first folder", move |a| {
-            a.cwd == want && !a.is_loading()
+            a.tab.cwd == want && !a.is_loading()
         });
         // The keyboard goes entry by entry, not row by row, and opens the one it is on.
         h.press("tab");
@@ -533,7 +533,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
         h.key(KeyCode::Enter);
         let want = second.clone();
         h.wait("the second folder", move |a| {
-            a.cwd == want && !a.is_loading()
+            a.tab.cwd == want && !a.is_loading()
         });
     }
 }
@@ -666,7 +666,7 @@ fn icon_column_marks_the_current_place() {
             h.app.settings.th = Theme::named(name, ColorDepth::True).unwrap();
             h.app.settings.icons = icons;
             let want = place(&h, "Scaricati");
-            assert_eq!(h.app.cwd, want);
+            assert_eq!(h.app.tab.cwd, want);
             let item = h
                 .app
                 .side_items()

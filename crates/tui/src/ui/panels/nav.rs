@@ -43,7 +43,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
     let items = crate::sidebar::items(app, false);
-    let current = App::nav_current(&rows, &app.cwd);
+    let current = App::nav_current(&rows, &app.tab.cwd);
     let cursor = app
         .side_nav
         .focus
@@ -63,7 +63,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         .or(current)
         .and_then(|a| body.iter().position(|i| *i == a))
     {
-        let seen = (app.cwd.clone(), cursor, body.len(), height);
+        let seen = (app.tab.cwd.clone(), cursor, body.len(), height);
         if app.frame.nav_seen.as_ref() != Some(&seen) {
             app.frame.nav_seen = Some(seen);
             if anchor_at < app.frame.nav_scroll {

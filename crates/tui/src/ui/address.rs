@@ -43,21 +43,21 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
     // A tag's items are not on a path: one segment, which is the list itself.
     if let Some(title) = app.view_title() {
-        return vec![(title, app.cwd.clone())];
+        return vec![(title, app.tab.cwd.clone())];
     }
     let home = app.home();
     // Inside a phone or a camera the path is the device's name, not the folders of the virtual
     // filesystem that hold it; the real path stays in the details.
     let (first, rest) = if let Some((label, root)) = app.device_head() {
-        let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
+        let rest = app.tab.cwd.strip_prefix(&root).unwrap_or(&app.tab.cwd);
         ((label, root), rest)
     } else {
-        match app.cwd.strip_prefix(home) {
+        match app.tab.cwd.strip_prefix(home) {
             Ok(rest) => ((home_label(app), home.to_path_buf()), rest),
             Err(_) => {
                 let mut root = PathBuf::new();
                 let mut label = String::new();
-                for c in app.cwd.components() {
+                for c in app.tab.cwd.components() {
                     match c {
                         Component::Prefix(_) | Component::RootDir => {
                             root.push(c.as_os_str());
@@ -73,7 +73,7 @@ fn segments(app: &App) -> Vec<(String, PathBuf)> {
                 if label.is_empty() || label == std::path::MAIN_SEPARATOR_STR {
                     label = std::path::MAIN_SEPARATOR_STR.to_string();
                 }
-                let rest = app.cwd.strip_prefix(&root).unwrap_or(&app.cwd);
+                let rest = app.tab.cwd.strip_prefix(&root).unwrap_or(&app.tab.cwd);
                 ((app.places.shown_name(&root, label), root), rest)
             }
         }
@@ -169,7 +169,7 @@ fn crumbs(app: &App, budget: usize, field: Style) -> Vec<(Span<'static>, Option<
 /// The view in use, as the pill on the right of the bar says it.
 fn view_label(app: &App) -> (Glyph, &'static str) {
     use crate::view::ViewMode;
-    match app.view {
+    match app.tab.view {
         ViewMode::Details => (Glyph::Details, Key::ViewDetails.tr()),
         ViewMode::Icons => (Glyph::Icons, Key::ViewIcons.tr()),
         ViewMode::Columns => (Glyph::Columns, Key::ViewColumns.tr()),
@@ -331,7 +331,7 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
         idle_crumbs(app, crumb_w, field, &mut body);
         if search_w > 0 {
             body.push(Span::styled(" │ ", th.faint().patch(field)));
-            let (text, style) = match &app.filter {
+            let (text, style) = match &app.tab.filter {
                 Some(f) => (
                     format!("{}{}", icons::ui(app.settings.icons, Glyph::Filter), f.text),
                     th.base().add_modifier(Modifier::BOLD),
@@ -389,9 +389,9 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
     let mut left = Bar::default();
     left.push(Span::styled(" ", band));
     let buttons = [
-        (Glyph::Back, app.nav.can_back(), Action::Back),
-        (Glyph::Forward, app.nav.can_forward(), Action::Forward),
-        (Glyph::Up, app.cwd.parent().is_some(), Action::Parent),
+        (Glyph::Back, app.tab.nav.can_back(), Action::Back),
+        (Glyph::Forward, app.tab.nav.can_forward(), Action::Forward),
+        (Glyph::Up, app.tab.cwd.parent().is_some(), Action::Parent),
         (Glyph::Refresh, true, Action::Refresh),
     ];
     let narrow = w < 50;

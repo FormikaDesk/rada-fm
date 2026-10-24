@@ -28,7 +28,7 @@ fn menus_windows_and_cards_fit_every_size_without_panicking() {
         let (mut hh, dest) = files(w, h);
         hh.keys("j");
         // The menu of an item, and the one beside it.
-        let (x, y) = hh.where_is(&Target::Row(hh.app.cursor));
+        let (x, y) = hh.where_is(&Target::Row(hh.app.tab.cursor));
         hh.mouse(
             MouseEventKind::Down(MouseButton::Right),
             x,
@@ -47,7 +47,7 @@ fn menus_windows_and_cards_fit_every_size_without_panicking() {
         hh.press("ctrl+c");
         hh.app.open_dir(dest.clone());
         let d = dest.clone();
-        hh.wait("dest", move |a| a.cwd == d && !a.is_loading());
+        hh.wait("dest", move |a| a.tab.cwd == d && !a.is_loading());
         hh.press("ctrl+v");
         plan_modal(&mut hh);
         let s = hh.screen();
@@ -108,7 +108,7 @@ fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
     h.app.settings.basic = true;
     h.app.settings.icons = rada_tui::IconSet::None;
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,
@@ -123,7 +123,7 @@ fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
     h.press("ctrl+c");
     h.app.open_dir(dest.clone());
     let d = dest.clone();
-    h.wait("dest", move |a| a.cwd == d && !a.is_loading());
+    h.wait("dest", move |a| a.tab.cwd == d && !a.is_loading());
     h.press("ctrl+v");
     plan_modal(&mut h);
     let plan = basic_screen(&mut h, 120, 36);
@@ -156,7 +156,7 @@ fn hint_row(h: &mut H) -> String {
 fn the_key_hints_of_a_menu_name_only_the_keys_that_work_now() {
     let (mut h, _dest) = files(150, 40);
     h.keys("j");
-    let (x, y) = h.where_is(&Target::Row(h.app.cursor));
+    let (x, y) = h.where_is(&Target::Row(h.app.tab.cursor));
     h.mouse(
         MouseEventKind::Down(MouseButton::Right),
         x,

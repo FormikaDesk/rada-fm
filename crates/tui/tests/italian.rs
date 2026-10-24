@@ -108,7 +108,7 @@ fn longest_italian_words_fit_at_each_width() {
     with_lang(Lang::It, || {
         for (w, hh) in SIZES {
             let mut h = demo_scene(w, hh);
-            h.app.marked.clear();
+            h.app.tab.marked.clear();
             let rows = lines(&mut h);
             // Nothing is wider than the screen.
             for l in &rows {

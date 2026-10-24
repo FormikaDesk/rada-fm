@@ -392,9 +392,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     // A shorter list may have left the cursor below its last row: bring it back in view.
     if notice_h > 0 {
-        let before = app.scroll;
+        let before = app.tab.scroll;
         app.ensure_visible();
-        if app.scroll != before {
+        if app.tab.scroll != before {
             app.redraw.dirty = true;
         }
     }
@@ -434,7 +434,7 @@ fn columns_basis(app: &App, details: DetailsMode, list: Rect, term_width: u16) -
 }
 
 fn draw_folder_view(f: &mut Frame, app: &mut App, main: Rect, width: u16) {
-    match app.view {
+    match app.tab.view {
         ViewMode::Columns => columns::draw_columns(f, app, main),
         ViewMode::Details => list::draw_list(
             f,
@@ -491,10 +491,10 @@ fn popup_rects(app: &App, area: Rect) -> Vec<Rect> {
 /// Whether the list has no room to spare for the cards: its rows reach into them. The other
 /// views give them the room at once.
 fn list_needs_room(app: &App, main: Rect, cards_h: u16) -> bool {
-    match app.view {
+    match app.tab.view {
         ViewMode::Details => {
             // The column titles, a row of air and the rows.
-            let rows = 2 + app.visible.len();
+            let rows = 2 + app.tab.visible.len();
             rows + cards_h as usize > main.height as usize
         }
         _ => true,

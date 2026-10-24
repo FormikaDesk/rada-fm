@@ -182,7 +182,7 @@ fn the_explorer_at_every_size_in_both_themes() {
 fn the_icons_view() {
     let mut h = busy_scene(120, 30);
     h.press("ctrl+2");
-    assert_eq!(h.app.view, ViewMode::Icons);
+    assert_eq!(h.app.tab.view, ViewMode::Icons);
     insta::assert_snapshot!("icons_120x30", shot(&mut h));
     let th = Theme::named("rada-light", ColorDepth::True).unwrap();
     h.app.settings.th = th.clone();
@@ -196,7 +196,7 @@ fn the_icons_view() {
 )]
 fn the_context_menus() {
     let mut h = scene(120, 35);
-    h.right_click(&Target::Row(h.app.cursor));
+    h.right_click(&Target::Row(h.app.tab.cursor));
     insta::assert_snapshot!("context_menu_item_120x30", shot(&mut h));
     h.press("esc");
     // On empty space.
@@ -223,7 +223,7 @@ fn two_tabs_open() {
     // The second tab goes to a folder of its own.
     put_cursor(&mut h, "docs");
     h.press("enter");
-    h.wait("docs", |a| a.cwd.ends_with("docs") && !a.is_loading());
+    h.wait("docs", |a| a.tab.cwd.ends_with("docs") && !a.is_loading());
     h.app.hooks.clock = Some(demo_now());
     insta::assert_snapshot!("two_tabs_120x30", shot(&mut h));
     let th = Theme::named("rada", ColorDepth::True).unwrap();
@@ -252,14 +252,14 @@ fn the_number_of_the_last_read_only_goes_up_whatever_the_tabs_do() {
     put_cursor(&mut h, "src");
     h.press("enter");
     check(&mut h, "tab 2 goes into src", true);
-    h.wait("src", |a| a.cwd.ends_with("src") && !a.is_loading());
+    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.is_loading());
     h.press("alt+1");
     check(&mut h, "back to tab 1", true);
     h.wait("tab 1", |a| a.tabs.active == 0 && !a.is_loading());
     put_cursor(&mut h, "docs");
     h.press("enter");
     check(&mut h, "tab 1 goes into docs", true);
-    h.wait("docs", |a| a.cwd.ends_with("docs") && !a.is_loading());
+    h.wait("docs", |a| a.tab.cwd.ends_with("docs") && !a.is_loading());
     h.app.close_tab(1);
     check(&mut h, "the tab behind is closed", false);
     h.press("ctrl+t");
@@ -276,31 +276,39 @@ fn the_number_of_the_last_read_only_goes_up_whatever_the_tabs_do() {
 #[test]
 fn tabs_keep_their_own_folder_cursor_selection_and_sort() {
     let mut h = scene(140, 30);
-    let first = h.app.cwd.clone();
+    let first = h.app.tab.cwd.clone();
     h.press("space"); // select photo.jpg in tab 1
     h.press("ctrl+t");
     h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
     assert_eq!(h.app.tabs.active, 1);
-    assert_eq!(h.app.cwd, first, "a new tab starts in the current folder");
-    assert!(h.app.marked.is_empty(), "the selection is the tab's own");
+    assert_eq!(
+        h.app.tab.cwd, first,
+        "a new tab starts in the current folder"
+    );
+    assert!(
+        h.app.tab.marked.is_empty(),
+        "the selection is the tab's own"
+    );
     // Tab 2: another folder and another order.
     put_cursor(&mut h, "src");
     h.press("enter");
-    h.wait("src", |a| a.cwd.ends_with("src") && !a.is_loading());
+    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.is_loading());
     h.press("S"); // reverse the order in this tab
-    let reversed = h.app.sort.reverse;
+    let reversed = h.app.tab.sort.reverse;
     assert!(reversed);
 
     h.press("alt+1");
     h.wait("back to tab 1", |a| {
-        a.tabs.active == 0 && a.cwd.ends_with("demo") && !a.is_loading()
+        a.tabs.active == 0 && a.tab.cwd.ends_with("demo") && !a.is_loading()
     });
-    assert_eq!(h.app.cwd, first);
-    assert!(!h.app.sort.reverse, "the sort order is per tab");
+    assert_eq!(h.app.tab.cwd, first);
+    assert!(!h.app.tab.sort.reverse, "the sort order is per tab");
     assert_eq!(h.marked_names(), ["photo.jpg"], "so is the selection");
     h.press("alt+2");
-    h.wait("tab 2 again", |a| a.cwd.ends_with("src") && !a.is_loading());
-    assert!(h.app.sort.reverse);
+    h.wait("tab 2 again", |a| {
+        a.tab.cwd.ends_with("src") && !a.is_loading()
+    });
+    assert!(h.app.tab.sort.reverse);
     // The clipboard and the undo are shared: copy in tab 2, paste in tab 1.
     assert_eq!(h.app.tabs.count(), 2);
 }
@@ -345,7 +353,7 @@ fn the_keys_and_the_mouse_change_and_close_tabs() {
     assert_eq!(h.app.tabs.count(), 1);
     // The last one is not closed: it goes home.
     h.press("ctrl+w");
-    h.wait("home", |a| a.cwd == a.home() && !a.is_loading());
+    h.wait("home", |a| a.tab.cwd == a.home() && !a.is_loading());
     assert_eq!(h.app.tabs.count(), 1);
     // The new-tab button.
     h.click(&Target::TabNew);
@@ -416,15 +424,15 @@ fn tabs_are_remembered_between_sessions_and_the_option_turns_it_off() {
     assert_eq!(h.app.tabs.count(), 2);
     assert_eq!(h.app.tabs.active, 1);
     h.wait("the front tab", move |app| {
-        app.cwd == b && !app.is_loading()
+        app.tab.cwd == b && !app.is_loading()
     });
     h.press("alt+1");
     h.wait("the first tab", move |app| {
-        app.cwd == a && !app.is_loading()
+        app.tab.cwd == a && !app.is_loading()
     });
-    assert_eq!(h.app.view, ViewMode::Icons, "its view came back");
-    assert!(h.app.sort.reverse);
-    assert_eq!(h.app.sort.key, rada_core::model::SortKey::Size);
+    assert_eq!(h.app.tab.view, ViewMode::Icons, "its view came back");
+    assert!(h.app.tab.sort.reverse);
+    assert_eq!(h.app.tab.sort.key, rada_core::model::SortKey::Size);
     // Switched off: one tab, as before.
     let sb = rada_core::testutil::Sandbox::new();
     let a = sb.mkdir("home/a");
@@ -459,7 +467,7 @@ fn a_folder_given_on_the_command_line_opens_beside_the_restored_tabs() {
     });
     assert_eq!(h.app.tabs.count(), 2);
     assert_eq!(h.app.tabs.active, 1);
-    assert_eq!(h.app.cwd, target);
+    assert_eq!(h.app.tab.cwd, target);
 }
 
 // ---------------------------------------------------------------------------- the address
@@ -474,7 +482,7 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
     assert!(row.contains("~/projects/demo/▏"), "{row}");
     // Esc leaves it as it was.
     h.press("esc");
-    assert!(h.app.windows.address.is_none() && h.app.cwd.ends_with("demo"));
+    assert!(h.app.windows.address.is_none() && h.app.tab.cwd.ends_with("demo"));
 
     // Type a path, complete with Tab, go with Enter.
     h.press("alt+d");
@@ -502,7 +510,7 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
     h.keys("..");
     h.press("enter");
     h.wait("the parent", |a| {
-        a.cwd.ends_with("projects") && !a.is_loading()
+        a.tab.cwd.ends_with("projects") && !a.is_loading()
     });
     assert!(h.app.windows.address.is_none());
 }
@@ -542,7 +550,7 @@ fn a_mistyped_address_says_why_and_stays_put() {
     h.keys("~/nowhere"); // what is typed over the selected path; a word alone is a search
     h.press("enter");
     h.wait("the refusal", |a| a.current_notice().is_some());
-    assert!(h.app.cwd.ends_with("demo"));
+    assert!(h.app.tab.cwd.ends_with("demo"));
 }
 
 // ---------------------------------------------------------------------------- the command bar
@@ -639,9 +647,11 @@ fn the_dropdowns_open_menus_that_work() {
         h.screen()
     );
     run_plan_and_wait(&mut h);
-    assert!(h.app.cwd.join("todo.txt").is_file());
+    assert!(h.app.tab.cwd.join("todo.txt").is_file());
     assert_eq!(
-        std::fs::metadata(h.app.cwd.join("todo.txt")).unwrap().len(),
+        std::fs::metadata(h.app.tab.cwd.join("todo.txt"))
+            .unwrap()
+            .len(),
         0
     );
     h.wait("the undo label", |a| {
@@ -660,7 +670,7 @@ fn the_dropdowns_open_menus_that_work() {
     h.press("down");
     h.press("down"); // Size
     h.press("enter");
-    assert_eq!(h.app.sort.key, rada_core::model::SortKey::Size);
+    assert_eq!(h.app.tab.sort.key, rada_core::model::SortKey::Size);
     h.click(&Target::Menu(MenuKind::Sort));
     h.press("j");
     h.press("j");
@@ -668,12 +678,12 @@ fn the_dropdowns_open_menus_that_work() {
     h.press("j");
     h.press("j"); // Descending
     h.press("enter");
-    assert!(h.app.sort.reverse);
+    assert!(h.app.tab.sort.reverse);
     // View ▾ switches the view and toggles the panes.
     h.click(&Target::Menu(MenuKind::View));
     h.press("down"); // Icons
     h.press("enter");
-    assert_eq!(h.app.view, ViewMode::Icons);
+    assert_eq!(h.app.tab.view, ViewMode::Icons);
     h.click(&Target::Menu(MenuKind::More));
     assert!(h.screen().contains("Operation history"));
 }
@@ -690,7 +700,7 @@ fn clicking_a_column_title_sorts_by_it_and_the_arrow_follows() {
     };
     assert!(head(&mut h).contains("Name ↑"));
     h.click(&Target::SortBy(rada_core::model::SortKey::Type));
-    assert_eq!(h.app.sort.key, rada_core::model::SortKey::Type);
+    assert_eq!(h.app.tab.sort.key, rada_core::model::SortKey::Type);
     assert!(head(&mut h).contains("Type ↑") && !head(&mut h).contains("Name ↑"));
     h.click(&Target::SortBy(rada_core::model::SortKey::Type));
     assert!(head(&mut h).contains("Type ↓"));
@@ -710,8 +720,8 @@ fn checkbox_selects_double_click_opens() {
     let _ = h.screen();
     // Click a name: the cursor moves, nothing is selected.
     h.click(&Target::Row(7));
-    assert_eq!(h.app.cursor, 7);
-    assert!(h.app.marked.is_empty());
+    assert_eq!(h.app.tab.cursor, 7);
+    assert!(h.app.tab.marked.is_empty());
     // Click the box of another row: it is selected, and the selection grows.
     let r = h
         .app
@@ -746,11 +756,11 @@ fn checkbox_selects_double_click_opens() {
     // Double click on a folder name opens it.
     h.double_click(&Target::Row(0));
     h.wait("the folder", |a| {
-        a.cwd.ends_with("assets") && !a.is_loading()
+        a.tab.cwd.ends_with("assets") && !a.is_loading()
     });
     // The title's box selects everything.
     h.click(&Target::Act(Action::SelectAll));
-    assert!(h.app.marked.is_empty() || !h.app.visible.is_empty());
+    assert!(h.app.tab.marked.is_empty() || !h.app.tab.visible.is_empty());
 }
 
 #[test]
@@ -759,7 +769,12 @@ fn cursor_row_solid_selected_rows_quiet() {
     let _ = h.screen();
     let th = h.app.settings.th.clone();
     let buf = h.term.backend().buffer().clone();
-    let cursor_row = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
+    let cursor_row = h
+        .app
+        .frame
+        .hits
+        .find(&Target::Row(h.app.tab.cursor))
+        .unwrap();
     // The cursor row: the solid colour, white text, and a bar in the leftmost cell.
     let cell = &buf[(cursor_row.x + 6, cursor_row.y)];
     assert_eq!(cell.bg, th.cursor);
@@ -781,8 +796,13 @@ fn cursor_row_solid_selected_rows_quiet() {
     h.press("up");
     let _ = h.screen();
     let buf = h.term.backend().buffer().clone();
-    let r = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
-    assert!(h.app.marked.contains(&h.app.current().unwrap().name));
+    let r = h
+        .app
+        .frame
+        .hits
+        .find(&Target::Row(h.app.tab.cursor))
+        .unwrap();
+    assert!(h.app.tab.marked.contains(&h.app.current().unwrap().name));
     assert_eq!(buf[(r.x + 6, r.y)].bg, th.cursor);
     assert_eq!(buf[(r.x + 1, r.y)].symbol(), "☑");
 }
@@ -795,23 +815,23 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
     h.press("ctrl+2");
     h.press("g");
     let _ = h.screen();
-    let cols = h.app.viewport.grid_cols;
+    let cols = h.app.tab.viewport.grid_cols;
     assert!(cols >= 4, "{cols}");
-    let start = h.app.cursor;
+    let start = h.app.tab.cursor;
     h.press("l");
-    assert_eq!(h.app.cursor, start + 1, "l moves across");
+    assert_eq!(h.app.tab.cursor, start + 1, "l moves across");
     h.press("right");
-    assert_eq!(h.app.cursor, start + 2);
+    assert_eq!(h.app.tab.cursor, start + 2);
     h.press("h");
     h.press("left");
-    assert_eq!(h.app.cursor, start);
+    assert_eq!(h.app.tab.cursor, start);
     h.press("j");
-    assert_eq!(h.app.cursor, start + cols, "j moves a whole row down");
+    assert_eq!(h.app.tab.cursor, start + cols, "j moves a whole row down");
     h.press("down");
-    assert_eq!(h.app.cursor, start + 2 * cols);
+    assert_eq!(h.app.tab.cursor, start + 2 * cols);
     h.press("k");
     h.press("up");
-    assert_eq!(h.app.cursor, start);
+    assert_eq!(h.app.tab.cursor, start);
     // Space selects, Enter opens, names are cut with …
     h.press("space");
     assert_eq!(h.marked_names().len(), 1);
@@ -819,16 +839,18 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
     assert!(s.contains("☑"), "{s}");
     // Back to the table with Ctrl+1, v and the status buttons.
     h.press("ctrl+1");
-    assert_eq!(h.app.view, ViewMode::Details);
+    assert_eq!(h.app.tab.view, ViewMode::Details);
     h.press("v");
-    assert_eq!(h.app.view, ViewMode::Icons);
+    assert_eq!(h.app.tab.view, ViewMode::Icons);
     h.click(&Target::ViewMode(ViewMode::Details));
-    assert_eq!(h.app.view, ViewMode::Details);
+    assert_eq!(h.app.tab.view, ViewMode::Details);
     h.click(&Target::ViewMode(ViewMode::Icons));
-    assert_eq!(h.app.view, ViewMode::Icons);
+    assert_eq!(h.app.tab.view, ViewMode::Icons);
     // A click on a tile moves the cursor, a double click opens.
     h.double_click(&Target::Row(0));
-    h.wait("a folder", |a| a.cwd.ends_with("assets") && !a.is_loading());
+    h.wait("a folder", |a| {
+        a.tab.cwd.ends_with("assets") && !a.is_loading()
+    });
 }
 
 #[test]
@@ -844,21 +866,23 @@ fn icons_view_cuts_names_and_follows_cursor() {
     let mut h = H::with_config(sb, dir, 80, 24, |c| c.view = ViewMode::Icons);
     let s = h.screen();
     assert!(s.contains('…'), "{s}");
-    let rows = h.app.viewport.grid_rows;
-    let cols = h.app.viewport.grid_cols;
+    let rows = h.app.tab.viewport.grid_rows;
+    let cols = h.app.tab.viewport.grid_cols;
     for _ in 0..(rows + 2) {
         h.press("j");
     }
     let _ = h.screen();
     assert!(
-        h.app.scroll > 0,
+        h.app.tab.scroll > 0,
         "the view scrolled to keep the cursor in sight"
     );
-    assert!(h.app.scroll <= h.app.cursor && h.app.cursor < h.app.scroll + rows * cols);
+    assert!(
+        h.app.tab.scroll <= h.app.tab.cursor && h.app.tab.cursor < h.app.tab.scroll + rows * cols
+    );
     h.press("G");
     let _ = h.screen();
-    assert_eq!(h.app.cursor, 59);
-    assert!(h.app.cursor < h.app.scroll + rows * cols);
+    assert_eq!(h.app.tab.cursor, 59);
+    assert!(h.app.tab.cursor < h.app.tab.scroll + rows * cols);
 }
 
 // ---------------------------------------------------------------------------- details
@@ -931,7 +955,7 @@ fn pane_rows(h: &mut H) -> Vec<String> {
 #[test]
 fn blank_rows_between_bars_and_status() {
     let mut h = scene(170, 35);
-    h.app.marked.clear();
+    h.app.tab.marked.clear();
     let rows = pane_rows(&mut h);
     let open = rows
         .iter()
@@ -968,7 +992,7 @@ fn blank_rows_between_bars_and_status() {
 #[test]
 fn with_nerd_icons_every_button_of_the_details_pane_is_a_rounded_pill() {
     let mut h = scene(170, 35);
-    h.app.marked.clear();
+    h.app.tab.marked.clear();
     h.app.settings.icons = rada_tui::IconSet::Nerd;
     let rows = pane_rows(&mut h);
     let with_caps = |needle: &str| {
@@ -1136,7 +1160,7 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
 fn the_item_menu_has_extract_on_archives_and_pin_on_folders() {
     let mut h = scene(120, 30);
     put_cursor(&mut h, "docs");
-    h.right_click(&Target::Row(h.app.cursor));
+    h.right_click(&Target::Row(h.app.tab.cursor));
     let s = h.screen();
     assert!(s.contains("Pin to navigation"), "{s}");
     // "Open with…" is for files: on a folder it is there but cannot be chosen.
@@ -1182,7 +1206,7 @@ fn types_and_dates_are_computed_once_per_entry() {
     let mut h = scene(140, 36);
     let _ = h.screen();
     // The type of every entry is a word, never computed while drawing: it is in the entry.
-    for e in h.app.listing.all() {
+    for e in h.app.tab.listing.all() {
         assert!(!e.type_label.is_empty());
     }
     assert!(h.screen().contains("Archive (tar.gz)") && h.screen().contains("Shell script"));
@@ -1193,7 +1217,7 @@ fn nothing_the_explorer_draws_leaves_the_screen_or_breaks_a_wide_glyph() {
     for (w, hh) in SIZES {
         let mut h = busy_scene(w, hh);
         for view in [ViewMode::Details, ViewMode::Icons] {
-            h.app.view = view;
+            h.app.tab.view = view;
             let s = h.screen();
             assert!(!s.contains('\u{fffd}'));
             for l in s.lines() {
@@ -1210,13 +1234,13 @@ fn nothing_the_explorer_draws_leaves_the_screen_or_breaks_a_wide_glyph() {
 fn key_events_that_are_releases_do_nothing() {
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
     let mut h = scene(120, 30);
-    let before = h.app.cursor;
+    let before = h.app.tab.cursor;
     let mut ev = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
     ev.kind = KeyEventKind::Release;
     ev.state = KeyEventState::NONE;
     h.app.on_key(ev);
-    assert_eq!(h.app.cursor, before);
+    assert_eq!(h.app.tab.cursor, before);
     ev.kind = KeyEventKind::Press;
     h.app.on_key(ev);
-    assert_eq!(h.app.cursor, before + 1);
+    assert_eq!(h.app.tab.cursor, before + 1);
 }

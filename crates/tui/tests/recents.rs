@@ -75,10 +75,10 @@ fn recents_newest_first_read_only() {
     h.press("down");
     h.press("alt+f");
     let work = b.parent().unwrap().to_path_buf();
-    h.wait("the folder", move |a| a.cwd == work && !a.is_loading());
+    h.wait("the folder", move |a| a.tab.cwd == work && !a.is_loading());
     assert_eq!(h.cursor_name(), "mid.txt");
     // Leaving the list gives the folders their own order back.
-    assert_eq!(h.app.sort.key, rada_core::model::SortKey::Name);
+    assert_eq!(h.app.tab.sort.key, rada_core::model::SortKey::Name);
 }
 
 #[test]

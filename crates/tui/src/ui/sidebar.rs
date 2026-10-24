@@ -107,7 +107,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
         return;
     }
     let rail = mode == Mode::Rail;
-    let current = current_index(&items, &app.cwd);
+    let current = current_index(&items, &app.tab.cwd);
     let focused = app
         .side_nav
         .focus

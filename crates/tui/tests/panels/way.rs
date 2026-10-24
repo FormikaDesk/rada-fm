@@ -37,7 +37,7 @@ fn nav_lists_only_the_ancestors_and_the_subfolders_of_the_folder_shown() {
     // The folder shown carries its number of items and is the highlighted row.
     let here = &rows[title + 4];
     assert_eq!(here.path, c);
-    assert_eq!(here.count, Some(h.app.listing.all().len()));
+    assert_eq!(here.count, Some(h.app.tab.listing.all().len()));
     assert_eq!(App::nav_current(&rows, &c), Some(title + 4));
     let text = nav_text(&mut h);
     assert!(
@@ -47,7 +47,7 @@ fn nav_lists_only_the_ancestors_and_the_subfolders_of_the_folder_shown() {
     // Moving to a folder in the middle box moves the way by itself.
     go_and_wait(&mut h, &home.join("a"));
     h.wait("the subfolders of a", |a| {
-        a.side_nav.tree.kids(&a.cwd).is_some()
+        a.side_nav.tree.kids(&a.tab.cwd).is_some()
     });
     h.settle();
     let text = nav_text(&mut h);
@@ -61,13 +61,13 @@ fn a_click_on_an_ancestor_of_the_way_shows_that_folder_in_the_middle_box() {
     h.click(&rada_tui::hits::Target::Place(b.clone()));
     h.wait("b", {
         let b = b.clone();
-        move |a| a.cwd == b && !a.is_loading()
+        move |a| a.tab.cwd == b && !a.is_loading()
     });
     h.settle();
     assert!(h.screen().contains("[ ~/a/b ]"));
     // Enter does the same from the keyboard, on a subfolder.
     h.wait("the subfolders of b", |a| {
-        a.side_nav.tree.kids(&a.cwd).is_some()
+        a.side_nav.tree.kids(&a.tab.cwd).is_some()
     });
     h.press("tab");
     let at = h
@@ -78,7 +78,7 @@ fn a_click_on_an_ancestor_of_the_way_shows_that_folder_in_the_middle_box() {
         .expect("c is listed under b");
     h.app.side_nav.nav_cursor = at;
     h.press("enter");
-    h.wait("c", move |a| a.cwd == c && !a.is_loading());
+    h.wait("c", move |a| a.tab.cwd == c && !a.is_loading());
 }
 
 #[test]
@@ -90,7 +90,10 @@ fn what_does_not_fit_under_the_way_is_counted_in_a_row_of_more() {
     go_and_wait(&mut h, &c);
     h.app.refresh();
     h.wait("the subfolders of c", |a| {
-        a.side_nav.tree.kids(&a.cwd).is_some_and(|k| k.len() == 43)
+        a.side_nav
+            .tree
+            .kids(&a.tab.cwd)
+            .is_some_and(|k| k.len() == 43)
     });
     h.settle();
     let rows = h.app.nav_rows();
@@ -146,7 +149,7 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     // box needs.
     std::fs::create_dir_all(home.join("d0")).unwrap();
     go_and_wait(&mut h, &home.join("d0"));
-    h.wait("the way", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+    h.wait("the way", |a| a.side_nav.tree.kids(&a.tab.cwd).is_some());
     h.settle();
     let tall = h.app.frame.nav_area.height as usize;
     let rows = h.app.nav_rows();
@@ -158,12 +161,12 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     }
     std::fs::create_dir_all(&deep).unwrap();
     go_and_wait(&mut h, &deep);
-    h.wait("the way", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+    h.wait("the way", |a| a.side_nav.tree.kids(&a.tab.cwd).is_some());
     h.settle();
     // (Indented as deep as that the name does not fit, so the row is looked for by its place.)
     let in_view = |h: &H| {
         let rows = h.app.nav_rows();
-        let at = App::nav_current(&rows, &h.app.cwd).unwrap();
+        let at = App::nav_current(&rows, &h.app.tab.cwd).unwrap();
         let (from, height) = (h.app.frame.nav_scroll, h.app.frame.nav_area.height as usize);
         (from..from + height).contains(&at)
     };
@@ -206,7 +209,9 @@ fn the_way_starts_at_the_nearest_place_that_holds_the_folder() {
     let deep = home.join("Documents/x/y");
     std::fs::create_dir_all(&deep).unwrap();
     go_and_wait(&mut h, &deep);
-    h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+    h.wait("the subfolders", |a| {
+        a.side_nav.tree.kids(&a.tab.cwd).is_some()
+    });
     h.settle();
     let docs = home.join("Documents");
     assert_eq!(
@@ -225,7 +230,9 @@ fn the_way_starts_at_the_nearest_place_that_holds_the_folder() {
     let abc = home.join("a/b/c");
     std::fs::create_dir_all(&abc).unwrap();
     go_and_wait(&mut h, &abc);
-    h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+    h.wait("the subfolders", |a| {
+        a.side_nav.tree.kids(&a.tab.cwd).is_some()
+    });
     let way = way_paths(&h);
     assert_eq!(way[0], home);
     assert_eq!(&way[1..], [home.join("a"), home.join("a/b"), abc.clone()]);
@@ -238,7 +245,9 @@ fn a_deep_way_keeps_the_name_of_the_folder_shown_whole() {
     let deep = home.join("uno/due/tre/quattro/cinque/sei/sette/cartella8");
     std::fs::create_dir_all(&deep).unwrap();
     go_and_wait(&mut h, &deep);
-    h.wait("the subfolders", |a| a.side_nav.tree.kids(&a.cwd).is_some());
+    h.wait("the subfolders", |a| {
+        a.side_nav.tree.kids(&a.tab.cwd).is_some()
+    });
     h.settle();
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).unwrap();
@@ -266,7 +275,10 @@ fn deep_scene(w: u16, hh: u16, levels: usize) -> H {
     }
     go_and_wait(&mut h, &deep);
     h.wait("the subfolders", |a| {
-        a.side_nav.tree.kids(&a.cwd).is_some_and(|k| k.len() == 3)
+        a.side_nav
+            .tree
+            .kids(&a.tab.cwd)
+            .is_some_and(|k| k.len() == 3)
     });
     h.settle();
     h

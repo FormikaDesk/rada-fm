@@ -323,7 +323,7 @@ fn event_loop(
         }
     }
     Ok(Outcome {
-        last_dir: app.cwd.clone(),
+        last_dir: app.tab.cwd.clone(),
         chosen: app.session.chosen.take(),
     })
 }

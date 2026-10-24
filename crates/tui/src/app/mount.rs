@@ -67,7 +67,7 @@ impl App {
     /// path of the virtual filesystem at the head of the path bar.
     pub fn device_head(&self) -> Option<(String, PathBuf)> {
         let root = self.svc.platform.device_root()?;
-        let device = self.cwd.strip_prefix(root).ok()?.components().next()?;
+        let device = self.tab.cwd.strip_prefix(root).ok()?.components().next()?;
         let dir = root.join(device);
         let label = self
             .devices

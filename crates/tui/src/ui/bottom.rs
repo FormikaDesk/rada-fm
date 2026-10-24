@@ -126,7 +126,7 @@ fn hints(app: &App) -> Vec<Hint> {
             ]
         };
     }
-    if let Some(f) = &app.filter
+    if let Some(f) = &app.tab.filter
         && f.editing
     {
         return vec![
@@ -142,7 +142,7 @@ fn hints(app: &App) -> Vec<Hint> {
         v.extend(Hint::act(app, ToggleSidebar, Key::HHide));
         return v;
     }
-    let mut v = if app.marked.is_empty() && app.in_archive() {
+    let mut v = if app.tab.marked.is_empty() && app.in_archive() {
         acts(&[
             (Open, Key::HOpen),
             (Copy, Key::HCopyOut),
@@ -152,7 +152,7 @@ fn hints(app: &App) -> Vec<Hint> {
             (Undo, Key::HUndo),
             (Help, Key::HHelp),
         ])
-    } else if app.marked.is_empty() {
+    } else if app.tab.marked.is_empty() {
         let mut first = if app.on_archive_item() {
             acts(&[
                 (ExtractHere, Key::HExtract),
@@ -194,7 +194,7 @@ fn hints(app: &App) -> Vec<Hint> {
         v.extend(acts(&[(ClearSelection, Key::HDeselect)]));
         v
     };
-    if app.filter.is_some() && app.marked.is_empty() {
+    if app.tab.filter.is_some() && app.tab.marked.is_empty() {
         v.insert(0, Hint::fixed("Esc", Key::HClearSearch));
     }
     v
@@ -202,17 +202,17 @@ fn hints(app: &App) -> Vec<Hint> {
 
 /// "19 items", "3 of 19 items".
 pub(super) fn count_text(app: &App) -> String {
-    let total = app.listing.all().len();
-    if app.filter.is_some() {
+    let total = app.tab.listing.all().len();
+    if app.tab.filter.is_some() {
         tf(
             Key::ItemsOfTotal,
             &[
-                &app.visible.len(),
+                &app.tab.visible.len(),
                 &fmt::count(total as u64, Key::ItemOne, Key::ItemMany),
             ],
         )
     } else {
-        fmt::count(app.visible.len() as u64, Key::ItemOne, Key::ItemMany)
+        fmt::count(app.tab.visible.len() as u64, Key::ItemOne, Key::ItemMany)
     }
 }
 
@@ -232,19 +232,20 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             match app.view_title() {
                 Some(title) => title,
-                None => fmt::short_path(&app.cwd, app.home()),
+                None => fmt::short_path(&app.tab.cwd, app.home()),
             },
             th.accent_style().add_modifier(Modifier::BOLD).patch(band),
         ));
         b.push(Span::styled("  │  ", th.faint().patch(band)));
     }
     b.push(Span::styled(count_text(app), th.base().patch(band)));
-    if !app.marked.is_empty() {
+    if !app.tab.marked.is_empty() {
         let size: u64 = app
+            .tab
             .listing
             .all()
             .iter()
-            .filter(|e| app.marked.contains(&e.name) && !e.is_dir())
+            .filter(|e| app.tab.marked.contains(&e.name) && !e.is_dir())
             .map(|e| e.size)
             .sum();
         let tick = icons::ui(app.settings.icons, Glyph::Checked);
@@ -252,12 +253,12 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
         b.push(Span::styled(
             format!(
                 "{tick} {}",
-                if app.marked.len() == 1 {
+                if app.tab.marked.len() == 1 {
                     tf(Key::SelectedSizeOne, &[&fmt::size(size)])
                 } else {
                     tf(
                         Key::SelectedSizeMany,
-                        &[&app.marked.len(), &fmt::size(size)],
+                        &[&app.tab.marked.len(), &fmt::size(size)],
                     )
                 }
             ),
@@ -337,7 +338,7 @@ pub(super) fn free_space<'a>(app: &App, with_bar: bool) -> Bar<'a> {
         .devices
         .volumes
         .iter()
-        .filter(|v| app.cwd.starts_with(&v.mount_point))
+        .filter(|v| app.tab.cwd.starts_with(&v.mount_point))
         .max_by_key(|v| v.mount_point.as_os_str().len())
     else {
         return b;
@@ -368,7 +369,7 @@ fn view_buttons<'a>(app: &App) -> Bar<'a> {
         (ViewMode::Columns, Glyph::Columns),
     ] {
         let g = icons::ui(app.settings.icons, glyph);
-        if app.view == mode {
+        if app.tab.view == mode {
             b.push_hits(
                 soft::pill(th, look, g, th.accent, th.pill(), band),
                 Target::ViewMode(mode),

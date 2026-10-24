@@ -23,20 +23,20 @@ fn members() -> Vec<Member> {
 fn in_archive(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("inside {tail}"), move |a| {
-        a.archive.is_some() && !a.is_loading() && a.cwd.ends_with(&t)
+        a.tab.archive.is_some() && !a.is_loading() && a.tab.cwd.ends_with(&t)
     });
 }
 
 fn at(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("in {tail}"), move |a| {
-        a.archive.is_none() && !a.is_loading() && a.cwd.ends_with(&t)
+        a.tab.archive.is_none() && !a.is_loading() && a.tab.cwd.ends_with(&t)
     });
 }
 
 fn put_cursor(h: &mut H, name: &str) {
     h.key(KeyCode::Home);
-    for _ in 0..h.app.visible.len() {
+    for _ in 0..h.app.tab.visible.len() {
         if h.cursor_name() == name {
             return;
         }
@@ -107,7 +107,7 @@ fn a_file_whose_content_is_an_archive_is_recognised_by_its_preview() {
     h.key(KeyCode::Enter);
     h.pump(150);
     assert!(
-        h.app.archive.is_none(),
+        h.app.tab.archive.is_none(),
         "opened with its program, not as a folder"
     );
     // ... and it is the system that is asked to open it, here a recording stand-in.
@@ -315,7 +315,7 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
     });
     let t = h.app.current_notice().unwrap().text.clone();
     assert!(t.contains("not an archive"), "{t}");
-    assert!(h.app.archive.is_none());
+    assert!(h.app.tab.archive.is_none());
     // The first message is still up: take it away, so that what comes next is the answer to
     // the extraction and not a left-over. The answer is a one-line message, or, when the
     // sentence is long (it holds the whole path of the file), a window of its own: which of

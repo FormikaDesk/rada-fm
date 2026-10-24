@@ -25,7 +25,7 @@ fn scene(width: u16) -> H {
 #[test]
 fn the_list_keeps_the_start_and_the_end_of_a_long_name() {
     let mut h = scene(110);
-    h.wait("the files", |a| !a.is_loading() && a.visible.len() == 4);
+    h.wait("the files", |a| !a.is_loading() && a.tab.visible.len() == 4);
     let screen = h.screen();
     for cut in [
         "CV_Alessa…ccenture.pdf",
@@ -40,7 +40,7 @@ fn the_list_keeps_the_start_and_the_end_of_a_long_name() {
 #[test]
 fn a_name_that_fits_is_shown_whole() {
     let mut h = scene(170);
-    h.wait("the files", |a| !a.is_loading() && a.visible.len() == 4);
+    h.wait("the files", |a| !a.is_loading() && a.tab.visible.len() == 4);
     let screen = h.screen();
     for file in FILES {
         assert!(screen.contains(file), "{file}:\n{screen}");

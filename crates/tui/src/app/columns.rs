@@ -33,15 +33,18 @@ pub struct ColumnsView {
 impl App {
     /// Whether the Columns view is the one drawn.
     pub fn columns_on(&self) -> bool {
-        self.view == ViewMode::Columns
+        self.tab.view == ViewMode::Columns
     }
 
     /// Ask for the folder above the shown one if the first column does not have it yet.
     pub fn want_parent_column(&mut self) {
-        if self.view != ViewMode::Columns || self.archive.is_some() || self.tag_view().is_some() {
+        if self.tab.view != ViewMode::Columns
+            || self.tab.archive.is_some()
+            || self.tag_view().is_some()
+        {
             return;
         }
-        let Some(parent) = self.cwd.parent().map(Path::to_path_buf) else {
+        let Some(parent) = self.tab.cwd.parent().map(Path::to_path_buf) else {
             self.columns.columns_parent = None;
             return;
         };
@@ -75,7 +78,7 @@ impl App {
         match result {
             Ok(entries) => {
                 self.columns.columns_parent = Some(ParentColumn {
-                    listing: DirListing::new(path.clone(), entries, self.sort),
+                    listing: DirListing::new(path.clone(), entries, self.tab.sort),
                     path,
                 });
             }

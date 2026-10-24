@@ -67,10 +67,10 @@ fn right_goes_into_the_folder_and_left_comes_back_to_where_it_was() {
     h.key(KeyCode::Right);
     let inside = dir.join("dir");
     let d = inside.clone();
-    h.wait("inside", move |a| a.cwd == d && !a.is_loading());
+    h.wait("inside", move |a| a.tab.cwd == d && !a.is_loading());
     h.key(KeyCode::Left);
     let d = dir.clone();
-    h.wait("back", move |a| a.cwd == d && !a.is_loading());
+    h.wait("back", move |a| a.tab.cwd == d && !a.is_loading());
     assert_eq!(h.cursor_name(), "dir", "the cursor is where it was");
 }
 
@@ -82,7 +82,7 @@ fn right_on_a_file_stays_and_opens_nothing_but_enter_still_opens() {
     assert_eq!(h.cursor_name(), "a.txt");
     h.key(KeyCode::Right);
     h.pump(50);
-    assert_eq!(h.app.cwd, dir, "a file is not a place to go to");
+    assert_eq!(h.app.tab.cwd, dir, "a file is not a place to go to");
     assert!(h.opened().is_empty(), "and Right does not launch a program");
     h.key(KeyCode::Enter);
     // The opening is made by a thread of its own: wait for it, not for a fixed time.
@@ -113,7 +113,7 @@ fn a_click_in_the_first_column_goes_to_that_folder() {
     assert!(h.app.frame.hits.find(&Target::Place(dir.clone())).is_some());
     h.click(&Target::Place(sibling.clone()));
     let d = sibling.clone();
-    h.wait("the sibling", move |a| a.cwd == d && !a.is_loading());
+    h.wait("the sibling", move |a| a.tab.cwd == d && !a.is_loading());
 }
 
 #[test]
@@ -151,18 +151,18 @@ fn too_narrow_for_three_columns_it_is_a_table() {
 fn columns_choice_is_kept_per_tab() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 150, 30);
-    assert_eq!(h.app.view, ViewMode::Details);
+    assert_eq!(h.app.tab.view, ViewMode::Details);
     h.click(&Target::Menu(rada_tui::app::MenuKind::View));
     let s = h.screen();
     assert!(s.contains("Columns"), "{s}");
     h.press("down");
     h.press("down"); // Columns
     h.press("enter");
-    assert_eq!(h.app.view, ViewMode::Columns);
+    assert_eq!(h.app.tab.view, ViewMode::Columns);
     h.press("ctrl+1");
-    assert_eq!(h.app.view, ViewMode::Details);
+    assert_eq!(h.app.tab.view, ViewMode::Details);
     h.press("ctrl+3");
-    assert_eq!(h.app.view, ViewMode::Columns);
+    assert_eq!(h.app.tab.view, ViewMode::Columns);
     assert_eq!(ViewMode::parse("columns"), Some(ViewMode::Columns));
     assert_eq!(ViewMode::Columns.id(), "columns");
 }
