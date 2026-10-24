@@ -41,7 +41,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let mut right = Bar::default();
     // A newer version waits: a pill in the accent colour, a click (or the key) opens the notes.
     if w >= 60
-        && let crate::app::UpdateStatus::Available { notice, .. } = &app.update
+        && let crate::app::UpdateStatus::Available { notice, .. } = &app.updates.update
     {
         let up = icons::ui(set, Glyph::Up);
         let text = format!("{up} {}", tf(Key::UpdateTo, &[&notice.version]));

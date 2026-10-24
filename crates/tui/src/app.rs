@@ -507,7 +507,7 @@ pub use openwith::{OpenRow, OpenWithView};
 pub use panels::GitView;
 pub use props::PropsView;
 pub use tabs::TabState;
-pub use update::{UpdateStatus, UpdateView};
+pub use update::{UpdateStatus, UpdateView, Updates};
 
 /// Whether an entry carries a tag matching `want` (lower case): a name that contains it, or
 /// the colour of that name. An empty `want` (`tag:` alone) means "any tag".
@@ -713,13 +713,7 @@ pub struct App {
     pub size_notice_dismissed: bool,
     /// The last frame showed it.
     pub size_notice_visible: bool,
-    /// The version of this program, as the status bar shows it (the update worker's, when there
-    /// is one; tests pin it so that a release does not change every screenshot).
-    pub version: String,
-    /// What the update worker last told.
-    pub update: UpdateStatus,
-    /// Somebody asked to look for updates and is waiting for the answer.
-    update_asked: bool,
+    pub updates: Updates,
 }
 
 impl App {
@@ -884,12 +878,14 @@ impl App {
             denied: Vec::new(),
             size_notice_dismissed: false,
             size_notice_visible: false,
-            version: svc.updater.as_ref().map_or_else(
-                || env!("CARGO_PKG_VERSION").to_string(),
-                |u| u.ctx().current.to_string(),
-            ),
-            update: UpdateStatus::None,
-            update_asked: false,
+            updates: Updates {
+                version: svc.updater.as_ref().map_or_else(
+                    || env!("CARGO_PKG_VERSION").to_string(),
+                    |u| u.ctx().current.to_string(),
+                ),
+                update: UpdateStatus::None,
+                update_asked: false,
+            },
             svc,
             hooks: TestHooks {
                 demo_volumes: cfg.demo.is_some(),

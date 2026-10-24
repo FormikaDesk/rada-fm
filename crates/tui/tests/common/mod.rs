@@ -226,7 +226,7 @@ impl H {
         }
         let mut app = App::new(cfg, svc, images);
         // The version is in the status bar: pinned, a release does not change every snapshot.
-        app.version = "0.6.0".into();
+        app.updates.version = "0.6.0".into();
         // A double click is two clicks within a time. The tests do not depend on how fast a
         // machine is: any two clicks of a test are a double click unless the test says
         // otherwise (see `a_slow_second_click_is_not_a_double_click`).

@@ -303,7 +303,7 @@ pub(super) fn update_notice_bar<'a>(app: &App, room: usize, left_width: usize) -
     let (variants, clickable) = app.update_notice()?;
     let th = &app.th;
     let band = th.band();
-    let failed = matches!(app.update, crate::app::UpdateStatus::Failed { .. });
+    let failed = matches!(app.updates.update, crate::app::UpdateStatus::Failed { .. });
     let keep_for_count = 12.min(left_width);
     let text = variants
         .iter()

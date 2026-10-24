@@ -33,6 +33,17 @@ pub enum UpdateStatus {
     },
 }
 
+/// What the interface knows about updates.
+pub struct Updates {
+    /// The version of this program, as the status bar shows it (the update worker's, when there
+    /// is one; tests pin it so that a release does not change every screenshot).
+    pub version: String,
+    /// What the update worker last told.
+    pub update: UpdateStatus,
+    /// Somebody asked to look for updates and is waiting for the answer.
+    pub(super) update_asked: bool,
+}
+
 /// The window of the update.
 pub enum UpdateView {
     /// The release notes and the question.
@@ -50,7 +61,7 @@ pub enum UpdateView {
 impl App {
     /// Start the update worker (the program does this through [`Services`]; tests through here).
     pub fn start_updates(&mut self, ctx: rada_core::update::Ctx) {
-        self.version = ctx.current.to_string();
+        self.updates.version = ctx.current.to_string();
         self.svc.updater = Some(rada_core::update::Updater::spawn(
             ctx,
             self.svc.notes.clone(),
@@ -60,40 +71,40 @@ impl App {
     pub(super) fn on_update_event(&mut self, ev: UpdateEvent) {
         match ev {
             UpdateEvent::Available { notice, how } => {
-                let asked = std::mem::take(&mut self.update_asked);
+                let asked = std::mem::take(&mut self.updates.update_asked);
                 // Never replace the news of an update that is running or has just finished.
                 if matches!(
-                    self.update,
+                    self.updates.update,
                     UpdateStatus::Working { .. } | UpdateStatus::Done(_)
                 ) {
                     return;
                 }
-                self.update = UpdateStatus::Available { notice, how };
+                self.updates.update = UpdateStatus::Available { notice, how };
                 // Somebody asked: show what was found, not just a pill in a corner.
                 if asked && self.modal.is_none() {
                     self.start_update_action();
                 }
             }
             UpdateEvent::UpToDate => {
-                if std::mem::take(&mut self.update_asked) {
-                    self.update = UpdateStatus::None;
+                if std::mem::take(&mut self.updates.update_asked) {
+                    self.updates.update = UpdateStatus::None;
                     self.toast(ToastKind::Ok, Key::TUpToDate.tr(), 4);
                 }
-                if matches!(self.update, UpdateStatus::Working { .. }) {
-                    self.update = UpdateStatus::None;
+                if matches!(self.updates.update, UpdateStatus::Working { .. }) {
+                    self.updates.update = UpdateStatus::None;
                 }
             }
             UpdateEvent::CheckFailed(e) => {
-                if std::mem::take(&mut self.update_asked) {
+                if std::mem::take(&mut self.updates.update_asked) {
                     self.toast(ToastKind::Warn, tf(Key::TCannotLookUpdates, &[&e]), 6);
                 }
             }
             UpdateEvent::Progress(step) => {
-                let started = match &self.update {
+                let started = match &self.updates.update {
                     UpdateStatus::Working { started, .. } => *started,
                     _ => Instant::now(),
                 };
-                self.update = UpdateStatus::Working { step, started };
+                self.updates.update = UpdateStatus::Working { step, started };
             }
             UpdateEvent::Done(applied) => {
                 let text = if applied.restart {
@@ -102,10 +113,10 @@ impl App {
                     applied.note.clone()
                 };
                 self.toast(ToastKind::Ok, text, 10);
-                self.update = UpdateStatus::Done(applied);
+                self.updates.update = UpdateStatus::Done(applied);
             }
             UpdateEvent::Failed { message, log } => {
-                self.update = UpdateStatus::Failed {
+                self.updates.update = UpdateStatus::Failed {
                     message: message.clone(),
                     log: log.clone(),
                 };
@@ -120,7 +131,7 @@ impl App {
 
     /// The version of the running program.
     pub fn version(&self) -> String {
-        self.version.clone()
+        self.updates.version.clone()
     }
 
     /// Ask the network now, whatever the day's check said (the version in the status bar, and
@@ -128,11 +139,11 @@ impl App {
     /// is up to date".
     pub(super) fn check_updates_now(&mut self) {
         match &self.svc.updater {
-            _ if matches!(self.update, UpdateStatus::Working { .. }) => {
+            _ if matches!(self.updates.update, UpdateStatus::Working { .. }) => {
                 self.toast(ToastKind::Info, Key::TUpdateRunning.tr(), 3);
             }
             Some(u) => {
-                self.update_asked = true;
+                self.updates.update_asked = true;
                 u.check_now();
                 self.toast(ToastKind::Info, Key::TLookingNewer.tr(), 3);
             }
@@ -199,7 +210,7 @@ impl App {
 
     /// The Update action: show the news, retry after a failure, or look for a new version.
     pub(super) fn start_update_action(&mut self) {
-        match &self.update {
+        match &self.updates.update {
             UpdateStatus::Available { notice, how } => {
                 self.modal = Some(Modal::Update(UpdateView::Offer {
                     notice: notice.clone(),
@@ -226,7 +237,7 @@ impl App {
             }
             UpdateStatus::None => match &self.svc.updater {
                 Some(u) => {
-                    self.update_asked = true;
+                    self.updates.update_asked = true;
                     u.check_now();
                     self.toast(ToastKind::Info, Key::TLookingNewer.tr(), 3);
                 }
@@ -247,7 +258,7 @@ impl App {
                     Ok(_) => {
                         if let Some(u) = &self.svc.updater {
                             u.apply();
-                            self.update = UpdateStatus::Working {
+                            self.updates.update = UpdateStatus::Working {
                                 step: tf(Key::UpStarting, &[&notice.version]),
                                 started: Instant::now(),
                             };
@@ -298,7 +309,7 @@ impl App {
             None => String::new(),
         };
         let dot = |k: &Option<String>| k.as_ref().map(|k| format!(" · {k}")).unwrap_or_default();
-        match &self.update {
+        match &self.updates.update {
             UpdateStatus::None => None,
             UpdateStatus::Available { notice, .. } => Some((
                 vec![

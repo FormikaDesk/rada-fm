@@ -98,7 +98,10 @@ fn package_install_is_told_what_to_run() {
         matches!(h.app.modal, Some(Modal::Update(_))),
         "Enter must not start anything for a package"
     );
-    assert!(matches!(h.app.update, UpdateStatus::Available { .. }));
+    assert!(matches!(
+        h.app.updates.update,
+        UpdateStatus::Available { .. }
+    ));
     h.key(crossterm::event::KeyCode::Esc);
     assert!(h.app.modal.is_none());
 }
@@ -226,11 +229,11 @@ fn accept_starts_worker_failure_window() {
     h.key(crossterm::event::KeyCode::Enter);
     assert!(h.app.modal.is_none());
     assert!(
-        matches!(h.app.update, UpdateStatus::Working { .. }),
+        matches!(h.app.updates.update, UpdateStatus::Working { .. }),
         "the bar says it is working at once"
     );
     h.wait("the failure", |a| {
-        matches!(a.update, UpdateStatus::Failed { .. })
+        matches!(a.updates.update, UpdateStatus::Failed { .. })
     });
     let s = h.screen();
     assert!(
