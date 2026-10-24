@@ -170,7 +170,11 @@ fn notifications_pile_up_and_each_goes_when_its_time_is_up() {
     h.app
         .notify(Notice::new(NoticeKind::Error, "cannot rename setup.sh"));
     let now = h.app.notice_now();
-    assert_eq!(h.app.notices.shown(now).len(), 2, "both are on screen");
+    assert_eq!(
+        h.app.windows.notices.shown(now).len(),
+        2,
+        "both are on screen"
+    );
     let s = h.screen();
     assert!(
         s.contains("moved to the trash") && s.contains("Cannot rename"),
@@ -195,8 +199,8 @@ fn more_than_three_wait_for_room() {
         );
     }
     let now = h.app.notice_now();
-    assert_eq!(h.app.notices.shown(now).len(), 3);
-    assert_eq!(h.app.notices.waiting(), 1);
+    assert_eq!(h.app.windows.notices.shown(now).len(), 3);
+    assert_eq!(h.app.windows.notices.waiting(), 1);
     let s = h.screen();
     assert!(s.contains("Done a") && s.contains("Done c"), "{s}");
     assert!(!s.contains("Done d"), "{s}");

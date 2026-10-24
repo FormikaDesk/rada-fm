@@ -199,7 +199,7 @@ fn ctrl_l_redraws_everywhere() {
     assert!(h.app.take_full_redraw(), "Ctrl+L asks for a redraw");
     assert!(!h.app.take_full_redraw(), "asking once resets it");
     // While the bar is being edited, and inside a window, too.
-    assert!(h.app.address.is_some());
+    assert!(h.app.windows.address.is_some());
     h.press("ctrl+l");
     assert!(h.app.take_full_redraw());
     h.key(KeyCode::Esc);
@@ -227,7 +227,7 @@ fn starting_a_program_redraws_the_screen() {
 fn the_help_says_what_ctrl_l_does() {
     let (mut h, _dest) = files(150, 60);
     h.key(KeyCode::F(1));
-    h.app.help_scroll = 100;
+    h.app.windows.help_scroll = 100;
     let s = h.screen();
     assert!(
         s.contains("Ctrl+L") && s.contains("draws the whole screen again"),
@@ -240,7 +240,7 @@ fn the_help_window_does_not_mention_the_launch_helper() {
     let (mut h, _dest) = files(150, 60);
     h.key(KeyCode::F(1));
     for scroll in [0, 40, 100] {
-        h.app.help_scroll = scroll;
+        h.app.windows.help_scroll = scroll;
         let s = h.screen();
         assert!(!s.contains("launch-helper"), "{s}");
     }

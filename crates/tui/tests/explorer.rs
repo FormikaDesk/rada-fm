@@ -428,12 +428,12 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
     let mut h = scene(140, 30);
     // Clicking the path (not a segment) edits it.
     h.press("ctrl+l");
-    assert!(h.app.address.is_some());
+    assert!(h.app.windows.address.is_some());
     let row = h.screen().lines().nth(1).unwrap().to_string();
     assert!(row.contains("~/projects/demo/▏"), "{row}");
     // Esc leaves it as it was.
     h.press("esc");
-    assert!(h.app.address.is_none() && h.app.cwd.ends_with("demo"));
+    assert!(h.app.windows.address.is_none() && h.app.cwd.ends_with("demo"));
 
     // Type a path, complete with Tab, go with Enter.
     h.press("alt+d");
@@ -453,14 +453,17 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
         "the suggestion is drawn under the field"
     );
     h.press("tab");
-    assert_eq!(h.app.address.as_ref().unwrap().text, "~/projects/demo/");
+    assert_eq!(
+        h.app.windows.address.as_ref().unwrap().text,
+        "~/projects/demo/"
+    );
     // Go up with ".." and Enter.
     h.keys("..");
     h.press("enter");
     h.wait("the parent", |a| {
         a.cwd.ends_with("projects") && !a.is_loading()
     });
-    assert!(h.app.address.is_none());
+    assert!(h.app.windows.address.is_none());
 }
 
 #[test]
@@ -476,10 +479,10 @@ fn a_click_on_the_path_edits_it_and_a_click_elsewhere_stops() {
         KeyModifiers::NONE,
     );
     let _ = x;
-    assert!(h.app.address.is_some(), "{}", h.screen());
+    assert!(h.app.windows.address.is_some(), "{}", h.screen());
     h.click(&Target::Row(1));
     assert!(
-        h.app.address.is_none(),
+        h.app.windows.address.is_none(),
         "a click on the list ends the editing"
     );
     // A suggestion can be clicked.

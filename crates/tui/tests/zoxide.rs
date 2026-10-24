@@ -63,6 +63,7 @@ fn logged(f: &Fake) -> String {
 
 fn zoxide_hits(h: &H) -> Vec<PathBuf> {
     h.app
+        .windows
         .address
         .as_ref()
         .map(|a| {
@@ -123,7 +124,7 @@ fn what_matches_nothing_else_is_offered_from_zoxide_and_enter_goes_there() {
     h.settle();
     let want = fake.known[1].clone();
     h.wait("the folder opens", |a| a.cwd == want);
-    assert!(h.app.address.is_none());
+    assert!(h.app.windows.address.is_none());
 }
 
 #[test]
@@ -178,7 +179,7 @@ fn without_zoxide_nothing_happens_and_nothing_is_shown() {
     std::thread::sleep(Duration::from_millis(300));
     h.settle();
     assert!(zoxide_hits(&h).is_empty());
-    assert!(h.app.notices.is_empty(), "no error is shown");
+    assert!(h.app.windows.notices.is_empty(), "no error is shown");
     h.key(KeyCode::Enter);
     h.settle();
     assert_eq!(h.app.cwd, work);

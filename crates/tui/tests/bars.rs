@@ -106,7 +106,10 @@ fn one_field_shows_path_search_and_typing() {
         "{row}"
     );
     h.click(&Target::Act(Action::Filter));
-    assert!(h.app.address.is_some(), "the field is being typed in");
+    assert!(
+        h.app.windows.address.is_some(),
+        "the field is being typed in"
+    );
     h.keys("a");
     let row = address_row(&mut h);
     assert!(
@@ -114,7 +117,7 @@ fn one_field_shows_path_search_and_typing() {
         "the field shows what is being typed: {row}"
     );
     h.key(KeyCode::Esc);
-    assert!(h.app.address.is_none());
+    assert!(h.app.windows.address.is_none());
     assert!(address_row(&mut h).contains("Search files"));
 }
 
@@ -125,7 +128,10 @@ fn commands_is_a_hint_at_the_bottom_and_starts_the_field() {
     let row = hints_row(&mut h);
     assert!(row.contains("Ctrl+P") && row.contains("commands"), "{row}");
     h.click(&Target::Act(Action::Palette));
-    assert!(h.app.address.is_some(), "the field takes what is typed");
+    assert!(
+        h.app.windows.address.is_some(),
+        "the field takes what is typed"
+    );
     assert!(h.app.modal.is_none(), "it is not a window");
 }
 

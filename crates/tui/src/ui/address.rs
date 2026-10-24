@@ -246,7 +246,7 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
     };
     let mut body = Bar::default();
 
-    if let Some(a) = &app.address {
+    if let Some(a) = &app.windows.address {
         // Typing: an icon, the text with its cursor, and the way out.
         let esc = key_chip(app, look, "Esc", field, None);
         let esc_w: usize = esc.iter().map(|s| s.content.width()).sum();
@@ -450,7 +450,7 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
     };
     app.frame.bar_field = field_rect;
     // A click anywhere in the field that is not a segment starts the typing.
-    if app.address.is_none() {
+    if app.windows.address.is_none() {
         app.frame.hits.add(field_rect, Target::Address);
     }
     let mut bar = left;
@@ -466,7 +466,7 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
 /// What is offered under the field: the subfolders of a path being typed, or the commands and
 /// places that match the words typed.
 pub fn draw_suggestions(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
-    match app.address.as_ref().map(|a| a.mode()) {
+    match app.windows.address.as_ref().map(|a| a.mode()) {
         Some(BarMode::Search) => draw_bar_hits(f, app, row, screen),
         _ => draw_paths(f, app, row, screen),
     }
@@ -482,7 +482,7 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     let w = (widest + 4).clamp(24, 60).min(screen.width as usize) as u16;
     // Under the field: after the buttons.
     let x = (app.frame.bar_field.x + 2).min(screen.width.saturating_sub(w));
-    let selected = app.address.as_ref().and_then(|a| a.selected);
+    let selected = app.windows.address.as_ref().and_then(|a| a.selected);
     let area = Rect {
         x,
         y: row.y + row.height,
@@ -528,7 +528,9 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
 fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     let th = app.settings.th.clone();
     let look = Look::of(app);
-    let Some(a) = &app.address else { return };
+    let Some(a) = &app.windows.address else {
+        return;
+    };
     if a.hits.is_empty() || row.y + row.height >= screen.height {
         return;
     }

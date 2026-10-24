@@ -110,7 +110,7 @@ fn hints(app: &App) -> Vec<Hint> {
             _ => vec![Hint::fixed("Esc", Key::HClose)],
         };
     }
-    if let Some(a) = &app.address {
+    if let Some(a) = &app.windows.address {
         return if a.mode() == BarMode::Search {
             vec![
                 Hint::fixed("Enter", Key::HGo),

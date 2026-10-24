@@ -148,7 +148,7 @@ impl App {
     /// Read the front tab's folder again, keeping the cursor and the selection.
     fn after_switch(&mut self) {
         let cwd = self.cwd.clone();
-        self.address = None;
+        self.windows.address = None;
         self.dir_gen += 1;
         self.load = LoadState::Loading(cwd.clone());
         self.svc.loader.load(cwd.clone(), self.dir_gen);

@@ -438,6 +438,7 @@ mod sizes;
 pub use sizes::FolderSizeView;
 mod tabs;
 mod update;
+mod windows;
 
 pub use address::{AddressEdit, BarHit, BarItem, BarMode};
 pub use eject::{EjectStage, EjectView};
@@ -516,10 +517,9 @@ pub struct App {
     /// What waits on the clipboard, the plan being prepared, the operation running and the undo.
     pub ops: ops::Operations,
     pub modal: Option<Modal>,
-    /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
-    pub notices: NoticeQueue,
+    /// Notification cards, the address bar and the other things put over the explorer.
+    pub windows: windows::Windows,
     pub columns: columns::ColumnsView,
-    pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
     /// How the session ends, and whether it is a file chooser.
@@ -533,7 +533,6 @@ pub struct App {
     pub filter: Option<FilterState>,
     sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
-    pub help_scroll: usize,
 
     // ---- the explorer interface
     /// How the folder of the front tab is shown.
@@ -544,12 +543,8 @@ pub struct App {
     /// The tabs; the slot of the front one is empty, its state lives in the fields above.
     tabs: Vec<TabState>,
     pub active_tab: usize,
-    /// The address bar while its text is being edited.
-    pub address: Option<AddressEdit>,
     /// Where tabs are saved and the rest of what is remembered between sessions.
     saved_ui: rada_core::uistate::UiState,
-    /// The advice to enlarge a small window was closed (for the rest of this session).
-    pub size_notice_dismissed: bool,
     pub updates: Updates,
 }
 
@@ -637,9 +632,8 @@ impl App {
             tags: side::Tags::new(svc_tag_language(&svc)),
             ops: Default::default(),
             modal: None,
-            notices: NoticeQueue::default(),
+            windows: Default::default(),
             columns: columns::ColumnsView::default(),
-            watch_note: None,
             viewport: Viewport::default(),
             session: chooser::Session::new(cfg.chooser.clone()),
             redraw: Redraw {
@@ -653,15 +647,12 @@ impl App {
             filter: None,
             sel_anchor: None,
             last_click: None,
-            help_scroll: 0,
             view,
             folder_info: Default::default(),
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
             active_tab: active,
-            address: None,
             saved_ui: cfg.saved_ui,
-            size_notice_dismissed: false,
             updates: Updates {
                 version: svc.updater.as_ref().map_or_else(
                     || env!("CARGO_PKG_VERSION").to_string(),
@@ -731,7 +722,7 @@ impl App {
 
     fn tick_notices(&mut self) {
         let now = self.notice_now();
-        if self.notices.tick(now) {
+        if self.windows.notices.tick(now) {
             self.redraw.dirty = true;
         }
     }
@@ -752,24 +743,25 @@ impl App {
     /// Queue a notification.
     pub fn notify(&mut self, notice: Notice) {
         let now = self.notice_now();
-        self.notices.push(notice, now);
+        self.windows.notices.push(notice, now);
         self.redraw.dirty = true;
     }
 
     /// Take every notification away (tests: so that what comes next is not a left-over).
     pub fn clear_notices(&mut self) {
-        self.notices = NoticeQueue::default();
+        self.windows.notices = NoticeQueue::default();
         self.redraw.dirty = true;
     }
 
     /// The oldest notification on screen.
     pub fn current_notice(&self) -> Option<&Notice> {
-        self.notices.front()
+        self.windows.notices.front()
     }
 
     /// Every notification on screen, the oldest first.
     pub fn shown_notices(&self) -> Vec<&Notice> {
-        self.notices
+        self.windows
+            .notices
             .shown(self.notice_now())
             .into_iter()
             .map(|(n, _)| n)
@@ -807,7 +799,7 @@ impl App {
         }
         self.tick_notices();
         if self.ops.is_busy()
-            || self.notices.has_clock()
+            || self.windows.notices.has_clock()
             || matches!(self.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
         {
@@ -1429,9 +1421,9 @@ impl App {
                     self.svc.loader.patch(dir, paths, self.dir_gen);
                 }
             }
-            WatchEvent::Degraded(msg) => self.watch_note = Some(msg),
+            WatchEvent::Degraded(msg) => self.windows.watch_note = Some(msg),
             WatchEvent::Failed(msg) => {
-                self.watch_note = Some(msg.clone());
+                self.windows.watch_note = Some(msg.clone());
                 self.toast(ToastKind::Warn, tf(Key::TLiveOff, &[&msg]), 6);
             }
         }
@@ -2796,23 +2788,23 @@ impl App {
     fn on_help_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
-                self.help_scroll += 1;
+                self.windows.help_down(1);
                 self.modal = Some(Modal::Help);
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                self.help_scroll = self.help_scroll.saturating_sub(1);
+                self.windows.help_up(1);
                 self.modal = Some(Modal::Help);
             }
             KeyCode::PageDown => {
-                self.help_scroll += 10;
+                self.windows.help_down(10);
                 self.modal = Some(Modal::Help);
             }
             KeyCode::PageUp => {
-                self.help_scroll = self.help_scroll.saturating_sub(10);
+                self.windows.help_up(10);
                 self.modal = Some(Modal::Help);
             }
             KeyCode::Home => {
-                self.help_scroll = 0;
+                self.windows.help_scroll = 0;
                 self.modal = Some(Modal::Help);
             }
             // Closing is deliberate: Esc, q, ? , F1, Enter or Space.

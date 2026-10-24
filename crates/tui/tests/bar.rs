@@ -27,12 +27,12 @@ fn row(h: &mut H) -> String {
 fn ctrl_l_selects_the_path_and_the_first_key_replaces_it() {
     let mut h = files();
     h.press("ctrl+l");
-    let a = h.app.address.as_ref().expect("the field is open");
+    let a = h.app.windows.address.as_ref().expect("the field is open");
     assert!(a.fresh && a.text.contains("w/"), "{:?}", a.text);
     assert_eq!(a.mode(), BarMode::Path);
     // Typing a word replaces the path: it is a search now.
     h.keys("be");
-    let a = h.app.address.as_ref().unwrap();
+    let a = h.app.windows.address.as_ref().unwrap();
     assert_eq!(a.text, "be");
     assert_eq!(a.mode(), BarMode::Search);
     assert_eq!(
@@ -44,7 +44,7 @@ fn ctrl_l_selects_the_path_and_the_first_key_replaces_it() {
     h.key(KeyCode::Esc);
     h.press("ctrl+l");
     h.key(KeyCode::End);
-    assert!(!h.app.address.as_ref().unwrap().fresh);
+    assert!(!h.app.windows.address.as_ref().unwrap().fresh);
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn ctrl_p_and_ctrl_f_start_from_nothing() {
     for key in ["ctrl+p", "ctrl+f"] {
         let mut h = files();
         h.press(key);
-        let a = h.app.address.as_ref().expect(key);
+        let a = h.app.windows.address.as_ref().expect(key);
         assert!(a.text.is_empty() && !a.fresh, "{key}");
         assert_eq!(a.mode(), BarMode::Empty);
         assert!(h.app.modal.is_none(), "{key}: not a window");
@@ -69,7 +69,7 @@ fn words_filter_the_files_and_offer_the_commands_that_match() {
     let mut h = files();
     h.press("ctrl+p");
     h.keys("rena");
-    let a = h.app.address.as_ref().unwrap();
+    let a = h.app.windows.address.as_ref().unwrap();
     let first = a.hits.first().expect("a command matches");
     assert!(matches!(first.item, BarItem::Command(Action::Rename)));
     // The command can be asked for in the other language too.
@@ -85,9 +85,12 @@ fn enter_runs_the_command_picked_with_the_arrows() {
     h.press("ctrl+p");
     h.keys("rena");
     h.key(KeyCode::Down); // pick the first
-    assert_eq!(h.app.address.as_ref().unwrap().hit_selected, Some(0));
+    assert_eq!(
+        h.app.windows.address.as_ref().unwrap().hit_selected,
+        Some(0)
+    );
     h.key(KeyCode::Enter);
-    assert!(h.app.address.is_none(), "the field closed");
+    assert!(h.app.windows.address.is_none(), "the field closed");
     assert!(h.app.filter.is_none(), "and took its filter off");
     // Rename needs a file under the cursor: with none it does nothing, but the command ran
     // (the bar is not left open holding words).
@@ -96,6 +99,7 @@ fn enter_runs_the_command_picked_with_the_arrows() {
     h.keys("new f");
     let hit = h
         .app
+        .windows
         .address
         .as_ref()
         .unwrap()
@@ -121,7 +125,7 @@ fn enter_keeps_the_filter_when_files_match_and_esc_takes_it_off() {
     h.keys("txt");
     assert_eq!(h.names(), ["alpha.txt", "beta.txt", "notes.txt"]);
     h.key(KeyCode::Enter);
-    assert!(h.app.address.is_none(), "the field is done");
+    assert!(h.app.windows.address.is_none(), "the field is done");
     assert_eq!(h.names().len(), 3, "the filter stays on the folder");
     assert!(
         row(&mut h).contains("txt"),
@@ -136,7 +140,7 @@ fn enter_keeps_the_filter_when_files_match_and_esc_takes_it_off() {
     h.keys("gam");
     assert_eq!(h.names(), ["gamma.md"]);
     h.key(KeyCode::Esc);
-    assert!(h.app.address.is_none() && h.app.filter.is_none());
+    assert!(h.app.windows.address.is_none() && h.app.filter.is_none());
     assert_eq!(h.names().len(), 5);
     assert!(row(&mut h).contains("Search files"));
 }
@@ -150,7 +154,7 @@ fn enter_with_no_file_matching_runs_the_best_command() {
     h.key(KeyCode::Enter);
     // Nothing is selected and no file is under a filter: Compress asks for the files (or
     // does nothing), but the field is closed and the filter gone.
-    assert!(h.app.address.is_none() && h.app.filter.is_none());
+    assert!(h.app.windows.address.is_none() && h.app.filter.is_none());
 }
 
 #[test]
@@ -158,7 +162,10 @@ fn a_path_is_completed_and_gone_to_not_searched() {
     let mut h = files();
     h.press("ctrl+l");
     h.keys("~/");
-    assert_eq!(h.app.address.as_ref().unwrap().mode(), BarMode::Path);
+    assert_eq!(
+        h.app.windows.address.as_ref().unwrap().mode(),
+        BarMode::Path
+    );
     assert!(h.app.filter.is_none(), "a path filters nothing");
     h.key(KeyCode::Esc);
     h.press("ctrl+l");
@@ -174,10 +181,13 @@ fn backspace_on_an_empty_field_leaves_it() {
     h.keys("ab");
     h.key(KeyCode::Backspace);
     h.key(KeyCode::Backspace);
-    assert!(h.app.address.is_some(), "the field is empty but still open");
+    assert!(
+        h.app.windows.address.is_some(),
+        "the field is empty but still open"
+    );
     assert!(h.app.filter.is_none(), "an empty field filters nothing");
     h.key(KeyCode::Backspace);
-    assert!(h.app.address.is_none(), "one more leaves it");
+    assert!(h.app.windows.address.is_none(), "one more leaves it");
 }
 
 #[test]
@@ -190,7 +200,7 @@ fn the_arrows_move_through_the_files_when_there_is_no_command_to_pick() {
     let after = h.cursor_name();
     // Either a command was picked (when one matched "txt") or the cursor moved; the field
     // never swallows the key.
-    let a = h.app.address.as_ref().unwrap();
+    let a = h.app.windows.address.as_ref().unwrap();
     assert!(a.hit_selected.is_some() || before != after);
 }
 
@@ -198,8 +208,8 @@ fn the_arrows_move_through_the_files_when_there_is_no_command_to_pick() {
 fn clicking_the_field_and_its_key_start_the_typing() {
     let mut h = files();
     h.click(&Target::Act(Action::Palette));
-    assert!(h.app.address.is_some());
+    assert!(h.app.windows.address.is_some());
     h.key(KeyCode::Esc);
     h.click(&Target::Act(Action::Filter));
-    assert!(h.app.address.is_some());
+    assert!(h.app.windows.address.is_some());
 }

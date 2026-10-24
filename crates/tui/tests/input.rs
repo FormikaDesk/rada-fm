@@ -152,9 +152,9 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("new folder", "ctrl+n", |h| {
             matches!(h.app.modal, Some(Modal::Input(_)))
         }),
-        ("commands", "m", |h| h.app.address.is_some()),
-        ("address", "ctrl+l", |h| h.app.address.is_some()),
-        ("address", "alt+d", |h| h.app.address.is_some()),
+        ("commands", "m", |h| h.app.windows.address.is_some()),
+        ("address", "ctrl+l", |h| h.app.windows.address.is_some()),
+        ("address", "alt+d", |h| h.app.windows.address.is_some()),
         ("new folder", "ctrl+shift+n", |h| {
             matches!(h.app.modal, Some(Modal::Input(_)))
         }),
@@ -170,9 +170,9 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
             h.app.settings.details == Some(false)
         }),
         ("view", "v", |h| h.app.view == rada_tui::ViewMode::Icons),
-        ("commands", "ctrl+p", |h| h.app.address.is_some()),
-        ("search", "/", |h| h.app.address.is_some()),
-        ("search", "ctrl+f", |h| h.app.address.is_some()),
+        ("commands", "ctrl+p", |h| h.app.windows.address.is_some()),
+        ("search", "/", |h| h.app.windows.address.is_some()),
+        ("search", "ctrl+f", |h| h.app.windows.address.is_some()),
         ("help", "?", |h| matches!(h.app.modal, Some(Modal::Help))),
         ("help", "F1", |h| matches!(h.app.modal, Some(Modal::Help))),
         ("history", "U", |h| {
@@ -455,9 +455,9 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     h.wait("parent", |a| a.cwd.ends_with("dir") && !a.is_loading());
     // The top bar's "Go to" button and the bottom bar's hints run their action.
     h.click(&Target::Act(Action::Palette));
-    assert!(h.app.address.is_some(), "{}", h.screen());
+    assert!(h.app.windows.address.is_some(), "{}", h.screen());
     h.key(crossterm::event::KeyCode::Esc);
-    assert!(h.app.address.is_none());
+    assert!(h.app.windows.address.is_none());
     h.click(&Target::Act(Action::Rename));
     assert!(
         matches!(h.app.modal, Some(Modal::Input(_))),
@@ -604,7 +604,7 @@ fn the_commands_offered_under_the_field_are_clickable() {
         "{}",
         h.screen()
     );
-    assert!(h.app.address.is_none(), "the field closed");
+    assert!(h.app.windows.address.is_none(), "the field closed");
     assert!(h.app.filter.is_none(), "and took its filter off");
 }
 
@@ -620,6 +620,7 @@ fn places_are_offered_too_and_a_click_goes_there() {
     assert!(s.contains("go to"), "{s}");
     let row = h
         .app
+        .windows
         .address
         .as_ref()
         .unwrap()
@@ -629,7 +630,7 @@ fn places_are_offered_too_and_a_click_goes_there() {
         .expect("the bookmark is among the suggestions");
     h.click(&Target::BarHit(row));
     h.wait("moved", |a| a.cwd == target && !a.is_loading());
-    assert!(h.app.address.is_none());
+    assert!(h.app.windows.address.is_none());
 }
 
 #[test]

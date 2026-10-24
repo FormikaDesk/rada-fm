@@ -281,18 +281,18 @@ impl App {
         // error stays until Esc, which it takes when nothing else is open.
         let now = self.notice_now();
         if self.modal.is_none()
-            && self.address.is_none()
+            && self.windows.address.is_none()
             && key.code == KeyCode::Esc
-            && self.notices.dismiss_error(now)
+            && self.windows.notices.dismiss_error(now)
         {
             return;
         }
-        self.notices.on_key(now);
+        self.windows.notices.on_key(now);
         if self.modal.is_some() {
             self.on_modal_key(key);
             return;
         }
-        if self.address.is_some() {
+        if self.windows.address.is_some() {
             self.on_address_key(key);
             return;
         }
@@ -451,7 +451,7 @@ impl App {
                 } else if self.frame.size_notice_visible {
                     // Nothing else for Esc to do: it closes the advice about the window size,
                     // which then stays closed for the session.
-                    self.size_notice_dismissed = true;
+                    self.windows.size_notice_dismissed = true;
                 }
             }
 
@@ -547,7 +547,7 @@ impl App {
             ShowPackage => self.show_package(),
             ShowInFolder => self.show_in_folder(),
             Help => {
-                self.help_scroll = 0;
+                self.windows.help_scroll = 0;
                 self.modal = Some(Modal::Help);
             }
             Quit => self.quit(),
@@ -881,10 +881,10 @@ impl App {
                     }
                 }
                 Modal::Help => {
-                    self.help_scroll = if down {
-                        self.help_scroll + WHEEL_STEP
+                    if down {
+                        self.windows.help_down(WHEEL_STEP);
                     } else {
-                        self.help_scroll.saturating_sub(WHEEL_STEP)
+                        self.windows.help_up(WHEEL_STEP);
                     }
                 }
                 Modal::Update(UpdateView::Offer { scroll, .. }) => {
@@ -936,7 +936,7 @@ impl App {
             return self.click_notice(id, hit);
         }
         // A click anywhere but on the address field or its suggestions ends the editing.
-        if self.address.is_some() {
+        if self.windows.address.is_some() {
             match &target {
                 Some(Target::Suggest(i)) => return self.pick_suggestion(*i),
                 Some(Target::BarHit(i)) => return self.run_bar_hit(*i),

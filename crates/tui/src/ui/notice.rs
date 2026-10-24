@@ -70,7 +70,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
     let key_of = |a: Action| app.settings.keymap.hint(a).unwrap_or_default();
     let done = icons::ui(app.settings.icons, Glyph::Done);
     let mut notes: Vec<Card> = Vec::new();
-    for (n, _) in app.notices.shown(now) {
+    for (n, _) in app.windows.notices.shown(now) {
         let (mark, tone) = match n.kind {
             NoticeKind::Ok => (if done.is_empty() { "+" } else { done }, Tone::Ok),
             NoticeKind::Info => ("●", Tone::Info),
@@ -122,7 +122,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             data: String::new(),
             links,
             progress: None,
-            left: app.notices.left(n.id, now),
+            left: app.windows.notices.left(n.id, now),
             max_lines: if n.kind == NoticeKind::Error { 6 } else { 3 },
         });
     }

@@ -276,7 +276,7 @@ impl App {
         }
         let mut edit = AddressEdit::new(text);
         edit.fresh = true;
-        self.address = Some(edit);
+        self.windows.address = Some(edit);
         self.filter_editing_off();
         self.address_changed();
     }
@@ -299,7 +299,7 @@ impl App {
         )));
         // A filter already on the folder is the bar's to take off.
         edit.filtering = keep_filter && self.filter.is_some();
-        self.address = Some(edit);
+        self.windows.address = Some(edit);
         self.filter_editing_off();
         self.bar_changed();
     }
@@ -316,7 +316,7 @@ impl App {
     }
 
     pub fn cancel_address_edit(&mut self) {
-        let filtering = self.address.take().is_some_and(|a| a.filtering);
+        let filtering = self.windows.address.take().is_some_and(|a| a.filtering);
         if filtering {
             self.set_filter(None);
         }
@@ -327,7 +327,9 @@ impl App {
     /// work out the commands and places to offer.
     pub(super) fn bar_changed(&mut self) {
         self.address_changed();
-        let Some(a) = &self.address else { return };
+        let Some(a) = &self.windows.address else {
+            return;
+        };
         match a.mode() {
             BarMode::Search => {
                 let text = a.text.trim().to_string();
@@ -335,14 +337,14 @@ impl App {
                     text,
                     editing: false,
                 }));
-                if let Some(a) = &mut self.address {
+                if let Some(a) = &mut self.windows.address {
                     a.filtering = true;
                 }
                 self.refresh_bar_hits();
             }
             _ => {
                 let was = a.filtering;
-                if let Some(a) = &mut self.address {
+                if let Some(a) = &mut self.windows.address {
                     a.hits.clear();
                     a.hit_selected = None;
                     a.filtering = false;
@@ -357,7 +359,9 @@ impl App {
     /// The commands and the places that match what is typed, best first.
     fn refresh_bar_hits(&mut self) {
         let chooser = self.session.chooser.clone();
-        let Some(a) = &mut self.address else { return };
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
         let q = a.text.trim().to_string();
         let q_text = q.clone();
         // An entry of the folder with exactly that name is a path that exists.
@@ -434,7 +438,9 @@ impl App {
 
     /// zoxide answered: the folders count if they are for the text still in the bar.
     pub(super) fn on_zoxide(&mut self, query: String, dirs: Vec<PathBuf>) {
-        let Some(a) = &mut self.address else { return };
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
         if a.mode() != BarMode::Search || a.text.trim() != query || a.zoxide_asked != query {
             return;
         }
@@ -445,7 +451,9 @@ impl App {
 
     /// Run the `i`-th suggestion of the search mode: the bar closes, the filter it made goes.
     pub(super) fn run_bar_hit(&mut self, i: usize) {
-        let Some(a) = self.address.take() else { return };
+        let Some(a) = self.windows.address.take() else {
+            return;
+        };
         let Some(hit) = a.hits.get(i).cloned() else {
             return;
         };
@@ -462,7 +470,9 @@ impl App {
     /// Enter in the search mode: run what was picked; else keep the filter if it shows
     /// something; else run the best suggestion; else leave.
     fn bar_enter(&mut self) {
-        let Some(a) = &self.address else { return };
+        let Some(a) = &self.windows.address else {
+            return;
+        };
         if let Some(i) = a.hit_selected {
             return self.run_bar_hit(i);
         }
@@ -471,7 +481,7 @@ impl App {
         }
         if !self.visible.is_empty() {
             // The files that match stay: the bar is done, the filter stays on the folder.
-            self.address = None;
+            self.windows.address = None;
             return;
         }
         if !a.hits.is_empty() {
@@ -483,7 +493,9 @@ impl App {
     /// The text changed: ask for the subfolders of the folder it is in, if not asked yet.
     fn address_changed(&mut self) {
         let (home, cwd) = (self.svc.home.clone(), self.cwd.clone());
-        let Some(a) = &mut self.address else { return };
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
         let (dir, _) = a.target(&cwd, &home);
         if a.asked.as_deref() != Some(dir.as_path()) {
             a.asked = Some(dir.clone());
@@ -493,7 +505,7 @@ impl App {
 
     /// A list of subfolders arrived from the worker.
     pub(super) fn on_complete(&mut self, dir: PathBuf, names: Vec<String>) {
-        if let Some(a) = &mut self.address
+        if let Some(a) = &mut self.windows.address
             && a.asked.as_deref() == Some(dir.as_path())
         {
             a.names = names;
@@ -504,7 +516,7 @@ impl App {
 
     /// What is offered under the field right now.
     pub fn address_suggestions(&self) -> Vec<String> {
-        match &self.address {
+        match &self.windows.address {
             Some(a) => a.suggestions(&self.cwd, &self.svc.home),
             None => Vec::new(),
         }
@@ -513,7 +525,7 @@ impl App {
     /// A suggestion was clicked: go there.
     pub(super) fn pick_suggestion(&mut self, i: usize) {
         let sugg = self.address_suggestions();
-        if let (Some(a), Some(name)) = (&mut self.address, sugg.get(i)) {
+        if let (Some(a), Some(name)) = (&mut self.windows.address, sugg.get(i)) {
             a.text = a.with_name(name);
         }
         self.submit_address();
@@ -523,7 +535,9 @@ impl App {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
         let sugg = self.address_suggestions();
-        let Some(a) = &mut self.address else { return };
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
         match key.code {
             KeyCode::Esc => return self.cancel_address_edit(),
             KeyCode::Enter if a.mode() != BarMode::Path => return self.bar_enter(),
@@ -630,7 +644,9 @@ impl App {
 
     /// Go where the text says.
     pub fn submit_address(&mut self) {
-        let Some(a) = self.address.take() else { return };
+        let Some(a) = self.windows.address.take() else {
+            return;
+        };
         if a.text.trim().is_empty() {
             return;
         }

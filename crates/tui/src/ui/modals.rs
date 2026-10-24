@@ -401,7 +401,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             area,
             &app.settings.keymap,
             app.settings.mouse,
-            app.help_scroll,
+            app.windows.help_scroll,
         ),
         Modal::Menu(m) => {
             super::menu::draw(f, &ctx, &app.settings.keymap, m, room, &mut app.frame.hits)

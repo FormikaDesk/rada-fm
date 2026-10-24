@@ -147,7 +147,7 @@ pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
     app.session.chooser.is_none()
         && app.settings.layout == LayoutKind::Explorer
         && app.settings.layout_pref == crate::LayoutPref::Panels
-        && !app.size_notice_dismissed
+        && !app.windows.size_notice_dismissed
         && app.panels_wanted(width, height).is_none()
         && (width < FULL_LAYOUT_MIN.0 || height < FULL_LAYOUT_MIN.1)
         && width >= 24
@@ -450,7 +450,7 @@ fn draw_folder_view(f: &mut Frame, app: &mut App, main: Rect, width: u16) {
 /// window in front.
 fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
     let th = app.settings.th.clone();
-    if let (Some(row), true) = (address_row, app.address.is_some()) {
+    if let (Some(row), true) = (address_row, app.windows.address.is_some()) {
         address::draw_suggestions(f, app, row, area);
     }
     if app.modal.is_some() {

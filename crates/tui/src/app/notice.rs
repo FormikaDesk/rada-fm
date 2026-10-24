@@ -708,7 +708,7 @@ impl App {
     pub(super) fn click_notice(&mut self, id: u64, hit: crate::hits::NoticeHit) {
         use crate::hits::NoticeHit;
         let now = self.notice_now();
-        let shown = self.notices.get(id).cloned();
+        let shown = self.windows.notices.get(id).cloned();
         self.redraw.dirty = true;
         match hit {
             NoticeHit::CancelRun => {
@@ -720,7 +720,7 @@ impl App {
             _ if id == 0 => return,
             _ => {}
         }
-        self.notices.dismiss(id, now);
+        self.windows.notices.dismiss(id, now);
         match hit {
             NoticeHit::Undo => self.dispatch(Action::Undo),
             NoticeHit::Redo => self.dispatch(Action::Redo),
