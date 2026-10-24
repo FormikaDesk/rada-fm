@@ -7,6 +7,7 @@ use rada_core::update::{Applied, Mode, Notice, UpdateEvent};
 use super::{App, Modal, PropsView, ToastKind};
 use crate::fmt;
 use crate::keymap::Action;
+use crate::services::Services;
 use crossterm::event::{KeyCode, KeyEvent};
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
@@ -42,6 +43,19 @@ pub struct Updates {
     pub update: UpdateStatus,
     /// Somebody asked to look for updates and is waiting for the answer.
     pub(super) update_asked: bool,
+}
+
+impl Updates {
+    pub fn new(svc: &Services) -> Updates {
+        Updates {
+            version: svc.updater.as_ref().map_or_else(
+                || env!("CARGO_PKG_VERSION").to_string(),
+                |u| u.ctx().current.to_string(),
+            ),
+            update: UpdateStatus::None,
+            update_asked: false,
+        }
+    }
 }
 
 /// The window of the update.

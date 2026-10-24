@@ -7,7 +7,7 @@
 use rada_core::uistate::SavedTab;
 
 use super::selection::Selection;
-use super::{App, FilterState, LoadState, ToastKind, Viewport};
+use super::{App, Config, FilterState, LoadState, ToastKind, Viewport};
 use crate::nav::NavMove;
 use crate::view::ViewMode;
 use rada_core::archive::ArchiveView;
@@ -64,7 +64,54 @@ pub struct Tabs {
     pub(super) sort_outside_recents: Option<SortSpec>,
 }
 
+/// A tab as the start reads it: its folder, view, order, and whether the order was chosen.
+type Start = (PathBuf, ViewMode, SortSpec, bool);
+
+/// Which folders are open at the start, and which is in front: the ones left open last time if
+/// they are remembered, with the folder asked for in the front (in a tab of its own, if it was
+/// not one of them), or else just the folder asked for.
+fn tabs_to_start(cfg: &Config) -> (Vec<Start>, usize) {
+    if !cfg.remember_tabs || cfg.saved_ui.tabs.is_empty() {
+        return (vec![(cfg.start_dir.clone(), cfg.view, cfg.sort, false)], 0);
+    }
+    let mut saved: Vec<Start> = cfg
+        .saved_ui
+        .tabs
+        .iter()
+        .map(|t| {
+            let (sort, chosen) = sort_from_saved(t, cfg.sort);
+            let view = t.view.as_deref().and_then(ViewMode::parse);
+            (t.path.clone(), view.unwrap_or(cfg.view), sort, chosen)
+        })
+        .collect();
+    let mut active = cfg.saved_ui.active_tab.min(saved.len() - 1);
+    if cfg.start_explicit {
+        match saved.iter().position(|(p, _, _, _)| *p == cfg.start_dir) {
+            Some(i) => active = i,
+            None => {
+                saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
+                active = saved.len() - 1;
+            }
+        }
+    }
+    (saved, active)
+}
+
 impl Tabs {
+    /// The tabs of a start. The front one comes apart, already waiting for its folder; what
+    /// was remembered of the last session moves from `cfg` into the new `Tabs`.
+    pub(super) fn start(cfg: &mut Config) -> (TabState, Tabs) {
+        let (starts, active) = tabs_to_start(cfg);
+        let mut slots: Vec<TabState> = starts
+            .into_iter()
+            .map(|(p, v, s, c)| TabState::fresh(p, v, s, c))
+            .collect();
+        let mut front = std::mem::take(&mut slots[active]);
+        front.load = LoadState::Loading(front.cwd.clone());
+        let saved_ui = std::mem::take(&mut cfg.saved_ui);
+        (front, Tabs::new(slots, active, cfg.remember_tabs, saved_ui))
+    }
+
     pub fn new(
         slots: Vec<TabState>,
         active: usize,

@@ -392,6 +392,7 @@ pub struct Demo {
 }
 
 /// When the screen is drawn again, and the step of the spinner that moves between frames.
+#[derive(Default)]
 pub struct Redraw {
     /// Something changed: the next pass of the event loop draws a frame.
     pub dirty: bool,
@@ -401,6 +402,16 @@ pub struct Redraw {
     /// When to do that again after a program was started: they say things a while after.
     redraw_at: Vec<Instant>,
     pub spinner: usize,
+}
+
+impl Redraw {
+    /// The first frame is yet to be drawn.
+    fn new() -> Redraw {
+        Redraw {
+            dirty: true,
+            ..Default::default()
+        }
+    }
 }
 
 /// What only tests and screenshots use: a ready-made scene, made-up disks, a clock that can
@@ -415,6 +426,16 @@ pub struct TestHooks {
     pub clock: Option<std::time::SystemTime>,
     /// Added to the clock the notifications read: nobody waits six seconds for a card to go.
     notice_skew: Duration,
+}
+
+impl TestHooks {
+    fn new(demo: Option<Demo>) -> TestHooks {
+        TestHooks {
+            demo_volumes: demo.is_some(),
+            demo,
+            ..TestHooks::default()
+        }
+    }
 }
 
 mod address;
@@ -529,122 +550,60 @@ impl App {
             cfg.sort = crate::chooser::default_sort(cfg.sort);
             cfg.details_pane = None;
         }
-        // Which folder is in front, and which others were open last time.
-        let mut saved: Vec<(PathBuf, ViewMode, SortSpec, bool)> = Vec::new();
-        let mut active = 0;
-        if cfg.remember_tabs && !cfg.saved_ui.tabs.is_empty() {
-            for t in &cfg.saved_ui.tabs {
-                let (sort, chosen) = tabs::sort_from_saved(t, cfg.sort);
-                saved.push((
-                    t.path.clone(),
-                    t.view
-                        .as_deref()
-                        .and_then(ViewMode::parse)
-                        .unwrap_or(cfg.view),
-                    sort,
-                    chosen,
-                ));
-            }
-            active = cfg.saved_ui.active_tab.min(saved.len() - 1);
-            if cfg.start_explicit {
-                match saved.iter().position(|(p, _, _, _)| *p == cfg.start_dir) {
-                    Some(i) => active = i,
-                    None => {
-                        saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
-                        active = saved.len() - 1;
-                    }
-                }
-            }
-        } else {
-            saved.push((cfg.start_dir.clone(), cfg.view, cfg.sort, false));
-        }
-        let mut tab_slots: Vec<TabState> = saved
-            .iter()
-            .map(|(p, v, s, c)| TabState::fresh(p.clone(), *v, *s, *c))
-            .collect();
-        let mut tab = std::mem::take(&mut tab_slots[active]);
+        let settings = settings::Settings::from_config(&cfg);
+        let (tab, tabs) = tabs::Tabs::start(&mut cfg);
         let start_dir = tab.cwd.clone();
-        tab.load = LoadState::Loading(start_dir.clone());
-
         let mut app = App {
-            settings: settings::Settings {
-                th: cfg.theme,
-                icons: cfg.icons,
-                keymap: cfg.keymap,
-                mouse: cfg.mouse,
-                show_hints: cfg.show_hints,
-                show_hidden: cfg.show_hidden,
-                double_click: Duration::from_millis(400),
-                dates: cfg.dates,
-                date_format: cfg.date_format,
-                sidebar_density: cfg.sidebar_density,
-                nav_mode: cfg.nav_mode,
-                basic: cfg.basic,
-                show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
-                tz: jiff::tz::TimeZone::system(),
-                layout: cfg.layout,
-                layout_pref: cfg.layout_pref,
-                details: cfg.details_pane,
-            },
+            settings,
             tab,
-            preview: preview::PreviewPane::new(image_ui, cfg.limits),
+            preview: preview::PreviewPane::new(image_ui, cfg.limits.clone()),
             devices: Default::default(),
-            places: side::Places::new(cfg.bookmarks),
+            places: side::Places::new(std::mem::take(&mut cfg.bookmarks)),
             tags: side::Tags::new(svc_tag_language(&svc)),
             ops: Default::default(),
             windows: Default::default(),
-            tabs: tabs::Tabs::new(tab_slots, active, cfg.remember_tabs, cfg.saved_ui),
+            tabs,
             columns: columns::ColumnsView::default(),
             session: chooser::Session::new(cfg.chooser.clone()),
-            redraw: Redraw {
-                dirty: true,
-                full_redraw: false,
-                redraw_at: Vec::new(),
-                spinner: 0,
-            },
+            redraw: Redraw::new(),
             side_nav: side::SideNav::new(cfg.sidebar),
             frame: Default::default(),
             last_click: None,
             folder_info: Default::default(),
-            updates: Updates {
-                version: svc.updater.as_ref().map_or_else(
-                    || env!("CARGO_PKG_VERSION").to_string(),
-                    |u| u.ctx().current.to_string(),
-                ),
-                update: UpdateStatus::None,
-                update_asked: false,
-            },
+            updates: Updates::new(&svc),
+            hooks: TestHooks::new(cfg.demo.take()),
             svc,
-            hooks: TestHooks {
-                demo_volumes: cfg.demo.is_some(),
-                demo: cfg.demo,
-                ..TestHooks::default()
-            },
         };
-        for w in std::mem::take(&mut app.settings.keymap.warnings) {
+        app.start(start_dir, cfg);
+        app
+    }
+
+    /// What the first moments of a session do: tell what went wrong before it began, ask for
+    /// the folder, look for updates, and begin the operation or the offer that was asked for.
+    fn start(&mut self, start_dir: PathBuf, cfg: Config) {
+        for w in std::mem::take(&mut self.settings.keymap.warnings) {
             tracing::warn!("keymap: {w}");
         }
-        if !app.svc.journal_ok {
-            app.toast(ToastKind::Warn, Key::TJournalDown.tr(), 8);
+        if !self.svc.journal_ok {
+            self.toast(ToastKind::Warn, Key::TJournalDown.tr(), 8);
         }
         if let Some(name) = cfg.select {
-            app.tab.remembered.insert(start_dir.clone(), name);
+            self.tab.remembered.insert(start_dir.clone(), name);
         }
-        app.svc.places.load();
-        app.svc.places.visit(start_dir.clone());
-        app.svc.watcher.watch(start_dir.clone());
-        app.request_dir(start_dir);
-        app.svc.jobs.load_undo_label();
+        self.svc.places.load();
+        self.svc.places.visit(start_dir.clone());
+        self.svc.watcher.watch(start_dir.clone());
+        self.request_dir(start_dir);
+        self.svc.jobs.load_undo_label();
         // The daily check: the worker decides whether it is due, off this thread.
-        if let Some(u) = &app.svc.updater {
+        if let Some(u) = &self.svc.updater {
             u.check_in_background();
         }
         if let Some(req) = cfg.request {
-            let h = app.svc.jobs.plan_request(req);
-            app.begin_plan(Key::PlanningGeneric.tr(), h);
+            let h = self.svc.jobs.plan_request(req);
+            self.begin_plan(Key::PlanningGeneric.tr(), h);
         }
-        app.maybe_offer_font(cfg.font_offer);
-        app
+        self.maybe_offer_font(cfg.font_offer);
     }
 
     /// "Now" for relative dates.

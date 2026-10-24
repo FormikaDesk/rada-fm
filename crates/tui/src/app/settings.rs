@@ -1,6 +1,7 @@
 //! What comes from `config.toml` and the View menu: the look, the keys, the formats of dates
 //! and how the window is laid out. It is read all the time and changes seldom.
 
+use super::Config;
 use crate::fmt::{self, DateFormat, DateStyle};
 use crate::icons::IconSet;
 use crate::keymap::Keymap;
@@ -41,6 +42,30 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// What `config.toml` and the last session left, read before the rest of the start moves
+    /// parts of `cfg` elsewhere.
+    pub fn from_config(cfg: &Config) -> Settings {
+        Settings {
+            th: cfg.theme.clone(),
+            icons: cfg.icons,
+            keymap: cfg.keymap.clone(),
+            mouse: cfg.mouse,
+            show_hints: cfg.show_hints,
+            show_hidden: cfg.show_hidden,
+            double_click: Duration::from_millis(400),
+            dates: cfg.dates,
+            date_format: cfg.date_format,
+            sidebar_density: cfg.sidebar_density,
+            nav_mode: cfg.nav_mode,
+            basic: cfg.basic,
+            show_tags: cfg.tags_column.or(cfg.saved_ui.tags_column).unwrap_or(true),
+            tz: jiff::tz::TimeZone::system(),
+            layout: cfg.layout,
+            layout_pref: cfg.layout_pref,
+            details: cfg.details_pane,
+        }
+    }
+
     /// The date of a row of the list, in the style the person chose.
     pub fn explorer_date(&self, t: Option<SystemTime>, now: SystemTime) -> String {
         fmt::explorer_date_in(t, now, self.dates, self.date_format, &self.tz)
