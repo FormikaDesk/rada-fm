@@ -27,25 +27,18 @@ pub(super) const PASS_THROUGH: &[Action] = &[
     Action::SortReverse,
 ];
 
-/// The places the sidebar lists, and the tags it knows.
+/// The places the sidebar lists.
 pub struct Places {
     /// Recent folders, state bookmarks and standard places (from the places worker).
     pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
-    /// The language the names of the seven tag colours are written in (the system's).
-    pub tag_lang: String,
-    /// Tags of the user's own seen on the items of the folders shown so far (the sidebar's TAGS
-    /// section lists them after the seven colours), by name.
-    pub known_tags: Vec<Tag>,
 }
 
 impl Places {
-    pub fn new(cfg_bookmarks: Vec<PathBuf>, tag_lang: String) -> Places {
+    pub fn new(cfg_bookmarks: Vec<PathBuf>) -> Places {
         Places {
             paths: Default::default(),
             cfg_bookmarks,
-            tag_lang,
-            known_tags: Vec::new(),
         }
     }
 
@@ -76,21 +69,39 @@ impl Places {
             .map(str::to_string)
             .unwrap_or(on_disk)
     }
+}
+
+/// The tags the sidebar and the tag menu know.
+pub struct Tags {
+    /// The language the names of the seven tag colours are written in (the system's).
+    pub lang: String,
+    /// Tags of the user's own seen on the items of the folders shown so far (the sidebar's TAGS
+    /// section lists them after the seven colours), by name.
+    pub known: Vec<Tag>,
+}
+
+impl Tags {
+    pub fn new(lang: String) -> Tags {
+        Tags {
+            lang,
+            known: Vec::new(),
+        }
+    }
 
     /// Remember the tags of the user's own that these items carry, for the sidebar.
-    pub(super) fn note_tags<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
+    pub(super) fn note<'a>(&mut self, entries: impl IntoIterator<Item = &'a Entry>) {
         use rada_core::platform::TagColor as Hue;
-        let before = self.known_tags.len();
+        let before = self.known.len();
         for t in entries.into_iter().flat_map(|e| e.tags.iter()) {
             if Hue::from_name(&t.name).is_none()
-                && !self.known_tags.iter().any(|k| k.is_called(&t.name))
-                && self.known_tags.len() < 60
+                && !self.known.iter().any(|k| k.is_called(&t.name))
+                && self.known.len() < 60
             {
-                self.known_tags.push(t.clone());
+                self.known.push(t.clone());
             }
         }
-        if self.known_tags.len() != before {
-            self.known_tags.sort_by_key(|t| t.name.to_lowercase());
+        if self.known.len() != before {
+            self.known.sort_by_key(|t| t.name.to_lowercase());
         }
     }
 }

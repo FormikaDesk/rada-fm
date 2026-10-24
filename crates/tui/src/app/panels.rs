@@ -719,7 +719,7 @@ impl App {
                     let path = match row.kind {
                         NavKind::Tags => {
                             let c = Hue::ALL[self.nav_tag.min(Hue::ALL.len() - 1)];
-                            rada_core::tagsearch::view_path(c.label(&self.places.tag_lang))
+                            rada_core::tagsearch::view_path(c.label(&self.tags.lang))
                         }
                         NavKind::Heading | NavKind::Gap | NavKind::More => return true,
                         _ => row.path,

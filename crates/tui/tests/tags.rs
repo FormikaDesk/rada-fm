@@ -357,7 +357,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
         return;
     };
     let mut h = H::new(sb, dir, 140, 36);
-    h.app.places.tag_lang = "it".into();
+    h.app.tags.lang = "it".into();
     h.keys("j"); // a.txt
     // A file tagged "Rosso" is red: the dot is drawn in red, and the menu ticks Rosso.
     assert_eq!(

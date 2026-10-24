@@ -338,7 +338,7 @@ impl App {
         // The colours are called what the system calls them (a Mac in Italian says "Blu"): a
         // tag of another name has no colour for the Finder. A tag with the colour counts
         // whatever its name.
-        let lang = self.places.tag_lang.as_str();
+        let lang = self.tags.lang.as_str();
         let has_colour = |c: Hue| {
             !targets.is_empty()
                 && targets.iter().all(|e| {

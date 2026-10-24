@@ -333,9 +333,9 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
             locked: false,
         };
         for c in Hue::ALL {
-            out.push(tag(c.label(&app.places.tag_lang).to_string(), Some(c)));
+            out.push(tag(c.label(&app.tags.lang).to_string(), Some(c)));
         }
-        for t in &app.places.known_tags {
+        for t in &app.tags.known {
             out.push(tag(t.name.clone(), t.color));
         }
     }

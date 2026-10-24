@@ -581,8 +581,10 @@ pub struct App {
 
     /// Disks, sticks and phones, and the folders the system holds back.
     pub devices: mount::Devices,
-    /// The places the sidebar lists, and the tags it knows.
+    /// The places the sidebar lists.
     pub places: side::Places,
+    /// The tags the sidebar and the tag menu know.
+    pub tags: side::Tags,
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
     pub running: Option<Running>,
@@ -773,7 +775,8 @@ impl App {
             preview_gen: 0,
             previewed: None,
             devices: Default::default(),
-            places: side::Places::new(cfg.bookmarks, svc_tag_language(&svc)),
+            places: side::Places::new(cfg.bookmarks),
+            tags: side::Tags::new(svc_tag_language(&svc)),
             clipboard: None,
             modal: None,
             running: None,
@@ -1513,7 +1516,7 @@ impl App {
                 match result {
                     Ok(entries) => {
                         self.devices.allow(&path);
-                        self.places.note_tags(&entries);
+                        self.tags.note(&entries);
                         let same_dir = path == self.cwd;
                         let keep = if same_dir {
                             // Before the first listing there is no cursor yet: use the
@@ -1585,11 +1588,10 @@ impl App {
                     return;
                 }
                 let keep = self.cursor_name();
-                self.places
-                    .note_tags(updates.iter().filter_map(|u| match u {
-                        rada_core::model::EntryUpdate::Upsert(e) => Some(e),
-                        _ => None,
-                    }));
+                self.tags.note(updates.iter().filter_map(|u| match u {
+                    rada_core::model::EntryUpdate::Upsert(e) => Some(e),
+                    _ => None,
+                }));
                 self.listing.apply(updates);
                 self.sync_folder_sizes();
                 let existing: BTreeSet<OsString> =
