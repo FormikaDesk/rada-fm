@@ -188,7 +188,7 @@ fn hints(app: &App) -> Vec<Hint> {
             (BulkRename, Key::HRenameAll),
             (Compress, Key::HCompress),
         ]);
-        if app.clipboard.is_some() {
+        if app.ops.clipboard.is_some() {
             v.extend(acts(&[(Paste, Key::HPaste)]));
         }
         v.extend(acts(&[(ClearSelection, Key::HDeselect)]));
@@ -264,7 +264,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
             th.fg(th.check).add_modifier(Modifier::BOLD).patch(band),
         ));
     }
-    if let Some(c) = &app.clipboard {
+    if let Some(c) = &app.ops.clipboard {
         let icon = icons::ui(app.icons, Glyph::Clipboard);
         let verb = if c.mode == rada_core::ops::TransferMode::Copy {
             Key::ReadyPaste

@@ -126,7 +126,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             max_lines: if n.kind == NoticeKind::Error { 6 } else { 3 },
         });
     }
-    if let Some(r) = &app.running {
+    if let Some(r) = &app.ops.running {
         let p = &r.progress;
         let frac = p.fraction();
         let mut data = vec![format!("{}%", (frac * 100.0) as u32)];

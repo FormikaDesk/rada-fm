@@ -28,6 +28,6 @@ fn choosing_replace_in_the_plan_renames_over_it() {
         _ => false,
     });
     h.press("enter");
-    h.wait("done", |a| a.running.is_none() && a.modal.is_none());
+    h.wait("done", |a| a.ops.running.is_none() && a.modal.is_none());
     assert_eq!(std::fs::read_to_string(dir.join("b.txt")).unwrap(), "new");
 }

@@ -89,7 +89,7 @@ fn a_selection_and_the_clipboard_are_in_italian() {
         for _ in 0..3 {
             h.press("space");
         }
-        h.app.clipboard = Some(rada_tui::app::Clip {
+        h.app.ops.clipboard = Some(rada_tui::app::Clip {
             mode: rada_core::ops::TransferMode::Copy,
             paths: vec![h.app.current().unwrap().path.clone(); 2],
         });

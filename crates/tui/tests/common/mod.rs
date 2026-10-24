@@ -444,7 +444,7 @@ pub fn run_plan_and_wait(h: &mut H) {
     assert!(h.modal_is_plan(), "{}", h.screen());
     h.key(KeyCode::Enter);
     h.wait("operation to finish", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });
 }
 

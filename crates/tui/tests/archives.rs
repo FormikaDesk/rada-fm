@@ -261,7 +261,7 @@ fn a_possible_bomb_needs_yes_typed_and_nothing_else_will_do() {
     let screen = h.screen();
     assert!(screen.contains("bomb"), "{screen}");
     h.key(KeyCode::Enter); // not enough
-    assert!(h.modal_is_plan() && h.app.running.is_none());
+    assert!(h.modal_is_plan() && h.app.ops.running.is_none());
     assert!(!dir.join("zeros").exists());
     h.keys("yes");
     run_plan_and_wait(&mut h);

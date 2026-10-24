@@ -124,7 +124,7 @@ fn hints(app: &App) -> Vec<Hint> {
             (DeletePermanently, "delete"),
             (BulkRename, "bulk rename"),
         ]);
-        if app.clipboard.is_some() {
+        if app.ops.clipboard.is_some() {
             v.extend(acts(&[(Paste, "paste")]));
         }
         v.extend(acts(&[(ClearSelection, "clear")]));
@@ -165,7 +165,7 @@ fn status<'a>(app: &App) -> Bar<'a> {
         ));
         b.push(Span::styled("   ", band));
     }
-    if let Some(c) = &app.clipboard {
+    if let Some(c) = &app.ops.clipboard {
         let icon = if app.icons == IconSet::Nerd {
             "\u{f0ea}"
         } else {

@@ -40,7 +40,7 @@ pub fn scene(w: u16, hh: u16, theme: &str, nerd: bool) -> H {
         .filter_map(|n| h.app.listing.all().iter().find(|e| e.display == *n))
         .map(|e| e.path.clone())
         .collect();
-    h.app.clipboard = Some(rada_tui::app::Clip {
+    h.app.ops.clipboard = Some(rada_tui::app::Clip {
         mode: rada_core::ops::TransferMode::Copy,
         paths,
     });

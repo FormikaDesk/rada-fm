@@ -39,7 +39,7 @@ fn ctrl_c_copies_and_never_quits() {
         h.press("ctrl+c");
         assert!(!h.app.session.should_quit, "{preset:?}");
         if preset != Preset::Vim {
-            assert!(h.app.clipboard.is_some(), "Ctrl+C copies ({preset:?})");
+            assert!(h.app.ops.clipboard.is_some(), "Ctrl+C copies ({preset:?})");
         }
     }
     // Also inside windows and text fields.
@@ -130,10 +130,10 @@ fn vim_navigation_still_works_alongside() {
 fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
     type Check = fn(&H) -> bool;
     let cases: &[(&str, &str, Check)] = &[
-        ("copy", "y", |h| h.app.clipboard.is_some()),
-        ("copy", "ctrl+c", |h| h.app.clipboard.is_some()),
-        ("cut", "x", |h| h.app.clipboard.is_some()),
-        ("cut", "ctrl+x", |h| h.app.clipboard.is_some()),
+        ("copy", "y", |h| h.app.ops.clipboard.is_some()),
+        ("copy", "ctrl+c", |h| h.app.ops.clipboard.is_some()),
+        ("cut", "x", |h| h.app.ops.clipboard.is_some()),
+        ("cut", "ctrl+x", |h| h.app.ops.clipboard.is_some()),
         ("trash", "d", |h| h.modal_is_plan() || scanning(h)),
         ("trash", "delete", |h| h.modal_is_plan() || scanning(h)),
         ("delete", "D", |h| h.modal_is_plan() || scanning(h)),
@@ -218,12 +218,12 @@ fn presets_ignore_each_others_keys() {
     h.press("delete");
     assert!(h.app.modal.is_none());
     h.keys("y");
-    assert!(h.app.clipboard.is_some());
+    assert!(h.app.ops.clipboard.is_some());
 
     let mut h = harness();
     h.app.keymap = Keymap::new(Preset::Classic, &HashMap::new());
     h.keys("y");
-    assert!(h.app.clipboard.is_none());
+    assert!(h.app.ops.clipboard.is_none());
     h.keys("q");
     assert!(!h.app.session.should_quit);
     h.press("ctrl+q");
@@ -244,10 +244,10 @@ fn keys_can_be_rebound_from_the_configuration() {
     let mut h = harness();
     h.app.keymap = Keymap::new(Preset::VimClassic, &o);
     h.keys("c");
-    assert!(h.app.clipboard.is_some());
-    h.app.clipboard = None;
+    assert!(h.app.ops.clipboard.is_some());
+    h.app.ops.clipboard = None;
     h.press("ctrl+c");
-    assert!(h.app.clipboard.is_none(), "the old copy keys are gone");
+    assert!(h.app.ops.clipboard.is_none(), "the old copy keys are gone");
 }
 
 #[test]
@@ -507,13 +507,13 @@ fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
         matches!(h.app.modal, Some(Modal::Menu(_))),
         "a click on what is greyed out does nothing, and the menu stays"
     );
-    assert!(h.app.clipboard.is_none());
+    assert!(h.app.ops.clipboard.is_none());
     h.press("esc");
     assert!(h.app.modal.is_none());
 
     h.right_click(&Target::Row(2));
     h.click(&Target::MenuItem(3)); // Copy
-    assert!(h.app.clipboard.is_some());
+    assert!(h.app.ops.clipboard.is_some());
 
     // Keyboard works in the menu too.
     h.right_click(&Target::Row(2));
@@ -577,7 +577,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     });
     h.click(&Target::PlanRun);
     h.wait("done", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });
     let names: Vec<_> = std::fs::read_dir(&dest)
         .unwrap()
@@ -768,7 +768,7 @@ fn a_destructive_request_still_needs_the_typed_confirmation() {
     h.keys("yes");
     h.press("enter");
     h.wait("done", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });
     assert!(!victim.exists());
 }

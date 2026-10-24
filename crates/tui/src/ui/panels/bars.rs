@@ -130,7 +130,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
             th.fg(th.check).add_modifier(Modifier::BOLD).patch(band),
         ));
     }
-    if let Some(c) = &app.clipboard {
+    if let Some(c) = &app.ops.clipboard {
         let icon = icons::ui(app.icons, Glyph::Clipboard);
         let verb = if c.mode == rada_core::ops::TransferMode::Copy {
             Key::ReadyPaste

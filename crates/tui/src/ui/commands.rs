@@ -143,7 +143,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Paste,
         Key::LPaste.tr(),
-        app.clipboard.is_some() && !nowhere,
+        app.ops.clipboard.is_some() && !nowhere,
         Target::Act(Action::Paste),
     );
     if !reduced {
@@ -201,10 +201,10 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Undo,
         Key::LUndo.tr(),
-        app.undo_label.is_some(),
+        app.ops.undo_label.is_some(),
         Target::Act(Action::Undo),
     );
-    if with_desc && let Some(label) = &app.undo_label {
+    if with_desc && let Some(label) = &app.ops.undo_label {
         b.push(Span::styled(format!("  · {label}"), th.dim().patch(bar)));
     }
     b

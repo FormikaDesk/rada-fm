@@ -443,8 +443,7 @@ impl App {
             SelectToFirst => self.extend_selection(0),
             SelectToLast => self.extend_selection(usize::MAX),
             ClearSelection => {
-                if let Some(r) = &self.running {
-                    r.handle.cancel.cancel();
+                if self.ops.cancel() {
                     self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
                 } else if !self.marked.is_empty() {
                     self.clear_marks();
@@ -650,7 +649,7 @@ impl App {
             .map(|p| rada_core::display::path(p))
             .collect::<Vec<_>>()
             .join("\n");
-        self.copied_text = Some(text);
+        self.ops.copied_text = Some(text);
         self.toast(
             ToastKind::Ok,
             if paths.len() == 1 {
@@ -706,9 +705,7 @@ impl App {
 
     /// An outside request to stop (SIGTERM, closing the terminal): cancel and leave.
     pub fn shutdown(&mut self) {
-        if let Some(r) = &self.running {
-            r.handle.cancel.cancel();
-        }
+        self.ops.cancel();
         self.session.should_quit = true;
     }
 

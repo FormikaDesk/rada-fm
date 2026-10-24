@@ -22,7 +22,7 @@ use rada_core::ops::{
     Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Progress, Scan, TransferMode,
     TransferOptions, UndoPlan,
 };
-use rada_core::ops::{ExtractInto, OpKind, OpRequest, Totals, WarningKind};
+use rada_core::ops::{ExtractInto, OpKind, OpRequest, WarningKind};
 use rada_core::platform::Volume;
 use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
 
@@ -51,12 +51,6 @@ pub enum LoadState {
     Ready,
     /// Navigating: the old listing stays visible until the new one is in.
     Loading(PathBuf),
-}
-
-#[derive(Clone)]
-pub struct Clip {
-    pub mode: TransferMode,
-    pub paths: Vec<PathBuf>,
 }
 
 /// How much of the folder the area it was last drawn in can show: set by the renderer, read
@@ -110,42 +104,6 @@ pub enum ImageStatus {
     NoGraphics,
     TooLarge(String),
     Failed(String),
-}
-
-pub struct Running {
-    pub job: JobId,
-    pub title: String,
-    pub progress: Progress,
-    pub started: Instant,
-    pub handle: JobHandle,
-    /// (time, bytes) samples for a smoothed transfer rate.
-    samples: Vec<(Instant, u64)>,
-    /// What it is doing, for the message when it ends.
-    pub kind: OpKind,
-    pub totals: Totals,
-    pub reversible: bool,
-    /// Where the result will be, for the card that says it is done.
-    pub outcome: notice::Outcome,
-}
-
-impl Running {
-    pub fn rate(&self) -> f64 {
-        match (self.samples.first(), self.samples.last()) {
-            (Some((t0, b0)), Some((t1, b1))) if t1 > t0 => {
-                (*b1 as f64 - *b0 as f64) / t1.duration_since(*t0).as_secs_f64()
-            }
-            _ => 0.0,
-        }
-    }
-
-    pub fn eta(&self) -> Option<Duration> {
-        let rate = self.rate();
-        let left = self
-            .progress
-            .bytes_total
-            .saturating_sub(self.progress.bytes_done);
-        (rate > 1.0 && left > 0).then(|| Duration::from_secs_f64(left as f64 / rate))
-    }
 }
 
 #[derive(Clone)]
@@ -501,6 +459,7 @@ mod menus;
 mod mount;
 mod notice;
 mod openwith;
+mod ops;
 mod panels;
 mod props;
 mod side;
@@ -516,6 +475,7 @@ pub use input::{FilterState, MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, T
 pub use menus::MenuKind;
 pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
+pub use ops::{Clip, Operations, Running};
 pub use panels::GitView;
 pub use props::PropsView;
 pub use tabs::TabState;
@@ -585,9 +545,9 @@ pub struct App {
     pub places: side::Places,
     /// The tags the sidebar and the tag menu know.
     pub tags: side::Tags,
-    pub clipboard: Option<Clip>,
+    /// What waits on the clipboard, the plan being prepared, the operation running and the undo.
+    pub ops: ops::Operations,
     pub modal: Option<Modal>,
-    pub running: Option<Running>,
     /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
     pub notices: NoticeQueue,
     pub columns: columns::ColumnsView,
@@ -597,7 +557,6 @@ pub struct App {
     /// How the session ends, and whether it is a file chooser.
     pub session: chooser::Session,
     pub redraw: Redraw,
-    plan_job: Option<JobId>,
 
     pub keymap: Keymap,
     pub mouse: bool,
@@ -675,12 +634,8 @@ pub struct App {
     /// The tabs; the slot of the front one is empty, its state lives in the fields above.
     tabs: Vec<TabState>,
     pub active_tab: usize,
-    /// What the next undo would undo, in a few words (for the command bar).
-    pub undo_label: Option<String>,
     /// The address bar while its text is being edited.
     pub address: Option<AddressEdit>,
-    /// Text for the system clipboard (the "copy path" command); the event loop takes it.
-    pub copied_text: Option<String>,
     /// What the last frame showed of the details pane.
     pub details_shown: crate::ui::DetailsMode,
     /// Where tabs are saved and the rest of what is remembered between sessions.
@@ -777,9 +732,8 @@ impl App {
             devices: Default::default(),
             places: side::Places::new(cfg.bookmarks),
             tags: side::Tags::new(svc_tag_language(&svc)),
-            clipboard: None,
+            ops: Default::default(),
             modal: None,
-            running: None,
             notices: NoticeQueue::default(),
             columns: columns::ColumnsView::default(),
             watch_note: None,
@@ -791,7 +745,6 @@ impl App {
                 redraw_at: Vec::new(),
                 spinner: 0,
             },
-            plan_job: None,
             keymap: cfg.keymap,
             mouse: cfg.mouse,
             show_hints: cfg.show_hints,
@@ -835,9 +788,7 @@ impl App {
             remember_tabs: cfg.remember_tabs,
             tabs: tab_slots,
             active_tab: active,
-            undo_label: None,
             address: None,
-            copied_text: None,
             details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
             screen: (0, 0),
@@ -987,7 +938,7 @@ impl App {
             }
         }
         self.tick_notices();
-        if self.running.is_some()
+        if self.ops.is_busy()
             || self.notices.has_clock()
             || matches!(self.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
@@ -1062,10 +1013,6 @@ impl App {
         self.current()
             .map(|e| vec![e.path.clone()])
             .unwrap_or_default()
-    }
-
-    pub fn is_busy(&self) -> bool {
-        self.running.is_some()
     }
 
     pub(crate) fn ensure_visible(&mut self) {
@@ -1744,11 +1691,8 @@ impl App {
                 undo,
             } => self.on_planned(job, *plan, scan, undo),
             JobEvent::PlanFailed { job, message } | JobEvent::Error { job, message } => {
-                if self.plan_job == Some(job) || self.running.as_ref().is_some_and(|r| r.job == job)
-                {
+                if self.ops.fail(job) {
                     self.modal = None;
-                    self.plan_job = None;
-                    self.running = None;
                     // A sentence that does not fit a one-line message is read in a window.
                     if message.chars().count() > 70 {
                         self.modal = Some(Modal::Result(ResultView {
@@ -1761,32 +1705,24 @@ impl App {
                     }
                 }
             }
-            JobEvent::UndoLabel { label, .. } => self.undo_label = label,
+            JobEvent::UndoLabel { label, .. } => self.ops.undo_label = label,
             JobEvent::NothingToUndo { job } => {
-                if self.plan_job == Some(job) {
+                if self.ops.end_plan(job) {
                     self.modal = None;
-                    self.plan_job = None;
                     self.toast(ToastKind::Info, Key::TNothingUndo.tr(), 3);
                 }
             }
             JobEvent::NothingToRedo { job } => {
-                if self.plan_job == Some(job) {
+                if self.ops.end_plan(job) {
                     self.modal = None;
-                    self.plan_job = None;
                     self.toast(ToastKind::Info, Key::TNothingRedo.tr(), 4);
                 }
             }
             JobEvent::Progress { job, progress } => {
-                if let Some(r) = self.running.as_mut().filter(|r| r.job == job) {
-                    let now = Instant::now();
-                    r.samples.push((now, progress.bytes_done));
-                    r.samples
-                        .retain(|(t, _)| now.duration_since(*t) < Duration::from_secs(4));
-                    r.progress = progress;
-                }
+                self.ops.progress(job, progress);
             }
             JobEvent::AskFailure { job, info, reply } => {
-                if self.running.as_ref().is_some_and(|r| r.job == job) {
+                if self.ops.is_running(job) {
                     self.modal = Some(Modal::Failure { job, info, reply });
                 } else {
                     let _ = reply.send(ErrorChoice::Abort);
@@ -1799,9 +1735,8 @@ impl App {
                 journal_errors,
                 ..
             } => {
-                if self.running.as_ref().is_some_and(|r| r.job == job) {
-                    let done = self.running.take();
-                    self.finish(title, report, journal_errors, done);
+                if let Some(done) = self.ops.finish(job) {
+                    self.finish(title, report, journal_errors, Some(done));
                     // Refresh even if live updates are unavailable.
                     self.dir_gen += 1;
                     self.svc.loader.load(self.cwd.clone(), self.dir_gen);
@@ -1952,10 +1887,9 @@ impl App {
             pv.scroll = 0;
             return;
         }
-        if self.plan_job != Some(job) {
+        if !self.ops.end_plan(job) {
             return; // the user cancelled while it was being planned
         }
-        self.plan_job = None;
         let replan = match (&plan.kind, &plan.destination) {
             (rada_core::ops::OpKind::Copy, Some(d)) => Replan::Transfer {
                 dest: d.clone(),
@@ -2004,7 +1938,7 @@ impl App {
     // ------------------------------------------------------------------ starting operations
 
     fn begin_plan(&mut self, what: &str, handle: JobHandle) {
-        self.plan_job = Some(handle.id);
+        self.ops.plan_job = Some(handle.id);
         self.modal = Some(Modal::Scanning {
             job: handle.id,
             what: what.to_string(),
@@ -2017,7 +1951,7 @@ impl App {
     }
 
     fn refuse_if_busy(&mut self) -> bool {
-        if self.is_busy() {
+        if self.ops.is_busy() {
             self.toast(ToastKind::Warn, Key::TBusy.tr(), 3);
             true
         } else {
@@ -2053,7 +1987,7 @@ impl App {
         {
             return;
         }
-        let Some(clip) = self.clipboard.clone() else {
+        let Some(clip) = self.ops.clipboard.clone() else {
             self.toast(ToastKind::Info, Key::TNothingCopied.tr(), 3);
             return;
         };
@@ -2149,7 +2083,7 @@ impl App {
             Some(up) => self.svc.jobs.execute_undo(*up),
             None => self.svc.jobs.execute(pv.plan),
         };
-        self.running = Some(Running {
+        self.ops.running = Some(Running {
             job: handle.id,
             title,
             progress: Progress {
@@ -2290,7 +2224,7 @@ impl App {
     // ------------------------------------------------------------------ keys
 
     fn quit(&mut self) {
-        if self.is_busy() {
+        if self.ops.is_busy() {
             self.modal = Some(Modal::ConfirmQuit);
         } else {
             self.session.should_quit = true;
@@ -2334,7 +2268,7 @@ impl App {
             return;
         }
         let n = paths.len();
-        self.clipboard = Some(Clip { mode, paths });
+        self.ops.clipboard = Some(Clip { mode, paths });
         self.clear_marks();
         let verb = match (mode == TransferMode::Copy, n == 1) {
             (true, true) => Key::TYankCopiedOne,
@@ -2597,7 +2531,7 @@ impl App {
                     .map(|e| (e.name.clone(), e.path.clone()))
                     .collect();
                 self.marked = files.iter().take(3).map(|(n, _)| n.clone()).collect();
-                self.clipboard = Some(Clip {
+                self.ops.clipboard = Some(Clip {
                     mode: TransferMode::Copy,
                     paths: files
                         .iter()
@@ -2628,7 +2562,7 @@ impl App {
                     .map(|(_, p)| p)
                     .collect();
                 if !waiting.is_empty() {
-                    self.clipboard = Some(Clip {
+                    self.ops.clipboard = Some(Clip {
                         mode: TransferMode::Copy,
                         paths: waiting,
                     });
@@ -2637,7 +2571,7 @@ impl App {
                 self.ensure_visible();
                 self.request_preview();
                 let items = fmt::count(3, Key::ItemOne, Key::ItemMany);
-                self.undo_label = Some(tf(Key::DoneCopy, &[&items]));
+                self.ops.undo_label = Some(tf(Key::DoneCopy, &[&items]));
                 let folder = self
                     .places
                     .paths
@@ -2812,7 +2746,7 @@ impl App {
             if let Modal::Scanning { cancel, .. } = &scanning {
                 cancel.cancel();
             }
-            self.plan_job = None;
+            self.ops.plan_job = None;
         } else {
             self.modal = Some(scanning);
         }
@@ -3058,9 +2992,7 @@ impl App {
     fn on_confirm_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('y') | KeyCode::Enter => {
-                if let Some(r) = &self.running {
-                    r.handle.cancel.cancel();
-                }
+                self.ops.cancel();
                 self.session.should_quit = true;
             }
             _ => {}
@@ -3168,11 +3100,6 @@ impl App {
                 ));
             }
         }
-    }
-
-    /// Take the text waiting for the system clipboard, if any.
-    pub fn take_copied_text(&mut self) -> Option<String> {
-        self.copied_text.take()
     }
 
     // ------------------------------------------------------------------ for the renderer

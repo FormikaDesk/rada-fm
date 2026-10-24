@@ -177,7 +177,7 @@ fn the_sidebar_and_the_breadcrumbs_use_the_names_the_finder_shows() {
     );
     // …but the real path is still what is copied and what Properties locates.
     h.keys("Y");
-    let copied = h.app.copied_text.clone().unwrap();
+    let copied = h.app.ops.copied_text.clone().unwrap();
     assert!(
         copied.replace('\\', "/").contains("Desktop/progetti"),
         "{copied}"
@@ -505,7 +505,7 @@ fn cmd_c_cmd_v_and_cmd_backspace_work_like_in_the_finder() {
     let mut h = with_cmd_keys();
     h.keys("j"); // a.txt
     cmd(&mut h, KeyCode::Char('c'), M::NONE);
-    assert!(h.app.clipboard.is_some(), "Cmd+C copies");
+    assert!(h.app.ops.clipboard.is_some(), "Cmd+C copies");
     cmd(&mut h, KeyCode::Backspace, M::NONE);
     plan_modal(&mut h); // a plan to trash it, as with Del
 }
@@ -554,7 +554,7 @@ fn without_the_mac_table_cmd_does_nothing() {
         KeyCode::Char('c'),
         crossterm::event::KeyModifiers::NONE,
     );
-    assert!(h.app.clipboard.is_none());
+    assert!(h.app.ops.clipboard.is_none());
 }
 
 // ---------------------------------------------------------------------------- the Finder's names

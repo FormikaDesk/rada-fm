@@ -112,7 +112,7 @@ fn the_folders_of_a_mac_are_named_in_the_language_of_the_interface() {
     // The real name is what a rename starts from, what is copied, and what the filter finds.
     h.keys("Y");
     h.press("f2");
-    let copied = h.app.copied_text.clone().unwrap_or_default();
+    let copied = h.app.ops.copied_text.clone().unwrap_or_default();
     assert!(
         copied.contains(&home.to_string_lossy().to_string()),
         "{copied}"

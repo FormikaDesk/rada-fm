@@ -287,7 +287,7 @@ fn event_loop(
         }
         // The "copy path" command: the terminal puts the text on the clipboard, or the
         // system's own clipboard program does where the terminal would not.
-        if let Some(text) = app.take_copied_text() {
+        if let Some(text) = app.ops.take_copied_text() {
             crate::clipboard::copy(&text, caps.osc52, basic, terminal.backend_mut().inner_mut());
         }
         if shutdown.load(std::sync::atomic::Ordering::Relaxed) {

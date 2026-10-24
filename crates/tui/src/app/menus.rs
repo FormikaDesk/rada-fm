@@ -185,7 +185,7 @@ impl App {
     /// The menu of the right button (or the Menu key): on an item, or on empty space.
     pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
         use Action::*;
-        let has_clip = self.clipboard.is_some();
+        let has_clip = self.ops.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();
         let ro = self.archive.is_some();
         let nowhere = ro || self.tag_view().is_some();

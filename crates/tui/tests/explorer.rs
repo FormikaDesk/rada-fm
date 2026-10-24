@@ -65,7 +65,7 @@ fn busy_scene(w: u16, hh: u16) -> H {
         h.press("space");
     }
     put_cursor(&mut h, "photo.jpg");
-    h.app.clipboard = Some(rada_tui::app::Clip {
+    h.app.ops.clipboard = Some(rada_tui::app::Clip {
         mode: rada_core::ops::TransferMode::Copy,
         paths: vec![h.app.current().unwrap().path.clone(); 2],
     });
@@ -521,7 +521,7 @@ fn the_command_buttons_do_what_their_keys_do() {
     assert!(!in_command_bar(&h, Action::Undo));
     assert!(in_command_bar(&h, Action::Copy));
     h.click(&Target::Act(Action::Copy));
-    assert!(h.app.clipboard.is_some());
+    assert!(h.app.ops.clipboard.is_some());
     let _ = h.screen();
     assert!(in_command_bar(&h, Action::Paste), "now Paste is a button");
     // Paste into the same folder: the plan comes first, like with Ctrl+V.
@@ -543,7 +543,7 @@ fn the_command_buttons_do_what_their_keys_do() {
     // Cut marks the move.
     h.click(&Target::Act(Action::Cut));
     assert_eq!(
-        h.app.clipboard.as_ref().unwrap().mode,
+        h.app.ops.clipboard.as_ref().unwrap().mode,
         rada_core::ops::TransferMode::Move
     );
 }
@@ -556,14 +556,14 @@ fn undo_says_what_it_would_undo_and_runs_after_a_plan() {
     h.press("enter");
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
-    h.wait("the label", |a| a.undo_label.is_some());
+    h.wait("the label", |a| a.ops.undo_label.is_some());
     let row = h.screen().lines().nth(4).unwrap().to_string();
     assert!(row.contains("Undo") && row.contains("new folder"), "{row}");
     assert!(h.app.hits.find(&Target::Act(Action::Undo)).is_some());
     h.click(&Target::Act(Action::Undo));
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
-    h.wait("nothing left to undo", |a| a.undo_label.is_none());
+    h.wait("nothing left to undo", |a| a.ops.undo_label.is_none());
     let row = h.screen().lines().nth(4).unwrap().to_string();
     assert!(!row.contains("new folder"), "{row}");
 }
@@ -600,7 +600,7 @@ fn the_dropdowns_open_menus_that_work() {
         0
     );
     h.wait("the undo label", |a| {
-        a.undo_label.as_deref() == Some("new file")
+        a.ops.undo_label.as_deref() == Some("new file")
     });
     // Sort ▾ lists the keys with the current one marked.
     h.click(&Target::Menu(MenuKind::Sort));
@@ -1018,13 +1018,13 @@ fn properties_copy_path_and_open_terminal_are_reachable() {
     assert!(!cfg!(unix) || s.contains("Permissions"), "{s}");
     h.press("esc");
     h.press("ctrl+shift+c");
-    let text = h.app.copied_text.clone().expect("a path to copy");
+    let text = h.app.ops.copied_text.clone().expect("a path to copy");
     assert!(
         std::path::Path::new(&text).ends_with("projects/demo/photo.jpg"),
         "{text}"
     );
-    assert_eq!(h.app.take_copied_text().as_deref(), Some(text.as_str()));
-    assert!(h.app.copied_text.is_none());
+    assert_eq!(h.app.ops.take_copied_text().as_deref(), Some(text.as_str()));
+    assert!(h.app.ops.copied_text.is_none());
 }
 
 #[test]

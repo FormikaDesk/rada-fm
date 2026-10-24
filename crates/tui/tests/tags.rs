@@ -81,7 +81,7 @@ fn confirm(h: &mut H) {
     plan_modal(h);
     h.key(KeyCode::Enter);
     h.wait("the operation", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });
     // The folder is read again: an attribute change does not always reach the watcher.
     h.app.refresh();
@@ -189,7 +189,7 @@ fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
     plan_modal(&mut h);
     h.key(KeyCode::Enter);
     h.wait("undone", |a| {
-        a.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
     });
     h.app.refresh();
     h.wait("reloaded", |a| !a.is_loading());
