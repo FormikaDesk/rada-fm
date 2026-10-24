@@ -573,9 +573,6 @@ impl MacPlatform {
     /// A platform whose trash is `trash` (the tests give it a folder of their own).
     pub fn with_trash(dirs: Dirs, trash: Box<dyn TrashBackend>) -> Self {
         MacPlatform {
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
-            tags: super::tags::XattrTags::finder()
-                .with_finder_list(dirs.home.join(super::finderlist::FINDER_LIST)),
             attrs: attrs(&dirs.home),
             dirs,
             trash,
@@ -584,6 +581,8 @@ impl MacPlatform {
                 quick_look: true,
                 osascript: None,
             },
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            tags: super::tags::XattrTags::finder(),
             sandbox_user_dirs: false,
             system_tables: super::foldernames::SYSTEM_TABLES.into(),
             mdfind: None,

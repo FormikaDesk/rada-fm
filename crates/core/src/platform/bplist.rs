@@ -82,7 +82,7 @@ fn write_uint(out: &mut Vec<u8>, value: u64, size: usize) {
     out.extend_from_slice(&value.to_be_bytes()[8 - size..]);
 }
 
-pub(super) fn read_uint(bytes: &[u8]) -> Option<u64> {
+fn read_uint(bytes: &[u8]) -> Option<u64> {
     if bytes.is_empty() || bytes.len() > 8 {
         return None;
     }
