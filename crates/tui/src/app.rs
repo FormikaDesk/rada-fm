@@ -464,6 +464,20 @@ pub struct Demo {
     pub dest: Option<PathBuf>,
 }
 
+/// What only tests and screenshots use: a ready-made scene, made-up disks, a clock that can
+/// be set and moved on.
+#[derive(Default)]
+pub struct TestHooks {
+    demo: Option<Demo>,
+    /// Show made-up disks instead of the machine's own.
+    demo_volumes: bool,
+    demo_auto_run: bool,
+    /// Replaces the system clock when drawing relative dates.
+    pub clock: Option<std::time::SystemTime>,
+    /// Added to the clock the notifications read: nobody waits six seconds for a card to go.
+    notice_skew: Duration,
+}
+
 mod address;
 mod archives;
 mod chooser;
@@ -521,6 +535,8 @@ pub struct App {
     pub th: Theme,
     pub icons: IconSet,
     svc: Services,
+    /// What only tests and screenshots use.
+    pub hooks: TestHooks,
 
     pub cwd: PathBuf,
     /// Set while looking inside an archive: the folder shown is a read-only virtual one.
@@ -562,10 +578,6 @@ pub struct App {
     /// Recent folders, state bookmarks and standard places (from the places worker).
     pub paths: rada_core::places::PathLists,
     cfg_bookmarks: Vec<PathBuf>,
-    demo: Option<Demo>,
-    /// Developer hook: show made-up disks instead of the machine's own (screenshots).
-    demo_volumes: bool,
-    demo_auto_run: bool,
     pub clipboard: Option<Clip>,
     pub modal: Option<Modal>,
     pub running: Option<Running>,
@@ -575,8 +587,6 @@ pub struct App {
     pub columns_parent: Option<columns::ParentColumn>,
     parent_gen: u64,
     parent_asked: Option<PathBuf>,
-    /// Added to the clock the notifications read: tests and screenshots move time on with it.
-    notice_skew: Duration,
     pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
@@ -626,8 +636,6 @@ pub struct App {
     /// section lists them after the seven colours), by name.
     pub known_tags: Vec<rada_core::platform::Tag>,
     pub help_scroll: usize,
-    /// Replaces the system clock when drawing relative dates (tests, screenshots).
-    pub clock: Option<std::time::SystemTime>,
 
     // ---- the explorer interface
     /// How the folder of the front tab is shown.
@@ -800,9 +808,6 @@ impl App {
             volumes_seen: false,
             paths: Default::default(),
             cfg_bookmarks: cfg.bookmarks,
-            demo_volumes: cfg.demo.is_some(),
-            demo: cfg.demo,
-            demo_auto_run: false,
             clipboard: None,
             modal: None,
             running: None,
@@ -810,7 +815,6 @@ impl App {
             columns_parent: None,
             parent_gen: 0,
             parent_asked: None,
-            notice_skew: Duration::ZERO,
             watch_note: None,
             viewport: Viewport::default(),
             should_quit: false,
@@ -840,7 +844,6 @@ impl App {
             tag_lang: svc_tag_language(&svc),
             known_tags: Vec::new(),
             help_scroll: 0,
-            clock: None,
             view,
             layout: cfg.layout,
             details: cfg.details_pane,
@@ -888,6 +891,11 @@ impl App {
             update: UpdateStatus::None,
             update_asked: false,
             svc,
+            hooks: TestHooks {
+                demo_volumes: cfg.demo.is_some(),
+                demo: cfg.demo,
+                ..TestHooks::default()
+            },
         };
         for w in std::mem::take(&mut app.keymap.warnings) {
             tracing::warn!("keymap: {w}");
@@ -931,7 +939,7 @@ impl App {
 
     /// "Now" for relative dates.
     pub fn now(&self) -> std::time::SystemTime {
-        self.clock.unwrap_or_else(std::time::SystemTime::now)
+        self.hooks.clock.unwrap_or_else(std::time::SystemTime::now)
     }
 
     pub fn home(&self) -> &Path {
@@ -946,12 +954,12 @@ impl App {
 
     /// The time notifications go by: the clock, and what tests have moved it on.
     pub fn notice_now(&self) -> Instant {
-        Instant::now() + self.notice_skew
+        Instant::now() + self.hooks.notice_skew
     }
 
     /// Move the notifications' clock on (tests and screenshots: nobody waits six seconds).
     pub fn advance_notices(&mut self, by: Duration) {
-        self.notice_skew += by;
+        self.hooks.notice_skew += by;
         self.tick_notices();
     }
 
@@ -1500,13 +1508,21 @@ impl App {
             CoreEvent::Preview(p) => self.on_preview(p),
             CoreEvent::Volumes(v) => {
                 self.volumes_seen = true;
-                self.volumes = if self.demo_volumes { demo_volumes() } else { v };
+                self.volumes = if self.hooks.demo_volumes {
+                    demo_volumes()
+                } else {
+                    v
+                };
                 self.folder_sizes
                     .set_volumes(&self.volumes, self.svc.platform.device_root());
                 self.refresh_palette();
             }
             CoreEvent::Unmounted(list) => {
-                self.unmounted = if self.demo_volumes { Vec::new() } else { list };
+                self.unmounted = if self.hooks.demo_volumes {
+                    Vec::new()
+                } else {
+                    list
+                };
             }
             CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
             CoreEvent::Paths(p) => {
@@ -2024,8 +2040,8 @@ impl App {
             }
             _ => Replan::None,
         };
-        if self.demo_auto_run {
-            self.demo_auto_run = false;
+        if self.hooks.demo_auto_run {
+            self.hooks.demo_auto_run = false;
             self.modal = None;
             let pv = Box::new(PlanView {
                 plan,
@@ -2597,7 +2613,9 @@ impl App {
 
     /// Developer hook (`--demo`): put the interface in a ready-made state, once.
     fn run_demo(&mut self) {
-        let Some(d) = self.demo.take() else { return };
+        let Some(d) = self.hooks.demo.take() else {
+            return;
+        };
         let (scene, arg) = d
             .scene
             .split_once(':')
@@ -2625,7 +2643,7 @@ impl App {
                     .map(|e| e.name.clone())
                     .collect();
                 let Some(dest) = d.dest else { return };
-                self.demo_auto_run = scene == "progress";
+                self.hooks.demo_auto_run = scene == "progress";
                 let opts = TransferOptions::copy(ConflictPolicy::Skip);
                 let h = self.svc.jobs.plan_transfer(paths, dest, opts);
                 self.begin_plan(Key::PlanningCopy.tr(), h);
@@ -2770,7 +2788,7 @@ impl App {
                     })
                     .collect();
                 let Some(dest) = d.dest else { return };
-                self.demo_auto_run = true;
+                self.hooks.demo_auto_run = true;
                 let opts = TransferOptions::copy(ConflictPolicy::KeepBoth);
                 let h = self.svc.jobs.plan_transfer(paths, dest, opts);
                 self.begin_plan(Key::PlanningCopy.tr(), h);

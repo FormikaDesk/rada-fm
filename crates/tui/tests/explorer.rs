@@ -224,7 +224,7 @@ fn two_tabs_open() {
     put_cursor(&mut h, "docs");
     h.press("enter");
     h.wait("docs", |a| a.cwd.ends_with("docs") && !a.is_loading());
-    h.app.clock = Some(demo_now());
+    h.app.hooks.clock = Some(demo_now());
     insta::assert_snapshot!("two_tabs_120x30", shot(&mut h));
     let th = Theme::named("rada", ColorDepth::True).unwrap();
     insta::assert_snapshot!("two_tabs_120x30_tokens", token_map(&mut h, &th));

@@ -520,7 +520,7 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     put("song.mp3", 7_800_000, 72 * day);
     let mut h = H::new(sb, dir, w, h);
     h.wait("the places", |a| !a.paths.places.is_empty());
-    h.app.clock = Some(demo_now());
+    h.app.hooks.clock = Some(demo_now());
     h.app.details = None;
     h.app.tz = jiff::tz::TimeZone::UTC;
     // Creation times are the real ones of the sandbox: leave them out of the screenshots.

@@ -74,7 +74,7 @@ fn scene(w: u16, h: u16) -> H {
     h.wait("the places", |a| !a.paths.places.is_empty());
     // ... and the volumes: a late answer would put the real ones back after they are cleared.
     h.wait("the volumes", |a| a.volumes_seen);
-    h.app.clock = Some(fixed_now());
+    h.app.hooks.clock = Some(fixed_now());
     h.app.tz = jiff::tz::TimeZone::UTC;
     h.app.details = Some(false);
     h.app.volumes.clear();
@@ -176,7 +176,7 @@ fn plan_window_names_the_folders_once() {
     h.wait("backup", |a| a.cwd.ends_with("backup") && !a.is_loading());
     h.press("ctrl+v");
     plan_modal(&mut h);
-    h.app.clock = Some(fixed_now());
+    h.app.hooks.clock = Some(fixed_now());
     insta::assert_snapshot!("plan_copy_120x36", shot(&mut h));
 }
 
