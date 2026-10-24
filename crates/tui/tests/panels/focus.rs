@@ -25,14 +25,14 @@ fn tab_takes_the_keyboard_from_the_folder_to_nav_to_the_preview_and_back() {
     assert_eq!(border_of(&mut h, folder), th.accent);
     assert_eq!(border_of(&mut h, "[ NAV ]"), th.muted);
     h.press("tab");
-    assert!(h.app.side_focus && !h.app.preview_focus);
+    assert!(h.app.side_focus && !h.app.preview.focus);
     assert_eq!(border_of(&mut h, "[ NAV ]"), th.accent);
     assert_eq!(border_of(&mut h, folder), th.muted);
     h.press("tab");
-    assert!(!h.app.side_focus && h.app.preview_focus);
+    assert!(!h.app.side_focus && h.app.preview.focus);
     assert_eq!(border_of(&mut h, "[ PREVIEW ]"), th.accent);
     h.press("tab");
-    assert!(!h.app.side_focus && !h.app.preview_focus);
+    assert!(!h.app.side_focus && !h.app.preview.focus);
     assert_eq!(border_of(&mut h, folder), th.accent);
 }
 
@@ -104,7 +104,7 @@ fn the_arrows_scroll_the_preview_when_the_keyboard_is_in_it() {
     put_cursor(&mut h, "notes.txt");
     h.press("tab");
     h.press("tab");
-    assert!(h.app.preview_focus);
+    assert!(h.app.preview.focus);
     assert_eq!(h.app.preview.scroll, 0);
     h.press("down");
     h.press("down");
@@ -114,5 +114,5 @@ fn the_arrows_scroll_the_preview_when_the_keyboard_is_in_it() {
     // The cursor of the folder did not move.
     assert_eq!(h.cursor_name(), "notes.txt");
     h.press("esc");
-    assert!(!h.app.preview_focus);
+    assert!(!h.app.preview.focus);
 }

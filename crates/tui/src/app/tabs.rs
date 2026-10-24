@@ -155,7 +155,7 @@ impl App {
         if self.archive.is_none() && self.tag_view().is_none() {
             self.svc.watcher.watch(cwd);
         }
-        self.previewed = None;
+        self.preview.invalidate();
         self.folder_info.date_cache.clear();
         self.rebuild_visible();
         self.ensure_visible();

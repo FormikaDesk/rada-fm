@@ -243,7 +243,7 @@ impl H {
     /// Process worker events until `done` holds (or fail after a few seconds).
     pub fn wait(&mut self, what: &str, mut done: impl FnMut(&App) -> bool) {
         let rx = self.app.events();
-        let resized = self.app.image_ui.as_ref().map(|u| u.results());
+        let resized = self.app.preview.image_ui.as_ref().map(|u| u.results());
         // Generous: CI machines are slow, and a test that waits is waiting for a worker thread.
         let end = Instant::now() + Duration::from_secs(20);
         while !done(&self.app) {
@@ -282,7 +282,7 @@ impl H {
     /// Let workers and the encoder thread deliver for a moment, drawing as the real loop does.
     pub fn pump(&mut self, ms: u64) {
         let rx = self.app.events();
-        let resized = self.app.image_ui.as_ref().map(|u| u.results());
+        let resized = self.app.preview.image_ui.as_ref().map(|u| u.results());
         let end = Instant::now() + Duration::from_millis(ms);
         while Instant::now() < end {
             if let Ok(ev) = rx.recv_timeout(Duration::from_millis(10)) {

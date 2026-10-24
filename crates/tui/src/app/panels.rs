@@ -209,7 +209,7 @@ impl App {
         self.layout_pref = pref;
         if pref == crate::panels::LayoutPref::Classic {
             self.side_focus = false;
-            self.preview_focus = false;
+            self.preview.focus = false;
         }
         self.saved_ui.layout = Some(pref.id().to_string());
         self.save_ui_state();
@@ -573,11 +573,11 @@ impl App {
             self.redraw.dirty = true;
             return;
         }
-        let had_focus = self.side_focus || self.preview_focus;
+        let had_focus = self.side_focus || self.preview.focus;
         self.left_preview = !self.left_preview;
         if had_focus {
             self.side_focus = !self.left_preview;
-            self.preview_focus = self.left_preview;
+            self.preview.focus = self.left_preview;
         }
         self.redraw.dirty = true;
     }
@@ -586,16 +586,16 @@ impl App {
     /// box on the left is the only one after the folder, whichever of the two it is.
     pub(super) fn switch_pane_panels(&mut self) {
         if self.panels_two {
-            if self.side_focus || self.preview_focus {
+            if self.side_focus || self.preview.focus {
                 self.side_focus = false;
-                self.preview_focus = false;
+                self.preview.focus = false;
                 return;
             }
             if !self.side_on {
                 self.toggle_sidebar();
             }
             if self.left_preview {
-                self.preview_focus = true;
+                self.preview.focus = true;
             } else {
                 let rows = self.nav_rows();
                 self.nav_cursor = Self::nav_current(&rows, &self.cwd).unwrap_or(0);
@@ -605,11 +605,11 @@ impl App {
         }
         if self.side_focus {
             self.side_focus = false;
-            self.preview_focus = self.details_shown != crate::ui::DetailsMode::Hidden;
+            self.preview.focus = self.details_shown != crate::ui::DetailsMode::Hidden;
             return;
         }
-        if self.preview_focus {
-            self.preview_focus = false;
+        if self.preview.focus {
+            self.preview.focus = false;
             return;
         }
         if !self.side_on {
@@ -772,15 +772,15 @@ impl App {
     pub(super) fn on_preview_action(&mut self, action: Action) -> bool {
         use Action::*;
         match action {
-            Up => self.preview.scroll = self.preview.scroll.saturating_sub(1),
-            Down => self.preview.scroll = self.preview.scroll.saturating_add(1),
+            Up => self.preview.scroll_up(1),
+            Down => self.preview.scroll_down(1),
             First => self.preview.scroll = 0,
-            PageUp | PreviewUp => self.preview.scroll = self.preview.scroll.saturating_sub(10),
-            PageDown | PreviewDown => self.preview.scroll = self.preview.scroll.saturating_add(10),
+            PageUp | PreviewUp => self.preview.scroll_up(10),
+            PageDown | PreviewDown => self.preview.scroll_down(10),
             // Tab goes on round: back to the folder.
-            Parent | ClearSelection | SwitchPane => self.preview_focus = false,
+            Parent | ClearSelection | SwitchPane => self.preview.focus = false,
             Filter => {
-                self.preview_focus = false;
+                self.preview.focus = false;
                 return false;
             }
             _ => return false,

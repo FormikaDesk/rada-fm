@@ -24,7 +24,7 @@ use rada_core::ops::{
 };
 use rada_core::ops::{ExtractInto, OpKind, OpRequest, WarningKind};
 use rada_core::platform::Volume;
-use rada_core::preview::{ImageInfo, ImageState, Limits, Preview};
+use rada_core::preview::Limits;
 
 use crate::fmt::{self, DateFormat, DateStyle};
 use crate::hits::Hits;
@@ -74,36 +74,6 @@ impl Default for Viewport {
             grid_rows: 3,
         }
     }
-}
-
-pub struct PreviewState {
-    pub name: String,
-    pub content: Option<Preview>,
-    pub scroll: usize,
-    /// For image files: what to show besides the picture itself.
-    pub image: Option<ImageView>,
-    /// Binary files show a card; the hex dump only on request (`H`).
-    pub hex: bool,
-    path: Option<PathBuf>,
-}
-
-pub struct ImageView {
-    pub info: ImageInfo,
-    pub status: ImageStatus,
-    pub note: Option<String>,
-    /// A PDF that could not be drawn: the text of its first page.
-    pub text: Vec<String>,
-}
-
-pub enum ImageStatus {
-    /// Header read, pixels being decoded in the worker.
-    Decoding,
-    /// The picture is in the graphics protocol and drawn by the renderer.
-    Shown,
-    /// Image rendering is off (`--images off`): information only.
-    NoGraphics,
-    TooLarge(String),
-    Failed(String),
 }
 
 #[derive(Clone)]
@@ -461,6 +431,7 @@ mod notice;
 mod openwith;
 mod ops;
 mod panels;
+mod preview;
 mod props;
 mod side;
 mod sizes;
@@ -477,6 +448,7 @@ pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
 pub use ops::{Clip, Operations, Running};
 pub use panels::GitView;
+pub use preview::{ImageStatus, ImageView, PreviewPane};
 pub use props::PropsView;
 pub use tabs::TabState;
 pub use update::{UpdateStatus, UpdateView, Updates};
@@ -533,11 +505,8 @@ pub struct App {
     pub nav: crate::nav::NavHistory,
     nav_move: Option<crate::nav::NavMove>,
 
-    pub preview: PreviewState,
-    pub image_ui: Option<ImageUi>,
-    limits: Limits,
-    preview_gen: u64,
-    previewed: Option<PathBuf>,
+    /// The preview of the item under the cursor, its picture, and the keyboard focus in it.
+    pub preview: preview::PreviewPane,
 
     /// Disks, sticks and phones, and the folders the system holds back.
     pub devices: mount::Devices,
@@ -614,8 +583,6 @@ pub struct App {
     pub ring: Option<crate::ring::Cache>,
     pub nav_area: ratatui::layout::Rect,
     pub nav_seen: Option<(PathBuf, Option<usize>, usize, usize)>,
-    /// The keyboard is in the ANTEPRIMA box (panels view): the arrows scroll the preview.
-    pub preview_focus: bool,
     pub dates: DateStyle,
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
@@ -656,7 +623,6 @@ impl App {
             cfg.sort = crate::chooser::default_sort(cfg.sort);
             cfg.details_pane = None;
         }
-        let decode_images = image_ui.is_some();
         // Which folder is in front, and which others were open last time.
         let mut saved: Vec<(PathBuf, ViewMode, SortSpec, bool)> = Vec::new();
         let mut active = 0;
@@ -712,23 +678,7 @@ impl App {
             remembered: HashMap::new(),
             nav: crate::nav::NavHistory::new(start_dir.clone()),
             nav_move: None,
-            preview: PreviewState {
-                name: String::new(),
-                content: None,
-                scroll: 0,
-                image: None,
-                hex: false,
-                path: None,
-            },
-            image_ui,
-            limits: {
-                let mut l = cfg.limits;
-                // No graphics, no point in decoding pictures.
-                l.image.decode = l.image.decode && decode_images;
-                l
-            },
-            preview_gen: 0,
-            previewed: None,
+            preview: preview::PreviewPane::new(image_ui, cfg.limits),
             devices: Default::default(),
             places: side::Places::new(cfg.bookmarks),
             tags: side::Tags::new(svc_tag_language(&svc)),
@@ -776,7 +726,6 @@ impl App {
             ring: None,
             nav_area: Default::default(),
             nav_seen: None,
-            preview_focus: false,
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
@@ -1092,13 +1041,8 @@ impl App {
     /// The cell is `cell` pixels now. If that is not what the pictures were made for, they
     /// are made again, and the screen is cleared so that the terminal drops the old ones.
     pub fn use_cell_px(&mut self, cell: (u16, u16)) {
-        let changed = self
-            .image_ui
-            .as_mut()
-            .is_some_and(|ui| ui.set_cell_px(cell));
-        if changed {
+        if self.preview.use_cell_px(cell) {
             self.ring = None;
-            self.previewed = None;
             self.request_preview();
             self.redraw.full_redraw = true;
             self.redraw.dirty = true;
@@ -1107,22 +1051,13 @@ impl App {
 
     fn request_preview(&mut self) {
         let Some(e) = self.current() else {
-            self.preview.content = None;
-            self.preview.name.clear();
-            self.previewed = None;
+            self.preview.clear();
             return;
         };
         let path = e.path.clone();
-        if self.previewed.as_ref() == Some(&path) {
-            return;
+        if let Some((generation, limits)) = self.preview.ask(&path, self.show_hidden) {
+            self.svc.previewer.request(path, generation, limits);
         }
-        self.previewed = Some(path.clone());
-        self.preview_gen += 1;
-        let limits = Limits {
-            show_hidden: self.show_hidden,
-            ..self.limits.clone()
-        };
-        self.svc.previewer.request(path, self.preview_gen, limits);
     }
 
     // ------------------------------------------------------------------ navigation
@@ -1507,7 +1442,7 @@ impl App {
                                 self.svc.zoxide_add(&path);
                                 self.svc.watcher.watch(path);
                             }
-                            self.previewed = None;
+                            self.preview.invalidate();
                         } else {
                             let existing: BTreeSet<OsString> =
                                 self.listing.all().iter().map(|e| e.name.clone()).collect();
@@ -1546,7 +1481,7 @@ impl App {
                 self.marked.retain(|n| existing.contains(n));
                 self.rebuild_visible();
                 self.restore_cursor(keep);
-                self.previewed = None; // contents may have changed
+                self.preview.invalidate(); // contents may have changed
                 self.request_preview();
             }
         }
@@ -1584,79 +1519,19 @@ impl App {
     }
 
     fn on_preview(&mut self, ev: PreviewEvent) {
-        if ev.generation != self.preview_gen {
-            return;
-        }
-        if self.preview.path.as_ref() != Some(&ev.path) {
-            self.preview.hex = false;
-            self.preview.scroll = 0;
-            self.preview.path = Some(ev.path.clone());
-        }
-        self.preview.name = rada_core::display::name(&ev.name);
-        match ev.preview {
-            Preview::Image(ip) => {
-                let status = match ip.state {
-                    ImageState::Disabled => {
-                        self.clear_image();
-                        ImageStatus::NoGraphics
-                    }
-                    ImageState::Loading => {
-                        if let Some(ui) = &mut self.image_ui {
-                            ui.clear();
-                        }
-                        ImageStatus::Decoding
-                    }
-                    ImageState::Ready(px) => match &mut self.image_ui {
-                        Some(ui) => {
-                            // The event owns the only reference: no pixel copy.
-                            let img = std::sync::Arc::try_unwrap(px)
-                                .unwrap_or_else(|shared| (*shared).clone());
-                            // Rounded corners, blended into the colour behind the picture
-                            // (the theme's own background, or its canvas).
-                            let bg = if self.basic {
-                                None
-                            } else {
-                                crate::theme::rgb_of(self.th.bg.unwrap_or(self.th.canvas))
-                            };
-                            ui.show(img, bg);
-                            ImageStatus::Shown
-                        }
-                        None => ImageStatus::NoGraphics,
-                    },
-                    ImageState::TooLarge(m) => {
-                        self.clear_image();
-                        ImageStatus::TooLarge(m)
-                    }
-                    ImageState::Failed(m) => {
-                        self.clear_image();
-                        ImageStatus::Failed(m)
-                    }
-                };
-                self.preview.image = Some(ImageView {
-                    info: ip.info,
-                    status,
-                    note: ip.note,
-                    text: ip.text,
-                });
-                self.preview.content = None;
-            }
-            other => {
-                self.clear_image();
-                self.preview.image = None;
-                self.preview.content = Some(other);
-            }
-        }
-    }
-
-    fn clear_image(&mut self) {
-        if let Some(ui) = &mut self.image_ui {
-            ui.clear();
-        }
+        // Rounded corners, blended into the colour behind the picture (the theme's own
+        // background, or its canvas).
+        let bg = if self.basic {
+            None
+        } else {
+            crate::theme::rgb_of(self.th.bg.unwrap_or(self.th.canvas))
+        };
+        self.preview.show(ev, bg);
     }
 
     /// The encoder thread finished resizing/encoding the picture for the current area.
     pub fn on_image_resized(&mut self, r: ResizeResult) {
-        if let Some(ui) = &mut self.image_ui {
+        if let Some(ui) = &mut self.preview.image_ui {
             ui.on_resized(r);
         }
         self.redraw.dirty = true;
@@ -3030,19 +2905,19 @@ impl App {
     fn on_full_preview_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
-                self.preview.scroll += 1;
+                self.preview.scroll_down(1);
                 self.modal = Some(Modal::FullPreview);
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                self.preview.scroll = self.preview.scroll.saturating_sub(1);
+                self.preview.scroll_up(1);
                 self.modal = Some(Modal::FullPreview);
             }
             KeyCode::PageDown => {
-                self.preview.scroll += 20;
+                self.preview.scroll_down(20);
                 self.modal = Some(Modal::FullPreview);
             }
             KeyCode::PageUp => {
-                self.preview.scroll = self.preview.scroll.saturating_sub(20);
+                self.preview.scroll_up(20);
                 self.modal = Some(Modal::FullPreview);
             }
             KeyCode::Char('H') => {

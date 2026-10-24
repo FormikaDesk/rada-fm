@@ -105,10 +105,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         }
     } else {
         app.side_focus = false;
-        app.preview_focus = false;
+        app.preview.focus = false;
     }
     if two && !app.left_preview {
-        app.preview_focus = false;
+        app.preview.focus = false;
     }
     if two && app.left_preview {
         app.side_focus = false;
@@ -218,7 +218,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
         &th,
         &title,
         &edge,
-        !app.side_focus && !app.preview_focus,
+        !app.side_focus && !app.preview.focus,
     );
     // The cards never cover the text: the list is made shorter while they are there.
     let now = app.notice_now();
@@ -280,7 +280,7 @@ fn draw_right(f: &mut Frame, app: &mut App, area: Rect) {
         &th,
         rada_core::i18n::Key::PanelPreview.tr(),
         &frame::Edge::NONE,
-        app.preview_focus,
+        app.preview.focus,
     );
     side::draw_preview(f, app, frame::pad(inner, airy));
     frame::settle(f.buffer_mut(), inner, &th);

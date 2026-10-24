@@ -13,7 +13,6 @@ use rada_core::events::CoreEvent;
 use rada_core::i18n::Key;
 use rada_core::model::{SortKey, SortSpec};
 use rada_core::ops::TransferMode;
-use rada_core::preview::Preview;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -339,7 +338,7 @@ impl App {
                 self.redraw.dirty = true;
                 return;
             }
-            if self.panels_shown && self.preview_focus && self.on_preview_action(action) {
+            if self.panels_shown && self.preview.focus && self.on_preview_action(action) {
                 self.redraw.dirty = true;
                 return;
             }
@@ -500,19 +499,16 @@ impl App {
                 self.rebuild_visible();
                 self.restore_cursor(keep);
                 // A folder's preview lists what the list lists.
-                self.previewed = None;
+                self.preview.invalidate();
                 self.request_preview();
             }
             ToggleHex => {
-                if matches!(self.preview.content, Some(Preview::Binary(_))) {
-                    self.preview.hex = !self.preview.hex;
-                    self.preview.scroll = 0;
-                } else {
+                if !self.preview.toggle_hex() {
                     self.toast(ToastKind::Info, Key::THexOnlyBinary.tr(), 2);
                 }
             }
-            PreviewDown => self.preview.scroll = self.preview.scroll.saturating_add(5),
-            PreviewUp => self.preview.scroll = self.preview.scroll.saturating_sub(5),
+            PreviewDown => self.preview.scroll_down(5),
+            PreviewUp => self.preview.scroll_up(5),
             Bookmark => self.toggle_bookmark(),
             SwitchPane => self.switch_pane(),
             ToggleSidebar => self.toggle_sidebar(),
@@ -909,11 +905,11 @@ impl App {
             return;
         }
         if target == Some(Target::Preview) {
-            self.preview.scroll = if down {
-                self.preview.scroll.saturating_add(WHEEL_STEP)
+            if down {
+                self.preview.scroll_down(WHEEL_STEP);
             } else {
-                self.preview.scroll.saturating_sub(WHEEL_STEP)
-            };
+                self.preview.scroll_up(WHEEL_STEP);
+            }
             return;
         }
         self.sel_anchor = None;
@@ -948,7 +944,7 @@ impl App {
             }
         }
         // The keyboard follows the click: into the preview box when that is what was clicked.
-        self.preview_focus = self.panels_shown && matches!(target, Some(Target::Preview));
+        self.preview.focus = self.panels_shown && matches!(target, Some(Target::Preview));
         match target {
             Some(Target::TreeToggle(dir)) => self.toggle_tree(&dir),
             Some(Target::Row(i)) => {

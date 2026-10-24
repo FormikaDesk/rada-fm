@@ -30,7 +30,7 @@ fn nothing_in_spazio_ends_with_an_ellipsis_at_78_by_45() {
     for ring in [false, true] {
         let mut h = scene(78, 45, "rada", false);
         if ring {
-            h.app.image_ui = Some(rada_tui::ImageUi::sized(
+            h.app.preview.image_ui = Some(rada_tui::ImageUi::sized(
                 ratatui_image::picker::ProtocolType::Kitty,
                 (10, 20),
             ));

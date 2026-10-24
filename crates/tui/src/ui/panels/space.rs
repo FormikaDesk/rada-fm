@@ -97,7 +97,13 @@ fn bar(th: &Theme, set: IconSet, used: f64, cells: usize, basic: bool) -> Vec<Sp
 /// The colours of the ring when this terminal can draw one: it has a graphics protocol and the
 /// theme is in true colours. Otherwise the main disk is the bar.
 pub fn ring_colors(app: &App) -> Option<crate::ring::Colors> {
-    if !app.image_ui.as_ref().is_some_and(|u| u.is_graphics()) || app.basic {
+    if !app
+        .preview
+        .image_ui
+        .as_ref()
+        .is_some_and(|u| u.is_graphics())
+        || app.basic
+    {
         return None;
     }
     let th = &app.th;
@@ -119,7 +125,7 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
     };
     let pct = (used_share(main) * 100.0).round() as u8;
     let ring_at = Rect::new(area.x + 1, area.y, COLS, ROWS.min(area.height));
-    let Some(ui) = app.image_ui.as_ref() else {
+    let Some(ui) = app.preview.image_ui.as_ref() else {
         return false;
     };
     if crate::ring::pieces(&mut app.ring, ui, pct, &colors).is_none() {

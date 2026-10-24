@@ -409,7 +409,7 @@ fn an_image_is_drawn_with_its_facts_underneath() {
     assert!(s.contains("PNG · 160 × 100 px"), "{s}");
     assert!(s.contains("modified 20"), "{s}");
     assert_eq!(
-        h.app.image_ui.as_ref().unwrap().protocol_name(),
+        h.app.preview.image_ui.as_ref().unwrap().protocol_name(),
         "half blocks"
     );
 }

@@ -573,7 +573,7 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
     match kind {
         Kind::Shown => {
             let mut facts_at = bottom;
-            if let Some(ui) = app.image_ui.as_mut() {
+            if let Some(ui) = app.preview.image_ui.as_mut() {
                 let target = ratatui::layout::Size::new(pic.width, pic.height);
                 match ui.proto.size_for(Resize::Fit(None), target) {
                     Some(sz) => {

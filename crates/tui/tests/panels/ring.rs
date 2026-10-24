@@ -8,7 +8,7 @@ use rada_tui::theme::ColorDepth;
 /// The scene on a terminal that draws pictures (Kitty), with a cell of 10 × 20 pixels.
 fn ring_scene(theme: &str) -> H {
     let mut h = scene(160, 46, theme, false);
-    h.app.image_ui = Some(rada_tui::ImageUi::sized(
+    h.app.preview.image_ui = Some(rada_tui::ImageUi::sized(
         ratatui_image::picker::ProtocolType::Kitty,
         (10, 20),
     ));
@@ -120,7 +120,7 @@ fn the_ring_follows_the_cell_when_the_font_is_zoomed() {
     h.app.use_cell_px((14, 28));
     assert!(h.app.take_full_redraw(), "the old picture is cleared");
     let _ = h.screen();
-    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (14, 28));
+    assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (14, 28));
     assert_eq!(
         h.app.ring.as_ref().unwrap().made,
         1,
@@ -130,7 +130,7 @@ fn the_ring_follows_the_cell_when_the_font_is_zoomed() {
     // Columns and rows change as well (the window kept its size).
     h.app.use_cell_px((7, 14));
     let _ = h.screen();
-    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (7, 14));
+    assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (7, 14));
     assert_eq!(h.app.ring.as_ref().unwrap().made, 1);
     assert_eq!(ring_cells(&h), cells);
 }
@@ -141,5 +141,5 @@ fn a_cell_the_system_does_not_report_leaves_the_ring_as_it_is() {
     let _ = h.screen();
     h.app.use_cell_px((0, 0));
     assert!(!h.app.take_full_redraw());
-    assert_eq!(h.app.image_ui.as_ref().unwrap().cell_px(), (10, 20));
+    assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (10, 20));
 }

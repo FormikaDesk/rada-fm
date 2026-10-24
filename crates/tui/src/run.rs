@@ -244,6 +244,7 @@ fn event_loop(
     let shutdown = shutdown_flag();
     let core_rx = app.events();
     let resize_rx = app
+        .preview
         .image_ui
         .as_ref()
         .map(|u| u.results())

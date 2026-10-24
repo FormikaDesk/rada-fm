@@ -231,8 +231,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         finish(f, app, area, Some(address_row));
         return;
     }
-    if app.preview_focus {
-        app.preview_focus = false;
+    if app.preview.focus {
+        app.preview.focus = false;
     }
 
     // Top to bottom: tabs, address, commands, the body, the progress of a running operation,
