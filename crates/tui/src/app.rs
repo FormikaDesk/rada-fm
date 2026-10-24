@@ -583,10 +583,7 @@ pub struct App {
     pub running: Option<Running>,
     /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
     pub notices: NoticeQueue,
-    /// The folder above the one shown, for the Columns view (see `columns.rs`).
-    pub columns_parent: Option<columns::ParentColumn>,
-    parent_gen: u64,
-    parent_asked: Option<PathBuf>,
+    pub columns: columns::ColumnsView,
     pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
@@ -806,9 +803,7 @@ impl App {
             modal: None,
             running: None,
             notices: NoticeQueue::default(),
-            columns_parent: None,
-            parent_gen: 0,
-            parent_asked: None,
+            columns: columns::ColumnsView::default(),
             watch_note: None,
             viewport: Viewport::default(),
             should_quit: false,

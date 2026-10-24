@@ -21,6 +21,15 @@ pub struct ParentColumn {
     pub listing: DirListing,
 }
 
+/// The state of the Columns view: its first column and the question that fills it.
+#[derive(Default)]
+pub struct ColumnsView {
+    /// The folder above the one shown.
+    pub columns_parent: Option<ParentColumn>,
+    parent_gen: u64,
+    parent_asked: Option<PathBuf>,
+}
+
 impl App {
     /// Whether the Columns view is the one drawn.
     pub fn columns_on(&self) -> bool {
@@ -33,22 +42,23 @@ impl App {
             return;
         }
         let Some(parent) = self.cwd.parent().map(Path::to_path_buf) else {
-            self.columns_parent = None;
+            self.columns.columns_parent = None;
             return;
         };
         if self
+            .columns
             .columns_parent
             .as_ref()
             .is_some_and(|c| c.path == parent)
-            || self.parent_asked.as_ref() == Some(&parent)
+            || self.columns.parent_asked.as_ref() == Some(&parent)
         {
             return;
         }
-        self.parent_gen += 1;
-        self.parent_asked = Some(parent.clone());
+        self.columns.parent_gen += 1;
+        self.columns.parent_asked = Some(parent.clone());
         self.svc
             .parent_loader
-            .load(parent, PARENT_GEN | self.parent_gen);
+            .load(parent, PARENT_GEN | self.columns.parent_gen);
     }
 
     /// The answer about the folder above arrived.
@@ -58,18 +68,18 @@ impl App {
         path: PathBuf,
         result: Result<Vec<Entry>, String>,
     ) {
-        if generation != PARENT_GEN | self.parent_gen {
+        if generation != PARENT_GEN | self.columns.parent_gen {
             return; // a question that was replaced by a newer one
         }
-        self.parent_asked = None;
+        self.columns.parent_asked = None;
         match result {
             Ok(entries) => {
-                self.columns_parent = Some(ParentColumn {
+                self.columns.columns_parent = Some(ParentColumn {
                     listing: DirListing::new(path.clone(), entries, self.sort),
                     path,
                 });
             }
-            Err(_) => self.columns_parent = None,
+            Err(_) => self.columns.columns_parent = None,
         }
         self.dirty = true;
     }
@@ -77,7 +87,7 @@ impl App {
     /// The entries of the folder above in the order of the first column: what the list would
     /// show of it (hidden items only when hidden files are on).
     pub fn parent_entries(&self) -> Vec<&Entry> {
-        let Some(c) = &self.columns_parent else {
+        let Some(c) = &self.columns.columns_parent else {
             return Vec::new();
         };
         c.listing
