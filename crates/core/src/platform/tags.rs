@@ -2,10 +2,10 @@
 //!
 //! * **macOS**: the Finder's tags, in the extended attribute `com.apple.metadata:_kMDItemUserTags`,
 //!   a binary property list holding strings of the form `Name` or `Name\n<colour number>`. The
-//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The colour is the number;
-//!   the name of a standard colour is written in the language of the system (`Blu\n4` on an
-//!   Italian Mac), because the Finder knows its colour tags by those names and gives a tag of
-//!   another name no colour.
+//!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The name of a standard
+//!   colour is written in the language of the system (`Blu\n4` on an Italian Mac). A tag called
+//!   after a standard colour has that colour, whatever number the file carries; any other tag has
+//!   the number, and none without one.
 //! * **Linux**: `user.xdg.tags`, the freedesktop convention that Dolphin and Baloo use: tag
 //!   names in UTF-8, separated by commas. It has no colours; a tag called "Red" is drawn red.
 //! * **Windows**: not supported; the interface offers nothing there.
@@ -285,13 +285,12 @@ pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
                     Some((n, i)) => (n.to_string(), i.trim().parse::<u8>().ok()),
                     None => (s, None),
                 };
-                // The colour is the number the Finder wrote (0: none), whatever the name says: a
-                // Finder in Italian calls blue "Blu". Only a tag with no number at all is
-                // given the colour of its name, if it has one.
-                let color = match index {
-                    Some(i) => TagColor::from_finder_index(i),
-                    None => TagColor::from_name(&name),
-                };
+                // A tag called after one of the seven colours (in any language) has that colour,
+                // whatever number the file carries: the Finder draws a file tagged "Verde\n1"
+                // green, though 1 is gray. Any other tag has the number the Finder wrote (0:
+                // none), and none when it wrote no number.
+                let color = TagColor::from_name(&name)
+                    .or_else(|| index.and_then(TagColor::from_finder_index));
                 Tag { name, color }
             })
             .filter(|t| !t.name.is_empty())
@@ -830,9 +829,10 @@ mod tests {
     }
 
     #[test]
-    fn real_finder_values_in_italian_are_read_by_their_numbers() {
+    fn real_finder_values_in_italian_are_read() {
         // What an Italian Finder writes for its seven colours, a tag of the user's own, one
-        // with a colour, one with the number 0, and a tag whose name lies about its number.
+        // with a colour, one with the number 0, and two tags whose number disagrees with their
+        // name (the name wins).
         let bytes = crate::platform::bplist::encode_string_array(&[
             "Rosso\n6".into(),
             "Arancione\n7".into(),
@@ -863,11 +863,43 @@ mod tests {
                 None,
                 Some(Blue),
                 None,
-                None,
-                Some(Red),
+                Some(Blue),
+                Some(Blue),
             ]
         );
         assert_eq!(got[4].name, "Blu");
+    }
+
+    #[test]
+    fn a_tag_named_after_a_colour_has_that_colour_whatever_number_the_file_carries() {
+        use TagColor::*;
+        // "Verde\n1" is a real file of a Mac: the number says gray, the Finder draws green.
+        let bytes = crate::platform::bplist::encode_string_array(&[
+            "Verde\n1".into(),
+            "Blu\n0".into(),
+            "Arancio\n7".into(),
+            "Progetto\n0".into(),
+            "Rot\n1".into(),
+            "Progetto\n4".into(),
+            "Progetto".into(),
+        ]);
+        let colours: Vec<_> = decode_finder(&bytes)
+            .unwrap()
+            .iter()
+            .map(|t| t.color)
+            .collect();
+        assert_eq!(
+            colours,
+            [
+                Some(Green),
+                Some(Blue),
+                Some(Orange),
+                None,
+                Some(Red),
+                Some(Blue),
+                None
+            ]
+        );
     }
 
     #[test]

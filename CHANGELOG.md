@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Fixed
+- **On a Mac a tag named after one of the seven colours shows that colour even when the file carries another number**, as in the Finder: a file tagged `Verde` with the number 1 (gray) was drawn gray in the list, the TAG column and the details, and the Finder shows it green. Tags of your own keep the colour of their number. Nothing changes on Linux and Windows.
 - **The row of tags in NAV of the panels view lists the tags of your own** after the seven colours (on a Mac "Arancio", "🌈", "👵"), as the classic sidebar does: each is a dot in its colour (gray if it has none), a click or `Enter` opens its list, and `←` `→` walk them. When they do not fit on a line they go on to a second and a third; in a short box the extra lines go first and the others are counted as `+N`. The name of the dot under the pointer or the keyboard is in the status bar. Nothing changes on Windows, which keeps no tags.
 
 ## [0.6.0-rc.15] - 2026-10-24
