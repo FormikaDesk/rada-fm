@@ -402,7 +402,8 @@ impl App {
             // The lines of the user's own tags come after everything else: they take what is
             // left over the places, the disks, the least of the way and the first line of dots.
             let spare = height.saturating_sub(rest + min_way + block_len(&devices) + tags.len());
-            if spare > 0 {
+            // (Where tags are not kept there is no block, and nothing to give lines to.)
+            if spare > 0 && !tags.is_empty() {
                 tags = self.tags_rows(tags.len() - 1 + spare.min(TAG_LINES_MOST - 1));
             }
             devices = squeeze(devices, &mut tags, rest + min_way, height);

@@ -243,3 +243,40 @@ fn the_status_bar_names_the_tag_under_the_pointer_or_the_keyboard() {
     h.app.side_nav.nav_tag = 8;
     assert_eq!(h.app.nav_tag_name().as_deref(), Some("Lavoro"));
 }
+
+#[test]
+fn where_tags_are_not_kept_there_is_no_row_and_no_height_is_counted_for_one() {
+    use rada_core::fs::LocalFs;
+    use rada_core::testplatform::{MacLike, MacLikeSpec};
+    use rada_tui::panels::NavMode;
+    use std::sync::Arc;
+    // The stand-in keeps no tags, as Windows does.
+    for nav in [NavMode::Path, NavMode::Tree] {
+        for hh in 24..=46 {
+            let sb = rada_core::testutil::Sandbox::new();
+            let home = sb.dirs.home.clone();
+            for d in ["Documents", "Downloads", "projects/demo"] {
+                std::fs::create_dir_all(home.join(d)).unwrap();
+            }
+            let p = Arc::new(MacLike::new(sb.platform(), MacLikeSpec::default()));
+            let start = home.join("projects/demo");
+            let mut h = H::with_system(sb, start, 110, hh, (Arc::new(LocalFs), p), |_| {});
+            h.app.settings.layout_pref = rada_tui::LayoutPref::Panels;
+            h.app.settings.nav_mode = nav;
+            let s = h.screen();
+            assert!(!h.app.tags_supported());
+            assert!(h.app.frame.panels_shown, "{hh}");
+            assert!(!s.contains("TAGS"), "{hh}:\n{s}");
+            assert!(lines(&h).is_empty(), "{hh}");
+            let rows = h.app.nav_rows();
+            let doubled = rows
+                .windows(2)
+                .any(|w| w[0].kind == NavKind::Gap && w[1].kind == NavKind::Gap);
+            assert!(
+                !doubled,
+                "{hh}: no second blank row where the tags would be"
+            );
+            assert_eq!(h.app.nav_tag_name(), None);
+        }
+    }
+}
