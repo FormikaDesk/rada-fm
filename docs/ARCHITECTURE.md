@@ -46,6 +46,37 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 - `ui::draw(f, &mut App)` reads only `App` state. It takes `&mut` to store what it learned about the screen (click rectangles in `Hits`, row counts in `Viewport`), never to touch the disk. All file data it shows (`DirListing`, `Preview`, sizes, git status) arrived earlier as an event.
 - Known exception: the save-as check of the file chooser stats one path on the UI thread (`app/chooser.rs`). The terminal probes in `termtheme.rs` and `clipboard.rs` run programs, not files.
 
+## The state of `App`
+
+`App` (`crates/tui/src/app.rs`) has 19 fields. Each is a group that owns one kind of state, with its methods next to it; `app.rs` keeps the event loop entry points and what crosses groups.
+
+| Field | Holds | Where |
+|---|---|---|
+| `settings` | What `config.toml` and the View menu set: theme, icons, keymap, date formats, layout. Read all the time, changes seldom. | `app/settings.rs` |
+| `svc` | The workers and their senders (`Services`), seen only from `App`. | `services.rs` |
+| `hooks` | What only tests and screenshots use: the demo scene, made-up disks, a settable clock. | `app.rs` (`TestHooks`) |
+| `tab` | The front tab: folder, listing, filter, sort, view, history, and its `Selection` (cursor, scroll, marks). | `app/tabs.rs`, `app/selection.rs` |
+| `tabs` | The other tabs, which one is in front, and what is saved between sessions. | `app/tabs.rs` |
+| `preview` | The preview of the item under the cursor, its picture, and the keyboard focus in it. | `app/preview.rs` |
+| `devices` | Disks, sticks and phones, and the folders the system holds back. | `app/mount.rs` |
+| `places`, `tags` | The places the sidebar lists, and the tags the sidebar and the tag menu know. | `app/side.rs` |
+| `ops` | The clipboard, the plan being prepared, the operation running, the undo label. | `app/ops.rs` |
+| `windows` | The open window (`Modal`), the notification cards, the address bar, the help scroll. | `app/windows.rs` |
+| `columns` | The Columns view: the parent column and its read. | `app/columns.rs` |
+| `session` | How the session ends, and whether it is a file chooser. | `app/chooser.rs` |
+| `redraw` | Whether a frame is due, a full redraw, the spinner. | `app.rs` (`Redraw`) |
+| `side_nav` | The sidebar and the NAV box: the keyboard in them, their cursors, the tree. | `app/side.rs` |
+| `frame` | What the last frame drew (click rectangles, areas), for the mouse and the tests. | `ui/frame.rs` (`LastFrame`) |
+| `folder_info` | What is worked out about the folder shown: git status, folder sizes, date cache. | `app/panels.rs` |
+| `updates` | The version, what the update worker last told, whether somebody waits for an answer. | `app/update.rs` |
+| `last_click` | The time and row of the last click, for the double click. | `app.rs` |
+
+### Tabs
+
+Everything that works on "the folder" reads `App::tab`, a `TabState`: the front tab. The tabs behind it sit in `tabs.slots`, one `TabState` each, and the slot of the front tab is an empty `TabState::default()` so that the indices of `slots` are the indices of the tabs; `tabs.active` says which one is in front.
+
+To change the front tab, `App::bring_to_front(incoming)` does `mem::replace(&mut self.tab, incoming)` and hands back the tab that left, to be put in its slot. `switch_tab`, `new_tab` and `close_tab` all go through it. `TabState::leave` runs on the tab that goes out and drops what only makes sense in front: a read of the folder still on its way (`load`) and a pending history move (`nav_move`). No field is copied one by one, so a new per-tab field only has to be added to `TabState`.
+
 ## Platform code
 
 All OS-dependent behaviour sits behind the `Platform` trait (`core/src/platform/mod.rs`): trash, volumes, file attributes, opening files, path rules, tags, user folders. The rest of the core never tests the OS; it asks the trait.
