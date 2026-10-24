@@ -52,18 +52,42 @@ fn unusable_buttons_are_not_clickable_and_usable_ones_are() {
     let mut h = H::new(sb, dir, 140, 30);
     let _ = h.screen();
     assert!(
-        h.app.hits.find(&Target::Act(Action::Back)).is_none(),
+        h.app.frame.hits.find(&Target::Act(Action::Back)).is_none(),
         "no history yet"
     );
-    assert!(h.app.hits.find(&Target::Act(Action::Forward)).is_none());
-    assert!(h.app.hits.find(&Target::Act(Action::Parent)).is_some());
-    assert!(h.app.hits.find(&Target::Act(Action::Refresh)).is_some());
+    assert!(
+        h.app
+            .frame
+            .hits
+            .find(&Target::Act(Action::Forward))
+            .is_none()
+    );
+    assert!(
+        h.app
+            .frame
+            .hits
+            .find(&Target::Act(Action::Parent))
+            .is_some()
+    );
+    assert!(
+        h.app
+            .frame
+            .hits
+            .find(&Target::Act(Action::Refresh))
+            .is_some()
+    );
 
     h.key(KeyCode::Enter); // into sub
     h.wait("sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
     h.click(&Target::Act(Action::Back));
     h.wait("back", |a| a.cwd.ends_with("proj.v1") && !a.is_loading());
-    assert!(h.app.hits.find(&Target::Act(Action::Forward)).is_some());
+    assert!(
+        h.app
+            .frame
+            .hits
+            .find(&Target::Act(Action::Forward))
+            .is_some()
+    );
     h.click(&Target::Act(Action::Forward));
     h.wait("forward", |a| a.cwd.ends_with("sub") && !a.is_loading());
     h.click(&Target::Act(Action::Parent));
@@ -144,6 +168,7 @@ fn the_folded_part_of_a_path_opens_a_list_to_pick_from() {
     let _ = h.screen();
     let more = h
         .app
+        .frame
         .hits
         .all()
         .find_map(|(_, t)| matches!(t, Target::CrumbMore(_)).then(|| t.clone()))

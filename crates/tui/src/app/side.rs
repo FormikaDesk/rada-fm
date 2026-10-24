@@ -216,13 +216,13 @@ impl App {
 
     /// The items the sidebar shows right now.
     pub fn side_items(&self) -> Vec<Item> {
-        sidebar::items(self, self.side_mode == Mode::Rail)
+        sidebar::items(self, self.frame.side_mode == Mode::Rail)
     }
 
     /// What the footer says about the item under the keyboard focus or the mouse, in the
     /// icon-only mode where the names are not on screen.
     pub fn side_description(&self) -> Option<String> {
-        if self.side_mode != Mode::Rail {
+        if self.frame.side_mode != Mode::Rail {
             return None;
         }
         let items = self.side_items();
@@ -250,14 +250,14 @@ impl App {
         }
         self.saved_ui.sidebar = Some(self.side_nav.wanted);
         self.save_ui_state();
-        if self.side_nav.wanted && Mode::for_width(self.term_width, true) == Mode::Hidden {
+        if self.side_nav.wanted && Mode::for_width(self.frame.term_width, true) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarOnNarrow.tr(), 3);
         }
     }
 
     /// Tab: the keyboard goes to the sidebar, or back to the list.
     pub(super) fn switch_pane(&mut self) {
-        if self.panels_shown {
+        if self.frame.panels_shown {
             return self.switch_pane_panels();
         }
         if self.side_nav.focus {
@@ -267,12 +267,12 @@ impl App {
         if !self.side_nav.wanted {
             self.toggle_sidebar();
         }
-        if Mode::for_width(self.term_width, self.side_nav.wanted) == Mode::Hidden {
+        if Mode::for_width(self.frame.term_width, self.side_nav.wanted) == Mode::Hidden {
             self.toast(ToastKind::Info, Key::TSidebarNarrow.tr(), 3);
             return;
         }
         // Make the next frame's mode current before looking at the items.
-        self.side_mode = Mode::for_width(self.term_width, self.side_nav.wanted);
+        self.frame.side_mode = Mode::for_width(self.frame.term_width, self.side_nav.wanted);
         let items = self.side_items();
         if items.is_empty() {
             return;
@@ -284,7 +284,7 @@ impl App {
     /// A key while the sidebar has the focus. `true`: dealt with here.
     pub(super) fn on_side_action(&mut self, action: Action) -> bool {
         use Action::*;
-        if self.panels_shown {
+        if self.frame.panels_shown {
             return self.on_nav_action(action);
         }
         let items = self.side_items();

@@ -100,7 +100,7 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
             ..area
         },
     );
-    app.hits.add(area, Target::Window);
+    app.frame.hits.add(area, Target::Window);
 }
 
 fn draw_properties(f: &mut Frame, ctx: &Ctx, p: &PropsView, area: Rect, hits: &mut Hits) {
@@ -233,8 +233,10 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             ];
             f.render_widget(Paragraph::new(lines), inner);
         }
-        Modal::Plan(pv) => super::plan::draw(f, &ctx, pv, &home, &app.keymap, area, &mut app.hits),
-        Modal::Palette(p) => draw_palette(f, &th, p, area, &mut app.hits),
+        Modal::Plan(pv) => {
+            super::plan::draw(f, &ctx, pv, &home, &app.keymap, area, &mut app.frame.hits)
+        }
+        Modal::Palette(p) => draw_palette(f, &th, p, area, &mut app.frame.hits),
         Modal::OpenWith(v) => {
             // Opened from the context menu: the menu stays in view and the list sits beside it.
             let anchor = v.under.as_deref().map(|m| {
@@ -242,7 +244,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 super::menu::beside(&ctx, &app.keymap, m, room)
             });
             let at = if anchor.is_some() { room } else { area };
-            super::openwith::draw(f, &ctx, &app.keymap, v, at, anchor, &mut app.hits);
+            super::openwith::draw(f, &ctx, &app.keymap, v, at, anchor, &mut app.frame.hits);
         }
         Modal::Failure { info, .. } => {
             let w = 88.min(area.width.saturating_sub(4));
@@ -274,7 +276,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 button(&th, "a", Key::BtnAbort.tr(), None, true),
             ];
             hit_spans(
-                &mut app.hits,
+                &mut app.frame.hits,
                 inner.x,
                 inner.y + lines.len() as u16,
                 &btns,
@@ -290,7 +292,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::Input(iv) => draw_input(f, &ctx, iv, area),
-        Modal::History(h) => draw_history(f, &ctx, h, area, spinner, &mut app.hits),
+        Modal::History(h) => draw_history(f, &ctx, h, area, spinner, &mut app.frame.hits),
         Modal::Result(r) => {
             let w = 90.min(area.width.saturating_sub(4));
             let wrapped: Vec<(ToastKind, String, bool)> = r
@@ -330,7 +332,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 button(&th, "Esc", Key::BtnClose.tr(), None, true),
             ];
             hit_spans(
-                &mut app.hits,
+                &mut app.frame.hits,
                 inner.x,
                 inner.y + lines.len() as u16,
                 &btns,
@@ -368,7 +370,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 button(&th, "Esc", Key::BtnStay.tr(), None, true),
             ];
             hit_spans(
-                &mut app.hits,
+                &mut app.frame.hits,
                 inner.x,
                 inner.y + 5,
                 &btns,
@@ -380,12 +382,12 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_widget(Paragraph::new(lines), inner);
         }
         Modal::Help => draw_help(f, &ctx, area, &app.keymap, app.mouse, app.help_scroll),
-        Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, room, &mut app.hits),
-        Modal::Properties(p) => draw_properties(f, &ctx, p, area, &mut app.hits),
-        Modal::Update(u) => super::updates::draw_update(f, &ctx, u, area, &mut app.hits),
-        Modal::Access(d) => super::dialogs::draw_access(f, &ctx, d, area, &mut app.hits),
-        Modal::Eject(e) => super::dialogs::draw_eject(f, &ctx, e, area, &mut app.hits),
-        Modal::Font(v) => super::dialogs::draw_font(f, &ctx, v, area, &mut app.hits),
+        Modal::Menu(m) => super::menu::draw(f, &ctx, &app.keymap, m, room, &mut app.frame.hits),
+        Modal::Properties(p) => draw_properties(f, &ctx, p, area, &mut app.frame.hits),
+        Modal::Update(u) => super::updates::draw_update(f, &ctx, u, area, &mut app.frame.hits),
+        Modal::Access(d) => super::dialogs::draw_access(f, &ctx, d, area, &mut app.frame.hits),
+        Modal::Eject(e) => super::dialogs::draw_eject(f, &ctx, e, area, &mut app.frame.hits),
+        Modal::Font(v) => super::dialogs::draw_font(f, &ctx, v, area, &mut app.frame.hits),
         Modal::FullPreview => {}
     }
 }

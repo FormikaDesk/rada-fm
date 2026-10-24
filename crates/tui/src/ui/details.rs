@@ -227,7 +227,7 @@ pub fn draw_chooser_preview(f: &mut Frame, app: &mut App, area: Rect) {
         ..inner
     };
     if body.height >= 3 {
-        app.hits.add(body, Target::Preview);
+        app.frame.hits.add(body, Target::Preview);
         preview::content(f, app, body, false);
     }
 }
@@ -279,7 +279,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             height: preview_h,
             ..inner
         };
-        app.hits.add(body, Target::Preview);
+        app.frame.hits.add(body, Target::Preview);
         preview::content(f, app, body, false);
     }
 
@@ -306,7 +306,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         let open = format!("{} {}", icons::ui(set, Glyph::Open), Key::BtnOpen.tr());
         let open_rect = row(by);
         draw_pill(f, open_rect, open.trim(), primary, rounded);
-        app.hits.add(open_rect, Target::Act(Action::Open));
+        app.frame.hits.add(open_rect, Target::Act(Action::Open));
 
         if by + 2 < end {
             let row2 = row(by + 2);
@@ -323,7 +323,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             };
             if e.is_navigable_dir() {
                 draw_pill(f, row2, &second, secondary, rounded);
-                app.hits.add(row2, second_target);
+                app.frame.hits.add(row2, second_target);
             } else {
                 let half = (w.saturating_sub(1)) / 2;
                 let left = Rect {
@@ -337,15 +337,15 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
                 };
                 draw_pill(f, left, Key::BtnOpenWith.tr(), secondary, rounded);
                 draw_pill(f, right, &second, secondary, rounded);
-                app.hits.add(left, Target::Act(Action::OpenWith));
-                app.hits.add(right, second_target);
+                app.frame.hits.add(left, Target::Act(Action::OpenWith));
+                app.frame.hits.add(right, second_target);
             }
         }
         // macOS: the Finder's own preview, under the others.
         if quick_look_below && by + 4 < end {
             let row3 = row(by + 4);
             draw_pill(f, row3, Key::BtnQuickLook.tr(), secondary, rounded);
-            app.hits.add(row3, Target::Act(Action::QuickLook));
+            app.frame.hits.add(row3, Target::Act(Action::QuickLook));
         }
     }
 

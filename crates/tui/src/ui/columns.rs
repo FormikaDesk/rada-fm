@@ -142,7 +142,7 @@ fn draw_parent(f: &mut Frame, app: &mut App, area: Rect) {
         if *is_here {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Place);
         }
-        app.hits.add(r, Target::Place(e.path.clone()));
+        app.frame.hits.add(r, Target::Place(e.path.clone()));
     }
 }
 
@@ -152,7 +152,7 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
     let look = Look::of(app);
     let rows = area.height as usize;
     app.viewport.rows = rows;
-    app.hits.add(area, Target::List);
+    app.frame.hits.add(area, Target::List);
     let count = app.visible.len();
     if count == 0 {
         f.render_widget(
@@ -196,7 +196,7 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);
         }
-        app.hits.add(r, Target::Row(vis));
+        app.frame.hits.add(r, Target::Row(vis));
     }
 }
 
@@ -229,7 +229,7 @@ fn draw_next(f: &mut Frame, app: &mut App, area: Rect) {
         width: area.width.saturating_sub(2),
         height: area.height - 2,
     };
-    app.hits.add(body, Target::Preview);
+    app.frame.hits.add(body, Target::Preview);
     super::preview::content(f, app, body, false);
 }
 

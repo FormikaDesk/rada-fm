@@ -77,7 +77,7 @@ fn every_colour_of_the_panels_is_a_theme_token_in_every_theme() {
 fn way_folders_have_the_folder_colour() {
     let (mut h, _) = path_scene();
     let buf = h.redrawn_buffer();
-    let nav = h.app.nav_area;
+    let nav = h.app.frame.nav_area;
     let mut in_nav = std::collections::BTreeSet::new();
     let mut in_list = std::collections::BTreeSet::new();
     for y in nav.top()..nav.bottom() {

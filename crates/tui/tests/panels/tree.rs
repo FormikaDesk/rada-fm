@@ -110,12 +110,12 @@ fn long_tree_scrolls_to_a_deep_folder() {
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).expect("the folder is a row of the tree");
     assert!(h.app.side_nav.tree.is_open(deep.parent().unwrap()));
-    let a = h.app.nav_area;
+    let a = h.app.frame.nav_area;
     assert!(
-        at >= h.app.nav_scroll && at < h.app.nav_scroll + a.height as usize,
+        at >= h.app.frame.nav_scroll && at < h.app.frame.nav_scroll + a.height as usize,
         "row {at} is outside {}..{}",
-        h.app.nav_scroll,
-        h.app.nav_scroll + a.height as usize
+        h.app.frame.nav_scroll,
+        h.app.frame.nav_scroll + a.height as usize
     );
     let text = nav_text(&mut h);
     assert!(text.contains("two"), "{text}");
@@ -130,9 +130,9 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
     let (mut h, _) = long_tree_scene();
     h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
     h.settle();
-    let a = h.app.nav_area;
+    let a = h.app.frame.nav_area;
     let (x, y) = (a.x + 2, a.y + 2);
-    assert_eq!(h.app.nav_scroll, 0);
+    assert_eq!(h.app.frame.nav_scroll, 0);
     h.mouse(
         ratatui::crossterm::event::MouseEventKind::ScrollDown,
         x,
@@ -140,7 +140,7 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
         ratatui::crossterm::event::KeyModifiers::NONE,
     );
     h.settle();
-    assert_eq!(h.app.nav_scroll, 3, "three rows to a turn");
+    assert_eq!(h.app.frame.nav_scroll, 3, "three rows to a turn");
     let t = nav_text(&mut h);
     assert!(!t.lines().next().unwrap().contains("Home"), "{t}");
     h.mouse(
@@ -150,7 +150,7 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
         ratatui::crossterm::event::KeyModifiers::NONE,
     );
     h.settle();
-    assert_eq!(h.app.nav_scroll, 0);
+    assert_eq!(h.app.frame.nav_scroll, 0);
     // The wheel does not move the folder shown.
     assert_eq!(h.app.cwd, h.app.home());
     // Down from the keyboard in NAV follows the cursor past the bottom of the box.
@@ -162,11 +162,11 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
     let _ = h.screen();
     assert!(h.app.side_nav.nav_cursor >= height);
     assert!(
-        h.app.side_nav.nav_cursor >= h.app.nav_scroll
-            && h.app.side_nav.nav_cursor < h.app.nav_scroll + height,
+        h.app.side_nav.nav_cursor >= h.app.frame.nav_scroll
+            && h.app.side_nav.nav_cursor < h.app.frame.nav_scroll + height,
         "cursor {} scroll {}",
         h.app.side_nav.nav_cursor,
-        h.app.nav_scroll
+        h.app.frame.nav_scroll
     );
 }
 
@@ -174,7 +174,7 @@ fn the_wheel_and_the_arrows_scroll_a_long_tree() {
 fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
     let (mut h, _) = long_tree_scene();
     h.wait("the tree", |a| a.side_nav.tree.kids(a.home()).is_some());
-    let a = h.app.nav_area;
+    let a = h.app.frame.nav_area;
     h.mouse(
         ratatui::crossterm::event::MouseEventKind::ScrollDown,
         a.x + 2,
@@ -228,7 +228,7 @@ fn nav_click_opens_folder() {
         .enumerate()
         .find(|(_, l)| l.contains("Scaricati"))
         .expect("the row is in NAV");
-    let a = h.app.nav_area;
+    let a = h.app.frame.nav_area;
     h.mouse(
         ratatui::crossterm::event::MouseEventKind::Down(
             ratatui::crossterm::event::MouseButton::Left,

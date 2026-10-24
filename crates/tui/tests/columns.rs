@@ -99,13 +99,18 @@ fn a_click_in_the_first_column_goes_to_that_folder() {
     let sibling = dir.parent().unwrap().join("x");
     for _ in 0..200 {
         let _ = h.screen();
-        if h.app.hits.find(&Target::Place(sibling.clone())).is_some() {
+        if h.app
+            .frame
+            .hits
+            .find(&Target::Place(sibling.clone()))
+            .is_some()
+        {
             break;
         }
         h.pump(10);
     }
     // The folder we are in is a row of the first column, picked out; so is its sibling.
-    assert!(h.app.hits.find(&Target::Place(dir.clone())).is_some());
+    assert!(h.app.frame.hits.find(&Target::Place(dir.clone())).is_some());
     h.click(&Target::Place(sibling.clone()));
     let d = sibling.clone();
     h.wait("the sibling", move |a| a.cwd == d && !a.is_loading());

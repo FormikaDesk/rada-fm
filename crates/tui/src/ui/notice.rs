@@ -241,7 +241,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect, now: Instant) {
         y += h;
     }
     for (r, t) in targets {
-        app.hits.add(r, t);
+        app.frame.hits.add(r, t);
     }
 }
 

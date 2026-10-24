@@ -272,12 +272,12 @@ fn disallowed_folder_explains_how_to_allow() {
     let i = items.iter().position(|i| i.path == docs).unwrap();
     assert!(items[i].locked);
     h.app.side_nav.side_cursor = i;
-    h.app.side_mode = rada_tui::sidebar::Mode::Rail;
+    h.app.frame.side_mode = rada_tui::sidebar::Mode::Rail;
     assert_eq!(
         h.app.side_description().unwrap(),
         "macOS has not given Ghostty access to Documents"
     );
-    h.app.side_mode = rada_tui::sidebar::Mode::Full;
+    h.app.frame.side_mode = rada_tui::sidebar::Mode::Full;
 
     // Full Disk Access is the other button.
     h.app.open_dir(docs.clone());

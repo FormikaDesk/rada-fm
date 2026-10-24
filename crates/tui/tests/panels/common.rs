@@ -159,7 +159,7 @@ pub fn go_and_wait(h: &mut H, dir: &std::path::Path) {
 }
 
 pub fn nav_text(h: &mut H) -> String {
-    let a = h.app.nav_area;
+    let a = h.app.frame.nav_area;
     let s = h.screen();
     s.lines()
         .skip(a.y as usize)

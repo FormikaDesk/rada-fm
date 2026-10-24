@@ -179,5 +179,5 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = w.saturating_sub(left.width() + right.width());
     left.push(Span::styled(" ".repeat(gap), band));
     left.append(right);
-    left.render(f, &mut app.hits, area);
+    left.render(f, &mut app.frame.hits, area);
 }

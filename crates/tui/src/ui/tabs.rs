@@ -80,7 +80,7 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
 
     let mut left = Bar::default();
     if w >= 30 {
-        if app.panels_shown {
+        if app.frame.panels_shown {
             // In the panels view the name of the program is a pill.
             left.push(Span::styled(" ", band));
             for s in soft::pill(&th, look, "rada", th.accent, th.pill(), band) {
@@ -198,5 +198,5 @@ pub fn draw_tabs(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = w.saturating_sub(bar.width() + right.width());
     bar.push(Span::styled(" ".repeat(gap), band));
     bar.append(right);
-    bar.render(f, &mut app.hits, area);
+    bar.render(f, &mut app.frame.hits, area);
 }

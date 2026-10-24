@@ -57,7 +57,7 @@ fn columns(app: &App, width: usize) -> Cols {
     if app.tags_column_wanted() && width >= fixed(&cols) + TAG_W + GAP + 22 {
         cols.tags = TAG_W;
     }
-    if width < fixed(&cols) + 18 || (app.term_width as usize) < crate::ui::list::DATE_FROM {
+    if width < fixed(&cols) + 18 || (app.frame.term_width as usize) < crate::ui::list::DATE_FROM {
         cols.date = 0;
     }
     let gaps = 1 + usize::from(cols.date > 0) + usize::from(cols.tags > 0);
@@ -115,7 +115,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             th.dim().add_modifier(Modifier::BOLD),
         ));
     }
-    hit_spans(&mut app.hits, area.x, area.y, &head, &head_hits);
+    hit_spans(&mut app.frame.hits, area.x, area.y, &head, &head_hits);
     f.render_widget(Paragraph::new(Line::from(head)), Rect { height: 1, ..area });
 
     // A blank row under the titles where there is room for it.
@@ -129,7 +129,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     if body.height == 0 {
         return;
     }
-    app.hits.add(body, Target::List);
+    app.frame.hits.add(body, Target::List);
 
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
@@ -185,7 +185,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Panel);
         }
-        app.hits.add(r, Target::Row(vis));
+        app.frame.hits.add(r, Target::Row(vis));
     }
 }
 

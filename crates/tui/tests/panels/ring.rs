@@ -20,7 +20,7 @@ fn ring_scene(theme: &str) -> H {
 fn disk_is_a_ring_where_pictures_draw() {
     let mut h = ring_scene("neon");
     let s = h.screen();
-    let ring = h.app.ring.as_ref().expect("the ring was made");
+    let ring = h.app.frame.ring.as_ref().expect("the ring was made");
     assert_eq!(ring.pieces.len(), 4, "around the hole for the text");
     // In the hole, the percentage and the word; beside it the name, used of total, free. The
     // cells that carry a picture are left out of the rows.
@@ -66,7 +66,7 @@ fn the_ring_is_made_again_only_when_the_percentage_changes() {
     h.app.redraw.dirty = true;
     let _ = h.screen();
     assert_eq!(
-        h.app.ring.as_ref().unwrap().made,
+        h.app.frame.ring.as_ref().unwrap().made,
         1,
         "three frames, one picture"
     );
@@ -76,7 +76,7 @@ fn the_ring_is_made_again_only_when_the_percentage_changes() {
     // system, which is not `/` everywhere).
     h.app.devices.volumes[0].available = Some(total / 10);
     let _ = h.screen();
-    assert_eq!(h.app.ring.as_ref().unwrap().made, 2);
+    assert_eq!(h.app.frame.ring.as_ref().unwrap().made, 2);
 }
 
 #[test]
@@ -84,19 +84,20 @@ fn without_pictures_or_true_colours_the_main_disk_stays_a_bar() {
     // Half blocks: the terminal draws no pictures.
     let mut h = scene(160, 46, "neon", false);
     let s = h.screen();
-    assert!(h.app.ring.is_none());
+    assert!(h.app.frame.ring.is_none());
     assert!(s.contains("■"), "a bar");
     // Pictures, but a theme in 256 colours.
     let mut h = ring_scene("neon");
     h.app.th = Theme::named("neon", ColorDepth::Ansi256).unwrap();
     let s = h.screen();
-    assert!(h.app.ring.is_none());
+    assert!(h.app.frame.ring.is_none());
     assert!(s.contains("■"), "a bar");
 }
 
 /// The cells of the ring on the screen, as the pieces cover them.
 fn ring_cells(h: &H) -> Vec<ratatui::layout::Rect> {
     h.app
+        .frame
         .ring
         .as_ref()
         .unwrap()
@@ -111,18 +112,18 @@ fn the_ring_follows_the_cell_when_the_font_is_zoomed() {
     let mut h = ring_scene("neon");
     let _ = h.screen();
     let cells = ring_cells(&h);
-    let before = h.app.ring.as_ref().unwrap().made;
+    let before = h.app.frame.ring.as_ref().unwrap().made;
     // The same cell: nothing is made again.
     h.app.use_cell_px((10, 20));
     let _ = h.screen();
-    assert_eq!(h.app.ring.as_ref().unwrap().made, before);
+    assert_eq!(h.app.frame.ring.as_ref().unwrap().made, before);
     // Same columns and rows, other pixels (the font zoomed in a window of the same size).
     h.app.use_cell_px((14, 28));
     assert!(h.app.take_full_redraw(), "the old picture is cleared");
     let _ = h.screen();
     assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (14, 28));
     assert_eq!(
-        h.app.ring.as_ref().unwrap().made,
+        h.app.frame.ring.as_ref().unwrap().made,
         1,
         "made for the new cell"
     );
@@ -131,7 +132,7 @@ fn the_ring_follows_the_cell_when_the_font_is_zoomed() {
     h.app.use_cell_px((7, 14));
     let _ = h.screen();
     assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (7, 14));
-    assert_eq!(h.app.ring.as_ref().unwrap().made, 1);
+    assert_eq!(h.app.frame.ring.as_ref().unwrap().made, 1);
     assert_eq!(ring_cells(&h), cells);
 }
 

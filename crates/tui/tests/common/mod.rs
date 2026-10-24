@@ -331,6 +331,7 @@ impl H {
         let _ = self.screen();
         let r = self
             .app
+            .frame
             .hits
             .find(target)
             .unwrap_or_else(|| panic!("{target:?} is not on screen:\n{}", self.screen()));

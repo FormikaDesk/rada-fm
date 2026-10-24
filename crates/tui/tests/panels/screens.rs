@@ -107,7 +107,7 @@ fn the_panels_at_160_by_46_in_each_theme() {
     for name in THEMES {
         let mut h = scene(160, 46, name, false);
         assert!(
-            h.app.panels_shown && !h.app.panels_two,
+            h.app.frame.panels_shown && !h.app.frame.panels_two,
             "{name}: three columns at 160x46"
         );
         let th = h.app.th.clone();
@@ -128,7 +128,7 @@ fn the_panels_at_160_by_46_in_each_theme() {
 )]
 fn the_panels_at_the_smallest_window_that_gets_them() {
     let mut h = scene(140, 36, "rada", false);
-    assert!(h.app.panels_shown);
+    assert!(h.app.frame.panels_shown);
     insta::assert_snapshot!("panels_140x36", shot(&mut h));
     assert_fits(&mut h, 140, 36);
 }
@@ -140,7 +140,7 @@ fn the_panels_at_the_smallest_window_that_gets_them() {
 )]
 fn small_window_gets_classic_layout() {
     let mut h = scene(69, 30, "rada", false);
-    assert!(!h.app.panels_shown, "69x30 is classic");
+    assert!(!h.app.frame.panels_shown, "69x30 is classic");
     let s = shot(&mut h);
     assert!(!s.contains("Enlarge"), "auto asks nothing:\n{s}");
     insta::assert_snapshot!("panels_classic_69x30", s);
@@ -154,7 +154,7 @@ fn small_window_gets_classic_layout() {
     for (w, hh) in [(69, 46), (100, 23), (160, 23)] {
         h.term.backend_mut().resize(w, hh);
         let _ = h.screen();
-        assert!(!h.app.panels_shown, "{w}x{hh} is classic");
+        assert!(!h.app.frame.panels_shown, "{w}x{hh} is classic");
     }
 }
 
@@ -166,7 +166,10 @@ fn small_window_gets_classic_layout() {
 fn the_two_columns_at_78_by_45_and_at_100_by_30() {
     for (w, hh) in [(78, 45), (100, 30)] {
         let mut h = scene(w, hh, "rada", false);
-        assert!(h.app.panels_shown && h.app.panels_two, "{w}x{hh}");
+        assert!(
+            h.app.frame.panels_shown && h.app.frame.panels_two,
+            "{w}x{hh}"
+        );
         let s = shot(&mut h);
         assert!(
             !s.contains("Enlarge"),

@@ -325,7 +325,7 @@ impl App {
         }
         if let Some(action) = self.keymap.action_for(&key) {
             // In NAV of the panels view the sideways arrows open and close the folders.
-            if self.panels_shown
+            if self.frame.panels_shown
                 && self.side_nav.focus
                 && key.modifiers.is_empty()
                 && let Some(right) = match (action, key.code) {
@@ -338,7 +338,7 @@ impl App {
                 self.redraw.dirty = true;
                 return;
             }
-            if self.panels_shown && self.preview.focus && self.on_preview_action(action) {
+            if self.frame.panels_shown && self.preview.focus && self.on_preview_action(action) {
                 self.redraw.dirty = true;
                 return;
             }
@@ -448,7 +448,7 @@ impl App {
                     self.clear_marks();
                 } else if self.filter.is_some() {
                     self.set_filter(None);
-                } else if self.size_notice_visible {
+                } else if self.frame.size_notice_visible {
                     // Nothing else for Esc to do: it closes the advice about the window size,
                     // which then stays closed for the session.
                     self.size_notice_dismissed = true;
@@ -584,11 +584,11 @@ impl App {
 
     /// Whether the last frame showed the details pane.
     pub fn details_visible(&self) -> bool {
-        self.details_shown != crate::ui::DetailsMode::Hidden
+        self.frame.details_shown != crate::ui::DetailsMode::Hidden
     }
 
     pub fn toggle_details(&mut self) {
-        if self.panels_shown && self.panels_two {
+        if self.frame.panels_shown && self.frame.panels_two {
             return self.toggle_left_preview();
         }
         if self.session.chooser.is_some() {
@@ -598,7 +598,7 @@ impl App {
         self.details = Some(want);
         self.saved_ui.details = Some(want);
         self.save_ui_state();
-        if want && self.term_width < 60 {
+        if want && self.frame.term_width < 60 {
             self.toast(ToastKind::Info, Key::TDetailsOnNarrow.tr(), 3);
         }
     }
@@ -606,7 +606,7 @@ impl App {
     /// A file chooser shows its preview beside the list from 70 columns; below that, the key
     /// puts it in the place of the list and takes it away again. None of it is remembered.
     fn toggle_chooser_preview(&mut self) {
-        if self.term_width < crate::ui::CHOOSER_PREVIEW_FROM {
+        if self.frame.term_width < crate::ui::CHOOSER_PREVIEW_FROM {
             self.details = Some(self.details != Some(true));
         }
     }
@@ -691,6 +691,7 @@ impl App {
     /// Shift+F10 or the Menu key: the context menu, at the item under the cursor.
     fn open_context_menu_at_cursor(&mut self) {
         let at = self
+            .frame
             .hits
             .find(&Target::Row(self.cursor))
             .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
@@ -807,7 +808,7 @@ impl App {
         // Motion only matters for what is under the pointer in the sidebar (its names show
         // in the bottom bar when it is reduced to icons): redraw only when that changes.
         if m.kind == MouseEventKind::Moved {
-            let over = match self.hits.at(m.column, m.row) {
+            let over = match self.frame.hits.at(m.column, m.row) {
                 Some(Target::Place(p)) => Some(p.clone()),
                 _ => None,
             };
@@ -828,14 +829,15 @@ impl App {
             return;
         }
         self.redraw.dirty = true;
-        let target = self.hits.at(m.column, m.row).cloned();
-        if self.panels_shown
+        let target = self.frame.hits.at(m.column, m.row).cloned();
+        if self.frame.panels_shown
             && self.modal.is_none()
             && matches!(
                 m.kind,
                 MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
             )
             && self
+                .frame
                 .nav_area
                 .contains(ratatui::layout::Position::new(m.column, m.row))
         {
@@ -943,7 +945,7 @@ impl App {
             }
         }
         // The keyboard follows the click: into the preview box when that is what was clicked.
-        self.preview.focus = self.panels_shown && matches!(target, Some(Target::Preview));
+        self.preview.focus = self.frame.panels_shown && matches!(target, Some(Target::Preview));
         match target {
             Some(Target::TreeToggle(dir)) => self.toggle_tree(&dir),
             Some(Target::Row(i)) => {
@@ -976,6 +978,7 @@ impl App {
             Some(Target::CheckUpdates) => self.check_updates_now(),
             Some(Target::Menu(kind)) => {
                 let at = self
+                    .frame
                     .hits
                     .find(&Target::Menu(kind))
                     .map(|r| (r.x, r.y + 1))

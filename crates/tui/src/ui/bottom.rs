@@ -427,7 +427,7 @@ pub fn draw_status(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = w.saturating_sub(left.width() + right.width());
     left.push(Span::styled(" ".repeat(gap), band));
     left.append(right);
-    left.render(f, &mut app.hits, area);
+    left.render(f, &mut app.frame.hits, area);
 }
 
 /// The strip of key hints: a background of its own set apart from the status bar by a row of
@@ -528,5 +528,5 @@ pub fn draw_hints(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
     }
-    bar.render(f, &mut app.hits, inner);
+    bar.render(f, &mut app.frame.hits, inner);
 }

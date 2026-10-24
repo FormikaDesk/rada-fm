@@ -126,6 +126,7 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
     let scaricati = place(&h, "Scaricati");
     let r = h
         .app
+        .frame
         .hits
         .find(&Target::Place(scaricati))
         .expect("on screen");
@@ -160,6 +161,7 @@ fn tab_focuses_the_sidebar_enter_opens() {
     );
     let r = h
         .app
+        .frame
         .hits
         .find(&Target::Place(items[cur].path.clone()))
         .unwrap();
@@ -203,18 +205,21 @@ fn narrow_terminals_get_a_column_of_icons_with_the_places_only() {
     let _ = h.screen();
     assert!(
         h.app
+            .frame
             .hits
             .find(&Target::Place(place(&h, "Documenti")))
             .is_some()
     );
     assert!(
         h.app
+            .frame
             .hits
             .find(&Target::Place(place(&h, "lavoro/progetto")))
             .is_none()
     );
     assert!(
         h.app
+            .frame
             .hits
             .find(&Target::Place(PathBuf::from("/")))
             .is_none(),
@@ -254,9 +259,10 @@ fn icon_column_names_item_on_hover() {
 fn below_sixty_columns_the_navigation_pane_is_gone() {
     let mut h = italian(56, 30);
     let _ = h.screen();
-    assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Hidden);
+    assert_eq!(h.app.frame.side_mode, rada_tui::sidebar::Mode::Hidden);
     assert!(
         h.app
+            .frame
             .hits
             .find(&Target::Place(place(&h, "Documenti")))
             .is_none()
@@ -278,7 +284,7 @@ fn ui_state_file(h: &H) -> PathBuf {
 fn ctrl_b_hides_and_shows_it_and_the_choice_is_remembered() {
     let mut h = italian(150, 30);
     let _ = h.screen();
-    assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Full);
+    assert_eq!(h.app.frame.side_mode, rada_tui::sidebar::Mode::Full);
     h.press("ctrl+b");
     let s = h.screen();
     assert!(!s.contains("PINNED"), "{s}");
@@ -392,6 +398,7 @@ fn a_bookmark_of_a_folder_the_pane_already_lists_is_not_listed_again() {
 fn try_row_of(h: &mut H, path: PathBuf) -> Option<u16> {
     let _ = h.screen();
     h.app
+        .frame
         .hits
         .all()
         .filter(|(_, t)| *t == Target::Place(path.clone()))
@@ -484,7 +491,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
         // A click on an empty line does nothing at all.
         let cwd = h.app.cwd.clone();
         for y in (ys[0]..=*ys.last().unwrap()).filter(|y| !ys.contains(y)) {
-            if h.app.hits.at(3, y).is_some() {
+            if h.app.frame.hits.at(3, y).is_some() {
                 continue; // the bar of a disk: not an empty line
             }
             h.mouse(
@@ -678,7 +685,7 @@ fn icon_column_marks_the_current_place() {
 
             let y = row_of(&mut h, want.clone());
             let buf = h.redrawn_buffer();
-            assert_eq!(h.app.side_mode, rada_tui::sidebar::Mode::Rail);
+            assert_eq!(h.app.frame.side_mode, rada_tui::sidebar::Mode::Rail);
             let cells: Vec<_> = (0..rada_tui::sidebar::RAIL_WIDTH)
                 .map(|x| buf[(x, y)].clone())
                 .collect();

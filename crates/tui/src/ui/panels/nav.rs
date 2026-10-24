@@ -37,7 +37,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let look = Look::of(app);
     // The rows of the way shown are as many as fit, so the box's height comes first.
-    app.nav_area = area;
+    app.frame.nav_area = area;
     let rows = app.nav_rows();
     if rows.is_empty() || area.height == 0 {
         return;
@@ -64,17 +64,17 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         .and_then(|a| body.iter().position(|i| *i == a))
     {
         let seen = (app.cwd.clone(), cursor, body.len(), height);
-        if app.nav_seen.as_ref() != Some(&seen) {
-            app.nav_seen = Some(seen);
-            if anchor_at < app.nav_scroll {
-                app.nav_scroll = anchor_at;
-            } else if anchor_at >= app.nav_scroll + height {
-                app.nav_scroll = anchor_at + 1 - height;
+        if app.frame.nav_seen.as_ref() != Some(&seen) {
+            app.frame.nav_seen = Some(seen);
+            if anchor_at < app.frame.nav_scroll {
+                app.frame.nav_scroll = anchor_at;
+            } else if anchor_at >= app.frame.nav_scroll + height {
+                app.frame.nav_scroll = anchor_at + 1 - height;
             }
         }
     }
-    app.nav_scroll = app.nav_scroll.min(max_skip);
-    let skip = app.nav_scroll;
+    app.frame.nav_scroll = app.frame.nav_scroll.min(max_skip);
+    let skip = app.frame.nav_scroll;
 
     let mut placed: Vec<(u16, usize)> = body
         .iter()
@@ -165,7 +165,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
                         Style::default().fg(th.tag_color(Some(*hue))).patch(bg),
                     ));
                     let path = rada_core::tagsearch::view_path(hue.label(&app.tags.lang));
-                    app.hits.add(
+                    app.frame.hits.add(
                         Rect {
                             x,
                             y: r.y,
@@ -303,11 +303,11 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Panel);
         }
         if !row.path.as_os_str().is_empty() {
-            app.hits.add(r, Target::Place(row.path.clone()));
+            app.frame.hits.add(r, Target::Place(row.path.clone()));
         }
         if toggles {
             // The arrow and the cell after it: a click there opens or closes the folder.
-            app.hits.add(
+            app.frame.hits.add(
                 Rect {
                     x: r.x + 1 + indent.len() as u16,
                     width: 2,

@@ -294,7 +294,7 @@ pub fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
     let gap = w.saturating_sub(bar.width() + right.width());
     bar.push(Span::styled(" ".repeat(gap), band));
     bar.append(right);
-    bar.render(f, &mut app.hits, area);
+    bar.render(f, &mut app.frame.hits, area);
 }
 
 #[cfg(test)]

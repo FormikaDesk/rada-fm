@@ -95,7 +95,7 @@ fn what_does_not_fit_under_the_way_is_counted_in_a_row_of_more() {
     h.settle();
     let rows = h.app.nav_rows();
     assert!(
-        rows.len() <= h.app.nav_area.height as usize,
+        rows.len() <= h.app.frame.nav_area.height as usize,
         "{}",
         rows.len()
     );
@@ -148,7 +148,7 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     go_and_wait(&mut h, &home.join("d0"));
     h.wait("the way", |a| a.side_nav.tree.kids(&a.cwd).is_some());
     h.settle();
-    let tall = h.app.nav_area.height as usize;
+    let tall = h.app.frame.nav_area.height as usize;
     let rows = h.app.nav_rows();
     let first = App::nav_current(&rows, &home.join("d0")).unwrap();
     let levels = tall - first;
@@ -164,7 +164,7 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     let in_view = |h: &H| {
         let rows = h.app.nav_rows();
         let at = App::nav_current(&rows, &h.app.cwd).unwrap();
-        let (from, height) = (h.app.nav_scroll, h.app.nav_area.height as usize);
+        let (from, height) = (h.app.frame.nav_scroll, h.app.frame.nav_area.height as usize);
         (from..from + height).contains(&at)
     };
     let tall_box = tall;
@@ -173,7 +173,7 @@ fn the_way_stays_in_view_when_the_box_gets_shorter_after_the_first_frames() {
     let _ = h.screen();
     let rows = h.app.nav_rows();
     let at = App::nav_current(&rows, &deep).unwrap();
-    let shown = h.app.nav_area.height as usize;
+    let shown = h.app.frame.nav_area.height as usize;
     assert!(shown < tall_box, "the box is shorter: {shown} < {tall_box}");
     assert!(
         rows.len() <= shown,
@@ -285,7 +285,7 @@ fn the_places_stay_in_sight_and_the_way_gives_up_rows() {
     );
     assert!(nav.contains("… ") && nav.contains(" more"), "{nav}");
     assert!(nav.contains("level-11"), "the folder shown stays:\n{nav}");
-    assert_eq!(h.app.nav_scroll, 0, "nothing scrolls:\n{nav}");
+    assert_eq!(h.app.frame.nav_scroll, 0, "nothing scrolls:\n{nav}");
 }
 
 /// One more fixed disk, `Extra 1`, `Extra 2`.., and the box drawn with it: its height is what
@@ -362,7 +362,7 @@ fn the_places_stay_in_sight_while_the_blank_rows_and_then_the_disks_give_way() {
     for _ in 0..10 {
         add_disk(&mut h);
         let b = Blocks::of(&h);
-        let height = h.app.nav_area.height as usize;
+        let height = h.app.frame.nav_area.height as usize;
         let nav = nav_text(&mut h);
         let lines: Vec<&str> = nav.lines().collect();
         let main_only =
@@ -371,7 +371,10 @@ fn the_places_stay_in_sight_while_the_blank_rows_and_then_the_disks_give_way() {
         // What the box can hold at the least: one disk and "… more", no blank row above TAGS.
         let least = b.rows(b.disks.min(2), false) + WAY_LEAST;
         if least <= height {
-            assert!(lines[0].contains("Home") && h.app.nav_scroll == 0, "{nav}");
+            assert!(
+                lines[0].contains("Home") && h.app.frame.nav_scroll == 0,
+                "{nav}"
+            );
             assert!(nav.contains("level-11"), "{nav}");
         }
         if let Some(at) = tags_at {

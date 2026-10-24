@@ -587,8 +587,8 @@ fn draw_image_pane(f: &mut Frame, app: &mut App, inner: Rect, with_facts: bool) 
                         };
                         // A picture the terminal draws lies over the cells: where a popup is
                         // drawn it is left out (the cells under it stay as they are).
-                        let covered =
-                            ui.is_graphics() && app.popup_covers.iter().any(|c| c.intersects(r));
+                        let covered = ui.is_graphics()
+                            && app.frame.popup_covers.iter().any(|c| c.intersects(r));
                         if !covered {
                             f.render_stateful_widget(StatefulImage::default(), r, &mut ui.proto);
                         }

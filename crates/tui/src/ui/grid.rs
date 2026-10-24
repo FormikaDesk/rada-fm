@@ -81,7 +81,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = ((area.height as usize + 1) / TILE_H).max(1);
     app.set_grid(cols, rows);
     app.viewport.rows = rows;
-    app.hits.add(area, Target::List);
+    app.frame.hits.add(area, Target::List);
     let count = app.visible.len();
 
     if count == 0 {
@@ -196,7 +196,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
                     bg,
                 ));
             }
-            app.hits.add(
+            app.frame.hits.add(
                 Rect {
                     x: x0 + (c * TILE_W) as u16,
                     y: area.y + (r * TILE_H) as u16,

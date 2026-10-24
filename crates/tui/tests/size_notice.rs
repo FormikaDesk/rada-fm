@@ -28,7 +28,7 @@ fn a_small_window_is_told_how_big_the_full_layout_is_wanted() {
         s.contains("Enlarge the window for the full layout (now 69×24)"),
         "{s}"
     );
-    assert!(h.app.size_notice_visible);
+    assert!(h.app.frame.size_notice_visible);
     // A window short rather than narrow is told too.
     resize(&mut h, 120, 20);
     assert!(h.screen().contains("(now 120×20)"));
@@ -38,7 +38,7 @@ fn a_small_window_is_told_how_big_the_full_layout_is_wanted() {
 fn a_window_that_is_big_enough_is_told_nothing() {
     let mut h = asked_for_panels(100, 24);
     assert!(!h.screen().contains("Enlarge the window"));
-    assert!(!h.app.size_notice_visible);
+    assert!(!h.app.frame.size_notice_visible);
     resize(&mut h, 160, 40);
     assert!(!h.screen().contains("Enlarge the window"));
 }
@@ -108,7 +108,7 @@ fn with_auto_the_view_is_rada_s_to_choose_and_nothing_is_asked() {
             c.layout_pref = rada_tui::LayoutPref::Auto
         });
         assert!(!h.screen().contains("Enlarge the window"), "{w}x{rows}");
-        assert!(!h.app.size_notice_visible, "{w}x{rows}");
+        assert!(!h.app.frame.size_notice_visible, "{w}x{rows}");
     }
 }
 

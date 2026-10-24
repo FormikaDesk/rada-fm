@@ -214,7 +214,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     if area.height < 2 {
         return;
     }
-    hit_spans(&mut app.hits, area.x, area.y, &head, &head_hits);
+    hit_spans(&mut app.frame.hits, area.x, area.y, &head, &head_hits);
     let head_row = Rect { height: 1, ..area };
     f.render_widget(Paragraph::new(Line::from(head)), head_row);
     soft::round_ends(f.buffer_mut(), head_row, &th, look, th.field);
@@ -230,7 +230,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     if body.height == 0 {
         return;
     }
-    app.hits.add(body, Target::List);
+    app.frame.hits.add(body, Target::List);
 
     if app.visible.is_empty() {
         let msg = if app.is_loading() {
@@ -289,8 +289,8 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         } else if marked {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Marked);
         }
-        app.hits.add(r, Target::Row(vis));
-        app.hits.add(
+        app.frame.hits.add(r, Target::Row(vis));
+        app.frame.hits.add(
             Rect {
                 width: (CHECK as u16).min(r.width),
                 ..r

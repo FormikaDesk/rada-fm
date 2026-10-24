@@ -216,7 +216,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                     spans.push(Span::styled(free_shown, th.dim().patch(row_style)));
                     let used: usize = spans.iter().map(|s| s.content.width()).sum();
                     spans.push(Span::styled(" ".repeat(w.saturating_sub(used)), row_style));
-                    app.hits.add(r, Target::Place(item.path.clone()));
+                    app.frame.hits.add(r, Target::Place(item.path.clone()));
                     f.render_widget(Paragraph::new(Line::from(spans)), r);
                     if is_focus {
                         soft::tint_row(f.buffer_mut(), r, &th, Look::FLAT, RowTone::Focus);
@@ -309,7 +309,7 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                         ));
                     }
                 }
-                app.hits.add(r, Target::Place(item.path.clone()));
+                app.frame.hits.add(r, Target::Place(item.path.clone()));
                 f.render_widget(Paragraph::new(Line::from(spans)), r);
                 // The place you are in is a rounded pill; the item the keyboard is on is
                 // stronger.

@@ -128,13 +128,13 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
     let Some(ui) = app.preview.image_ui.as_ref() else {
         return false;
     };
-    if crate::ring::pieces(&mut app.ring, ui, pct, &colors).is_none() {
+    if crate::ring::pieces(&mut app.frame.ring, ui, pct, &colors).is_none() {
         return false;
     }
     let th = app.th.clone();
     // A picture the terminal draws lies over the cells: where a popup is drawn it is left out.
-    if !app.popup_covers.iter().any(|c| c.intersects(ring_at)) {
-        for (r, proto) in app.ring.as_ref().map_or(&[][..], |c| &c.pieces) {
+    if !app.frame.popup_covers.iter().any(|c| c.intersects(ring_at)) {
+        for (r, proto) in app.frame.ring.as_ref().map_or(&[][..], |c| &c.pieces) {
             f.render_widget(
                 ratatui_image::Image::new(proto),
                 Rect::new(ring_at.x + r.x, ring_at.y + r.y, r.width, r.height),
@@ -200,7 +200,7 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
             );
         }
     }
-    app.hits.add(
+    app.frame.hits.add(
         Rect::new(area.x, area.y, area.width, ROWS.min(area.height)),
         Target::Place(main.mount_point.clone()),
     );
@@ -213,7 +213,11 @@ fn other_lines(app: &App, others: &[Volume], names: &[String], w: usize) -> Vec<
     let th = &app.th;
     let pct_w = 4;
     let longest = names.iter().map(|n| n.width()).max().unwrap_or(0);
-    let min_bar = if app.panels_two { MIN_BAR_TWO } else { MIN_BAR };
+    let min_bar = if app.frame.panels_two {
+        MIN_BAR_TWO
+    } else {
+        MIN_BAR
+    };
     let bar_w = w
         .saturating_sub(1 + 1 + 1 + pct_w + 1 + longest)
         .clamp(min_bar, BAR);
@@ -312,7 +316,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(Paragraph::new(lines), below);
     // A click on the box goes to the disk the row is about.
     if !ring {
-        app.hits.add(
+        app.frame.hits.add(
             Rect { height: 1, ..area },
             Target::Place(main.mount_point.clone()),
         );
@@ -327,7 +331,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     for (n, v) in others.iter().enumerate() {
         let y = top_others + n;
         if y < shown {
-            app.hits.add(
+            app.frame.hits.add(
                 Rect {
                     y: area.y + y as u16,
                     height: 1,

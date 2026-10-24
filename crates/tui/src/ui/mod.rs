@@ -12,6 +12,7 @@ mod columns;
 mod commands;
 mod details;
 mod dialogs;
+mod frame;
 mod grid;
 mod list;
 mod menu;
@@ -29,6 +30,7 @@ mod tagdots;
 mod updates;
 pub mod widgets;
 
+pub use frame::LastFrame;
 pub use list::{Columns as ListColumns, ListOpts, columns as list_columns};
 pub use plan::policy_step;
 
@@ -212,21 +214,15 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         return;
     }
     let th = app.th.clone();
-    app.hits.clear();
     if let Some(bg) = th.bg {
         f.render_widget(Block::default().style(Style::default().bg(bg)), area);
     }
-    app.term_width = area.width;
-    app.screen = (area.width, area.height);
-    app.popup_covers = popup_rects(app, area);
+    app.frame.begin(area);
+    app.frame.popup_covers = popup_rects(app, area);
     let columns = app.panels_wanted(area.width, area.height);
-    app.panels_shown = columns.is_some();
-    app.panels_two = columns == Some(crate::panels::Columns::Two);
-    if app.panels_shown {
+    app.frame.drawn_as(columns);
+    if app.frame.panels_shown {
         // The panels view has its own arrangement of everything; the overlays are the same.
-        app.size_notice_visible = false;
-        app.side_mode = Mode::Full;
-        app.details_shown = DetailsMode::Column;
         let address_row = panels::draw(f, app, area);
         finish(f, app, area, Some(address_row));
         return;
@@ -261,7 +257,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         hints_height(explorer && app.show_hints, area.height)
     };
     let notice = size_notice_shown(app, area.width, area.height);
-    app.size_notice_visible = notice;
+    app.frame.size_notice_visible = notice;
     let [
         chooser_row,
         tabs_row,
@@ -309,15 +305,15 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // Body: the navigation pane, the folder, and the details pane when there is room; in the
     // explorer layout each is a card with rounded corners, a column of air between them.
     let dmode = details_mode_of(app, area.width);
-    app.details_shown = dmode;
-    app.side_mode = side_mode_of(app, area.width, dmode);
-    if app.side_mode == Mode::Hidden {
+    app.frame.details_shown = dmode;
+    app.frame.side_mode = side_mode_of(app, area.width, dmode);
+    if app.frame.side_mode == Mode::Hidden {
         app.side_nav.focus = false;
     }
     let carded = explorer && body.height >= 3;
     let mut rest = body;
-    if app.side_mode != Mode::Hidden {
-        let width = if app.side_mode == Mode::Full {
+    if app.frame.side_mode != Mode::Hidden {
+        let width = if app.frame.side_mode == Mode::Full {
             crate::sidebar::FULL_WIDTH
         } else {
             crate::sidebar::RAIL_WIDTH
@@ -328,7 +324,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             Constraint::Min(1),
         ])
         .areas(rest);
-        let mode = app.side_mode;
+        let mode = app.frame.side_mode;
         if carded {
             let inner = soft::card(f, side_area, &th, app.side_nav.focus);
             sidebar::draw_sidebar(f, app, inner, mode);
@@ -459,7 +455,7 @@ fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
     }
     if app.modal.is_some() {
         // Only the window is clickable while it is open.
-        app.hits.clear();
+        app.frame.hits.clear();
         // A window dims what is behind it; a menu does not, nor the list of programs that sits
         // beside one.
         if modals::dims_backdrop(app) {

@@ -274,5 +274,5 @@ pub fn draw_commands(f: &mut Frame, app: &mut App, area: Rect) {
         Span::styled(format!(" {more}"), th.base().patch(bar)),
         Target::Menu(MenuKind::More),
     );
-    bar_line.render(f, &mut app.hits, inner);
+    bar_line.render(f, &mut app.frame.hits, inner);
 }

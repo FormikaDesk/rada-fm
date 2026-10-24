@@ -143,7 +143,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             height: body_h,
             ..inner
         };
-        app.hits.add(body, Target::Preview);
+        app.frame.hits.add(body, Target::Preview);
         preview::content(f, app, body, false);
     }
     let y0 = inner.y + inner.height.saturating_sub(foot_h);
@@ -208,7 +208,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             push(&mut bar, format!("{iw} × {ih}"), th.hues.pink);
         }
         bar.clip(w);
-        bar.render(f, &mut app.hits, row(1));
+        bar.render(f, &mut app.frame.hits, row(1));
     }
 
     if foot_h >= 5 {
@@ -255,7 +255,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         bar.clip(w);
-        bar.render(f, &mut app.hits, row(foot_h - 1));
+        bar.render(f, &mut app.frame.hits, row(foot_h - 1));
     }
 }
 
@@ -434,6 +434,6 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         bar.append(value);
-        bar.render(f, &mut app.hits, r);
+        bar.render(f, &mut app.frame.hits, r);
     }
 }

@@ -75,18 +75,18 @@ fn panels_in_config_never_ask_for_a_bigger_window() {
         let mut h = chooser(w, rows, LayoutPref::Panels);
         let screen = h.screen();
         assert!(!screen.contains("Enlarge"), "{w}x{rows}: {screen}");
-        assert!(!h.app.size_notice_visible && !h.app.panels_shown);
+        assert!(!h.app.frame.size_notice_visible && !h.app.frame.panels_shown);
     }
 }
 
 #[test]
 fn the_preview_comes_at_70_columns_and_the_sidebar_narrows() {
     let mut h = chooser(70, 30, LayoutPref::Auto);
-    assert_eq!(h.app.details_shown, DetailsMode::Column);
-    assert_eq!(h.app.side_mode, Mode::Rail);
+    assert_eq!(h.app.frame.details_shown, DetailsMode::Column);
+    assert_eq!(h.app.frame.side_mode, Mode::Rail);
     assert!(h.screen().contains("A few notes"));
     let mut h = chooser(69, 30, LayoutPref::Auto);
-    assert_eq!(h.app.details_shown, DetailsMode::Hidden);
+    assert_eq!(h.app.frame.details_shown, DetailsMode::Hidden);
     assert!(!h.screen().contains("A few notes"));
 }
 

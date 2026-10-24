@@ -388,7 +388,7 @@ impl App {
             .find(|i| i.section == Section::Trash)
             .map(|t| plain_row(NavKind::Trash, t.name.clone(), t.path.clone()));
         let (chain, kids) = self.way_rows(&items);
-        let height = self.nav_area.height as usize;
+        let height = self.frame.nav_area.height as usize;
         let rest = places.len() + trash.iter().len();
         let min_way = if chain.is_empty() { 0 } else { WAY_LEAST };
         if height > 0 {
@@ -585,7 +585,7 @@ impl App {
     /// Tab in the panels view: the folder, NAV, ANTEPRIMA, the folder. With two columns the
     /// box on the left is the only one after the folder, whichever of the two it is.
     pub(super) fn switch_pane_panels(&mut self) {
-        if self.panels_two {
+        if self.frame.panels_two {
             if self.side_nav.focus || self.preview.focus {
                 self.side_nav.focus = false;
                 self.preview.focus = false;
@@ -605,7 +605,7 @@ impl App {
         }
         if self.side_nav.focus {
             self.side_nav.focus = false;
-            self.preview.focus = self.details_shown != crate::ui::DetailsMode::Hidden;
+            self.preview.focus = self.frame.details_shown != crate::ui::DetailsMode::Hidden;
             return;
         }
         if self.preview.focus {
@@ -623,10 +623,10 @@ impl App {
     /// The wheel over the NAV box: it scrolls the rows, three at a time, and not the cursor.
     pub(super) fn scroll_nav(&mut self, down: bool) {
         const STEP: usize = 3;
-        self.nav_scroll = if down {
-            self.nav_scroll + STEP
+        self.frame.nav_scroll = if down {
+            self.frame.nav_scroll + STEP
         } else {
-            self.nav_scroll.saturating_sub(STEP)
+            self.frame.nav_scroll.saturating_sub(STEP)
         };
         self.redraw.dirty = true;
     }

@@ -27,7 +27,6 @@ use rada_core::platform::Volume;
 use rada_core::preview::Limits;
 
 use crate::fmt::{self, DateFormat, DateStyle};
-use crate::hits::Hits;
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi, ResizeResult};
 use crate::keymap::{Action, Keymap};
@@ -532,17 +531,8 @@ pub struct App {
     pub show_hints: bool,
     /// The sidebar and the NAV box: the keyboard in them, their cursors and the tree.
     pub side_nav: side::SideNav,
-    /// What the last frame showed of it.
-    pub side_mode: crate::sidebar::Mode,
-    pub term_width: u16,
-    /// Where the field of the bar at the top was drawn (what is offered under it lines up
-    /// with it).
-    pub bar_field: ratatui::layout::Rect,
-    /// Where popups are drawn this frame (menus, the list of programs, windows): a picture the
-    /// terminal draws is left out of these places.
-    pub popup_covers: Vec<ratatui::layout::Rect>,
-    /// Screen rectangles of everything clickable, rebuilt every frame.
-    pub hits: Hits,
+    /// What the last frame drew, for the keyboard, the mouse and the tests.
+    pub frame: crate::ui::LastFrame,
     pub filter: Option<FilterState>,
     sel_anchor: Option<(usize, BTreeSet<OsString>)>,
     last_click: Option<(Instant, usize)>,
@@ -558,19 +548,6 @@ pub struct App {
     pub details: Option<bool>,
     /// Panels, the classic layout, or whichever fits the window (the View menu sets it).
     pub layout_pref: crate::panels::LayoutPref,
-    /// The last frame was drawn as panels.
-    pub panels_shown: bool,
-    /// ...with two columns (NAV or the preview, and the folder).
-    pub panels_two: bool,
-    /// The first row of the NAV box that is shown, where the box was last drawn, and what the
-    /// scrolling was last made to show (the folder, the keyboard's row, how many rows there
-    /// are): the box scrolls to the folder only when one of those changes, so that the wheel
-    /// can move it away.
-    pub nav_scroll: usize,
-    /// The ring of the SPAZIO box, as it was last made.
-    pub ring: Option<crate::ring::Cache>,
-    pub nav_area: ratatui::layout::Rect,
-    pub nav_seen: Option<(PathBuf, Option<usize>, usize, usize)>,
     pub dates: DateStyle,
     pub date_format: DateFormat,
     /// How much room the sidebar leaves between its entries (`sidebar_density`).
@@ -591,16 +568,10 @@ pub struct App {
     pub active_tab: usize,
     /// The address bar while its text is being edited.
     pub address: Option<AddressEdit>,
-    /// What the last frame showed of the details pane.
-    pub details_shown: crate::ui::DetailsMode,
     /// Where tabs are saved and the rest of what is remembered between sessions.
     saved_ui: rada_core::uistate::UiState,
-    /// Layout the last frame used, for the keyboard and the tests.
-    pub screen: (u16, u16),
     /// The advice to enlarge a small window was closed (for the rest of this session).
     pub size_notice_dismissed: bool,
-    /// The last frame showed it.
-    pub size_notice_visible: bool,
     pub updates: Updates,
 }
 
@@ -687,11 +658,7 @@ impl App {
             mouse: cfg.mouse,
             show_hints: cfg.show_hints,
             side_nav: side::SideNav::new(cfg.sidebar),
-            side_mode: crate::sidebar::Mode::Hidden,
-            term_width: 0,
-            bar_field: ratatui::layout::Rect::default(),
-            popup_covers: Vec::new(),
-            hits: Hits::default(),
+            frame: Default::default(),
             filter: None,
             sel_anchor: None,
             last_click: None,
@@ -701,12 +668,6 @@ impl App {
             layout: cfg.layout,
             details: cfg.details_pane,
             layout_pref: cfg.layout_pref,
-            panels_shown: false,
-            panels_two: false,
-            nav_scroll: 0,
-            ring: None,
-            nav_area: Default::default(),
-            nav_seen: None,
             dates: cfg.dates,
             date_format: cfg.date_format,
             sidebar_density: cfg.sidebar_density,
@@ -719,11 +680,8 @@ impl App {
             tabs: tab_slots,
             active_tab: active,
             address: None,
-            details_shown: crate::ui::DetailsMode::Hidden,
             saved_ui: cfg.saved_ui,
-            screen: (0, 0),
             size_notice_dismissed: false,
-            size_notice_visible: false,
             updates: Updates {
                 version: svc.updater.as_ref().map_or_else(
                     || env!("CARGO_PKG_VERSION").to_string(),
@@ -1023,7 +981,7 @@ impl App {
     /// are made again, and the screen is cleared so that the terminal drops the old ones.
     pub fn use_cell_px(&mut self, cell: (u16, u16)) {
         if self.preview.use_cell_px(cell) {
-            self.ring = None;
+            self.frame.ring = None;
             self.request_preview();
             self.redraw.full_redraw = true;
             self.redraw.dirty = true;

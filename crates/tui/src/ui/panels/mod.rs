@@ -73,7 +73,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     commands::draw_commands(f, app, buttons_row);
 
     // The columns.
-    let two = app.panels_two;
+    let two = app.frame.panels_two;
     let (left_w, right_w) = if two {
         let (min, max) = crate::panels::TWO_LEFT_WIDTH;
         (
@@ -156,7 +156,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.th.clone();
     let airy = is_airy(f);
     // The two columns have SPAZIO only in a tall window.
-    let with_space = !app.panels_two || f.area().height >= crate::panels::TWO_SPACE_FROM_ROWS;
+    let with_space = !app.frame.panels_two || f.area().height >= crate::panels::TWO_SPACE_FROM_ROWS;
     let others = space::volumes(app)
         .filter(|_| with_space)
         .map(|(_, o)| o.len());

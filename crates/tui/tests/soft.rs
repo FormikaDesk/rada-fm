@@ -33,7 +33,7 @@ fn scene(icons: IconSet) -> H {
 /// The cells of the row of the cursor, as the list drew them.
 fn cursor_cells(h: &mut H) -> Vec<ratatui::buffer::Cell> {
     let _ = h.screen();
-    let r = h.app.hits.find(&Target::Row(h.app.cursor)).unwrap();
+    let r = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
     let buf = h.term.backend().buffer().clone();
     (r.x..r.x + r.width)
         .map(|x| buf[(x, r.y)].clone())
@@ -71,7 +71,7 @@ fn selected_rows_are_tinted_with_round_ends_too() {
     h.press("space");
     put_cursor(&mut h, "photo.jpg");
     let _ = h.screen();
-    let r = h.app.hits.find(&Target::Row(6)).unwrap();
+    let r = h.app.frame.hits.find(&Target::Row(6)).unwrap();
     let buf = h.term.backend().buffer().clone();
     assert_eq!(buf[(r.x, r.y)].symbol(), CAP_LEFT);
     assert_eq!(buf[(r.x, r.y)].fg, th.sel);

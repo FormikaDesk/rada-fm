@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 fn window_78x22_is_classic() {
     // Three windows side by side on a laptop: too short for two columns, and rada's to choose.
     let mut h = scene(78, 22, "rada", false);
-    assert!(!h.app.panels_shown);
+    assert!(!h.app.frame.panels_shown);
     let s = h.screen();
     assert!(!s.contains("Enlarge"), "{s}");
     assert!(
@@ -104,7 +104,7 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     use rada_tui::app::{MenuKind, Modal};
     let mut h = scene(120, 40, "rada", false);
     assert!(
-        h.app.panels_shown && h.app.panels_two,
+        h.app.frame.panels_shown && h.app.frame.panels_two,
         "auto at 120x40 is two columns"
     );
     // The three layouts are in the menu, the one in use ticked.
@@ -130,21 +130,24 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     assert_eq!(h.app.layout_pref, LayoutPref::Panels);
     let _ = h.screen();
     assert!(
-        h.app.panels_shown && !h.app.panels_two,
+        h.app.frame.panels_shown && !h.app.frame.panels_two,
         "three columns at 120x40 when asked for"
     );
     // Two in a window with room for two only, and none where there is no room.
     h.term.backend_mut().resize(90, 40);
     let _ = h.screen();
-    assert!(h.app.panels_shown && h.app.panels_two);
+    assert!(h.app.frame.panels_shown && h.app.frame.panels_two);
     h.term.backend_mut().resize(65, 40);
     let _ = h.screen();
-    assert!(!h.app.panels_shown);
+    assert!(!h.app.frame.panels_shown);
     h.term.backend_mut().resize(160, 46);
     // Classic asked for: never panels.
     choose_in_view_menu(&mut h, "classic");
     let _ = h.screen();
-    assert!(!h.app.panels_shown, "classic at 160x46 when asked for");
+    assert!(
+        !h.app.frame.panels_shown,
+        "classic at 160x46 when asked for"
+    );
     // Automatic again: the size decides, by itself, as the window is made larger and smaller.
     choose_in_view_menu(&mut h, "automatic");
     for (w, hh, panels, two) in [
@@ -158,8 +161,8 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     ] {
         h.term.backend_mut().resize(w, hh);
         let _ = h.screen();
-        assert_eq!(h.app.panels_shown, panels, "{w}x{hh}");
-        assert_eq!(h.app.panels_two, two, "{w}x{hh}");
+        assert_eq!(h.app.frame.panels_shown, panels, "{w}x{hh}");
+        assert_eq!(h.app.frame.panels_two, two, "{w}x{hh}");
     }
 }
 
@@ -174,7 +177,7 @@ fn a_file_chooser_always_draws_the_classic_layout() {
             c.layout_pref = pref;
         });
         let s = h.screen();
-        assert!(!h.app.panels_shown, "{pref:?}: a chooser is classic");
+        assert!(!h.app.frame.panels_shown, "{pref:?}: a chooser is classic");
         assert!(!s.contains("[ NAV ]") && s.contains("a.txt"), "{s}");
     }
 }
@@ -188,5 +191,5 @@ fn the_compact_arrangement_never_has_panels() {
         c.layout_pref = LayoutPref::Panels;
     });
     let _ = h.screen();
-    assert!(!h.app.panels_shown);
+    assert!(!h.app.frame.panels_shown);
 }

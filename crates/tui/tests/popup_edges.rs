@@ -276,7 +276,7 @@ fn menu_near_bottom_clears_the_status_bar() {
         // The last visible row of the list, then the last of the files.
         let last_row = (0..h.app.visible.len())
             .rev()
-            .find(|i| h.app.hits.find(&Target::Row(*i)).is_some())
+            .find(|i| h.app.frame.hits.find(&Target::Row(*i)).is_some())
             .expect("a visible row");
         open_context_menu(&mut h, last_row);
         for chain in 0..2 {

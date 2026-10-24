@@ -433,7 +433,7 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
 
     let field_w = w.saturating_sub(left.width() + right.width());
     if field_w < 8 {
-        left.render(f, &mut app.hits, row);
+        left.render(f, &mut app.frame.hits, row);
         return;
     }
     let field_x = area.x + left.width() as u16;
@@ -444,10 +444,10 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
         width: field_w as u16,
         height: 1,
     };
-    app.bar_field = field_rect;
+    app.frame.bar_field = field_rect;
     // A click anywhere in the field that is not a segment starts the typing.
     if app.address.is_none() {
-        app.hits.add(field_rect, Target::Address);
+        app.frame.hits.add(field_rect, Target::Address);
     }
     let mut bar = left;
     bar.append(field);
@@ -456,7 +456,7 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
     if total < w {
         bar.push(Span::styled(" ".repeat(w - total), band));
     }
-    bar.render(f, &mut app.hits, row);
+    bar.render(f, &mut app.frame.hits, row);
 }
 
 /// What is offered under the field: the subfolders of a path being typed, or the commands and
@@ -477,7 +477,7 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     let widest = names.iter().map(|n| n.width()).max().unwrap_or(8);
     let w = (widest + 4).clamp(24, 60).min(screen.width as usize) as u16;
     // Under the field: after the buttons.
-    let x = (app.bar_field.x + 2).min(screen.width.saturating_sub(w));
+    let x = (app.frame.bar_field.x + 2).min(screen.width.saturating_sub(w));
     let selected = app.address.as_ref().and_then(|a| a.selected);
     let area = Rect {
         x,
@@ -510,7 +510,7 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
         .collect();
     f.render_widget(Paragraph::new(lines), area);
     for i in 0..area.height {
-        app.hits.add(
+        app.frame.hits.add(
             Rect {
                 y: area.y + i,
                 height: 1,
@@ -567,7 +567,7 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
         .clamp(0, 32);
     let tag_w = 9usize;
     let w = (label_w + detail_w + tag_w + 10).min(screen.width as usize - 2) as u16;
-    let x = (app.bar_field.x + 2).min(screen.width.saturating_sub(w));
+    let x = (app.frame.bar_field.x + 2).min(screen.width.saturating_sub(w));
     let height = (rows.len() as u16).min(screen.height.saturating_sub(row.y + row.height));
     let area = Rect {
         x,
@@ -625,7 +625,7 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
         if selected == Some(i) {
             soft::tint_row(f.buffer_mut(), r, &th, look, RowTone::Cursor);
         }
-        app.hits.add(r, Target::BarHit(i));
+        app.frame.hits.add(r, Target::BarHit(i));
     }
 }
 

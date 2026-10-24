@@ -468,7 +468,7 @@ fn a_click_on_the_path_edits_it_and_a_click_elsewhere_stops() {
     let mut h = scene(140, 30);
     let (x, y) = h.where_is(&Target::Address);
     // The right end of the field is empty space after the last segment.
-    let r = h.app.hits.find(&Target::Address).unwrap();
+    let r = h.app.frame.hits.find(&Target::Address).unwrap();
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),
         r.x + r.width - 2,
@@ -506,6 +506,7 @@ fn a_mistyped_address_says_why_and_stays_put() {
 /// Is there a clickable button for `action` in the command bar (its middle row)?
 fn in_command_bar(h: &H, action: Action) -> bool {
     h.app
+        .frame
         .hits
         .all()
         .any(|(r, t)| *t == Target::Act(action) && r.y == 4)
@@ -559,7 +560,7 @@ fn undo_says_what_it_would_undo_and_runs_after_a_plan() {
     h.wait("the label", |a| a.ops.undo_label.is_some());
     let row = h.screen().lines().nth(4).unwrap().to_string();
     assert!(row.contains("Undo") && row.contains("new folder"), "{row}");
-    assert!(h.app.hits.find(&Target::Act(Action::Undo)).is_some());
+    assert!(h.app.frame.hits.find(&Target::Act(Action::Undo)).is_some());
     h.click(&Target::Act(Action::Undo));
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
@@ -668,7 +669,12 @@ fn checkbox_selects_double_click_opens() {
     assert_eq!(h.app.cursor, 7);
     assert!(h.app.marked.is_empty());
     // Click the box of another row: it is selected, and the selection grows.
-    let r = h.app.hits.find(&Target::Check(9)).expect("a checkbox");
+    let r = h
+        .app
+        .frame
+        .hits
+        .find(&Target::Check(9))
+        .expect("a checkbox");
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),
         r.x,
@@ -676,7 +682,7 @@ fn checkbox_selects_double_click_opens() {
         KeyModifiers::NONE,
     );
     assert_eq!(h.marked_names().len(), 1);
-    let r = h.app.hits.find(&Target::Check(10)).unwrap();
+    let r = h.app.frame.hits.find(&Target::Check(10)).unwrap();
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),
         r.x + 1,
@@ -685,7 +691,7 @@ fn checkbox_selects_double_click_opens() {
     );
     assert_eq!(h.marked_names().len(), 2, "the boxes add up");
     // Clicking a box again clears it.
-    let r = h.app.hits.find(&Target::Check(9)).unwrap();
+    let r = h.app.frame.hits.find(&Target::Check(9)).unwrap();
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),
         r.x,
@@ -709,7 +715,7 @@ fn cursor_row_solid_selected_rows_quiet() {
     let _ = h.screen();
     let th = h.app.th.clone();
     let buf = h.term.backend().buffer().clone();
-    let cursor_row = h.app.hits.find(&Target::Row(h.app.cursor)).unwrap();
+    let cursor_row = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
     // The cursor row: the solid colour, white text, and a bar in the leftmost cell.
     let cell = &buf[(cursor_row.x + 6, cursor_row.y)];
     assert_eq!(cell.bg, th.cursor);
@@ -722,7 +728,7 @@ fn cursor_row_solid_selected_rows_quiet() {
     assert_eq!(name.fg, th.cursor_text);
     assert!(name.modifier.contains(ratatui::style::Modifier::BOLD));
     // A selected row: the quiet tone, a tick in the accent colour, the name in bold.
-    let marked = h.app.hits.find(&Target::Row(5)).unwrap();
+    let marked = h.app.frame.hits.find(&Target::Row(5)).unwrap();
     assert_eq!(buf[(marked.x + 6, marked.y)].bg, th.sel);
     let tick = &buf[(marked.x + 1, marked.y)];
     assert_eq!((tick.symbol(), tick.fg), ("☑", th.check));
@@ -731,7 +737,7 @@ fn cursor_row_solid_selected_rows_quiet() {
     h.press("up");
     let _ = h.screen();
     let buf = h.term.backend().buffer().clone();
-    let r = h.app.hits.find(&Target::Row(h.app.cursor)).unwrap();
+    let r = h.app.frame.hits.find(&Target::Row(h.app.cursor)).unwrap();
     assert!(h.app.marked.contains(&h.app.current().unwrap().name));
     assert_eq!(buf[(r.x + 6, r.y)].bg, th.cursor);
     assert_eq!(buf[(r.x + 1, r.y)].symbol(), "☑");
@@ -981,11 +987,14 @@ fn details_pane_hidden_below_140_columns() {
     let mut h = scene(120, 30);
     let s = h.screen();
     assert!(!s.contains("Location"), "hidden by default:\n{s}");
-    assert_eq!(h.app.details_shown, rada_tui::ui::DetailsMode::Hidden);
+    assert_eq!(h.app.frame.details_shown, rada_tui::ui::DetailsMode::Hidden);
     h.press("alt+p");
     let s = h.screen();
     assert!(s.contains("Location") && s.contains("photo.jpg"), "{s}");
-    assert_eq!(h.app.details_shown, rada_tui::ui::DetailsMode::Overlay);
+    assert_eq!(
+        h.app.frame.details_shown,
+        rada_tui::ui::DetailsMode::Overlay
+    );
     h.press("alt+p");
     assert!(!h.screen().contains("Location"));
     // Too narrow for even the overlay.

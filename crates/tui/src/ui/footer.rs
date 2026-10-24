@@ -267,5 +267,5 @@ pub fn draw_footer(f: &mut Frame, app: &mut App, area: Rect) {
     let after = w.saturating_sub(bar.width() + rw);
     bar.push(Span::styled(" ".repeat(after), band));
     bar.append(right);
-    bar.render(f, &mut app.hits, area);
+    bar.render(f, &mut app.frame.hits, area);
 }
