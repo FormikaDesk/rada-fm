@@ -100,7 +100,7 @@ fn chooser_details_mode(width: u16, chosen: Option<bool>) -> DetailsMode {
 }
 
 fn details_mode_of(app: &App, width: u16) -> DetailsMode {
-    if app.chooser.is_some() {
+    if app.session.chooser.is_some() {
         chooser_details_mode(width, app.details)
     } else {
         details_mode(width, app.details, app.layout)
@@ -110,14 +110,14 @@ fn details_mode_of(app: &App, width: u16) -> DetailsMode {
 /// The navigation pane, narrowed to its icons when a file chooser's preview needs the room.
 fn side_mode_of(app: &App, width: u16, details: DetailsMode) -> Mode {
     match Mode::for_width(width, app.side_on) {
-        Mode::Full if app.chooser.is_some() && details == DetailsMode::Column => Mode::Rail,
+        Mode::Full if app.session.chooser.is_some() && details == DetailsMode::Column => Mode::Rail,
         mode => mode,
     }
 }
 
 /// Width of the column on the right of the list, in a `room` columns wide.
 fn side_pane_width(app: &App, room: u16) -> u16 {
-    if app.chooser.is_some() {
+    if app.session.chooser.is_some() {
         (room * 2 / 5).clamp(28, 60)
     } else {
         (room * 27 / 100).clamp(34, 50)
@@ -125,7 +125,7 @@ fn side_pane_width(app: &App, room: u16) -> u16 {
 }
 
 fn draw_side_pane(f: &mut Frame, app: &mut App, area: Rect) {
-    if app.chooser.is_some() {
+    if app.session.chooser.is_some() {
         details::draw_chooser_preview(f, app, area);
     } else {
         details::draw_details(f, app, area);
@@ -142,7 +142,7 @@ pub const FULL_LAYOUT_MIN: (u16, u16) = (100, 24);
 /// With `auto` rada chooses the view and there is nothing to ask; `classic` and `compact` are
 /// choices of a small layout. A file chooser never asks: it only has the classic one.
 pub fn size_notice_shown(app: &App, width: u16, height: u16) -> bool {
-    app.chooser.is_none()
+    app.session.chooser.is_none()
         && app.layout == LayoutKind::Explorer
         && app.layout_pref == crate::LayoutPref::Panels
         && !app.size_notice_dismissed
@@ -182,7 +182,9 @@ pub fn hints_height(wanted: bool, height: u16) -> u16 {
 
 /// The bar of a file chooser: what is being asked, and the keys that answer.
 fn draw_chooser_bar(f: &mut Frame, app: &App, area: Rect) {
-    let Some(ch) = &app.chooser else { return };
+    let Some(ch) = &app.session.chooser else {
+        return;
+    };
     let th = &app.th;
     let band = th.band();
     f.render_widget(Block::default().style(band), area);
@@ -247,13 +249,13 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let address_h = u16::from(explorer);
     // A file chooser has a bar of its own at the top, and none of the buttons or key hints
     // for what it does not do.
-    let chooser_h = u16::from(app.chooser.is_some());
-    let commands_h = if app.chooser.is_some() {
+    let chooser_h = u16::from(app.session.chooser.is_some());
+    let commands_h = if app.session.chooser.is_some() {
         0
     } else {
         commands_height(explorer, area.height)
     };
-    let hints_h = if app.chooser.is_some() {
+    let hints_h = if app.session.chooser.is_some() {
         0
     } else {
         hints_height(explorer && app.show_hints, area.height)
@@ -386,7 +388,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     } else {
         main
     };
-    let preview_instead = app.chooser.is_some() && dmode == DetailsMode::Overlay;
+    let preview_instead = app.session.chooser.is_some() && dmode == DetailsMode::Overlay;
     if preview_instead {
         details::draw_chooser_preview(f, app, main);
     } else {
@@ -428,7 +430,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 /// with a preview, so it counts as the terminal in which the same list sits beside a full
 /// navigation pane.
 fn columns_basis(app: &App, details: DetailsMode, list: Rect, term_width: u16) -> u16 {
-    if app.chooser.is_some() && details == DetailsMode::Column {
+    if app.session.chooser.is_some() && details == DetailsMode::Column {
         list.width + Mode::Full.columns()
     } else {
         term_width

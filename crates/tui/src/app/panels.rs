@@ -151,7 +151,7 @@ impl App {
         crate::panels::columns_for(
             self.layout_pref,
             self.layout,
-            self.chooser.is_some(),
+            self.session.chooser.is_some(),
             width,
             height,
         )

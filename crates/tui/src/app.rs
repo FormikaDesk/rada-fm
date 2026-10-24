@@ -599,11 +599,8 @@ pub struct App {
     pub watch_note: Option<String>,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
-    pub should_quit: bool,
-    /// Set when this session is a file chooser for another program.
-    pub chooser: Option<crate::chooser::Chooser>,
-    /// What was chosen, when the person chose: the paths to hand over. `None` is a cancel.
-    pub chosen: Option<Vec<PathBuf>>,
+    /// How the session ends, and whether it is a file chooser.
+    pub session: chooser::Session,
     pub redraw: Redraw,
     plan_job: Option<JobId>,
 
@@ -812,9 +809,7 @@ impl App {
             columns: columns::ColumnsView::default(),
             watch_note: None,
             viewport: Viewport::default(),
-            should_quit: false,
-            chooser: cfg.chooser.clone(),
-            chosen: None,
+            session: chooser::Session::new(cfg.chooser.clone()),
             redraw: Redraw {
                 dirty: true,
                 full_redraw: false,
@@ -1062,7 +1057,11 @@ impl App {
         self.date_cache.clear();
         let show = self.show_hidden;
         // Choosing a folder: only folders are listed.
-        let dirs_only = self.chooser.as_ref().is_some_and(|c| c.folders_only());
+        let dirs_only = self
+            .session
+            .chooser
+            .as_ref()
+            .is_some_and(|c| c.folders_only());
         let terms: Vec<String> = self
             .filter
             .as_ref()
@@ -1395,7 +1394,7 @@ impl App {
     }
 
     fn enter(&mut self) {
-        if self.chooser.is_some() {
+        if self.session.chooser.is_some() {
             return self.chooser_enter(false, false);
         }
         let Some(e) = self.current() else { return };
@@ -2205,7 +2204,7 @@ impl App {
 
     fn run_plan(&mut self, pv: Box<PlanView>) {
         // A file chooser makes a folder and nothing else, whatever asked for more.
-        if self.chooser.is_some() && pv.plan.kind != OpKind::MakeDir {
+        if self.session.chooser.is_some() && pv.plan.kind != OpKind::MakeDir {
             self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 3);
             return;
         }
@@ -2361,7 +2360,7 @@ impl App {
         if self.is_busy() {
             self.modal = Some(Modal::ConfirmQuit);
         } else {
-            self.should_quit = true;
+            self.session.should_quit = true;
         }
     }
 
@@ -3129,7 +3128,7 @@ impl App {
                 if let Some(r) = &self.running {
                     r.handle.cancel.cancel();
                 }
-                self.should_quit = true;
+                self.session.should_quit = true;
             }
             _ => {}
         }

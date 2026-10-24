@@ -301,7 +301,7 @@ impl App {
             self.on_filter_key(key);
             return;
         }
-        if self.chooser.is_some() && self.on_chooser_key(key) {
+        if self.session.chooser.is_some() && self.on_chooser_key(key) {
             return;
         }
         // Alt+1 … Alt+9 jump to a tab.
@@ -372,8 +372,13 @@ impl App {
         use Action::*;
         self.redraw.dirty = true;
         // A file chooser does what looks and moves, and nothing that changes a file.
-        if self.chooser.is_some() {
-            if !self.chooser.as_ref().is_some_and(|c| c.allows(action)) {
+        if self.session.chooser.is_some() {
+            if !self
+                .session
+                .chooser
+                .as_ref()
+                .is_some_and(|c| c.allows(action))
+            {
                 self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 2);
                 return;
             }
@@ -591,7 +596,7 @@ impl App {
         if self.panels_shown && self.panels_two {
             return self.toggle_left_preview();
         }
-        if self.chooser.is_some() {
+        if self.session.chooser.is_some() {
             return self.toggle_chooser_preview();
         }
         let want = !self.details_visible();
@@ -704,7 +709,7 @@ impl App {
         if let Some(r) = &self.running {
             r.handle.cancel.cancel();
         }
-        self.should_quit = true;
+        self.session.should_quit = true;
     }
 
     // ------------------------------------------------------------------ redo
@@ -1113,7 +1118,7 @@ impl App {
     }
 
     fn right_click(&mut self, target: Option<Target>, x: u16, y: u16) {
-        if self.chooser.is_some() {
+        if self.session.chooser.is_some() {
             return;
         }
         if self.modal.is_some() {

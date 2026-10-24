@@ -293,7 +293,7 @@ fn event_loop(
         if shutdown.load(std::sync::atomic::Ordering::Relaxed) {
             app.shutdown();
         }
-        if app.should_quit {
+        if app.session.should_quit {
             break;
         }
         select! {
@@ -323,7 +323,7 @@ fn event_loop(
     }
     Ok(Outcome {
         last_dir: app.cwd.clone(),
-        chosen: app.chosen.take(),
+        chosen: app.session.chosen.take(),
     })
 }
 

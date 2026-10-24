@@ -356,7 +356,7 @@ impl App {
 
     /// The commands and the places that match what is typed, best first.
     fn refresh_bar_hits(&mut self) {
-        let chooser = self.chooser.clone();
+        let chooser = self.session.chooser.clone();
         let Some(a) = &mut self.address else { return };
         let q = a.text.trim().to_string();
         let q_text = q.clone();

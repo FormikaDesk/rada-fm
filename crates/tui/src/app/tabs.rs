@@ -340,7 +340,7 @@ impl App {
     /// Write what is remembered between sessions, from a thread of its own.
     pub(super) fn save_ui_state(&mut self) {
         // Asked to choose a file for another program, rada leaves its own state as it is.
-        if self.chooser.is_some() {
+        if self.session.chooser.is_some() {
             return;
         }
         if self.remember_tabs {

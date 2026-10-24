@@ -27,8 +27,8 @@ fn enter_on_a_file_chooses_it_and_quits() {
     assert_eq!(h.names(), ["sub", "a.txt", "b.txt"]);
     h.key(KeyCode::Down); // a.txt: sub is first
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("a.txt")]));
-    assert!(h.app.should_quit);
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("a.txt")]));
+    assert!(h.app.session.should_quit);
 }
 
 #[test]
@@ -36,10 +36,10 @@ fn enter_on_a_folder_goes_in_and_chooses_nothing() {
     let (mut h, dir, _) = chooser_at(Chooser::file(false));
     h.key(KeyCode::Enter);
     h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
-    assert!(h.app.chosen.is_none() && !h.app.should_quit);
+    assert!(h.app.session.chosen.is_none() && !h.app.session.should_quit);
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("sub/inner.txt")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("sub/inner.txt")]));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn the_right_arrow_never_opens_a_file() {
     h.key(KeyCode::Right);
     h.keys("l");
     assert!(h.opened().is_empty(), "{:?}", h.opened());
-    assert!(h.app.chosen.is_none() && !h.app.should_quit);
+    assert!(h.app.session.chosen.is_none() && !h.app.session.should_quit);
 }
 
 #[test]
@@ -58,12 +58,12 @@ fn a_double_click_chooses_a_file_and_enters_a_folder() {
     use rada_tui::hits::Target;
     let (mut h, dir, _) = chooser_at(Chooser::file(false));
     h.double_click(&Target::Row(1));
-    assert_eq!(h.app.chosen, Some(vec![dir.join("a.txt")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("a.txt")]));
     assert!(h.opened().is_empty());
     let (mut h, _, _) = chooser_at(Chooser::file(false));
     h.double_click(&Target::Row(0));
     h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
-    assert!(h.app.chosen.is_none());
+    assert!(h.app.session.chosen.is_none());
 }
 
 #[test]
@@ -78,10 +78,10 @@ fn several_files_are_marked_and_chosen_together() {
     assert_eq!(h.marked_names(), ["a.txt", "b.txt"]);
     h.key(KeyCode::Enter);
     assert_eq!(
-        h.app.chosen,
+        h.app.session.chosen,
         Some(vec![dir.join("a.txt"), dir.join("b.txt")])
     );
-    assert!(h.app.should_quit);
+    assert!(h.app.session.should_quit);
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn enter_with_nothing_marked_chooses_the_file_under_the_cursor() {
     let (mut h, dir, _) = chooser_at(Chooser::file(true));
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("a.txt")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("a.txt")]));
 }
 
 #[test]
@@ -106,15 +106,15 @@ fn folder_chooser_lists_only_folders() {
     let (mut h, dir, _) = chooser_at(Chooser::folder(false));
     assert_eq!(h.names(), ["sub"]);
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("sub")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("sub")]));
 }
 
 #[test]
 fn alt_enter_chooses_the_folder_you_are_in() {
     let (mut h, dir, _) = chooser_at(Chooser::folder(false));
     alt_enter(&mut h);
-    assert_eq!(h.app.chosen, Some(vec![dir]));
-    assert!(h.app.should_quit);
+    assert_eq!(h.app.session.chosen, Some(vec![dir]));
+    assert!(h.app.session.should_quit);
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn a_folder_with_no_folders_in_it_is_chosen_by_enter() {
     h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
     assert!(h.names().is_empty());
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("sub")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("sub")]));
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn a_double_click_on_a_folder_goes_in_when_a_folder_is_asked_for() {
     let (mut h, _, _) = chooser_at(Chooser::folder(false));
     h.double_click(&Target::Row(0));
     h.wait("in sub", |a| a.cwd.ends_with("sub") && !a.is_loading());
-    assert!(h.app.chosen.is_none());
+    assert!(h.app.session.chosen.is_none());
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn several_folders_can_be_chosen() {
     h.key(KeyCode::Char(' '));
     h.key(KeyCode::Char(' '));
     h.key(KeyCode::Enter);
-    let chosen = h.app.chosen.clone().unwrap();
+    let chosen = h.app.session.chosen.clone().unwrap();
     assert_eq!(chosen, vec![dir.join("other"), dir.join("sub")]);
 }
 
@@ -159,7 +159,7 @@ fn saving_asks_for_a_name_with_the_suggested_one_filled_in() {
     };
     assert_eq!(iv.text, "report.pdf");
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("report.pdf")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("report.pdf")]));
     // Nothing was created: the program that asked saves the file itself.
     assert!(!dir.join("report.pdf").exists());
 }
@@ -173,7 +173,7 @@ fn saving_in_another_folder_and_under_another_name() {
     h.press("ctrl+u");
     h.keys("notes.md");
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("sub/notes.md")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("sub/notes.md")]));
 }
 
 #[test]
@@ -181,13 +181,13 @@ fn saving_over_a_file_asks_twice() {
     let (mut h, dir, _) = chooser_at(Chooser::save("a.txt"));
     h.press("ctrl+s");
     h.key(KeyCode::Enter);
-    assert!(h.app.chosen.is_none(), "the first Enter only warns");
+    assert!(h.app.session.chosen.is_none(), "the first Enter only warns");
     let Some(rada_tui::app::Modal::Input(iv)) = &h.app.modal else {
         panic!("{}", h.screen());
     };
     assert!(iv.error.as_deref().unwrap().contains("already exists"));
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("a.txt")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("a.txt")]));
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn enter_on_a_file_while_saving_offers_to_replace_it() {
     assert_eq!(iv.text, "a.txt");
     h.key(KeyCode::Enter);
     h.key(KeyCode::Enter);
-    assert_eq!(h.app.chosen, Some(vec![dir.join("a.txt")]));
+    assert_eq!(h.app.session.chosen, Some(vec![dir.join("a.txt")]));
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn a_name_that_cannot_be_a_name_is_refused() {
         h.press("ctrl+u");
         h.keys(bad);
         h.key(KeyCode::Enter);
-        assert!(h.app.chosen.is_none(), "{bad}");
+        assert!(h.app.session.chosen.is_none(), "{bad}");
         assert!(
             matches!(&h.app.modal, Some(rada_tui::app::Modal::Input(iv)) if iv.error.is_some()),
             "{bad}: {}",
@@ -232,13 +232,13 @@ fn esc_cancels_and_chooses_nothing() {
         let (mut h, _, _) = chooser_at(ch);
         h.key(KeyCode::Down);
         h.key(KeyCode::Esc);
-        assert!(h.app.should_quit);
-        assert!(h.app.chosen.is_none());
+        assert!(h.app.session.should_quit);
+        assert!(h.app.session.chosen.is_none());
     }
     // So does q.
     let (mut h, _, _) = chooser_at(Chooser::file(false));
     h.keys("q");
-    assert!(h.app.should_quit && h.app.chosen.is_none());
+    assert!(h.app.session.should_quit && h.app.session.chosen.is_none());
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn esc_in_the_name_window_closes_it_and_stays_in_the_chooser() {
     let (mut h, _, _) = chooser_at(Chooser::save("x.txt"));
     h.press("ctrl+s");
     h.key(KeyCode::Esc);
-    assert!(h.app.modal.is_none() && !h.app.should_quit);
+    assert!(h.app.modal.is_none() && !h.app.session.should_quit);
 }
 
 #[test]
@@ -292,8 +292,8 @@ fn nothing_that_changes_a_file_can_be_done() {
             // Whatever it opened is closed again.
             h.key(KeyCode::Esc);
             h.key(KeyCode::Esc);
-            h.app.chosen = None;
-            h.app.should_quit = false;
+            h.app.session.chosen = None;
+            h.app.session.should_quit = false;
         }
         h.pump(200);
         assert_eq!(before, snapshot(&root), "files changed");
@@ -339,7 +339,7 @@ fn a_plan_that_is_not_a_new_folder_is_never_run() {
     h.press("delete");
     plan_modal(&mut h);
     // Now the same session becomes a chooser: the plan is shown, and refused when confirmed.
-    h.app.chooser = Some(Chooser::file(false));
+    h.app.session.chooser = Some(Chooser::file(false));
     h.key(KeyCode::Enter);
     h.pump(300);
     assert_eq!(before, snapshot(&root));
@@ -419,7 +419,7 @@ fn a_chooser_starts_with_the_newest_first_whatever_the_sort_setting() {
         );
         // The first file is the one made last: Enter on it chooses it.
         h.key(KeyCode::Enter);
-        assert!(h.app.chosen.as_ref().unwrap()[0].ends_with("c-new.txt"));
+        assert!(h.app.session.chosen.as_ref().unwrap()[0].ends_with("c-new.txt"));
     }
 }
 

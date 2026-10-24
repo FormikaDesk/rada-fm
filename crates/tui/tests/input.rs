@@ -37,7 +37,7 @@ fn ctrl_c_copies_and_never_quits() {
         h.press("ctrl+c");
         h.press("ctrl+c");
         h.press("ctrl+c");
-        assert!(!h.app.should_quit, "{preset:?}");
+        assert!(!h.app.session.should_quit, "{preset:?}");
         if preset != Preset::Vim {
             assert!(h.app.clipboard.is_some(), "Ctrl+C copies ({preset:?})");
         }
@@ -48,15 +48,15 @@ fn ctrl_c_copies_and_never_quits() {
     assert!(matches!(h.app.modal, Some(Modal::Input(_))));
     h.press("ctrl+c");
     h.press("ctrl+c");
-    assert!(!h.app.should_quit);
+    assert!(!h.app.session.should_quit);
     h.press("esc");
     h.press("ctrl+p");
     h.press("ctrl+c");
-    assert!(!h.app.should_quit);
+    assert!(!h.app.session.should_quit);
     h.press("esc");
     h.press("/");
     h.press("ctrl+c");
-    assert!(!h.app.should_quit);
+    assert!(!h.app.session.should_quit);
 }
 
 #[test]
@@ -183,8 +183,8 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("undo", "ctrl+z", |h| undoing(h)),
         ("redo", "ctrl+r", |h| redoing(h)),
         ("redo", "ctrl+y", |h| redoing(h)),
-        ("quit", "q", |h| h.app.should_quit),
-        ("quit", "ctrl+q", |h| h.app.should_quit),
+        ("quit", "q", |h| h.app.session.should_quit),
+        ("quit", "ctrl+q", |h| h.app.session.should_quit),
         ("select all", "ctrl+a", |h| h.app.marked.len() == 6),
         ("hidden", ".", |h| h.app.show_hidden),
         ("sort", "s", |h| h.app.sort_label().starts_with("size")),
@@ -225,9 +225,9 @@ fn presets_ignore_each_others_keys() {
     h.keys("y");
     assert!(h.app.clipboard.is_none());
     h.keys("q");
-    assert!(!h.app.should_quit);
+    assert!(!h.app.session.should_quit);
     h.press("ctrl+q");
-    assert!(h.app.should_quit);
+    assert!(h.app.session.should_quit);
 }
 
 #[test]
@@ -238,9 +238,9 @@ fn keys_can_be_rebound_from_the_configuration() {
     o.insert("copy".to_string(), vec!["c".to_string()]);
     h.app.keymap = Keymap::new(Preset::VimClassic, &o);
     h.keys("q");
-    assert!(!h.app.should_quit, "q no longer quits");
+    assert!(!h.app.session.should_quit, "q no longer quits");
     h.press("ctrl+w");
-    assert!(h.app.should_quit);
+    assert!(h.app.session.should_quit);
     let mut h = harness();
     h.app.keymap = Keymap::new(Preset::VimClassic, &o);
     h.keys("c");

@@ -9,10 +9,29 @@ use rada_core::i18n::{Key, tf};
 use rada_core::model::Entry;
 use std::path::PathBuf;
 
+/// How the session ends, and whether it is a file chooser for another program.
+pub struct Session {
+    pub should_quit: bool,
+    /// Set when this session is a file chooser for another program.
+    pub chooser: Option<chooser::Chooser>,
+    /// What was chosen, when the person chose: the paths to hand over. `None` is a cancel.
+    pub chosen: Option<Vec<PathBuf>>,
+}
+
+impl Session {
+    pub fn new(chooser: Option<chooser::Chooser>) -> Session {
+        Session {
+            should_quit: false,
+            chooser,
+            chosen: None,
+        }
+    }
+}
+
 impl App {
     /// A key that means something only to a chooser. `true` when it was taken.
     pub(super) fn on_chooser_key(&mut self, key: KeyEvent) -> bool {
-        let Some(ch) = self.chooser.clone() else {
+        let Some(ch) = self.session.chooser.clone() else {
             return false;
         };
         let alt = key.modifiers.contains(KeyModifiers::ALT);
@@ -23,8 +42,8 @@ impl App {
                 if self.filter.is_some() {
                     self.set_filter(None);
                 } else {
-                    self.chosen = None;
-                    self.should_quit = true;
+                    self.session.chosen = None;
+                    self.session.should_quit = true;
                 }
                 true
             }
@@ -50,8 +69,8 @@ impl App {
             self.toast(ToastKind::Error, Key::ChooseLineBreak.tr(), 4);
             return false;
         }
-        self.chosen = Some(paths);
-        self.should_quit = true;
+        self.session.chosen = Some(paths);
+        self.session.should_quit = true;
         true
     }
 
@@ -74,7 +93,7 @@ impl App {
     /// Enter (`by_key`) or a double click on the item under the cursor. `here` (Alt+Enter) is
     /// "the folder I am in".
     pub(super) fn chooser_enter(&mut self, here: bool, by_key: bool) {
-        let Some(ch) = self.chooser.clone() else {
+        let Some(ch) = self.session.chooser.clone() else {
             return;
         };
         let under = self
@@ -165,7 +184,13 @@ impl App {
     /// Space on an entry, where a file chooser takes only files.
     pub(super) fn chooser_may_mark(&mut self) -> bool {
         let is_dir = self.current().is_some_and(|e| e.is_dir());
-        if is_dir && self.chooser.as_ref().is_some_and(|c| c.kind == Kind::File) {
+        if is_dir
+            && self
+                .session
+                .chooser
+                .as_ref()
+                .is_some_and(|c| c.kind == Kind::File)
+        {
             self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
             self.set_cursor(self.cursor + 1);
             return false;
@@ -175,7 +200,8 @@ impl App {
 
     /// The window that asks for the name of the file to save, in the folder being shown.
     fn chooser_save_prompt(&mut self, name: Option<String>) {
-        let Some(Kind::Save { name: suggested }) = self.chooser.as_ref().map(|c| c.kind.clone())
+        let Some(Kind::Save { name: suggested }) =
+            self.session.chooser.as_ref().map(|c| c.kind.clone())
         else {
             return;
         };
