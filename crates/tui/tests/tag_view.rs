@@ -159,7 +159,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     open_tag(&mut h, "Blu");
     // No new folder, no new file, no paste.
     h.press("f7");
-    assert!(h.app.modal.is_none(), "{}", h.screen());
+    assert!(h.app.windows.modal.is_none(), "{}", h.screen());
     assert!(
         h.app
             .current_notice()
@@ -169,7 +169,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     );
     h.keys("y"); // copy the first
     h.keys("p");
-    assert!(h.app.modal.is_none(), "{}", h.screen());
+    assert!(h.app.windows.modal.is_none(), "{}", h.screen());
     // The path copied is the real one.
     h.press("ctrl+shift+c");
     // Rename works on the item where it is.

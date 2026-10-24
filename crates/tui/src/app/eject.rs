@@ -39,7 +39,7 @@ impl App {
         };
         let name = crate::sidebar::device_name(&volume);
         let name = self.places.shown_name(&volume.mount_point, name);
-        self.modal = Some(Modal::Eject(EjectView {
+        self.windows.modal = Some(Modal::Eject(EjectView {
             name,
             volume,
             stage: EjectStage::Confirm,
@@ -73,32 +73,32 @@ impl App {
             }
             _ => {}
         }
-        self.modal = Some(Modal::Eject(view));
+        self.windows.modal = Some(Modal::Eject(view));
     }
 
     pub(super) fn on_ejected(&mut self, mount: PathBuf, name: String, result: Result<(), String>) {
         let waiting = matches!(
-            &self.modal,
+            &self.windows.modal,
             Some(Modal::Eject(v)) if v.volume.mount_point == mount
         );
         match result {
             Ok(()) => {
                 if waiting {
-                    self.modal = None;
+                    self.windows.modal = None;
                 }
                 self.toast(ToastKind::Ok, tf(Key::TEjected, &[&name]), 6);
                 // A phone going away is no change of mounts: look again now, not in five seconds.
                 self.svc.volumes.refresh_now();
             }
             Err(why) => {
-                if let Some(Modal::Eject(v)) = &mut self.modal
+                if let Some(Modal::Eject(v)) = &mut self.windows.modal
                     && v.volume.mount_point == mount
                 {
                     v.stage = EjectStage::Failed(why);
                 } else if let Some(volume) =
                     self.devices.volumes.iter().find(|v| v.mount_point == mount)
                 {
-                    self.modal = Some(Modal::Eject(EjectView {
+                    self.windows.modal = Some(Modal::Eject(EjectView {
                         name,
                         volume: volume.clone(),
                         stage: EjectStage::Failed(why),

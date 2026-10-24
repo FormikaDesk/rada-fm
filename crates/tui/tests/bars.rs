@@ -132,7 +132,7 @@ fn commands_is_a_hint_at_the_bottom_and_starts_the_field() {
         h.app.windows.address.is_some(),
         "the field takes what is typed"
     );
-    assert!(h.app.modal.is_none(), "it is not a window");
+    assert!(h.app.windows.modal.is_none(), "it is not a window");
 }
 
 #[test]
@@ -184,7 +184,7 @@ fn the_folded_part_of_a_path_opens_a_list_to_pick_from() {
     };
     assert!(hidden.len() >= 2, "{hidden:?}");
     h.click(&more);
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
     let s = h.screen();
     assert!(s.contains("bbbbbb") || s.contains("cccccc"), "{s}");
     // Choosing an entry goes there.
@@ -266,7 +266,7 @@ fn a_window_changes_the_hints_to_its_own_keys() {
     let (sb, dir) = sandbox_with_files();
     let mut h = H::new(sb, dir, 120, 30);
     h.press("f2");
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     let row = hints_row(&mut h);
     assert!(row.contains("Esc") && row.contains("cancel"), "{row}");
     assert!(!row.contains("trash"), "{row}");

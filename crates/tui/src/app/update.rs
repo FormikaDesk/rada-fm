@@ -81,7 +81,7 @@ impl App {
                 }
                 self.updates.update = UpdateStatus::Available { notice, how };
                 // Somebody asked: show what was found, not just a pill in a corner.
-                if asked && self.modal.is_none() {
+                if asked && self.windows.modal.is_none() {
                     self.start_update_action();
                 }
             }
@@ -120,8 +120,8 @@ impl App {
                     message: message.clone(),
                     log: log.clone(),
                 };
-                if self.modal.is_none() {
-                    self.modal = Some(Modal::Update(UpdateView::Failed { message, log }));
+                if self.windows.modal.is_none() {
+                    self.windows.modal = Some(Modal::Update(UpdateView::Failed { message, log }));
                 } else {
                     self.toast(ToastKind::Error, Key::TUpdateFailed.tr(), 6);
                 }
@@ -201,7 +201,7 @@ impl App {
             Key::AboutSource.tr().into(),
             "github.com/FormikaDesk/rada-fm".into(),
         ));
-        self.modal = Some(Modal::Properties(PropsView {
+        self.windows.modal = Some(Modal::Properties(PropsView {
             title: Key::AboutTitle.tr().into(),
             rows,
             scroll: 0,
@@ -212,7 +212,7 @@ impl App {
     pub(super) fn start_update_action(&mut self) {
         match &self.updates.update {
             UpdateStatus::Available { notice, how } => {
-                self.modal = Some(Modal::Update(UpdateView::Offer {
+                self.windows.modal = Some(Modal::Update(UpdateView::Offer {
                     notice: notice.clone(),
                     how: how.clone(),
                     scroll: 0,
@@ -230,7 +230,7 @@ impl App {
                 self.toast(ToastKind::Ok, text, 6);
             }
             UpdateStatus::Failed { message, log } => {
-                self.modal = Some(Modal::Update(UpdateView::Failed {
+                self.windows.modal = Some(Modal::Update(UpdateView::Failed {
                     message: message.clone(),
                     log: log.clone(),
                 }));
@@ -282,7 +282,7 @@ impl App {
                 _ => {}
             },
         }
-        self.modal = Some(Modal::Update(view));
+        self.windows.modal = Some(Modal::Update(view));
     }
 
     /// Open a file with the system's program for it, from a thread of its own.

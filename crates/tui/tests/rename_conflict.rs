@@ -21,13 +21,18 @@ fn choosing_replace_in_the_plan_renames_over_it() {
     h.press("enter");
     plan_modal(&mut h);
     h.press("enter");
-    assert!(matches!(h.app.modal, Some(Modal::Plan(_))), "nothing runs");
+    assert!(
+        matches!(h.app.windows.modal, Some(Modal::Plan(_))),
+        "nothing runs"
+    );
     h.click(&Target::Policy(ConflictPolicy::Overwrite));
-    h.wait("replanned", |a| match &a.modal {
+    h.wait("replanned", |a| match &a.windows.modal {
         Some(Modal::Plan(pv)) => pv.plan.is_executable() && pv.replanning.is_none(),
         _ => false,
     });
     h.press("enter");
-    h.wait("done", |a| a.ops.running.is_none() && a.modal.is_none());
+    h.wait("done", |a| {
+        a.ops.running.is_none() && a.windows.modal.is_none()
+    });
     assert_eq!(std::fs::read_to_string(dir.join("b.txt")).unwrap(), "new");
 }

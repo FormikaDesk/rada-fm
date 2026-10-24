@@ -26,7 +26,7 @@ impl App {
     /// Open a dropdown with its corner at `at`.
     pub fn open_menu(&mut self, kind: MenuKind, at: (u16, u16)) {
         let items = self.menu_items(kind);
-        self.modal = Some(Modal::Menu(MenuView::new(at, items)));
+        self.windows.modal = Some(Modal::Menu(MenuView::new(at, items)));
     }
 
     pub(super) fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
@@ -416,7 +416,7 @@ impl App {
             TagCmd::Toggle(tag) => TagChange::Toggle { tag },
             TagCmd::Clear => TagChange::Clear,
             TagCmd::New => {
-                self.modal = Some(Modal::Input(InputView::new(
+                self.windows.modal = Some(Modal::Input(InputView::new(
                     InputKind::NewTag { items },
                     String::new(),
                 )));

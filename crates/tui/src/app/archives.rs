@@ -133,7 +133,7 @@ impl App {
             .file_name()
             .map(|n| archive::archive_stem(n).to_string_lossy().into_owned())
             .unwrap_or_default();
-        self.modal = Some(Modal::Input(InputView::new(
+        self.windows.modal = Some(Modal::Input(InputView::new(
             InputKind::ExtractTo {
                 archive,
                 dest,
@@ -175,7 +175,7 @@ impl App {
         };
         let text = format!("{base}{}", format.extension());
         let dir = self.folder_for_new(&sources);
-        self.modal = Some(Modal::Input(InputView::new(
+        self.windows.modal = Some(Modal::Input(InputView::new(
             InputKind::Compress {
                 sources,
                 dir,

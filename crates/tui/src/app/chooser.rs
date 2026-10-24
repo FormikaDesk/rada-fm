@@ -210,7 +210,7 @@ impl App {
             return;
         }
         let text = name.unwrap_or(suggested);
-        self.modal = Some(Modal::Input(InputView::new(InputKind::SaveAs, text)));
+        self.windows.modal = Some(Modal::Input(InputView::new(InputKind::SaveAs, text)));
     }
 
     /// The name was typed: check it, ask once before replacing a file, and hand it over.
@@ -218,7 +218,7 @@ impl App {
         let name = iv.text.trim_end_matches('\n').to_string();
         if let Err(why) = chooser::check_name(&name) {
             iv.error = Some(why.tr().to_string());
-            self.modal = Some(Modal::Input(iv));
+            self.windows.modal = Some(Modal::Input(iv));
             return;
         }
         let Some(dir) = self.chooser_here() else {
@@ -228,13 +228,13 @@ impl App {
         match std::fs::symlink_metadata(&target) {
             Ok(m) if m.is_dir() => {
                 iv.error = Some(tf(Key::ChooseIsFolder, &[&name]));
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
                 return;
             }
             // The first Enter warns, a second one with the same name goes ahead.
             Ok(_) if iv.error.is_none() => {
                 iv.error = Some(tf(Key::ChooseExists, &[&name]));
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
                 return;
             }
             _ => {}

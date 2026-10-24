@@ -256,7 +256,7 @@ fn eject_asks_first_and_needs_a_mount() {
     s.h.key(KeyCode::Esc);
     s.h.app.start_eject(&s.phone.clone());
     assert!(
-        matches!(s.h.app.modal, Some(Modal::Eject(_))),
+        matches!(s.h.app.windows.modal, Some(Modal::Eject(_))),
         "{}",
         s.h.screen()
     );
@@ -265,7 +265,7 @@ fn eject_asks_first_and_needs_a_mount() {
         "nothing happens before the answer"
     );
     s.h.key(KeyCode::Enter);
-    s.h.wait("done", |a| a.modal.is_none());
+    s.h.wait("done", |a| a.windows.modal.is_none());
     assert_eq!(
         calls(&s.log),
         [format!("eject {}", s.phone.display())],
@@ -283,7 +283,7 @@ fn eject_asks_first_and_needs_a_mount() {
         s.h.key(KeyCode::Down);
     }
     s.h.press("delete");
-    assert!(s.h.app.modal.is_none());
+    assert!(s.h.app.windows.modal.is_none());
     let said: Vec<String> =
         s.h.app
             .shown_notices()

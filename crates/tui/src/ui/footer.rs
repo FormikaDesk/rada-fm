@@ -52,7 +52,7 @@ fn hints(app: &App) -> Vec<Hint> {
             .filter_map(|(a, w)| Hint::act(app, *a, w))
             .collect()
     };
-    if let Some(modal) = &app.modal {
+    if let Some(modal) = &app.windows.modal {
         return match modal {
             Modal::Plan(_) => vec![Hint::fixed("Enter", "run"), Hint::fixed("Esc", "cancel")],
             Modal::Input(_) => vec![Hint::fixed("Enter", "ok"), Hint::fixed("Esc", "cancel")],

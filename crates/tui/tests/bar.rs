@@ -55,7 +55,7 @@ fn ctrl_p_and_ctrl_f_start_from_nothing() {
         let a = h.app.windows.address.as_ref().expect(key);
         assert!(a.text.is_empty() && !a.fresh, "{key}");
         assert_eq!(a.mode(), BarMode::Empty);
-        assert!(h.app.modal.is_none(), "{key}: not a window");
+        assert!(h.app.windows.modal.is_none(), "{key}: not a window");
         assert!(
             row(&mut h).contains("▏Search files or type a command"),
             "{}",
@@ -112,7 +112,7 @@ fn enter_runs_the_command_picked_with_the_arrows() {
     }
     h.key(KeyCode::Enter);
     assert!(
-        matches!(h.app.modal, Some(Modal::Input(_))),
+        matches!(h.app.windows.modal, Some(Modal::Input(_))),
         "{}",
         h.screen()
     );

@@ -19,11 +19,11 @@ impl App {
     /// Show the offer, if one is to be made and nothing else is in the way.
     pub(super) fn maybe_offer_font(&mut self, offer: Option<FontOffer>) {
         let Some(offer) = offer else { return };
-        if self.modal.is_some() {
+        if self.windows.modal.is_some() {
             return;
         }
         (offer.shown)();
-        self.modal = Some(Modal::Font(FontView {
+        self.windows.modal = Some(Modal::Font(FontView {
             offer,
             stage: FontStage::Ask,
         }));
@@ -43,12 +43,12 @@ impl App {
             (FontStage::Working, KeyCode::Esc) => return,
             _ => {}
         }
-        self.modal = Some(Modal::Font(view));
+        self.windows.modal = Some(Modal::Font(view));
     }
 
     pub(super) fn on_font_installed(&mut self, result: Result<String, String>) {
-        if matches!(self.modal, Some(Modal::Font(_))) {
-            self.modal = None;
+        if matches!(self.windows.modal, Some(Modal::Font(_))) {
+            self.windows.modal = None;
         }
         match result {
             Ok(text) => self.toast(ToastKind::Ok, text, 15),

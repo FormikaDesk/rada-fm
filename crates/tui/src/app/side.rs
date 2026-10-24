@@ -180,8 +180,8 @@ impl App {
     /// say so with the way to do it, and remember it for the sidebar.
     pub(super) fn on_access_denied(&mut self, d: rada_core::platform::AccessDenied) {
         self.devices.deny(d.clone());
-        if self.modal.is_none() {
-            self.modal = Some(Modal::Access(d));
+        if self.windows.modal.is_none() {
+            self.windows.modal = Some(Modal::Access(d));
         } else {
             self.toast(ToastKind::Error, d.message(), 6);
         }
@@ -211,7 +211,7 @@ impl App {
             self.toast(ToastKind::Info, Key::TSettingsOpened.tr(), 6);
             return;
         }
-        self.modal = Some(Modal::Access(d));
+        self.windows.modal = Some(Modal::Access(d));
     }
 
     /// The items the sidebar shows right now.

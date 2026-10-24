@@ -154,7 +154,7 @@ fn several_folders_can_be_chosen() {
 fn saving_asks_for_a_name_with_the_suggested_one_filled_in() {
     let (mut h, dir, _) = chooser_at(Chooser::save("report.pdf"));
     h.press("ctrl+s");
-    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.modal else {
+    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.windows.modal else {
         panic!("{}", h.screen());
     };
     assert_eq!(iv.text, "report.pdf");
@@ -182,7 +182,7 @@ fn saving_over_a_file_asks_twice() {
     h.press("ctrl+s");
     h.key(KeyCode::Enter);
     assert!(h.app.session.chosen.is_none(), "the first Enter only warns");
-    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.modal else {
+    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.windows.modal else {
         panic!("{}", h.screen());
     };
     assert!(iv.error.as_deref().unwrap().contains("already exists"));
@@ -195,7 +195,7 @@ fn enter_on_a_file_while_saving_offers_to_replace_it() {
     let (mut h, dir, _) = chooser_at(Chooser::save("zzz.txt"));
     h.key(KeyCode::Down); // a.txt
     h.key(KeyCode::Enter);
-    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.modal else {
+    let Some(rada_tui::app::Modal::Input(iv)) = &h.app.windows.modal else {
         panic!("{}", h.screen());
     };
     assert_eq!(iv.text, "a.txt");
@@ -214,7 +214,7 @@ fn a_name_that_cannot_be_a_name_is_refused() {
         h.key(KeyCode::Enter);
         assert!(h.app.session.chosen.is_none(), "{bad}");
         assert!(
-            matches!(&h.app.modal, Some(rada_tui::app::Modal::Input(iv)) if iv.error.is_some()),
+            matches!(&h.app.windows.modal, Some(rada_tui::app::Modal::Input(iv)) if iv.error.is_some()),
             "{bad}: {}",
             h.screen()
         );
@@ -246,7 +246,7 @@ fn esc_in_the_name_window_closes_it_and_stays_in_the_chooser() {
     let (mut h, _, _) = chooser_at(Chooser::save("x.txt"));
     h.press("ctrl+s");
     h.key(KeyCode::Esc);
-    assert!(h.app.modal.is_none() && !h.app.session.should_quit);
+    assert!(h.app.windows.modal.is_none() && !h.app.session.should_quit);
 }
 
 #[test]
@@ -280,11 +280,11 @@ fn nothing_that_changes_a_file_can_be_done() {
             "F7",
         ] {
             h.press(spec);
-            if matches!(h.app.modal, Some(rada_tui::app::Modal::Input(_))) {
+            if matches!(h.app.windows.modal, Some(rada_tui::app::Modal::Input(_))) {
                 // The window for a name of the file to save is the only one that may open.
                 h.key(KeyCode::Esc);
             }
-            assert!(h.app.modal.is_none(), "{spec}: {}", h.screen());
+            assert!(h.app.windows.modal.is_none(), "{spec}: {}", h.screen());
         }
         for a in Action::ALL {
             h.app.dispatch(a);
@@ -306,16 +306,19 @@ fn the_menu_of_a_right_click_does_not_open() {
     use rada_tui::hits::Target;
     let (mut h, _, _) = chooser_at(Chooser::file(false));
     h.right_click(&Target::Row(1));
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     h.press("shift+F10");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]
 fn new_folder_in_a_folder_or_save_chooser() {
     let (mut h, dir, _) = chooser_at(Chooser::save("x.txt"));
     h.app.dispatch(Action::NewFolder);
-    assert!(matches!(h.app.modal, Some(rada_tui::app::Modal::Input(_))));
+    assert!(matches!(
+        h.app.windows.modal,
+        Some(rada_tui::app::Modal::Input(_))
+    ));
     h.keys("fresh");
     h.key(KeyCode::Enter);
     plan_modal(&mut h);
@@ -324,7 +327,7 @@ fn new_folder_in_a_folder_or_save_chooser() {
     // And in a chooser of files it cannot.
     let (mut h, _, _) = chooser_at(Chooser::file(false));
     h.app.dispatch(Action::NewFolder);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]

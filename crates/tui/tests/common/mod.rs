@@ -447,7 +447,7 @@ impl H {
     }
 
     pub fn modal_is_plan(&self) -> bool {
-        matches!(self.app.modal, Some(Modal::Plan(_)))
+        matches!(self.app.windows.modal, Some(Modal::Plan(_)))
     }
 }
 
@@ -466,12 +466,14 @@ pub fn run_plan_and_wait(h: &mut H) {
     assert!(h.modal_is_plan(), "{}", h.screen());
     h.key(KeyCode::Enter);
     h.wait("operation to finish", |a| {
-        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
 }
 
 pub fn plan_modal(h: &mut H) {
-    h.wait("a plan window", |a| matches!(a.modal, Some(Modal::Plan(_))));
+    h.wait("a plan window", |a| {
+        matches!(a.windows.modal, Some(Modal::Plan(_)))
+    });
 }
 
 // ---------------------------------------------------------------------------- the explorer scene

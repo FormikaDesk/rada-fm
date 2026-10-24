@@ -22,7 +22,7 @@ impl App {
             let Some(e) = self.current() else { return };
             self.item_properties(e)
         };
-        self.modal = Some(Modal::Properties(view));
+        self.windows.modal = Some(Modal::Properties(view));
     }
 
     fn selection_properties(&self) -> PropsView {

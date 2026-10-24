@@ -178,7 +178,7 @@ impl App {
     pub(super) fn open_with_window(&mut self, path: PathBuf, under: Option<Box<MenuView>>) {
         let mut view = OpenWithView::new(path.clone());
         view.under = under;
-        self.modal = Some(Modal::OpenWith(Box::new(view)));
+        self.windows.modal = Some(Modal::OpenWith(Box::new(view)));
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
         let state = platform.dirs().rada_state();
@@ -204,7 +204,7 @@ impl App {
         apps: Vec<OpenApp>,
         always: Option<String>,
     ) {
-        let Some(Modal::OpenWith(v)) = &mut self.modal else {
+        let Some(Modal::OpenWith(v)) = &mut self.windows.modal else {
             return;
         };
         if v.path != path {
@@ -225,13 +225,13 @@ impl App {
             // menu, that is given back.
             KeyCode::Esc => {
                 if let Some(m) = v.under.take() {
-                    self.modal = Some(Modal::Menu(*m));
+                    self.windows.modal = Some(Modal::Menu(*m));
                 }
                 return;
             }
             KeyCode::Left if v.filter.is_empty() && v.under.is_some() => {
                 if let Some(m) = v.under.take() {
-                    self.modal = Some(Modal::Menu(*m));
+                    self.windows.modal = Some(Modal::Menu(*m));
                 }
                 return;
             }
@@ -247,7 +247,7 @@ impl App {
                             v.filter.clone(),
                         );
                         iv.cursor = iv.text.chars().count();
-                        self.modal = Some(Modal::Input(iv));
+                        self.windows.modal = Some(Modal::Input(iv));
                     }
                 }
                 return;
@@ -268,7 +268,7 @@ impl App {
             KeyCode::Char(c) if !ctrl => v.insert(c),
             _ => {}
         }
-        self.modal = Some(Modal::OpenWith(v));
+        self.windows.modal = Some(Modal::OpenWith(v));
     }
 
     /// Start the program, and remember the choice: used lately, and, as the box says, always (or

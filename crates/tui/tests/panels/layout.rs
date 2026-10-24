@@ -81,7 +81,7 @@ fn the_preview_command_puts_the_preview_in_the_place_of_nav_and_back() {
 fn choose_in_view_menu(h: &mut H, label: &str) {
     use rada_tui::app::{MenuKind, Modal};
     h.app.open_menu(MenuKind::View, (60, 4));
-    let selected = |h: &H| match &h.app.modal {
+    let selected = |h: &H| match &h.app.windows.modal {
         Some(Modal::Menu(m)) => m
             .items
             .get(m.selected)
@@ -109,7 +109,7 @@ fn the_view_menu_chooses_the_layout_and_the_window_follows() {
     );
     // The three layouts are in the menu, the one in use ticked.
     h.app.open_menu(MenuKind::View, (60, 4));
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         panic!("a menu");
     };
     let ticked: Vec<&str> = m

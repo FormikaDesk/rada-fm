@@ -149,7 +149,7 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
     for k in ["d", "D", "r", "R", "n", "x"] {
         h.keys(k);
         assert!(
-            h.app.modal.is_none(),
+            h.app.windows.modal.is_none(),
             "{k}: no window may open\n{}",
             h.screen()
         );
@@ -163,7 +163,7 @@ fn an_archive_is_read_only_in_every_way_and_says_how_to_get_things_out() {
     // Pasting into it is refused too, even with something copied.
     h.keys("y");
     h.keys("p");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Enter on a file explains instead of trying to open it.
     put_cursor(&mut h, "top.txt");
     h.key(KeyCode::Enter);
@@ -222,7 +222,7 @@ fn extract_here_names_the_folder_after_the_archive_and_not_after_the_path() {
     put_cursor(&mut h, "pack.tar.gz");
     h.keys("E"); // into a folder: the name is offered
     assert!(
-        matches!(&h.app.modal, Some(Modal::Input(iv)) if matches!(iv.kind, InputKind::ExtractTo { .. }) && iv.text == "pack")
+        matches!(&h.app.windows.modal, Some(Modal::Input(iv)) if matches!(iv.kind, InputKind::ExtractTo { .. }) && iv.text == "pack")
     );
     h.key(KeyCode::Enter);
     plan_modal(&mut h);
@@ -276,12 +276,12 @@ fn compress_asks_for_a_name_and_a_format_and_makes_the_archive() {
     h.key(KeyCode::Char(' '));
     h.key(KeyCode::Char(' ')); // a.txt and b.txt
     h.keys("z");
-    match &h.app.modal {
+    match &h.app.windows.modal {
         Some(Modal::Input(iv)) => assert_eq!(iv.text, "proj.v1.zip"),
         _ => panic!("{}", h.screen()),
     }
     h.key(KeyCode::Tab);
-    match &h.app.modal {
+    match &h.app.windows.modal {
         Some(Modal::Input(iv)) => assert_eq!(iv.text, "proj.v1.tar.gz"),
         _ => panic!(),
     }
@@ -322,7 +322,7 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
     // the two depends on where the test runs, so both are read.
     h.app.clear_notices();
     h.keys("e");
-    let said = |a: &rada_tui::app::App| match &a.modal {
+    let said = |a: &rada_tui::app::App| match &a.windows.modal {
         Some(Modal::Result(r)) => Some(
             r.lines
                 .iter()

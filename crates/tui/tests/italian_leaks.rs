@@ -117,7 +117,7 @@ fn the_screen_the_menus_and_their_submenus_speak_italian() {
         h.key(KeyCode::Esc);
         h.key(KeyCode::F(1));
         leaks(&mut h, "the help");
-        assert!(matches!(h.app.modal, Some(Modal::Help)));
+        assert!(matches!(h.app.windows.modal, Some(Modal::Help)));
         h.key(KeyCode::Esc);
     });
 }

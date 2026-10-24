@@ -128,7 +128,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     }
     // Notifications are a card at the bottom of the folder's box.
     let _ = th;
-    if app.modal.is_none() {
+    if app.windows.modal.is_none() {
         let now = app.notice_now();
         notice::draw(f, app, main, now);
     }
@@ -226,7 +226,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     );
     // The cards never cover the text: the list is made shorter while they are there.
     let now = app.notice_now();
-    let notice_h = if app.modal.is_none() {
+    let notice_h = if app.windows.modal.is_none() {
         notice::stack_height(app, now, inner.width as usize)
     } else {
         0

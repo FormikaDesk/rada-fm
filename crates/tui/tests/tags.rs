@@ -68,7 +68,7 @@ fn choose_tag(h: &mut H, label: &str) {
 
 /// The text of the menu entry the keyboard is on.
 fn menu_selected(h: &mut H) -> String {
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         return String::new();
     };
     m.items
@@ -80,7 +80,7 @@ fn menu_selected(h: &mut H) -> String {
 /// Down in the open menu until the selected entry starts with `label`, as many presses as
 /// there are entries.
 fn select_entry(h: &mut H, label: &str) {
-    let entries = match &h.app.modal {
+    let entries = match &h.app.windows.modal {
         Some(Modal::Menu(m)) => m.items.len(),
         _ => 0,
     };
@@ -98,7 +98,7 @@ fn confirm(h: &mut H) {
     plan_modal(h);
     h.key(KeyCode::Enter);
     h.wait("the operation", |a| {
-        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
     // The folder is read again: an attribute change does not always reach the watcher.
     h.app.refresh();
@@ -206,7 +206,7 @@ fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
     plan_modal(&mut h);
     h.key(KeyCode::Enter);
     h.wait("undone", |a| {
-        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
     h.app.refresh();
     h.wait("reloaded", |a| !a.is_loading());
@@ -236,7 +236,7 @@ fn a_selection_is_tagged_as_one_operation() {
     choose_tag(&mut h, "Red");
     plan_modal(&mut h);
     // One had Red already: only the other changes, and the plan counts one step.
-    let Some(Modal::Plan(pv)) = &h.app.modal else {
+    let Some(Modal::Plan(pv)) = &h.app.windows.modal else {
         panic!()
     };
     assert_eq!(pv.plan.steps.len(), 1);
@@ -251,7 +251,7 @@ fn a_new_tag_asks_for_its_name_and_refuses_a_bad_one() {
     let mut h = H::new(sb, dir, 140, 36);
     h.keys("j");
     choose_tag(&mut h, "New tag");
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     h.keys("a,b");
     h.key(KeyCode::Enter);
     assert!(h.screen().contains("comma"), "{}", h.screen());
@@ -281,7 +281,7 @@ fn the_menu_ticks_what_the_item_has_and_offers_to_take_it_all_off() {
     );
     select_entry(&mut h, "Tags");
     h.key(KeyCode::Enter);
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         panic!("{}", h.screen())
     };
     let labels: Vec<(String, Option<bool>, bool)> = m
@@ -388,7 +388,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
     );
     select_entry(&mut h, "Tags");
     h.key(KeyCode::Enter);
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         panic!("{}", h.screen())
     };
     let labels: Vec<(String, Option<bool>)> = m
@@ -413,7 +413,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
     // Esc gives back the menu the tags were opened from; a second one closes it.
     h.key(KeyCode::Esc);
     h.key(KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Choosing Blu puts a tag called Blu, blue, on the file.
     choose_tag(&mut h, "Blu");
     plan_modal(&mut h);

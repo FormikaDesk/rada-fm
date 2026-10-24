@@ -370,7 +370,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // The cards of the notifications sit in the bottom right of the list. They never cover
     // its text: when the list is full it is made shorter for as long as they are there.
     let now = app.notice_now();
-    let notice_h = if app.modal.is_none() {
+    let notice_h = if app.windows.modal.is_none() {
         notice::stack_height(app, now, main.width as usize)
     } else {
         0
@@ -416,7 +416,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         bottom::draw_hints(f, app, hints_row);
     }
     // Notifications sit at the bottom right of the list; a window in front hides them.
-    if app.modal.is_none() {
+    if app.windows.modal.is_none() {
         notice::draw(f, app, notice_area, now);
     }
     finish(f, app, area, (address_h > 0).then_some(address_row));
@@ -453,7 +453,7 @@ fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
     if let (Some(row), true) = (address_row, app.windows.address.is_some()) {
         address::draw_suggestions(f, app, row, area);
     }
-    if app.modal.is_some() {
+    if app.windows.modal.is_some() {
         // Only the window is clickable while it is open.
         app.frame.hits.clear();
         // A window dims what is behind it; a menu does not, nor the list of programs that sits
@@ -470,7 +470,7 @@ fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
 fn popup_rects(app: &App, area: Rect) -> Vec<Rect> {
     let ctx = popup::Ctx::of(app);
     let room = modals::popup_room(app, area);
-    match &app.modal {
+    match &app.windows.modal {
         None | Some(Modal::FullPreview) => Vec::new(),
         Some(Modal::Menu(m)) => menu::rects(&ctx, &app.settings.keymap, m, room),
         Some(Modal::OpenWith(v)) => {

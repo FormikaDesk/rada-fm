@@ -207,7 +207,7 @@ fn the_context_menus() {
         y + 19, // below the last row of the folder
         KeyModifiers::NONE,
     );
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
     insta::assert_snapshot!("context_menu_empty_120x30", shot(&mut h));
 }
 
@@ -534,7 +534,7 @@ fn the_command_buttons_do_what_their_keys_do() {
     h.press("esc");
     // Rename opens the prompt, as F2 does.
     h.click(&Target::Act(Action::Rename));
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     h.press("esc");
     // Delete is a plan to move to the trash.
     h.click(&Target::Act(Action::Trash));
@@ -542,7 +542,7 @@ fn the_command_buttons_do_what_their_keys_do() {
     h.press("esc");
     // Compress asks for a name.
     h.click(&Target::Act(Action::Compress));
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     h.press("esc");
     // Cut marks the move.
     h.click(&Target::Act(Action::Cut));
@@ -585,7 +585,7 @@ fn the_dropdowns_open_menus_that_work() {
     h.press("down");
     h.press("enter");
     assert!(
-        matches!(&h.app.modal, Some(Modal::Input(iv)) if matches!(iv.kind, rada_tui::app::InputKind::NewFile)),
+        matches!(&h.app.windows.modal, Some(Modal::Input(iv)) if matches!(iv.kind, rada_tui::app::InputKind::NewFile)),
         "{}",
         h.screen()
     );
@@ -857,13 +857,13 @@ fn the_details_pane_shows_the_item_its_properties_and_buttons() {
     // Each button works.
     h.click(&Target::Act(Action::OpenWith));
     // (The window of programs; the free field is its last line.)
-    assert!(matches!(&h.app.modal, Some(Modal::OpenWith(_))));
+    assert!(matches!(&h.app.windows.modal, Some(Modal::OpenWith(_))));
     h.press("esc");
     h.click(&Target::FullPreview);
-    assert!(matches!(h.app.modal, Some(Modal::FullPreview)));
+    assert!(matches!(h.app.windows.modal, Some(Modal::FullPreview)));
     assert!(h.screen().contains("close"));
     h.press("esc");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Alt+P hides and shows it.
     h.press("alt+p");
     assert!(!h.screen().contains("Location"));
@@ -1043,11 +1043,11 @@ fn properties_copy_path_and_open_terminal_are_reachable() {
 fn the_menu_key_and_shift_f10_open_the_context_menu() {
     let mut h = scene(120, 30);
     h.press("shift+f10");
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
     assert!(h.screen().contains("Properties"));
     h.press("esc");
     h.press("menu");
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
 }
 
 #[test]
@@ -1088,7 +1088,7 @@ fn the_empty_space_menu_has_new_paste_sort_view_refresh_and_terminal() {
     assert!(h.screen().contains("Columns"), "Right opens a submenu too");
     h.press("esc");
     h.press("esc");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]

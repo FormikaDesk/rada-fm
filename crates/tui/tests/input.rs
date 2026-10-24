@@ -45,7 +45,7 @@ fn ctrl_c_copies_and_never_quits() {
     // Also inside windows and text fields.
     let mut h = harness();
     h.press("F2");
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     h.press("ctrl+c");
     h.press("ctrl+c");
     assert!(!h.app.session.should_quit);
@@ -141,28 +141,28 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
             h.modal_is_plan() || scanning(h)
         }),
         ("rename", "r", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("rename", "F2", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("new folder", "n", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("new folder", "ctrl+n", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("commands", "m", |h| h.app.windows.address.is_some()),
         ("address", "ctrl+l", |h| h.app.windows.address.is_some()),
         ("address", "alt+d", |h| h.app.windows.address.is_some()),
         ("new folder", "ctrl+shift+n", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("new file", "N", |h| {
-            matches!(h.app.modal, Some(Modal::Input(_)))
+            matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
         ("properties", "alt+enter", |h| {
-            matches!(h.app.modal, Some(Modal::Properties(_)))
+            matches!(h.app.windows.modal, Some(Modal::Properties(_)))
         }),
         ("refresh", "f5", |h| h.app.is_loading()),
         ("new tab", "ctrl+t", |h| h.app.tab_count() == 2),
@@ -173,13 +173,17 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("commands", "ctrl+p", |h| h.app.windows.address.is_some()),
         ("search", "/", |h| h.app.windows.address.is_some()),
         ("search", "ctrl+f", |h| h.app.windows.address.is_some()),
-        ("help", "?", |h| matches!(h.app.modal, Some(Modal::Help))),
-        ("help", "F1", |h| matches!(h.app.modal, Some(Modal::Help))),
+        ("help", "?", |h| {
+            matches!(h.app.windows.modal, Some(Modal::Help))
+        }),
+        ("help", "F1", |h| {
+            matches!(h.app.windows.modal, Some(Modal::Help))
+        }),
         ("history", "U", |h| {
-            matches!(h.app.modal, Some(Modal::History(_)))
+            matches!(h.app.windows.modal, Some(Modal::History(_)))
         }),
         ("history", "F3", |h| {
-            matches!(h.app.modal, Some(Modal::History(_)))
+            matches!(h.app.windows.modal, Some(Modal::History(_)))
         }),
         ("undo", "u", |h| undoing(h)),
         ("undo", "ctrl+z", |h| undoing(h)),
@@ -201,7 +205,7 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
 }
 
 fn scanning(h: &H) -> bool {
-    matches!(h.app.modal, Some(Modal::Scanning { .. }))
+    matches!(h.app.windows.modal, Some(Modal::Scanning { .. }))
 }
 fn undoing(h: &H) -> bool {
     // "nothing to undo" is a plan job too: either a scanning window or the toast.
@@ -218,7 +222,7 @@ fn presets_ignore_each_others_keys() {
     h.press("ctrl+a");
     assert!(h.marked_names().is_empty());
     h.press("delete");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     h.keys("y");
     assert!(h.app.ops.clipboard.is_some());
 
@@ -372,7 +376,7 @@ fn click_selects_double_click_opens() {
     let row = Target::Row(3); // c.txt
     h.click(&row);
     assert_eq!(h.cursor_name(), "c.txt");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // A double click on the folder enters it.
     h.double_click(&Target::Row(0));
     h.wait("dir", |a| a.cwd.ends_with("dir") && !a.is_loading());
@@ -460,7 +464,7 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
     assert!(h.app.windows.address.is_none());
     h.click(&Target::Act(Action::Rename));
     assert!(
-        matches!(h.app.modal, Some(Modal::Input(_))),
+        matches!(h.app.windows.modal, Some(Modal::Input(_))),
         "{}",
         h.screen()
     );
@@ -479,7 +483,7 @@ fn clicking_a_column_title_sorts_and_clicking_again_reverses() {
 fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
     let mut h = harness();
     h.right_click(&Target::Row(2)); // b.txt
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
     assert_eq!(
         h.cursor_name(),
         "b.txt",
@@ -506,12 +510,12 @@ fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
     // Paste is greyed out until something is copied (it must not do anything).
     h.click(&Target::MenuItem(4));
     assert!(
-        matches!(h.app.modal, Some(Modal::Menu(_))),
+        matches!(h.app.windows.modal, Some(Modal::Menu(_))),
         "a click on what is greyed out does nothing, and the menu stays"
     );
     assert!(h.app.ops.clipboard.is_none());
     h.press("esc");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 
     h.right_click(&Target::Row(2));
     h.click(&Target::MenuItem(3)); // Copy
@@ -521,10 +525,10 @@ fn right_click_opens_a_menu_with_shortcut_hints_and_its_entries_work() {
     h.right_click(&Target::Row(2));
     h.press("down");
     h.press("esc");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Right click on empty space: a shorter menu.
     h.right_click(&Target::List);
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
 }
 
 #[test]
@@ -556,7 +560,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     assert!(s.contains("Keep both"), "{s}");
     // Pick "keep both" with the mouse: the plan is recomputed.
     h.click(&Target::Policy(rada_core::ops::ConflictPolicy::KeepBoth));
-    h.wait("replanned", |a| match &a.modal {
+    h.wait("replanned", |a| match &a.windows.modal {
         Some(Modal::Plan(pv)) => {
             pv.plan.policy == rada_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
         }
@@ -564,14 +568,14 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     });
     // Cancel with the mouse.
     h.click(&Target::PlanCancel);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     assert!(!dest.join("a (2).txt").exists() && !dest.join("a copy.txt").exists());
 
     // And confirm with the mouse.
     h.press("ctrl+v");
     plan_modal(&mut h);
     h.click(&Target::Policy(rada_core::ops::ConflictPolicy::KeepBoth));
-    h.wait("replanned", |a| match &a.modal {
+    h.wait("replanned", |a| match &a.windows.modal {
         Some(Modal::Plan(pv)) => {
             pv.plan.policy == rada_core::ops::ConflictPolicy::KeepBoth && pv.replanning.is_none()
         }
@@ -579,7 +583,7 @@ fn plan_window_buttons_and_conflict_control_are_clickable() {
     });
     h.click(&Target::PlanRun);
     h.wait("done", |a| {
-        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
     let names: Vec<_> = std::fs::read_dir(&dest)
         .unwrap()
@@ -600,7 +604,7 @@ fn the_commands_offered_under_the_field_are_clickable() {
     // The best match comes first: a click on it runs it, as its key would.
     h.click(&Target::BarHit(0));
     assert!(
-        matches!(h.app.modal, Some(Modal::Input(_))),
+        matches!(h.app.windows.modal, Some(Modal::Input(_))),
         "{}",
         h.screen()
     );
@@ -675,14 +679,17 @@ fn mouse_motion_never_triggers_a_redraw() {
 fn a_click_outside_a_window_does_not_reach_the_list_behind_it() {
     let mut h = harness();
     h.press("F2");
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Input(_))));
     h.mouse(
         MouseEventKind::Down(MouseButton::Left),
         2,
         8,
         KeyModifiers::NONE,
     );
-    assert!(matches!(h.app.modal, Some(Modal::Input(_))), "still there");
+    assert!(
+        matches!(h.app.windows.modal, Some(Modal::Input(_))),
+        "still there"
+    );
     assert_eq!(h.cursor_name(), "dir");
 }
 
@@ -709,7 +716,7 @@ fn help_shows_both_schemes_side_by_side_and_scrolls() {
     h.press("pagedown");
     assert_ne!(h.screen(), first, "the help scrolls");
     h.press("esc");
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Mouse notes mention how to select text, and the file explains the way out.
     h.press("?");
     for _ in 0..8 {
@@ -771,7 +778,7 @@ fn a_destructive_request_still_needs_the_typed_confirmation() {
     h.keys("yes");
     h.press("enter");
     h.wait("done", |a| {
-        a.ops.running.is_none() && !matches!(a.modal, Some(Modal::Scanning { .. }))
+        a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
     assert!(!victim.exists());
 }
@@ -791,7 +798,7 @@ fn a_bad_request_is_reported_and_the_browser_still_works() {
     );
     h.wait("an error", |a| a.current_notice().is_some());
     assert!(h.app.current_notice().unwrap().text.contains("absolute"));
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     h.keys("j");
     assert_eq!(h.cursor_name(), "a.txt");
 }

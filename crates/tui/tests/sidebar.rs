@@ -309,7 +309,7 @@ fn the_menu_adds_and_removes_bookmarks() {
     // A place that is not a bookmark yet: Open, Add to bookmarks.
     let docs = place(&h, "Documenti");
     h.right_click(&Target::Place(docs.clone()));
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
     let s = h.screen();
     assert!(s.contains("Open") && s.contains("Pin to navigation"), "{s}");
     assert!(!s.contains("Unpin from navigation"), "{s}");
@@ -508,7 +508,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
                 h.app.cwd, cwd,
                 "{density:?} {height}: a click on the empty row {y}"
             );
-            assert!(h.app.modal.is_none());
+            assert!(h.app.windows.modal.is_none());
         }
         // A click on the row of an entry opens it.
         let (first, second) = a_pair(&h);

@@ -516,8 +516,8 @@ pub struct App {
     pub tags: side::Tags,
     /// What waits on the clipboard, the plan being prepared, the operation running and the undo.
     pub ops: ops::Operations,
-    pub modal: Option<Modal>,
-    /// Notification cards, the address bar and the other things put over the explorer.
+    /// The open window, the notification cards, the address bar and the other things put over
+    /// the explorer.
     pub windows: windows::Windows,
     pub columns: columns::ColumnsView,
     /// Number of rows the list can show; set by the renderer.
@@ -631,7 +631,6 @@ impl App {
             places: side::Places::new(cfg.bookmarks),
             tags: side::Tags::new(svc_tag_language(&svc)),
             ops: Default::default(),
-            modal: None,
             windows: Default::default(),
             columns: columns::ColumnsView::default(),
             viewport: Viewport::default(),
@@ -800,7 +799,7 @@ impl App {
         self.tick_notices();
         if self.ops.is_busy()
             || self.windows.notices.has_clock()
-            || matches!(self.modal, Some(Modal::Scanning { .. }))
+            || matches!(self.windows.modal, Some(Modal::Scanning { .. }))
             || matches!(self.load, LoadState::Loading(_))
         {
             self.redraw.dirty = true; // spinner / elapsed time
@@ -1464,7 +1463,7 @@ impl App {
                     bytes: b,
                     current: c,
                     ..
-                }) = &mut self.modal
+                }) = &mut self.windows.modal
                     && *j == job
                 {
                     (*f, *d, *b, *c) = (files, dirs, bytes, current);
@@ -1478,10 +1477,10 @@ impl App {
             } => self.on_planned(job, *plan, scan, undo),
             JobEvent::PlanFailed { job, message } | JobEvent::Error { job, message } => {
                 if self.ops.fail(job) {
-                    self.modal = None;
+                    self.windows.modal = None;
                     // A sentence that does not fit a one-line message is read in a window.
                     if message.chars().count() > 70 {
-                        self.modal = Some(Modal::Result(ResultView {
+                        self.windows.modal = Some(Modal::Result(ResultView {
                             title: Key::ResultCouldNot.tr().to_string(),
                             lines: vec![(ToastKind::Error, message)],
                             scroll: 0,
@@ -1494,13 +1493,13 @@ impl App {
             JobEvent::UndoLabel { label, .. } => self.ops.undo_label = label,
             JobEvent::NothingToUndo { job } => {
                 if self.ops.end_plan(job) {
-                    self.modal = None;
+                    self.windows.modal = None;
                     self.toast(ToastKind::Info, Key::TNothingUndo.tr(), 3);
                 }
             }
             JobEvent::NothingToRedo { job } => {
                 if self.ops.end_plan(job) {
-                    self.modal = None;
+                    self.windows.modal = None;
                     self.toast(ToastKind::Info, Key::TNothingRedo.tr(), 4);
                 }
             }
@@ -1509,7 +1508,7 @@ impl App {
             }
             JobEvent::AskFailure { job, info, reply } => {
                 if self.ops.is_running(job) {
-                    self.modal = Some(Modal::Failure { job, info, reply });
+                    self.windows.modal = Some(Modal::Failure { job, info, reply });
                 } else {
                     let _ = reply.send(ErrorChoice::Abort);
                 }
@@ -1544,14 +1543,14 @@ impl App {
                     }
                 }
                 lines.push((ToastKind::Info, Key::ResultOpenHistory.tr().to_string()));
-                self.modal = Some(Modal::Result(ResultView {
+                self.windows.modal = Some(Modal::Result(ResultView {
                     title: Key::ResultInterruptedTitle.tr().to_string(),
                     lines,
                     scroll: 0,
                 }));
             }
             JobEvent::History { entries, .. } => {
-                if let Some(Modal::History(h)) = &mut self.modal {
+                if let Some(Modal::History(h)) = &mut self.windows.modal {
                     h.entries = entries;
                     h.loading = false;
                     h.selected = 0;
@@ -1648,7 +1647,7 @@ impl App {
         if lines.is_empty() {
             self.toast(kind, headline, 4);
         } else {
-            self.modal = Some(Modal::Result(ResultView {
+            self.windows.modal = Some(Modal::Result(ResultView {
                 title: headline,
                 lines,
                 scroll: 0,
@@ -1664,7 +1663,7 @@ impl App {
         undo: Option<Box<UndoPlan>>,
     ) {
         // Re-plan of an open plan window?
-        if let Some(Modal::Plan(pv)) = &mut self.modal
+        if let Some(Modal::Plan(pv)) = &mut self.windows.modal
             && pv.replanning == Some(job)
         {
             pv.plan = plan;
@@ -1693,7 +1692,7 @@ impl App {
         };
         if self.hooks.demo_auto_run {
             self.hooks.demo_auto_run = false;
-            self.modal = None;
+            self.windows.modal = None;
             let pv = Box::new(PlanView {
                 plan,
                 scan,
@@ -1708,7 +1707,7 @@ impl App {
             self.run_plan(pv);
             return;
         }
-        self.modal = Some(Modal::Plan(Box::new(PlanView {
+        self.windows.modal = Some(Modal::Plan(Box::new(PlanView {
             plan,
             scan,
             undo,
@@ -1725,7 +1724,7 @@ impl App {
 
     fn begin_plan(&mut self, what: &str, handle: JobHandle) {
         self.ops.plan_job = Some(handle.id);
-        self.modal = Some(Modal::Scanning {
+        self.windows.modal = Some(Modal::Scanning {
             job: handle.id,
             what: what.to_string(),
             files: 0,
@@ -1930,7 +1929,7 @@ impl App {
                 if name.contains(['/', '\\']) {
                     let mut iv = iv;
                     iv.error = Some("a name cannot contain a slash".into());
-                    self.modal = Some(Modal::Input(iv));
+                    self.windows.modal = Some(Modal::Input(iv));
                     return;
                 }
                 let kind = match ArchiveKind::from_name(std::ffi::OsStr::new(&name)) {
@@ -1966,13 +1965,13 @@ impl App {
                 Err(e) => {
                     let mut iv = iv;
                     iv.error = Some(e);
-                    self.modal = Some(Modal::Input(iv));
+                    self.windows.modal = Some(Modal::Input(iv));
                 }
             },
             InputKind::OpenWith { path } => {
                 let program = iv.text.trim().to_string();
                 if program.is_empty() {
-                    self.modal = Some(Modal::Input(iv));
+                    self.windows.modal = Some(Modal::Input(iv));
                     return;
                 }
                 let (path, platform, notes) = (
@@ -2001,7 +2000,7 @@ impl App {
                 Err(e) => {
                     let mut iv = iv;
                     iv.error = Some(e);
-                    self.modal = Some(Modal::Input(iv));
+                    self.windows.modal = Some(Modal::Input(iv));
                 }
             },
         }
@@ -2011,7 +2010,7 @@ impl App {
 
     fn quit(&mut self) {
         if self.ops.is_busy() {
-            self.modal = Some(Modal::ConfirmQuit);
+            self.windows.modal = Some(Modal::ConfirmQuit);
         } else {
             self.session.should_quit = true;
         }
@@ -2119,7 +2118,7 @@ impl App {
                 .to_string_lossy()
                 .into_owned();
             let from = e.path.clone();
-            self.modal = Some(Modal::Input(InputView::new(
+            self.windows.modal = Some(Modal::Input(InputView::new(
                 InputKind::Rename { from },
                 text,
             )));
@@ -2134,7 +2133,7 @@ impl App {
         if items.is_empty() {
             return;
         }
-        self.modal = Some(Modal::Input(InputView::new(
+        self.windows.modal = Some(Modal::Input(InputView::new(
             InputKind::BulkRename { items },
             "{name}_{n:2}.{ext}".to_string(),
         )));
@@ -2244,7 +2243,7 @@ impl App {
 
     fn open_palette(&mut self) {
         let items = self.palette_items();
-        self.modal = Some(Modal::Palette(Box::new(PaletteView::new(
+        self.windows.modal = Some(Modal::Palette(Box::new(PaletteView::new(
             items,
             self.svc.home.clone(),
         ))));
@@ -2252,9 +2251,9 @@ impl App {
 
     /// New recents/volumes arrived while the palette is open: refresh its list, keep the query.
     fn refresh_palette(&mut self) {
-        if matches!(self.modal, Some(Modal::Palette(_))) {
+        if matches!(self.windows.modal, Some(Modal::Palette(_))) {
             let items = self.palette_items();
-            if let Some(Modal::Palette(p)) = &mut self.modal {
+            if let Some(Modal::Palette(p)) = &mut self.windows.modal {
                 p.set_items(items);
             }
         }
@@ -2272,7 +2271,7 @@ impl App {
         match scene {
             "palette" => {
                 self.open_palette();
-                if let (Some(Modal::Palette(p)), Some(q)) = (&mut self.modal, arg) {
+                if let (Some(Modal::Palette(p)), Some(q)) = (&mut self.windows.modal, arg) {
                     for c in q.chars() {
                         p.insert(c);
                     }
@@ -2298,7 +2297,7 @@ impl App {
                 self.begin_plan(Key::PlanningCopy.tr(), h);
             }
             "history" => {
-                self.modal = Some(Modal::History(HistoryView {
+                self.windows.modal = Some(Modal::History(HistoryView {
                     entries: Vec::new(),
                     selected: 0,
                     loading: true,
@@ -2374,7 +2373,7 @@ impl App {
                 );
             }
             "main" => {}
-            "help" => self.modal = Some(Modal::Help),
+            "help" => self.windows.modal = Some(Modal::Help),
             // The menu of the right button on the picture, and the menus beside it.
             // "menubottom": the menu of a file among the last rows of the list.
             "menu" | "openwith" | "tagmenu" | "menubottom" => {
@@ -2398,7 +2397,7 @@ impl App {
                     m.selected = i;
                     self.menu_activate(m);
                 } else {
-                    self.modal = Some(Modal::Menu(m));
+                    self.windows.modal = Some(Modal::Menu(m));
                 }
             }
             // Two cards piled: a copy that is running (slowly: RADA_DEMO_SLOW_MBPS) over one
@@ -2503,7 +2502,7 @@ impl App {
     // ------------------------------------------------------------------ modal keys
 
     fn on_modal_key(&mut self, key: KeyEvent) {
-        let Some(modal) = self.modal.take() else {
+        let Some(modal) = self.windows.modal.take() else {
             return;
         };
         match modal {
@@ -2534,7 +2533,7 @@ impl App {
             }
             self.ops.plan_job = None;
         } else {
-            self.modal = Some(scanning);
+            self.windows.modal = Some(scanning);
         }
     }
 
@@ -2549,7 +2548,7 @@ impl App {
                 } else if pv.can_run() {
                     self.run_plan(pv);
                 } else {
-                    self.modal = Some(Modal::Plan(pv));
+                    self.windows.modal = Some(Modal::Plan(pv));
                 }
             }
             KeyCode::Char('c')
@@ -2557,7 +2556,7 @@ impl App {
             {
                 let policy = pv.plan.policy.next();
                 self.replan_with(&mut pv, policy);
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             // ← → choose how name clashes are settled (the pills, in the order they are in).
             KeyCode::Left | KeyCode::Right
@@ -2568,44 +2567,44 @@ impl App {
                 if policy != pv.plan.policy {
                     self.replan_with(&mut pv, policy);
                 }
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             // Tab moves the keyboard between the buttons.
             KeyCode::Tab | KeyCode::BackTab => {
                 pv.cancel_focus = !pv.cancel_focus;
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             // d: every step, or the summary.
             KeyCode::Char('d') if !pv.needs_typed_confirmation() => {
                 pv.details = !pv.details;
                 pv.scroll = 0;
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::Down | KeyCode::Char('j') if !pv.needs_typed_confirmation() => {
                 pv.scroll += 1;
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::Up | KeyCode::Char('k') if !pv.needs_typed_confirmation() => {
                 pv.scroll = pv.scroll.saturating_sub(1);
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::PageDown => {
                 pv.scroll += 10;
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::PageUp => {
                 pv.scroll = pv.scroll.saturating_sub(10);
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::Backspace if pv.needs_typed_confirmation() => {
                 pv.typed.pop();
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
             KeyCode::Char(c) if pv.needs_typed_confirmation() && !ctrl => {
                 pv.typed.push(c);
-                self.modal = Some(Modal::Plan(pv));
+                self.windows.modal = Some(Modal::Plan(pv));
             }
-            _ => self.modal = Some(Modal::Plan(pv)),
+            _ => self.windows.modal = Some(Modal::Plan(pv)),
         }
     }
 
@@ -2627,7 +2626,7 @@ impl App {
             Some(c) => {
                 let _ = reply.send(c);
             }
-            None => self.modal = Some(Modal::Failure { job, info, reply }),
+            None => self.windows.modal = Some(Modal::Failure { job, info, reply }),
         }
     }
 
@@ -2637,49 +2636,49 @@ impl App {
             KeyCode::Esc => {}
             KeyCode::Tab if matches!(iv.kind, InputKind::Compress { .. }) => {
                 iv.cycle_format();
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Enter => {
                 if iv.text.is_empty() {
-                    self.modal = Some(Modal::Input(iv));
+                    self.windows.modal = Some(Modal::Input(iv));
                 } else {
                     self.submit_input(iv);
                 }
             }
             KeyCode::Char(c) if !ctrl => {
                 iv.insert(c);
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Backspace => {
                 iv.backspace();
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Delete => {
                 iv.delete();
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Left => {
                 iv.cursor = iv.cursor.saturating_sub(1);
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Right => {
                 iv.cursor = (iv.cursor + 1).min(iv.text.chars().count());
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Home => {
                 iv.cursor = 0;
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::End => {
                 iv.cursor = iv.text.chars().count();
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
             KeyCode::Char('u') if ctrl => {
                 iv.text.clear();
                 iv.cursor = 0;
-                self.modal = Some(Modal::Input(iv));
+                self.windows.modal = Some(Modal::Input(iv));
             }
-            _ => self.modal = Some(Modal::Input(iv)),
+            _ => self.windows.modal = Some(Modal::Input(iv)),
         }
     }
 
@@ -2688,11 +2687,11 @@ impl App {
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('U') => {}
             KeyCode::Down | KeyCode::Char('j') => {
                 h.selected = (h.selected + 1).min(h.entries.len().saturating_sub(1));
-                self.modal = Some(Modal::History(h));
+                self.windows.modal = Some(Modal::History(h));
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 h.selected = h.selected.saturating_sub(1);
-                self.modal = Some(Modal::History(h));
+                self.windows.modal = Some(Modal::History(h));
             }
             KeyCode::Enter | KeyCode::Char('u') => {
                 if let Some(e) = h.entries.get(h.selected).cloned() {
@@ -2700,11 +2699,11 @@ impl App {
                         self.start_undo(Some(e.id));
                     } else {
                         self.toast(ToastKind::Info, Key::TCannotUndoThis.tr(), 4);
-                        self.modal = Some(Modal::History(h));
+                        self.windows.modal = Some(Modal::History(h));
                     }
                 }
             }
-            _ => self.modal = Some(Modal::History(h)),
+            _ => self.windows.modal = Some(Modal::History(h)),
         }
     }
 
@@ -2720,41 +2719,41 @@ impl App {
             }
             KeyCode::Down => {
                 p.move_by(1);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Up => {
                 p.move_by(-1);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Char('n') | KeyCode::Char('j') if ctrl => {
                 p.move_by(1);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Char('p') | KeyCode::Char('k') if ctrl => {
                 p.move_by(-1);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::PageDown => {
                 p.move_by(8);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::PageUp => {
                 p.move_by(-8);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Char('u') if ctrl => {
                 p.clear();
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Backspace => {
                 p.backspace();
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
             KeyCode::Char(c) if !ctrl => {
                 p.insert(c);
-                self.modal = Some(Modal::Palette(p));
+                self.windows.modal = Some(Modal::Palette(p));
             }
-            _ => self.modal = Some(Modal::Palette(p)),
+            _ => self.windows.modal = Some(Modal::Palette(p)),
         }
     }
 
@@ -2765,11 +2764,11 @@ impl App {
             KeyCode::Char('z') if ctrl => self.start_undo(None),
             KeyCode::Down | KeyCode::Char('j') => {
                 r.scroll += 1;
-                self.modal = Some(Modal::Result(r));
+                self.windows.modal = Some(Modal::Result(r));
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 r.scroll = r.scroll.saturating_sub(1);
-                self.modal = Some(Modal::Result(r));
+                self.windows.modal = Some(Modal::Result(r));
             }
             _ => {}
         }
@@ -2789,27 +2788,27 @@ impl App {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.windows.help_down(1);
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 self.windows.help_up(1);
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             KeyCode::PageDown => {
                 self.windows.help_down(10);
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             KeyCode::PageUp => {
                 self.windows.help_up(10);
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             KeyCode::Home => {
                 self.windows.help_scroll = 0;
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             // Closing is deliberate: Esc, q, ? , F1, Enter or Space.
             KeyCode::Esc | KeyCode::Char('q' | '?' | ' ') | KeyCode::F(1) | KeyCode::Enter => {}
-            _ => self.modal = Some(Modal::Help),
+            _ => self.windows.modal = Some(Modal::Help),
         }
     }
 
@@ -2817,31 +2816,31 @@ impl App {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
                 self.preview.scroll_down(1);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 self.preview.scroll_up(1);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             KeyCode::PageDown => {
                 self.preview.scroll_down(20);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             KeyCode::PageUp => {
                 self.preview.scroll_up(20);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             KeyCode::Char('H') => {
                 self.dispatch(Action::ToggleHex);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             KeyCode::Char('Q') => {
                 self.dispatch(Action::QuickLook);
-                self.modal = Some(Modal::FullPreview);
+                self.windows.modal = Some(Modal::FullPreview);
             }
             // Closing is deliberate: Esc, q, Space or Enter.
             KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
-            _ => self.modal = Some(Modal::FullPreview),
+            _ => self.windows.modal = Some(Modal::FullPreview),
         }
     }
 
@@ -2849,14 +2848,14 @@ impl App {
         match key.code {
             KeyCode::Down | KeyCode::Char('j') => {
                 p.scroll += 1;
-                self.modal = Some(Modal::Properties(p));
+                self.windows.modal = Some(Modal::Properties(p));
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 p.scroll = p.scroll.saturating_sub(1);
-                self.modal = Some(Modal::Properties(p));
+                self.windows.modal = Some(Modal::Properties(p));
             }
             KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
-            _ => self.modal = Some(Modal::Properties(p)),
+            _ => self.windows.modal = Some(Modal::Properties(p)),
         }
     }
 

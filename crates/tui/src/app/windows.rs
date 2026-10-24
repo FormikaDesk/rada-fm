@@ -1,11 +1,13 @@
-//! What is put over the explorer besides the window that is open: the cards of notifications,
-//! the address bar while it is edited, the scroll of the help and the advice to enlarge a small
+//! What is put over the explorer: the window that is open, the cards of notifications, the
+//! address bar while it is edited, the scroll of the help and the advice to enlarge a small
 //! window.
 
-use super::{AddressEdit, NoticeQueue};
+use super::{AddressEdit, Modal, NoticeQueue};
 
 #[derive(Default)]
 pub struct Windows {
+    /// The window that is open and has the keyboard, if any.
+    pub modal: Option<Modal>,
     /// What to tell the person: a card at the bottom right, one at a time (see `notice.rs`).
     pub notices: NoticeQueue,
     /// What the live updates of the folder said last (they are degraded or off).

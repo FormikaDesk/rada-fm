@@ -197,7 +197,7 @@ fn open_context_menu(h: &mut H, row: usize) {
     let target = Target::Row(row);
     h.app.cursor = row;
     h.right_click(&target);
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
 }
 
 /// A right click at a cell.
@@ -208,12 +208,12 @@ fn right_click_at(h: &mut H, x: u16, y: u16) {
         y,
         KeyModifiers::NONE,
     );
-    assert!(matches!(h.app.modal, Some(Modal::Menu(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Menu(_))));
 }
 
 /// Whether the menu in front has an entry that opens another menu.
 fn has_submenu(h: &H) -> bool {
-    matches!(&h.app.modal, Some(Modal::Menu(m))
+    matches!(&h.app.windows.modal, Some(Modal::Menu(m))
         if m.items.iter().any(|i| matches!(i.cmd, MenuCmd::Sub(_))))
 }
 
@@ -222,7 +222,7 @@ fn open_a_submenu(h: &mut H) {
     assert!(has_submenu(h), "a menu with a submenu");
     for _ in 0..20 {
         let on_sub = matches!(
-            &h.app.modal,
+            &h.app.windows.modal,
             Some(Modal::Menu(m)) if matches!(m.items[m.selected].cmd, MenuCmd::Sub(_))
         );
         if on_sub {
@@ -231,7 +231,7 @@ fn open_a_submenu(h: &mut H) {
         h.key(KeyCode::Down);
     }
     h.key(KeyCode::Right);
-    match &h.app.modal {
+    match &h.app.windows.modal {
         Some(Modal::Menu(m)) => assert!(m.parent.is_some(), "the submenu is open"),
         _ => panic!("no menu"),
     }

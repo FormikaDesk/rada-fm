@@ -242,7 +242,7 @@ fn disallowed_folder_explains_how_to_allow() {
     let mut h = H::with_system(sb, dir, 150, 36, (fs.clone(), p.clone()), |_| {});
     h.app.open_dir(docs.clone());
     h.wait("the explanation", |a| {
-        matches!(a.modal, Some(Modal::Access(_)))
+        matches!(a.windows.modal, Some(Modal::Access(_)))
     });
     let s = h.screen();
     assert!(
@@ -264,7 +264,7 @@ fn disallowed_folder_explains_how_to_allow() {
                 && c.contains("Privacy_FilesAndFolders")),
         "{calls:?}"
     );
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 
     // The sidebar carries the same words for that place.
     h.app.side_nav.focus = true;
@@ -281,7 +281,9 @@ fn disallowed_folder_explains_how_to_allow() {
 
     // Full Disk Access is the other button.
     h.app.open_dir(docs.clone());
-    h.wait("again", |a| matches!(a.modal, Some(Modal::Access(_))));
+    h.wait("again", |a| {
+        matches!(a.windows.modal, Some(Modal::Access(_)))
+    });
     h.keys("f");
     h.pump(300);
     assert!(
@@ -310,7 +312,7 @@ fn an_ordinary_refusal_is_still_just_an_error() {
     let mut h = H::with_system(sb, dir, 150, 30, (fs, p), |_| {});
     h.app.open_dir(secret);
     h.pump(400);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // An error as before (its wording is the system's own), no window about consent.
     assert!(h.app.current_notice().is_some(), "{}", h.screen());
 }
@@ -348,14 +350,14 @@ fn a_removable_disk_can_be_ejected_from_its_menu_with_a_confirmation() {
     h.key(KeyCode::Down);
     h.key(KeyCode::Enter);
     assert!(
-        matches!(h.app.modal, Some(Modal::Eject(_))),
+        matches!(h.app.windows.modal, Some(Modal::Eject(_))),
         "{}",
         h.screen()
     );
     assert!(h.screen().contains("Eject") && h.screen().contains("Backup"));
     assert!(p.calls().iter().all(|c| !c.starts_with("eject")));
     h.key(KeyCode::Enter);
-    h.wait("ejected", |a| a.modal.is_none());
+    h.wait("ejected", |a| a.windows.modal.is_none());
     assert_eq!(
         p.calls().iter().filter(|c| c.starts_with("eject")).count(),
         1,
@@ -374,7 +376,7 @@ fn a_busy_disk_says_so_and_can_be_tried_again() {
     h.key(KeyCode::Enter);
     h.wait(
         "the failure",
-        |a| matches!(&a.modal, Some(Modal::Eject(e)) if matches!(e.stage, EjectStage::Failed(_))),
+        |a| matches!(&a.windows.modal, Some(Modal::Eject(e)) if matches!(e.stage, EjectStage::Failed(_))),
     );
     let s = h.screen();
     assert!(s.contains("It was not ejected"), "{s}");
@@ -383,14 +385,14 @@ fn a_busy_disk_says_so_and_can_be_tried_again() {
     h.key(KeyCode::Enter);
     h.wait(
         "second try",
-        |a| matches!(&a.modal, Some(Modal::Eject(e)) if matches!(e.stage, EjectStage::Failed(_))),
+        |a| matches!(&a.windows.modal, Some(Modal::Eject(e)) if matches!(e.stage, EjectStage::Failed(_))),
     );
     assert_eq!(
         p.calls().iter().filter(|c| c.starts_with("eject")).count(),
         2
     );
     h.key(KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]
@@ -403,9 +405,9 @@ fn delete_in_sidebar_ejects_a_disk() {
     let items = h.app.side_items();
     h.app.side_nav.side_cursor = items.iter().position(|i| i.path == v.mount_point).unwrap();
     h.press("delete");
-    assert!(matches!(h.app.modal, Some(Modal::Eject(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Eject(_))));
     h.key(KeyCode::Enter);
-    h.wait("done", |a| a.modal.is_none());
+    h.wait("done", |a| a.windows.modal.is_none());
     h.wait("out of the disk", |a| {
         !a.cwd.starts_with(&v.mount_point) && !a.is_loading()
     });
@@ -468,13 +470,13 @@ fn the_full_screen_preview_offers_quick_look_on_q() {
     h.keys("jj");
     h.wait("preview", |a| a.preview.name == "Notes.txt");
     h.click(&Target::FullPreview);
-    assert!(matches!(h.app.modal, Some(Modal::FullPreview)));
+    assert!(matches!(h.app.windows.modal, Some(Modal::FullPreview)));
     assert!(h.screen().contains("Q  Quick Look") || h.screen().contains("Quick Look"));
     h.keys("Q");
     h.pump(300);
     assert!(p.calls().iter().any(|c| c.starts_with("quick_look ")));
     assert!(
-        matches!(h.app.modal, Some(Modal::FullPreview)),
+        matches!(h.app.windows.modal, Some(Modal::FullPreview)),
         "it stays open"
     );
 }
@@ -522,7 +524,7 @@ fn cmd_shift_dot_shows_the_hidden_files_and_cmd_i_the_properties() {
         h.names()
     );
     cmd(&mut h, KeyCode::Char('i'), M::NONE);
-    assert!(matches!(h.app.modal, Some(Modal::Properties(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Properties(_))));
 }
 
 #[test]

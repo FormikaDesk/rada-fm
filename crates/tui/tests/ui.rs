@@ -298,7 +298,7 @@ fn history_lists_operations_and_a_second_operation_is_refused_while_busy() {
     h.keys("U");
     h.wait(
         "history",
-        |a| matches!(&a.modal, Some(Modal::History(hv)) if !hv.loading),
+        |a| matches!(&a.windows.modal, Some(Modal::History(hv)) if !hv.loading),
     );
     let s = h.screen();
     assert!(
@@ -402,7 +402,7 @@ fn an_image_is_drawn_with_its_facts_underneath() {
     // ...and the preview over the whole screen carries them under the picture.
     h.click(&Target::FullPreview);
     assert!(matches!(
-        h.app.modal,
+        h.app.windows.modal,
         Some(rada_tui::app::Modal::FullPreview)
     ));
     let s = full_preview_screen(&mut h);

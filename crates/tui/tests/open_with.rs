@@ -81,7 +81,7 @@ fn world() -> World {
 }
 
 fn names(h: &H) -> Vec<String> {
-    let Some(Modal::OpenWith(v)) = &h.app.modal else {
+    let Some(Modal::OpenWith(v)) = &h.app.windows.modal else {
         panic!("no Open with window");
     };
     v.rows()
@@ -104,7 +104,7 @@ fn open_window(h: &mut H, on: &str) {
     h.press("alt+o");
     h.wait(
         "the programs",
-        |a| matches!(&a.modal, Some(Modal::OpenWith(v)) if !v.loading),
+        |a| matches!(&a.windows.modal, Some(Modal::OpenWith(v)) if !v.loading),
     );
 }
 
@@ -189,7 +189,7 @@ fn enter_starts_the_highlighted_program_and_it_is_remembered_as_used() {
     open_window(&mut w.h, "a.txt");
     w.h.keys("kate");
     w.h.key(KeyCode::Enter);
-    assert!(w.h.app.modal.is_none());
+    assert!(w.h.app.windows.modal.is_none());
     let file = w.dir.join("a.txt");
     wait_opened(&mut w.h, 1);
     assert_eq!(
@@ -287,7 +287,7 @@ fn other_program_is_the_free_field_of_before_with_what_was_typed() {
     w.h.keys("vlc --fullscreen");
     assert_eq!(names(&w.h), ["Other program…"]);
     w.h.key(KeyCode::Enter);
-    let Some(Modal::Input(iv)) = &w.h.app.modal else {
+    let Some(Modal::Input(iv)) = &w.h.app.windows.modal else {
         panic!("the field: {}", w.h.screen());
     };
     assert_eq!(iv.text, "vlc --fullscreen");
@@ -307,7 +307,7 @@ fn other_program_is_the_free_field_of_before_with_what_was_typed() {
     }
     w2.h.key(KeyCode::Down);
     w2.h.key(KeyCode::Enter);
-    assert!(matches!(w2.h.app.modal, Some(Modal::Input(_))));
+    assert!(matches!(w2.h.app.windows.modal, Some(Modal::Input(_))));
 }
 
 #[test]
@@ -327,7 +327,7 @@ fn a_kind_nobody_opens_still_offers_the_free_field() {
     }
     assert_eq!(w.h.cursor_name(), "sub");
     w.h.press("alt+o");
-    assert!(w.h.app.modal.is_none());
+    assert!(w.h.app.windows.modal.is_none());
 }
 
 #[test]

@@ -41,7 +41,7 @@ fn with_offer(fail: bool) -> (H, Arc<AtomicUsize>, Arc<AtomicUsize>) {
 #[test]
 fn the_offer_explains_itself_and_notes_that_it_was_made() {
     let (mut h, installs, shown) = with_offer(false);
-    assert!(matches!(h.app.modal, Some(Modal::Font(_))));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Font(_))));
     let raw = h.screen();
     // The text is wrapped inside the window: compare it as running text, the window alone (its
     // left edge is a `││`, the pane's border and its own), so that what the sidebar has on the
@@ -79,7 +79,7 @@ fn the_offer_explains_itself_and_notes_that_it_was_made() {
 fn not_now_closes_it_and_installs_nothing() {
     let (mut h, installs, _) = with_offer(false);
     h.key(KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     h.pump(200);
     assert_eq!(installs.load(Ordering::SeqCst), 0);
 }
@@ -89,7 +89,7 @@ fn yes_installs_in_the_background_and_says_what_to_do_next() {
     let (mut h, installs, _) = with_offer(false);
     h.key(KeyCode::Enter);
     assert!(h.screen().contains("Downloading and installing"));
-    h.wait("installed", |a| a.modal.is_none());
+    h.wait("installed", |a| a.windows.modal.is_none());
     assert_eq!(installs.load(Ordering::SeqCst), 1);
     // The card wraps what it says: read it as running text (the details pane, which shares
     // its rows, put away).
@@ -110,7 +110,7 @@ fn yes_installs_in_the_background_and_says_what_to_do_next() {
 fn a_failure_is_said_and_the_offer_is_not_repeated() {
     let (mut h, installs, shown) = with_offer(true);
     h.key(KeyCode::Enter);
-    h.wait("the failure", |a| a.modal.is_none());
+    h.wait("the failure", |a| a.windows.modal.is_none());
     let s = h.screen();
     assert!(s.contains("The font was not installed: no network"), "{s}");
     assert_eq!(
@@ -126,5 +126,5 @@ fn a_failure_is_said_and_the_offer_is_not_repeated() {
 fn without_an_offer_there_is_no_window() {
     let (sb, dir) = sandbox_with_files();
     let h = H::new(sb, dir, 140, 36);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }

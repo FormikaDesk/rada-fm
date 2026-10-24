@@ -280,7 +280,7 @@ impl App {
         // The card at the bottom right goes at the first key (the key still does its job); an
         // error stays until Esc, which it takes when nothing else is open.
         let now = self.notice_now();
-        if self.modal.is_none()
+        if self.windows.modal.is_none()
             && self.windows.address.is_none()
             && key.code == KeyCode::Esc
             && self.windows.notices.dismiss_error(now)
@@ -288,7 +288,7 @@ impl App {
             return;
         }
         self.windows.notices.on_key(now);
-        if self.modal.is_some() {
+        if self.windows.modal.is_some() {
             self.on_modal_key(key);
             return;
         }
@@ -466,7 +466,7 @@ impl App {
                 if !self.refuse_in_archive(Key::WhatCreateFolder.tr())
                     && !self.refuse_in_tag_view(Key::WhatCreateFolder.tr())
                 {
-                    self.modal = Some(Modal::Input(InputView::new(
+                    self.windows.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewDir,
                         String::new(),
                     )))
@@ -478,7 +478,7 @@ impl App {
             Undo => self.start_undo(None),
             Redo => self.start_redo(),
             History => {
-                self.modal = Some(Modal::History(HistoryView {
+                self.windows.modal = Some(Modal::History(HistoryView {
                     entries: Vec::new(),
                     selected: 0,
                     loading: true,
@@ -518,7 +518,7 @@ impl App {
                     && !self.refuse_in_archive(Key::WhatCreateFile.tr())
                     && !self.refuse_in_tag_view(Key::WhatCreateFile.tr())
                 {
-                    self.modal = Some(Modal::Input(InputView::new(
+                    self.windows.modal = Some(Modal::Input(InputView::new(
                         InputKind::NewFile,
                         String::new(),
                     )))
@@ -548,7 +548,7 @@ impl App {
             ShowInFolder => self.show_in_folder(),
             Help => {
                 self.windows.help_scroll = 0;
-                self.modal = Some(Modal::Help);
+                self.windows.modal = Some(Modal::Help);
             }
             Quit => self.quit(),
         }
@@ -697,7 +697,7 @@ impl App {
             .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
             .unwrap_or((8, 6));
         let on_item = self.current().is_some();
-        self.modal = Some(Modal::Menu(self.context_menu(on_item, at)));
+        self.windows.modal = Some(Modal::Menu(self.context_menu(on_item, at)));
     }
 
     /// An outside request to stop (SIGTERM, closing the terminal): cancel and leave.
@@ -831,7 +831,7 @@ impl App {
         self.redraw.dirty = true;
         let target = self.frame.hits.at(m.column, m.row).cloned();
         if self.frame.panels_shown
-            && self.modal.is_none()
+            && self.windows.modal.is_none()
             && matches!(
                 m.kind,
                 MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
@@ -851,7 +851,7 @@ impl App {
             }
             MouseEventKind::Down(MouseButton::Right) => self.right_click(target, m.column, m.row),
             MouseEventKind::Down(MouseButton::Middle) => {
-                if self.modal.is_none()
+                if self.windows.modal.is_none()
                     && let Some(Target::Tab(i) | Target::TabClose(i)) = target
                 {
                     self.close_tab(i);
@@ -862,7 +862,7 @@ impl App {
     }
 
     fn wheel(&mut self, target: Option<Target>, down: bool) {
-        if let Some(modal) = &mut self.modal {
+        if let Some(modal) = &mut self.windows.modal {
             match modal {
                 Modal::Palette(p) => p.move_by(if down { 1 } else { -1 }),
                 Modal::OpenWith(v) => v.move_by(if down { 1 } else { -1 }),
@@ -929,7 +929,7 @@ impl App {
     }
 
     fn click(&mut self, target: Option<Target>, mods: KeyModifiers, at: (u16, u16)) {
-        if self.modal.is_some() {
+        if self.windows.modal.is_some() {
             return self.click_in_modal(target);
         }
         if let Some(Target::Notice(id, hit)) = target {
@@ -988,7 +988,7 @@ impl App {
             Some(Target::ViewMode(mode)) => self.set_view(mode),
             Some(Target::FullPreview) => {
                 if self.current().is_some() {
-                    self.modal = Some(Modal::FullPreview);
+                    self.windows.modal = Some(Modal::FullPreview);
                 }
             }
             Some(Target::CrumbMore(hidden)) => {
@@ -1003,7 +1003,7 @@ impl App {
                         MenuItem::go(name, p)
                     })
                     .collect();
-                self.modal = Some(Modal::Menu(MenuView::new((at.0, at.1 + 1), items)));
+                self.windows.modal = Some(Modal::Menu(MenuView::new((at.0, at.1 + 1), items)));
             }
             Some(Target::Act(a)) => self.dispatch(a),
             Some(Target::SortBy(key)) => {
@@ -1051,23 +1051,23 @@ impl App {
     }
 
     fn click_in_modal(&mut self, target: Option<Target>) {
-        match (&mut self.modal, target) {
-            (Some(Modal::Help), _) => self.modal = None,
-            (Some(Modal::Properties(_)), Some(Target::Key(_))) => self.modal = None,
-            (Some(Modal::Properties(_)), None) => self.modal = None,
-            (Some(Modal::FullPreview), _) => self.modal = None,
+        match (&mut self.windows.modal, target) {
+            (Some(Modal::Help), _) => self.windows.modal = None,
+            (Some(Modal::Properties(_)), Some(Target::Key(_))) => self.windows.modal = None,
+            (Some(Modal::Properties(_)), None) => self.windows.modal = None,
+            (Some(Modal::FullPreview), _) => self.windows.modal = None,
             (Some(Modal::Menu(_)), Some(Target::MenuItem(i))) => {
-                if let Some(Modal::Menu(mut m)) = self.modal.take() {
+                if let Some(Modal::Menu(mut m)) = self.windows.modal.take() {
                     if i < m.items.len() && m.items[i].enabled {
                         m.selected = i;
                         self.menu_activate(m);
                     } else {
                         // A disabled entry does nothing, and the menu stays.
-                        self.modal = Some(Modal::Menu(m));
+                        self.windows.modal = Some(Modal::Menu(m));
                     }
                 }
             }
-            (Some(Modal::Menu(_)), _) => self.modal = None,
+            (Some(Modal::Menu(_)), _) => self.windows.modal = None,
             (Some(Modal::Palette(p)), Some(Target::PaletteRow(i))) => {
                 if i < p.hits.len() {
                     p.selected = i;
@@ -1088,20 +1088,20 @@ impl App {
                     h.selected = i;
                 }
             }
-            (Some(Modal::Plan(_)), Some(Target::PlanCancel)) => self.modal = None,
+            (Some(Modal::Plan(_)), Some(Target::PlanCancel)) => self.windows.modal = None,
             (Some(Modal::Plan(_)), Some(Target::PlanRun)) => {
-                if let Some(Modal::Plan(pv)) = self.modal.take() {
+                if let Some(Modal::Plan(pv)) = self.windows.modal.take() {
                     if pv.can_run() {
                         self.run_plan(pv);
                     } else {
-                        self.modal = Some(Modal::Plan(pv));
+                        self.windows.modal = Some(Modal::Plan(pv));
                     }
                 }
             }
             (Some(Modal::Plan(_)), Some(Target::Policy(p))) => {
-                if let Some(Modal::Plan(mut pv)) = self.modal.take() {
+                if let Some(Modal::Plan(mut pv)) = self.windows.modal.take() {
                     self.replan_with(&mut pv, p);
-                    self.modal = Some(Modal::Plan(pv));
+                    self.windows.modal = Some(Modal::Plan(pv));
                 }
             }
             (Some(_), Some(Target::Key(code))) => {
@@ -1115,14 +1115,14 @@ impl App {
         if self.session.chooser.is_some() {
             return;
         }
-        if self.modal.is_some() {
-            if matches!(self.modal, Some(Modal::Menu(_))) {
-                self.modal = None;
+        if self.windows.modal.is_some() {
+            if matches!(self.windows.modal, Some(Modal::Menu(_))) {
+                self.windows.modal = None;
             }
             return;
         }
         if let Some(Target::Place(path)) = &target {
-            self.modal = Some(Modal::Menu(self.side_menu(path, (x, y))));
+            self.windows.modal = Some(Modal::Menu(self.side_menu(path, (x, y))));
             return;
         }
         let on_item = match target {
@@ -1139,7 +1139,7 @@ impl App {
             Some(Target::List) | Some(Target::Preview) => false,
             _ => return,
         };
-        self.modal = Some(Modal::Menu(self.context_menu(on_item, (x, y))));
+        self.windows.modal = Some(Modal::Menu(self.context_menu(on_item, (x, y))));
     }
 
     pub(super) fn on_menu_key(&mut self, mut m: MenuView, key: KeyEvent) {
@@ -1147,32 +1147,32 @@ impl App {
             // Esc closes the menu in front: a submenu gives the menu it came from back.
             KeyCode::Esc | KeyCode::Char('q') => {
                 if let Some(p) = m.parent.take() {
-                    self.modal = Some(Modal::Menu(*p));
+                    self.windows.modal = Some(Modal::Menu(*p));
                 }
             }
             KeyCode::Left | KeyCode::Char('h') if m.parent.is_some() => {
                 if let Some(p) = m.parent.take() {
-                    self.modal = Some(Modal::Menu(*p));
+                    self.windows.modal = Some(Modal::Menu(*p));
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 m.step(1);
-                self.modal = Some(Modal::Menu(m));
+                self.windows.modal = Some(Modal::Menu(m));
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 m.step(-1);
-                self.modal = Some(Modal::Menu(m));
+                self.windows.modal = Some(Modal::Menu(m));
             }
             KeyCode::Right | KeyCode::Char('l') => {
                 // Right opens a submenu; on any other entry it does nothing.
                 if m.items.get(m.selected).is_some_and(MenuItem::opens_menu) {
                     self.menu_activate(m);
                 } else {
-                    self.modal = Some(Modal::Menu(m));
+                    self.windows.modal = Some(Modal::Menu(m));
                 }
             }
             KeyCode::Enter => self.menu_activate(m),
-            _ => self.modal = Some(Modal::Menu(m)),
+            _ => self.windows.modal = Some(Modal::Menu(m)),
         }
     }
 
@@ -1183,7 +1183,7 @@ impl App {
             return;
         };
         if !it.enabled {
-            self.modal = Some(Modal::Menu(m));
+            self.windows.modal = Some(Modal::Menu(m));
             return;
         }
         match it.cmd.clone() {
@@ -1192,13 +1192,13 @@ impl App {
                 let title = self.submenu_title(kind);
                 let mut child = MenuView::new((0, 0), items).titled(title);
                 child.parent = Some(Box::new(m));
-                self.modal = Some(Modal::Menu(child));
+                self.windows.modal = Some(Modal::Menu(child));
             }
             MenuCmd::OpenWithList => {
                 if let Some(path) = self.current().map(|e| e.path.clone()) {
                     self.open_with_window(path, Some(Box::new(m)));
                 } else {
-                    self.modal = None;
+                    self.windows.modal = None;
                 }
             }
             cmd => {
@@ -1206,7 +1206,7 @@ impl App {
                     m.at.0.saturating_add(2),
                     m.at.1.saturating_add(1 + m.selected as u16),
                 );
-                self.modal = None;
+                self.windows.modal = None;
                 self.run_menu(cmd, at);
             }
         }

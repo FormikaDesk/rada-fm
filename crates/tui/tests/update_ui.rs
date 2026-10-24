@@ -61,7 +61,7 @@ fn clicking_the_notice_or_pressing_its_key_opens_the_notes() {
     offer(&mut h, Ok(Mode::Binary));
     h.click(&Target::Act(Action::Update));
     let s = h.screen();
-    assert!(matches!(h.app.modal, Some(Modal::Update(_))), "{s}");
+    assert!(matches!(h.app.windows.modal, Some(Modal::Update(_))), "{s}");
     assert!(s.contains("rada 0.7.0 is available"), "{s}");
     assert!(s.contains("What is new"), "{s}");
     assert!(s.contains("Tags in the Finder's colours"), "{s}");
@@ -70,11 +70,11 @@ fn clicking_the_notice_or_pressing_its_key_opens_the_notes() {
     assert!(s.contains("Update now"), "{s}");
     assert!(s.contains("replace this one"), "{s}");
     h.key(crossterm::event::KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     // Later, by key.
     h.press("alt+u");
     assert!(matches!(
-        h.app.modal,
+        h.app.windows.modal,
         Some(Modal::Update(UpdateView::Offer { .. }))
     ));
 }
@@ -95,7 +95,7 @@ fn package_install_is_told_what_to_run() {
     assert!(!s.contains("Update now"), "{s}");
     h.key(crossterm::event::KeyCode::Enter);
     assert!(
-        matches!(h.app.modal, Some(Modal::Update(_))),
+        matches!(h.app.windows.modal, Some(Modal::Update(_))),
         "Enter must not start anything for a package"
     );
     assert!(matches!(
@@ -103,7 +103,7 @@ fn package_install_is_told_what_to_run() {
         UpdateStatus::Available { .. }
     ));
     h.key(crossterm::event::KeyCode::Esc);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn without_an_update_worker_the_key_says_so() {
     let mut h = H::new(sb, dir, 140, 30);
     h.press("alt+u");
     assert!(h.screen().contains("Updates are not available here"));
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
 }
 
 #[test]
@@ -173,7 +173,10 @@ fn a_failed_update_explains_itself_and_offers_the_log() {
     }));
     let s = h.screen();
     assert!(
-        matches!(h.app.modal, Some(Modal::Update(UpdateView::Failed { .. }))),
+        matches!(
+            h.app.windows.modal,
+            Some(Modal::Update(UpdateView::Failed { .. }))
+        ),
         "{s}"
     );
     assert!(s.contains("The update did not work"), "{s}");
@@ -187,7 +190,7 @@ fn a_failed_update_explains_itself_and_offers_the_log() {
     );
     h.press("alt+u");
     assert!(matches!(
-        h.app.modal,
+        h.app.windows.modal,
         Some(Modal::Update(UpdateView::Failed { .. }))
     ));
 }
@@ -227,7 +230,7 @@ fn accept_starts_worker_failure_window() {
     offer(&mut h, Ok(Mode::Binary));
     h.press("alt+u");
     h.key(crossterm::event::KeyCode::Enter);
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     assert!(
         matches!(h.app.updates.update, UpdateStatus::Working { .. }),
         "the bar says it is working at once"
@@ -237,7 +240,10 @@ fn accept_starts_worker_failure_window() {
     });
     let s = h.screen();
     assert!(
-        matches!(h.app.modal, Some(Modal::Update(UpdateView::Failed { .. }))),
+        matches!(
+            h.app.windows.modal,
+            Some(Modal::Update(UpdateView::Failed { .. }))
+        ),
         "{s}"
     );
     assert!(s.contains("cannot reach"), "{s}");
@@ -317,7 +323,10 @@ fn a_newer_version_is_a_pill_in_the_tab_bar_that_opens_the_notes() {
     h.click(&Target::Act(Action::Update));
     let s = h.screen();
     assert!(
-        matches!(h.app.modal, Some(Modal::Update(UpdateView::Offer { .. }))),
+        matches!(
+            h.app.windows.modal,
+            Some(Modal::Update(UpdateView::Offer { .. }))
+        ),
         "{s}"
     );
     assert!(s.contains("rada 0.7.0 is available"), "{s}");
@@ -344,7 +353,7 @@ fn the_version_is_in_the_status_bar_and_a_click_asks_for_a_newer_one() {
         a.current_notice()
             .is_some_and(|t| t.text == "rada is up to date")
     });
-    assert!(h.app.modal.is_none());
+    assert!(h.app.windows.modal.is_none());
     let asked = server.requests().len();
     assert!(asked >= 1, "the list was asked for");
     // And again: the second click asks again, it is not remembered for a day.
@@ -359,7 +368,9 @@ fn a_check_that_finds_something_opens_the_notes() {
     let mut h = H::new(sb, dir, 140, 36);
     h.app.start_updates(ctx);
     h.click(&Target::CheckUpdates);
-    h.wait("the notes", |a| matches!(a.modal, Some(Modal::Update(_))));
+    h.wait("the notes", |a| {
+        matches!(a.windows.modal, Some(Modal::Update(_)))
+    });
     let s = h.screen();
     assert!(s.contains("rada 0.7.0 is available"), "{s}");
     assert!(s.contains("Notes for 0.7.0"), "{s}");
@@ -400,7 +411,7 @@ fn the_help_button_is_a_menu_with_the_keys_the_check_and_about() {
         assert!(s.contains(needle), "{needle}: {s}");
     }
     // About: the version, the channel it follows and how it would be updated.
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         panic!("a menu: {s}")
     };
     let i = m
@@ -410,7 +421,10 @@ fn the_help_button_is_a_menu_with_the_keys_the_check_and_about() {
         .unwrap();
     h.click(&Target::MenuItem(i));
     let s = h.screen();
-    assert!(matches!(h.app.modal, Some(Modal::Properties(_))), "{s}");
+    assert!(
+        matches!(h.app.windows.modal, Some(Modal::Properties(_))),
+        "{s}"
+    );
     assert!(s.contains("About rada"), "{s}");
     assert!(s.contains("0.6.0-rc.4"), "{s}");
     assert!(s.contains("pre-releases (chosen from the version)"), "{s}");
@@ -418,7 +432,7 @@ fn the_help_button_is_a_menu_with_the_keys_the_check_and_about() {
     h.key(crossterm::event::KeyCode::Esc);
     // Check for updates, from the menu.
     h.click(&Target::Menu(MenuKind::Help));
-    let Some(Modal::Menu(m)) = &h.app.modal else {
+    let Some(Modal::Menu(m)) = &h.app.windows.modal else {
         panic!("a menu")
     };
     let i = m
@@ -433,5 +447,5 @@ fn the_help_button_is_a_menu_with_the_keys_the_check_and_about() {
     });
     // The first entry is still the keys, which F1 and ? open directly.
     h.press("F1");
-    assert!(matches!(h.app.modal, Some(Modal::Help)));
+    assert!(matches!(h.app.windows.modal, Some(Modal::Help)));
 }

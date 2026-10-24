@@ -155,10 +155,13 @@ fn draw_properties(f: &mut Frame, ctx: &Ctx, p: &PropsView, area: Rect, hits: &m
 /// Whether the window in front dims what is behind it: a menu does not, nor the list of
 /// programs that sits beside one, nor the preview that takes the whole screen.
 pub(super) fn dims_backdrop(app: &App) -> bool {
-    let beside_menu = matches!(&app.modal, Some(Modal::OpenWith(v)) if v.under.is_some());
-    app.modal.is_some()
+    let beside_menu = matches!(&app.windows.modal, Some(Modal::OpenWith(v)) if v.under.is_some());
+    app.windows.modal.is_some()
         && !beside_menu
-        && !matches!(app.modal, Some(Modal::Menu(_)) | Some(Modal::FullPreview))
+        && !matches!(
+            app.windows.modal,
+            Some(Modal::Menu(_)) | Some(Modal::FullPreview)
+        )
 }
 
 /// Where a menu may be: the screen without the status bar and the key hints, which it stays
@@ -174,7 +177,7 @@ pub(super) fn popup_room(app: &App, area: Rect) -> Rect {
 }
 
 pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
-    if matches!(app.modal, Some(Modal::FullPreview)) {
+    if matches!(app.windows.modal, Some(Modal::FullPreview)) {
         draw_full_preview(f, app, area);
         return;
     }
@@ -192,7 +195,9 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let home = app.home().to_path_buf();
     let spinner = SPIN[app.redraw.spinner % SPIN.len()];
-    let Some(modal) = &app.modal else { return };
+    let Some(modal) = &app.windows.modal else {
+        return;
+    };
     match modal {
         Modal::Scanning {
             what,

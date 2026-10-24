@@ -78,7 +78,7 @@ fn menus_windows_and_cards_fit_every_size_without_panicking() {
         let _ = hh.screen();
         hh.key(KeyCode::F(1));
         let _ = hh.screen();
-        assert!(matches!(hh.app.modal, Some(Modal::Help)));
+        assert!(matches!(hh.app.windows.modal, Some(Modal::Help)));
     }
 }
 
