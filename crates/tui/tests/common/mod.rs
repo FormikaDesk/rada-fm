@@ -562,6 +562,9 @@ pub fn demo_scene(w: u16, h: u16) -> H {
     put("song.mp3", 7_800_000, 72 * day);
     let mut h = H::new(sb, dir, w, h);
     h.wait("the places", |a| !a.places.paths.places.is_empty());
+    // The volumes arrive from a worker: a late answer would put the machine's own disks back
+    // over the made-up ones below (macOS answers later than Linux).
+    h.wait("the volumes", |a| a.devices.volumes_seen);
     h.app.hooks.clock = Some(demo_now());
     h.app.settings.details = None;
     h.app.settings.tz = jiff::tz::TimeZone::UTC;

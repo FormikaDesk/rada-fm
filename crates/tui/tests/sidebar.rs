@@ -68,6 +68,8 @@ fn italian_with(w: u16, h: u16, tweak: impl FnOnce(&mut rada_tui::Config) + 'sta
     h.wait("the places and bookmarks", |a| {
         a.places.paths.places.len() >= 3 && a.places.paths.bookmarks.len() == 2
     });
+    // The list the system reports arrives from a worker and would replace the one set below.
+    h.wait("the volumes", |a| a.devices.volumes_seen);
     set_volumes(&mut h);
     h
 }
