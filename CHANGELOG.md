@@ -3,6 +3,22 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.0-rc.15] - 2026-10-24
+
+The terminal's background takes the theme's colour while rada runs, so the margin around the window has no frame, the ring and the preview follow a zoom of the font, and the interface's code is split into groups. Still a **pre-release**.
+
+### Changed
+- **The terminal's background is the theme's colour while rada runs**, and goes back to what it was when rada ends, so a terminal that keeps a margin around its grid no longer shows a frame of another colour. It also goes back on an error and when the terminal is closed. Nothing is changed with a transparent theme, on 16 colours, with `NO_COLOR`, under tmux or screen, in Terminal.app and in the Windows console. After `kill -9` the terminal keeps the colour until you run `reset`. The window of `Rada.app` shares the leftover room on every side.
+- **The blank rows between the bars of the panels view stay from 40 rows**, not 42: a Mac window of 41 rows no longer loses them all.
+
+### Fixed
+- **The ring and the picture of the preview are made again when you change the size of the terminal's font** (zoom), so they no longer stay at the old size.
+
+### Internal
+- The interface's state is split into groups: the main structure goes from 114 fields to 19, and switching, opening and closing a tab swap one value instead of copying 17 fields by hand. `docs/ARCHITECTURE.md` says what each group holds.
+- A test can no longer wait for ever: the chooser tests wait for the folder before moving, a test that lasts more than 120 seconds says what it was doing and stops the run, and the test job may run 45 minutes.
+- The tests that draw disks wait for the system's list before setting their own, so a late answer (seen once on macOS) cannot replace them.
+
 ## [0.6.0-rc.14] - 2026-10-23
 
 The file chooser gets a preview, a rename onto a name that exists asks what to do, and the panels view keeps the places in sight and cuts long names in the middle. Still a **pre-release**.

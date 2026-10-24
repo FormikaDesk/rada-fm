@@ -9,9 +9,9 @@ Windows and macOS builds are new: please report anything odd in an issue.
 Linux and macOS, for example (take the file name for your system from the releases page; `x86_64-unknown-linux-musl` is the static Linux build):
 
 ```sh
-curl -LO https://github.com/formikadesk/rada-fm/releases/download/v0.6.0-rc.14/rada-0.6.0-rc.14-x86_64-unknown-linux-musl.tar.gz
-tar xzf rada-0.6.0-rc.14-x86_64-unknown-linux-musl.tar.gz
-install -m 755 rada-0.6.0-rc.14-x86_64-unknown-linux-musl/rada ~/.local/bin/rada
+curl -LO https://github.com/formikadesk/rada-fm/releases/download/v0.6.0-rc.15/rada-0.6.0-rc.15-x86_64-unknown-linux-musl.tar.gz
+tar xzf rada-0.6.0-rc.15-x86_64-unknown-linux-musl.tar.gz
+install -m 755 rada-0.6.0-rc.15-x86_64-unknown-linux-musl/rada ~/.local/bin/rada
 ```
 
 Check the signature first when the release has one: [verify.md](verify.md).
@@ -25,10 +25,10 @@ Not published yet. Until it is, use the binary or build from source.
 This builds rada from crates.io (it needs a Rust toolchain of version 1.90 or newer, [rustup](https://rustup.rs)) and puts it in `~/.cargo/bin`:
 
 ```sh
-cargo install rada --locked --version 0.6.0-rc.14
+cargo install rada --locked --version 0.6.0-rc.15
 ```
 
-`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself, so the version has to be named; with 0.6.0 `cargo install rada --locked` will be enough. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it (while the newer version is a pre-release, the command it gives names it: `cargo install rada --locked --version 0.6.0-rc.14`). This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
+`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself, so the version has to be named; with 0.6.0 `cargo install rada --locked` will be enough. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it (while the newer version is a pre-release, the command it gives names it: `cargo install rada --locked --version 0.6.0-rc.15`). This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
 
 ## From source
 
