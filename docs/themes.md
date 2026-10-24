@@ -18,6 +18,8 @@ The whole interface has **one background**: the tab bar, the bar of the path, th
 
 **A transparent terminal.** The default dark theme paints its night blue, so it looks the same everywhere. If you would rather see your own terminal's background (a translucent window, a wallpaper), set `transparent_background = true` in the configuration: the default dark theme then leaves the background alone, as `catppuccin` and `tokyo-night` already do. It is off by default and only the default dark theme is affected; the light themes keep their paper.
 
+**The terminal's own background.** A terminal keeps a margin around its grid (Ghostty's window padding, for one) and colours it with *its* background, not with what a program draws, so a theme that paints its paper shows a frame of another colour. While a theme paints, rada sets the terminal's background to the same colour (OSC 11) and gives it back when it ends (OSC 111): on a normal exit, on an error, on a panic and when the terminal is closed or rada is told to end. It does nothing where the terminal's background stays (the default dark theme with `transparent_background = true`, and the dark `catppuccin` and `tokyo-night`), on 16-colour terminals, with `NO_COLOR`, with `profile = "basic"`, under tmux or GNU screen (the sequence would reach every pane), in Terminal.app and the Windows console host (they ignore it), and when the output is not a terminal. If rada is killed with `SIGKILL` the terminal keeps the colour until its own settings are applied again (`reset` does it).
+
 ![Catppuccin](screenshots/tema-catppuccin.png)
 ![Tokyo Night](screenshots/tema-tokyo-night.png)
 ![The Gesso theme](screenshots/principale-gesso.png)

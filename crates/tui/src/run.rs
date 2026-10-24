@@ -1,6 +1,6 @@
 //! Terminal setup and the event loop.
 
-use std::io::{self, Stdout};
+use std::io::{self, IsTerminal, Stdout};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,6 +23,7 @@ use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi};
 use crate::input::{self, Input, InputGate};
 use crate::services::Services;
+use crate::theme::Theme;
 use crate::ui;
 
 type Term = Terminal<CompatBackend<CrosstermBackend<Stdout>>>;
@@ -67,6 +68,19 @@ fn leave() {
     let _ = execute!(io::stdout(), DisableMouseCapture);
     let _ = disable_raw_mode();
     let _ = execute!(io::stdout(), LeaveAlternateScreen);
+    crate::termbg::restore(&mut io::stdout());
+}
+
+/// Paint the terminal's own background with the theme's, so that the margin the terminal
+/// keeps around the grid is not a frame of another colour. [`leave`] gives it back.
+fn match_terminal_background(theme: &Theme, caps: &TermCaps) {
+    let mut out = io::stdout();
+    let Some(rgb) = crate::termbg::wanted(theme, caps, out.is_terminal()) else {
+        return;
+    };
+    if let Err(e) = crate::termbg::set(&mut out, rgb) {
+        tracing::warn!("cannot set the terminal background: {e}");
+    }
 }
 
 /// Termination requests from outside (`kill`, closing the terminal) end the program
@@ -220,6 +234,7 @@ fn event_loop(
     }
     // Asking for the Cmd key starts with a question to the terminal: not where none is asked.
     let cmd_keys = cfg.cmd_keys && caps.may_query && ask_for_cmd_keys();
+    match_terminal_background(&cfg.theme, caps);
     let mut app = App::new(cfg, svc, image_ui);
     app.keymap.prefer_cmd = cmd_keys;
     tracing::info!("Cmd key reported by the terminal: {cmd_keys}");

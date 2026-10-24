@@ -23,6 +23,7 @@ pub mod ring;
 pub mod run;
 pub mod services;
 pub mod sidebar;
+pub mod termbg;
 pub mod termtheme;
 pub mod theme;
 pub mod ui;

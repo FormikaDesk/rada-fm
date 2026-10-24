@@ -337,6 +337,10 @@ pub fn ghostty_config(exe: &Path) -> String {
          window-save-state = never\n\
          window-width = {WINDOW_COLUMNS}\n\
          window-height = {WINDOW_ROWS}\n\
+         # The margin around the grid takes the terminal's background, which rada sets to its\n\
+         # theme's (see docs/themes.md), and what is left over is shared on every side.\n\
+         window-padding-color = background\n\
+         window-padding-balance = true\n\
          # This window is rada's: closing it ends this Ghostty.\n\
          quit-after-last-window-closed = true\n\
          \n\
@@ -392,6 +396,10 @@ mod tests {
             "{c}"
         );
         assert!(c.contains("quit-after-last-window-closed = true"), "{c}");
+        assert!(
+            c.contains("window-padding-color = background\nwindow-padding-balance = true\n"),
+            "{c}"
+        );
         for key in [
             "super+c",
             "super+v",
