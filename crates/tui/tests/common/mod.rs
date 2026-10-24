@@ -1,6 +1,8 @@
 //! Shared harness: the interface driven headlessly with real workers on a sandbox.
 #![allow(dead_code)]
 
+mod watchdog;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -26,9 +28,11 @@ pub type System = (
 );
 
 pub struct H {
+    _teardown: watchdog::Teardown,
     pub app: App,
     pub term: Terminal<TestBackend>,
     _sb: Sandbox,
+    _watch: watchdog::Watch,
 }
 
 impl H {
@@ -232,9 +236,11 @@ impl H {
         // otherwise (see `a_slow_second_click_is_not_a_double_click`).
         app.settings.double_click = Duration::from_secs(600);
         let mut h = H {
+            _teardown: watchdog::Teardown,
             app,
             term: Terminal::new(TestBackend::new(w, h)).unwrap(),
             _sb: sb,
+            _watch: watchdog::Watch::start(),
         };
         h.settle();
         h
@@ -242,6 +248,7 @@ impl H {
 
     /// Process worker events until `done` holds (or fail after a few seconds).
     pub fn wait(&mut self, what: &str, mut done: impl FnMut(&App) -> bool) {
+        watchdog::call(format!("waiting for: {what}"));
         let rx = self.app.events();
         let resized = self.app.preview.image_ui.as_ref().map(|u| u.results());
         // Generous: CI machines are slow, and a test that waits is waiting for a worker thread.
@@ -253,6 +260,7 @@ impl H {
                 self.screen()
             );
             if let Ok(ev) = rx.recv_timeout(Duration::from_millis(20)) {
+                watchdog::step("handling an event of a worker");
                 self.app.on_core_event(ev);
             }
             // The picture is resized and encoded by its own thread once it has been drawn.
@@ -261,6 +269,7 @@ impl H {
                     self.app.on_image_resized(done);
                 }
             }
+            watchdog::step("tick");
             self.app.tick();
             let _ = self.screen(); // drawing is what asks for the resize
         }
@@ -269,6 +278,7 @@ impl H {
     /// Like `wait`, with `make` run again every so often until `done` holds: what is made
     /// before the watcher is in place is missed by it, and nothing says when that is over.
     pub fn wait_making(&mut self, what: &str, make: impl Fn(), mut done: impl FnMut(&App) -> bool) {
+        watchdog::call(format!("waiting for: {what}"));
         let mut made = None::<Instant>;
         self.wait(what, |a| {
             if made.is_none_or(|t| t.elapsed() > Duration::from_millis(400)) {
@@ -281,11 +291,13 @@ impl H {
 
     /// Let workers and the encoder thread deliver for a moment, drawing as the real loop does.
     pub fn pump(&mut self, ms: u64) {
+        watchdog::call(format!("pumping events for {ms} ms"));
         let rx = self.app.events();
         let resized = self.app.preview.image_ui.as_ref().map(|u| u.results());
         let end = Instant::now() + Duration::from_millis(ms);
         while Instant::now() < end {
             if let Ok(ev) = rx.recv_timeout(Duration::from_millis(10)) {
+                watchdog::step("handling an event of a worker");
                 self.app.on_core_event(ev);
             }
             if let Some(r) = &resized {
@@ -302,6 +314,7 @@ impl H {
     }
 
     pub fn key(&mut self, c: KeyCode) {
+        watchdog::call(format!("key {c:?}"));
         self.app.on_key(KeyEvent::new(c, KeyModifiers::NONE));
     }
 
@@ -314,10 +327,12 @@ impl H {
     /// Press a key written like in the configuration: `ctrl+c`, `shift+delete`, `F2`, `G`.
     pub fn press(&mut self, spec: &str) {
         let c = Chord::parse(spec).unwrap_or_else(|e| panic!("{e}"));
+        watchdog::call(format!("key {spec}"));
         self.app.on_key(KeyEvent::new(c.code, c.mods));
     }
 
     pub fn mouse(&mut self, kind: MouseEventKind, x: u16, y: u16, mods: KeyModifiers) {
+        watchdog::call(format!("mouse {kind:?} at {x},{y}"));
         self.app.on_mouse(MouseEvent {
             kind,
             column: x,
@@ -408,6 +423,7 @@ impl H {
     }
 
     pub fn screen(&mut self) -> String {
+        watchdog::step("drawing a frame");
         self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
         let buf = self.term.backend().buffer().clone();
         let mut out = String::new();
