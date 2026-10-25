@@ -71,58 +71,68 @@ impl App {
             let target = e.path.clone();
             self.open_dir(target);
         } else if self.tab.archive.is_some() {
-            self.toast(
-                ToastKind::Info,
-                tf(
-                    Key::TInArchive,
-                    &[
-                        &self
-                            .key_for(Action::Copy)
-                            .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
-                        &self
-                            .key_for(Action::ExtractHere)
-                            .unwrap_or_else(|| Key::KeyExtractWord.tr().into()),
-                    ],
-                ),
-                4,
-            );
+            self.say_archive_is_read_only();
         } else if self.archive_candidate(e) {
             let target = e.path.clone();
             self.open_dir(target);
         } else if e.error.is_none() {
             let path = e.path.clone();
-            let platform = self.svc.platform.clone();
-            let notes = self.svc.notes.clone();
-            let state = platform.dirs().rada_state();
-            // Spawning a process is I/O: keep it off the UI thread.
-            self.redraw.after_launch();
-            std::thread::spawn(move || {
-                // A program chosen in "Open with…" to be used always for this kind of file
-                // takes the place of the system's default.
-                if openwith::open_with_chosen(platform.as_ref(), &state, &path) {
-                    return;
-                }
-                if let Err(err) = platform.opener().open(&path) {
-                    tracing::warn!("open {}: {err}", path.display());
-                    let _ = notes.send(CoreEvent::Note {
-                        text: tf(Key::TCannotOpen, &[&path.display(), &err]),
-                        error: true,
-                    });
-                }
-            });
-            self.toast(
-                ToastKind::Info,
-                tf(
-                    Key::TOpening,
-                    &[&self
-                        .tab
-                        .current()
-                        .map(|e| e.display.clone())
-                        .unwrap_or_default()],
-                ),
-                2,
-            );
+            self.open_with_system(path);
         }
+    }
+
+    /// Enter on a file inside an archive: it is not opened, it is copied or extracted.
+    fn say_archive_is_read_only(&mut self) {
+        self.toast(
+            ToastKind::Info,
+            tf(
+                Key::TInArchive,
+                &[
+                    &self
+                        .key_for(Action::Copy)
+                        .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
+                    &self
+                        .key_for(Action::ExtractHere)
+                        .unwrap_or_else(|| Key::KeyExtractWord.tr().into()),
+                ],
+            ),
+            4,
+        );
+    }
+
+    /// Open a file with the program the system, or the person's "Open with…", has for it.
+    fn open_with_system(&mut self, path: PathBuf) {
+        let platform = self.svc.platform.clone();
+        let notes = self.svc.notes.clone();
+        let state = platform.dirs().rada_state();
+        // Spawning a process is I/O: keep it off the UI thread.
+        self.redraw.after_launch();
+        std::thread::spawn(move || {
+            // A program chosen in "Open with…" to be used always for this kind of file
+            // takes the place of the system's default.
+            if openwith::open_with_chosen(platform.as_ref(), &state, &path) {
+                return;
+            }
+            if let Err(err) = platform.opener().open(&path) {
+                tracing::warn!("open {}: {err}", path.display());
+                let _ = notes.send(CoreEvent::Note {
+                    text: tf(Key::TCannotOpen, &[&path.display(), &err]),
+                    error: true,
+                });
+            }
+        });
+        self.toast(
+            ToastKind::Info,
+            tf(
+                Key::TOpening,
+                &[&self
+                    .tab
+                    .current()
+                    .map(|e| e.display.clone())
+                    .unwrap_or_default()],
+            ),
+            2,
+        );
     }
 
     /// Go inside a package (`.app`, `.photoslibrary`…) instead of opening it.

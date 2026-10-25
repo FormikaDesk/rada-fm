@@ -326,7 +326,6 @@ impl App {
     }
 
     pub(super) fn on_plan_key(&mut self, mut pv: Box<PlanView>, key: KeyEvent) {
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
             KeyCode::Esc => {}
             KeyCode::Char('q') if !pv.needs_typed_confirmation() => {}
@@ -339,60 +338,48 @@ impl App {
                     self.windows.modal = Some(Modal::Plan(pv));
                 }
             }
-            KeyCode::Char('c')
-                if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
-            {
-                let policy = pv.plan.policy.next();
-                self.replan_with(&mut pv, policy);
+            _ => {
+                self.press_plan(&mut pv, key);
                 self.windows.modal = Some(Modal::Plan(pv));
             }
+        }
+    }
+
+    /// What a key does to the plan window that stays open: choose how name clashes are settled,
+    /// move the keyboard between the buttons, scroll, or type the confirmation.
+    fn press_plan(&mut self, pv: &mut PlanView, key: KeyEvent) {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let typing = pv.needs_typed_confirmation();
+        let can_replan = !typing && !matches!(pv.replan, Replan::None);
+        match key.code {
+            KeyCode::Char('c') if can_replan => {
+                let policy = pv.plan.policy.next();
+                self.replan_with(pv, policy);
+            }
             // ← → choose how name clashes are settled (the pills, in the order they are in).
-            KeyCode::Left | KeyCode::Right
-                if !pv.needs_typed_confirmation() && !matches!(pv.replan, Replan::None) =>
-            {
+            KeyCode::Left | KeyCode::Right if can_replan => {
                 let dir = if key.code == KeyCode::Right { 1 } else { -1 };
                 let policy = crate::ui::policy_step(pv.plan.policy, dir);
                 if policy != pv.plan.policy {
-                    self.replan_with(&mut pv, policy);
+                    self.replan_with(pv, policy);
                 }
-                self.windows.modal = Some(Modal::Plan(pv));
             }
             // Tab moves the keyboard between the buttons.
-            KeyCode::Tab | KeyCode::BackTab => {
-                pv.cancel_focus = !pv.cancel_focus;
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
+            KeyCode::Tab | KeyCode::BackTab => pv.cancel_focus = !pv.cancel_focus,
             // d: every step, or the summary.
-            KeyCode::Char('d') if !pv.needs_typed_confirmation() => {
+            KeyCode::Char('d') if !typing => {
                 pv.details = !pv.details;
                 pv.scroll = 0;
-                self.windows.modal = Some(Modal::Plan(pv));
             }
-            KeyCode::Down | KeyCode::Char('j') if !pv.needs_typed_confirmation() => {
-                pv.scroll += 1;
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
-            KeyCode::Up | KeyCode::Char('k') if !pv.needs_typed_confirmation() => {
-                pv.scroll = pv.scroll.saturating_sub(1);
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
-            KeyCode::PageDown => {
-                pv.scroll += 10;
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
-            KeyCode::PageUp => {
-                pv.scroll = pv.scroll.saturating_sub(10);
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
-            KeyCode::Backspace if pv.needs_typed_confirmation() => {
+            KeyCode::Down | KeyCode::Char('j') if !typing => pv.scroll += 1,
+            KeyCode::Up | KeyCode::Char('k') if !typing => pv.scroll = pv.scroll.saturating_sub(1),
+            KeyCode::PageDown => pv.scroll += 10,
+            KeyCode::PageUp => pv.scroll = pv.scroll.saturating_sub(10),
+            KeyCode::Backspace if typing => {
                 pv.typed.pop();
-                self.windows.modal = Some(Modal::Plan(pv));
             }
-            KeyCode::Char(c) if pv.needs_typed_confirmation() && !ctrl => {
-                pv.typed.push(c);
-                self.windows.modal = Some(Modal::Plan(pv));
-            }
-            _ => self.windows.modal = Some(Modal::Plan(pv)),
+            KeyCode::Char(c) if typing && !ctrl => pv.typed.push(c),
+            _ => {}
         }
     }
 
