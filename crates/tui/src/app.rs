@@ -689,20 +689,6 @@ impl App {
         natural: false,
     };
 
-    /// This system keeps tags (everywhere but Windows).
-    pub fn tags_supported(&self) -> bool {
-        self.svc.platform.tags().is_some()
-    }
-
-    /// Whether the table has a Tag column to offer: the person wants it, the system has tags
-    /// and at least one item of the folder carries one. A folder with none has nothing to put
-    /// in it, and the room goes to the names.
-    pub fn tags_column_wanted(&self) -> bool {
-        self.settings.show_tags
-            && self.tags_supported()
-            && self.tab.listing.all().iter().any(|e| !e.tags.is_empty())
-    }
-
     /// Say why nothing can be made here when the list is a tag's items, not a folder.
     pub(super) fn refuse_in_tag_view(&mut self, what: &str) -> bool {
         if self.tab.recents_view() {
@@ -2110,33 +2096,6 @@ impl App {
             }
             _ => {}
         }
-    }
-
-    fn toggle_bookmark(&mut self) {
-        if self.refuse_in_tag_view(Key::WhatBookmark.tr()) {
-            return;
-        }
-        let cwd = self.tab.cwd.clone();
-        let add = !self.places.paths.bookmarks.contains(&cwd);
-        self.set_bookmark(cwd, add);
-    }
-
-    /// Add a folder to the bookmarks, or take it out (nothing happens when it already is
-    /// as asked).
-    pub(super) fn set_bookmark(&mut self, path: PathBuf, add: bool) {
-        if self.places.paths.bookmarks.contains(&path) == add {
-            return;
-        }
-        self.svc.places.toggle_bookmark(path);
-        self.toast(
-            ToastKind::Ok,
-            if add {
-                Key::TBookmarked.tr()
-            } else {
-                Key::TBookmarkRemoved.tr()
-            },
-            3,
-        );
     }
 
     // ------------------------------------------------------------------ modal keys
