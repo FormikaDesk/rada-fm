@@ -462,6 +462,7 @@ mod listing;
 mod load;
 mod menus;
 mod mount;
+mod mouse;
 mod navigate;
 mod notice;
 mod openwith;
