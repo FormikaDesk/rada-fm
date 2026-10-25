@@ -17,6 +17,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use super::{App, FilterState};
+use crate::chooser::Chooser;
 use crate::keymap::Action;
 use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 use crate::{fmt, fuzzy};
@@ -186,6 +187,96 @@ impl AddressEdit {
             self.text.remove(at);
             self.selected = None;
         }
+    }
+
+    /// Enter on a highlighted name: the path takes it before it is submitted.
+    fn choose(&mut self, sugg: &[String]) {
+        if let Some(name) = self.selected.and_then(|i| sugg.get(i)) {
+            let text = self.with_name(name);
+            self.text = text;
+        }
+    }
+
+    /// Tab: the highlighted name, the only one there is, or as much as they all share.
+    fn complete(&mut self, sugg: &[String]) {
+        let pick = self
+            .selected
+            .and_then(|i| sugg.get(i))
+            .cloned()
+            .or_else(|| {
+                if sugg.len() == 1 {
+                    sugg.first().cloned()
+                } else {
+                    None
+                }
+            });
+        match pick {
+            Some(name) => {
+                self.text = self.with_name(&name);
+                self.cursor = self.text.chars().count();
+            }
+            None => {
+                // Several names: as much as they all share.
+                let common = common_prefix(sugg);
+                let cut = self.text.rfind(is_separator).map_or(0, |i| i + 1);
+                if common.chars().count() > self.text[cut..].chars().count() {
+                    self.text = format!("{}{}", &self.text[..cut], common);
+                    self.cursor = self.text.chars().count();
+                }
+            }
+        }
+        self.selected = None;
+    }
+
+    /// Tab in the search mode: the next of the hits.
+    fn next_hit(&mut self) {
+        let n = self.hits.len();
+        if n > 0 {
+            self.hit_selected = Some(self.hit_selected.map_or(0, |i| (i + 1) % n));
+        }
+    }
+
+    /// The arrows in the search mode, when there are hits: the one above or below.
+    fn step_hit(&mut self, down: bool) {
+        let n = self.hits.len();
+        self.hit_selected = match (self.hit_selected, down) {
+            (None, true) => Some(0),
+            (None, false) => Some(n - 1),
+            (Some(i), true) => Some((i + 1) % n),
+            (Some(i), false) => Some((i + n - 1) % n),
+        };
+    }
+
+    /// The arrows in the path mode: the suggestion below or above.
+    fn step_suggestion(&mut self, sugg: &[String], down: bool) {
+        let n = sugg.len();
+        if n == 0 {
+            return;
+        }
+        self.selected = Some(match (self.selected, down) {
+            (None, true) => 0,
+            (None, false) => n - 1,
+            (Some(i), true) => (i + 1) % n,
+            (Some(i), false) => (i + n - 1) % n,
+        });
+    }
+
+    /// Left, Right, Home and End: the text is no longer all selected.
+    fn move_cursor(&mut self, code: KeyCode) {
+        self.fresh = false;
+        self.cursor = match code {
+            KeyCode::Left => self.cursor.saturating_sub(1),
+            KeyCode::Right => (self.cursor + 1).min(self.text.chars().count()),
+            KeyCode::Home => 0,
+            _ => self.text.chars().count(),
+        };
+    }
+
+    fn clear_line(&mut self) {
+        self.text.clear();
+        self.cursor = 0;
+        self.selected = None;
+        self.fresh = false;
     }
 
     /// The folder whose subfolders are being completed, and the start of the name typed in it.
@@ -372,55 +463,12 @@ impl App {
             .all()
             .iter()
             .any(|e| e.name == q_text.as_str());
-        let mut commands: Vec<(i64, BarHit)> = Vec::new();
-        for &action in Action::ALL
-            .iter()
-            .filter(|a| offered(**a) && chooser.as_ref().is_none_or(|c| c.allows(**a)))
-        {
-            let label = action.label();
-            let english = action.label_key().in_lang(rada_core::i18n::Lang::En);
-            let best = match (fuzzy::score(&q, label), fuzzy::score(&q, english)) {
-                (Some((a, pos)), Some((b, _))) if a >= b => Some((a, pos)),
-                (_, Some((b, _))) => Some((b, Vec::new())),
-                (Some((a, pos)), None) => Some((a, pos)),
-                (None, None) => None,
-            };
-            if let Some((score, label_pos)) = best {
-                commands.push((
-                    score,
-                    BarHit {
-                        item: BarItem::Command(action),
-                        label_pos,
-                    },
-                ));
-            }
-        }
-        commands.sort_by_key(|c| std::cmp::Reverse(c.0));
-        let mut hits: Vec<BarHit> = commands
-            .into_iter()
-            .take(MAX_COMMANDS)
-            .map(|(_, h)| h)
-            .collect();
+        let mut hits = command_hits(&q, chooser.as_ref());
         if let Some(p) = &mut a.palette {
             p.query = q;
             p.cursor = p.query.chars().count();
             p.refilter();
-            let places: Vec<BarHit> = p
-                .hits
-                .iter()
-                .filter(|h| {
-                    !matches!(
-                        p.items[h.item].kind,
-                        PaletteKind::Folder | PaletteKind::Typed | PaletteKind::Parent
-                    )
-                })
-                .take(MAX_PLACES)
-                .map(|h| BarHit {
-                    item: BarItem::Place(p.items[h.item].clone()),
-                    label_pos: h.label_pos.clone(),
-                })
-                .collect();
-            hits.extend(places);
+            hits.extend(place_hits(p));
         }
         // Nothing among the commands and places, and no entry of this folder by that name:
         // the folders zoxide knows.
@@ -548,87 +596,21 @@ impl App {
             KeyCode::Esc => return self.cancel_address_edit(),
             KeyCode::Enter if a.mode() != BarMode::Path => return self.bar_enter(),
             KeyCode::Enter => {
-                if let Some(name) = a.selected.and_then(|i| sugg.get(i)) {
-                    let text = a.with_name(name);
-                    a.text = text;
-                }
+                a.choose(&sugg);
                 return self.submit_address();
             }
             KeyCode::Tab | KeyCode::BackTab if a.mode() == BarMode::Search => {
-                let n = a.hits.len();
-                if n > 0 {
-                    a.hit_selected = Some(a.hit_selected.map_or(0, |i| (i + 1) % n));
-                }
+                a.next_hit();
                 return;
             }
-            KeyCode::Tab | KeyCode::BackTab => {
-                let pick = a.selected.and_then(|i| sugg.get(i)).cloned().or_else(|| {
-                    if sugg.len() == 1 {
-                        sugg.first().cloned()
-                    } else {
-                        None
-                    }
-                });
-                match pick {
-                    Some(name) => {
-                        a.text = a.with_name(&name);
-                        a.cursor = a.text.chars().count();
-                    }
-                    None => {
-                        // Several names: as much as they all share.
-                        let common = common_prefix(&sugg);
-                        let cut = a.text.rfind(is_separator).map_or(0, |i| i + 1);
-                        if common.chars().count() > a.text[cut..].chars().count() {
-                            a.text = format!("{}{}", &a.text[..cut], common);
-                            a.cursor = a.text.chars().count();
-                        }
-                    }
-                }
-                a.selected = None;
-            }
+            KeyCode::Tab | KeyCode::BackTab => a.complete(&sugg),
             KeyCode::Down | KeyCode::Up if a.mode() == BarMode::Search => {
-                let down = key.code == KeyCode::Down;
-                let n = a.hits.len();
-                if n == 0 {
-                    // Nothing to pick: the arrows move through the files that match.
-                    return self.dispatch(if down { Action::Down } else { Action::Up });
-                }
-                a.hit_selected = match (a.hit_selected, down) {
-                    (None, true) => Some(0),
-                    (None, false) => Some(n - 1),
-                    (Some(i), true) => Some((i + 1) % n),
-                    (Some(i), false) => Some((i + n - 1) % n),
-                };
-                return;
+                return self.search_arrow(key.code == KeyCode::Down);
             }
-            KeyCode::Down => {
-                if !sugg.is_empty() {
-                    a.selected = Some(a.selected.map_or(0, |i| (i + 1) % sugg.len()));
-                }
-            }
-            KeyCode::Up => {
-                if !sugg.is_empty() {
-                    a.selected = Some(
-                        a.selected
-                            .map_or(sugg.len() - 1, |i| (i + sugg.len() - 1) % sugg.len()),
-                    );
-                }
-            }
-            KeyCode::Left => {
-                a.fresh = false;
-                a.cursor = a.cursor.saturating_sub(1)
-            }
-            KeyCode::Right => {
-                a.fresh = false;
-                a.cursor = (a.cursor + 1).min(a.text.chars().count())
-            }
-            KeyCode::Home => {
-                a.fresh = false;
-                a.cursor = 0
-            }
-            KeyCode::End => {
-                a.fresh = false;
-                a.cursor = a.text.chars().count()
+            KeyCode::Down => a.step_suggestion(&sugg, true),
+            KeyCode::Up => a.step_suggestion(&sugg, false),
+            KeyCode::Left | KeyCode::Right | KeyCode::Home | KeyCode::End => {
+                a.move_cursor(key.code)
             }
             // Backspace with nothing left to delete leaves the bar (as it took the filter off).
             KeyCode::Backspace if a.text.is_empty() && !a.fresh => {
@@ -636,16 +618,25 @@ impl App {
             }
             KeyCode::Backspace => a.backspace(),
             KeyCode::Delete => a.delete(),
-            KeyCode::Char('u') if ctrl => {
-                a.text.clear();
-                a.cursor = 0;
-                a.selected = None;
-                a.fresh = false;
-            }
+            KeyCode::Char('u') if ctrl => a.clear_line(),
             KeyCode::Char(c) if !ctrl && !alt => a.type_char(c),
             _ => {}
         }
         self.bar_changed();
+    }
+
+    /// An arrow in the search mode: the hit above or below, or, when the bar offers none, the
+    /// file above or below.
+    fn search_arrow(&mut self, down: bool) {
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
+        if !a.hits.is_empty() {
+            a.step_hit(down);
+            return;
+        }
+        // Nothing to pick: the arrows move through the files that match.
+        self.dispatch(if down { Action::Down } else { Action::Up });
     }
 
     /// Go where the text says.
@@ -661,6 +652,57 @@ impl App {
             self.open_dir(target);
         }
     }
+}
+
+/// The commands whose names match what is typed (in this language or in English), best first.
+fn command_hits(q: &str, chooser: Option<&Chooser>) -> Vec<BarHit> {
+    let mut commands: Vec<(i64, BarHit)> = Vec::new();
+    for &action in Action::ALL
+        .iter()
+        .filter(|a| offered(**a) && chooser.is_none_or(|c| c.allows(**a)))
+    {
+        let label = action.label();
+        let english = action.label_key().in_lang(rada_core::i18n::Lang::En);
+        let best = match (fuzzy::score(q, label), fuzzy::score(q, english)) {
+            (Some((a, pos)), Some((b, _))) if a >= b => Some((a, pos)),
+            (_, Some((b, _))) => Some((b, Vec::new())),
+            (Some((a, pos)), None) => Some((a, pos)),
+            (None, None) => None,
+        };
+        if let Some((score, label_pos)) = best {
+            commands.push((
+                score,
+                BarHit {
+                    item: BarItem::Command(action),
+                    label_pos,
+                },
+            ));
+        }
+    }
+    commands.sort_by_key(|c| std::cmp::Reverse(c.0));
+    commands
+        .into_iter()
+        .take(MAX_COMMANDS)
+        .map(|(_, h)| h)
+        .collect()
+}
+
+/// The places among what the palette found for the text, the folders of the list left out.
+fn place_hits(p: &PaletteView) -> Vec<BarHit> {
+    p.hits
+        .iter()
+        .filter(|h| {
+            !matches!(
+                p.items[h.item].kind,
+                PaletteKind::Folder | PaletteKind::Typed | PaletteKind::Parent
+            )
+        })
+        .take(MAX_PLACES)
+        .map(|h| BarHit {
+            item: BarItem::Place(p.items[h.item].clone()),
+            label_pos: h.label_pos.clone(),
+        })
+        .collect()
 }
 
 fn common_prefix(names: &[String]) -> String {
