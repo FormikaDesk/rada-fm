@@ -1,14 +1,15 @@
-//! Reading a folder: asking for it, taking in the answer of the worker, and the changes the watcher reports.
+//! Reading a folder: asking for it, taking in the answer of the worker, and the changes the
+//! watcher reports.
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use rada_core::events::{CoreEvent, DirEvent, WatchEvent};
+use rada_core::events::{DirEvent, WatchEvent};
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{DirListing, SortKey, SortSpec};
 
-use super::{App, LoadState, ToastKind, columns, demo_volumes};
+use super::{App, LoadState, ToastKind, columns};
 use crate::nav::NavMove;
 
 impl App {
@@ -21,74 +22,6 @@ impl App {
         natural: false,
     };
 
-    // ------------------------------------------------------------------ core events
-
-    pub fn on_core_event(&mut self, ev: CoreEvent) {
-        self.redraw.dirty = true;
-        match ev {
-            CoreEvent::Dir(d) => self.on_dir(d),
-            CoreEvent::Watch(w) => self.on_watch(w),
-            CoreEvent::Preview(p) => self.on_preview(p),
-            CoreEvent::Volumes(v) => {
-                self.devices.volumes_seen = true;
-                self.devices.volumes = if self.hooks.demo_volumes {
-                    demo_volumes()
-                } else {
-                    v
-                };
-                self.folder_info
-                    .sizes
-                    .set_volumes(&self.devices.volumes, self.svc.platform.device_root());
-                self.refresh_palette();
-            }
-            CoreEvent::Unmounted(list) => {
-                self.devices.unmounted = if self.hooks.demo_volumes {
-                    Vec::new()
-                } else {
-                    list
-                };
-            }
-            CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
-            CoreEvent::Paths(p) => {
-                self.places.paths = p;
-                self.refresh_palette();
-            }
-            CoreEvent::Job(j) => self.on_job(j),
-            CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
-            CoreEvent::Git { dir, status } => self.on_git(dir, status),
-            CoreEvent::Tree { dir, hidden, kids } => {
-                self.side_nav.tree.answer(dir, hidden, kids);
-                self.redraw.dirty = true;
-            }
-            CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
-            CoreEvent::Size(s) => self.on_size_event(s),
-            CoreEvent::Update(u) => self.on_update_event(u),
-            CoreEvent::Ejected {
-                mount,
-                name,
-                result,
-            } => self.on_ejected(mount, name, result),
-            CoreEvent::FontInstalled(r) => self.on_font_installed(r),
-            CoreEvent::OpenChoices {
-                path,
-                kind,
-                apps,
-                always,
-            } => self.on_open_choices(path, kind, apps, always),
-            CoreEvent::Note { text, error } => {
-                self.toast(
-                    if error {
-                        ToastKind::Error
-                    } else {
-                        ToastKind::Info
-                    },
-                    text,
-                    5,
-                );
-            }
-        }
-    }
-
     pub(super) fn request_dir(&mut self, path: PathBuf) {
         if path != self.tab.cwd {
             self.tab.filter = None;
@@ -99,7 +32,7 @@ impl App {
         self.svc.loader.load(path, generation);
     }
 
-    fn on_dir(&mut self, ev: DirEvent) {
+    pub(super) fn on_dir(&mut self, ev: DirEvent) {
         match ev {
             DirEvent::Loaded {
                 generation,
@@ -219,7 +152,7 @@ impl App {
         }
     }
 
-    fn on_watch(&mut self, ev: WatchEvent) {
+    pub(super) fn on_watch(&mut self, ev: WatchEvent) {
         match ev {
             WatchEvent::Changed { dir, paths, rescan } => {
                 if dir != self.tab.cwd {

@@ -643,8 +643,6 @@ impl App {
         }
     }
 
-    // ------------------------------------------------------------------ navigation
-
     /// Change how zoxide is called (the program starts with the configuration's choice; the
     /// tests give it a made-up one).
     pub fn use_zoxide(&mut self, zoxide: rada_core::zoxide::Zoxide) {
@@ -658,9 +656,73 @@ impl App {
         self.folder_info.forget_git();
     }
 
-    // ------------------------------------------------------------------ starting operations
+    // ------------------------------------------------------------------ core events
 
-    // ------------------------------------------------------------------ keys
+    pub fn on_core_event(&mut self, ev: CoreEvent) {
+        self.redraw.dirty = true;
+        match ev {
+            CoreEvent::Dir(d) => self.on_dir(d),
+            CoreEvent::Watch(w) => self.on_watch(w),
+            CoreEvent::Preview(p) => self.on_preview(p),
+            CoreEvent::Volumes(v) => {
+                self.devices.volumes_seen = true;
+                self.devices.volumes = if self.hooks.demo_volumes {
+                    demo_volumes()
+                } else {
+                    v
+                };
+                self.folder_info
+                    .sizes
+                    .set_volumes(&self.devices.volumes, self.svc.platform.device_root());
+                self.refresh_palette();
+            }
+            CoreEvent::Unmounted(list) => {
+                self.devices.unmounted = if self.hooks.demo_volumes {
+                    Vec::new()
+                } else {
+                    list
+                };
+            }
+            CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
+            CoreEvent::Paths(p) => {
+                self.places.paths = p;
+                self.refresh_palette();
+            }
+            CoreEvent::Job(j) => self.on_job(j),
+            CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Git { dir, status } => self.on_git(dir, status),
+            CoreEvent::Tree { dir, hidden, kids } => {
+                self.side_nav.tree.answer(dir, hidden, kids);
+                self.redraw.dirty = true;
+            }
+            CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
+            CoreEvent::Size(s) => self.on_size_event(s),
+            CoreEvent::Update(u) => self.on_update_event(u),
+            CoreEvent::Ejected {
+                mount,
+                name,
+                result,
+            } => self.on_ejected(mount, name, result),
+            CoreEvent::FontInstalled(r) => self.on_font_installed(r),
+            CoreEvent::OpenChoices {
+                path,
+                kind,
+                apps,
+                always,
+            } => self.on_open_choices(path, kind, apps, always),
+            CoreEvent::Note { text, error } => {
+                self.toast(
+                    if error {
+                        ToastKind::Error
+                    } else {
+                        ToastKind::Info
+                    },
+                    text,
+                    5,
+                );
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ modal keys
 
@@ -688,6 +750,4 @@ impl App {
             Modal::Properties(p) => self.on_properties_key(p, key),
         }
     }
-
-    // ------------------------------------------------------------------ dates for the list
 }
