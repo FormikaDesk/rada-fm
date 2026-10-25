@@ -1,5 +1,6 @@
 //! The menus: the one on the right button, and the dropdowns of the command bar.
 
+use crossterm::event::{KeyCode, KeyEvent};
 use rada_core::i18n::Key;
 
 use super::{
@@ -406,6 +407,76 @@ impl App {
             .jobs
             .plan_request(OpRequest::SetTags { items, change });
         self.begin_plan(Key::PlanningGeneric.tr(), h);
+    }
+
+    pub(super) fn on_menu_key(&mut self, mut m: MenuView, key: KeyEvent) {
+        match key.code {
+            // Esc closes the menu in front: a submenu gives the menu it came from back.
+            KeyCode::Esc | KeyCode::Char('q') => {
+                if let Some(p) = m.parent.take() {
+                    self.windows.modal = Some(Modal::Menu(*p));
+                }
+            }
+            KeyCode::Left | KeyCode::Char('h') if m.parent.is_some() => {
+                if let Some(p) = m.parent.take() {
+                    self.windows.modal = Some(Modal::Menu(*p));
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                m.step(1);
+                self.windows.modal = Some(Modal::Menu(m));
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                m.step(-1);
+                self.windows.modal = Some(Modal::Menu(m));
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                // Right opens a submenu; on any other entry it does nothing.
+                if m.items.get(m.selected).is_some_and(MenuItem::opens_menu) {
+                    self.menu_activate(m);
+                } else {
+                    self.windows.modal = Some(Modal::Menu(m));
+                }
+            }
+            KeyCode::Enter => self.menu_activate(m),
+            _ => self.windows.modal = Some(Modal::Menu(m)),
+        }
+    }
+
+    /// Choose the entry under the cursor: run it, or open the menu it stands for beside this
+    /// one (which stays in view, its entry marked).
+    pub(super) fn menu_activate(&mut self, m: MenuView) {
+        let Some(it) = m.items.get(m.selected) else {
+            return;
+        };
+        if !it.enabled {
+            self.windows.modal = Some(Modal::Menu(m));
+            return;
+        }
+        match it.cmd.clone() {
+            MenuCmd::Sub(kind) => {
+                let items = self.menu_items(kind);
+                let title = self.submenu_title(kind);
+                let mut child = MenuView::new((0, 0), items).titled(title);
+                child.parent = Some(Box::new(m));
+                self.windows.modal = Some(Modal::Menu(child));
+            }
+            MenuCmd::OpenWithList => {
+                if let Some(path) = self.tab.current().map(|e| e.path.clone()) {
+                    self.open_with_window(path, Some(Box::new(m)));
+                } else {
+                    self.windows.modal = None;
+                }
+            }
+            cmd => {
+                let at = (
+                    m.at.0.saturating_add(2),
+                    m.at.1.saturating_add(1 + m.selected as u16),
+                );
+                self.windows.modal = None;
+                self.run_menu(cmd, at);
+            }
+        }
     }
 }
 

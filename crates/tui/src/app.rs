@@ -449,6 +449,7 @@ impl TestHooks {
     }
 }
 
+mod actions;
 mod address;
 mod archives;
 mod bar;
@@ -462,9 +463,11 @@ mod jobs;
 mod listing;
 mod load;
 mod menus;
+mod menuview;
 mod mount;
 mod mouse;
 mod navigate;
+mod navrows;
 mod notice;
 mod openwith;
 mod ops;
@@ -486,8 +489,9 @@ mod windows;
 pub use address::{AddressEdit, BarHit, BarItem, BarMode};
 pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
-pub use input::{FilterState, MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, TagCmd};
+pub use input::FilterState;
 pub use menus::MenuKind;
+pub use menuview::{MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, TagCmd};
 pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
 pub use ops::{Clip, Operations, Running};
