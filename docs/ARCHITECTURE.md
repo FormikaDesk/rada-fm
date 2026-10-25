@@ -55,7 +55,7 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 | `settings` | What `config.toml` and the View menu set: theme, icons, keymap, date formats, layout. Read all the time, changes seldom. | `app/settings.rs` |
 | `svc` | The workers and their senders (`Services`), seen only from `App`. | `services.rs` |
 | `hooks` | What only tests and screenshots use: the demo scene, made-up disks, a settable clock. | `app.rs` (`TestHooks`) |
-| `tab` | The front tab: folder, listing, filter, sort, view, history, and its `Selection` (cursor, scroll, marks). | `app/tabs.rs`, `app/selection.rs` |
+| `tab` | The front tab: folder, listing, filter, sort, view, history, and its `Selection` (cursor, scroll, marks). | `app/tabs.rs`, `app/listing.rs`, `app/selection.rs` |
 | `tabs` | The other tabs, which one is in front, and what is saved between sessions. | `app/tabs.rs` |
 | `preview` | The preview of the item under the cursor, its picture, and the keyboard focus in it. | `app/preview.rs` |
 | `devices` | Disks, sticks and phones, and the folders the system holds back. | `app/mount.rs` |
@@ -70,6 +70,8 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 | `folder_info` | What is worked out about the folder shown: git status, folder sizes, date cache. | `app/panels.rs` |
 | `updates` | The version, what the update worker last told, whether somebody waits for an answer. | `app/update.rs` |
 | `last_click` | The time and row of the last click, for the double click. | `app.rs` |
+
+A method sits next to the data it uses. One that reads only a group is a method of that group (`TabState::current`, `Redraw::after_launch`). One that reaches several groups, or the workers in `svc`, stays a method of `App` and sits in the file of its subject (`toast` in `app/windows.rs`). `app.rs` keeps what only the whole `App` can do: building it, the event loop's entry points and the sending of events to the groups.
 
 ### Tabs
 
