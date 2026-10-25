@@ -139,6 +139,16 @@ impl Operations {
 }
 
 impl App {
+    /// The window with the journal of operations, which the worker fills.
+    pub(super) fn open_history(&mut self) {
+        self.windows.modal = Some(Modal::History(HistoryView {
+            entries: Vec::new(),
+            selected: 0,
+            loading: true,
+        }));
+        self.svc.jobs.load_history();
+    }
+
     pub(super) fn begin_plan(&mut self, what: &str, handle: JobHandle) {
         self.ops.plan_job = Some(handle.id);
         self.windows.modal = Some(Modal::Scanning {

@@ -2,8 +2,9 @@
 //! the picture that goes with it and whether the keyboard is in the pane.
 
 use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::i18n::Key;
 
-use super::{App, Modal};
+use super::{App, Modal, ToastKind};
 use crate::images::{ImageUi, ResizeResult};
 use crate::keymap::Action;
 use rada_core::events::PreviewEvent;
@@ -195,6 +196,12 @@ impl PreviewPane {
 }
 
 impl App {
+    pub(super) fn toggle_hex(&mut self) {
+        if !self.preview.toggle_hex() {
+            self.toast(ToastKind::Info, Key::THexOnlyBinary.tr(), 2);
+        }
+    }
+
     pub(super) fn request_preview(&mut self) {
         let Some(e) = self.tab.current() else {
             self.preview.clear();

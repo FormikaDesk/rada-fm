@@ -127,6 +127,16 @@ fn matches_name(e: &Entry, terms: &[&String]) -> bool {
 }
 
 impl App {
+    pub(super) fn toggle_hidden(&mut self) {
+        let keep = self.tab.cursor_name();
+        self.settings.show_hidden = !self.settings.show_hidden;
+        self.rebuild_visible();
+        self.tab.restore_cursor(keep);
+        // A folder's preview lists what the list lists.
+        self.preview.invalidate();
+        self.request_preview();
+    }
+
     pub(super) fn rebuild_visible(&mut self) {
         self.folder_info.date_cache.clear();
         let show = self.settings.show_hidden;

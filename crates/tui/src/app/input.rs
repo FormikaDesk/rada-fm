@@ -2,7 +2,7 @@
 
 use crossterm::event::KeyEventKind;
 
-use super::{App, HistoryView, InputKind, InputView, LoadState, MenuKind, Modal, ToastKind};
+use super::{App, LoadState, MenuKind, Modal, ToastKind};
 use crate::hits::Target;
 use crate::keymap::{Action, Scheme};
 use crate::view::ViewMode;
@@ -259,6 +259,25 @@ impl MenuView {
     }
 }
 
+/// Actions after which an extended selection is not extended any more.
+fn moves_cursor(action: Action) -> bool {
+    use Action::*;
+    matches!(
+        action,
+        Up | Down
+            | Parent
+            | Back
+            | Forward
+            | Open
+            | First
+            | Last
+            | PageUp
+            | PageDown
+            | HalfPageUp
+            | HalfPageDown
+    )
+}
+
 impl App {
     // ------------------------------------------------------------------ keyboard
 
@@ -272,42 +291,60 @@ impl App {
         if key.code == KeyCode::Char('l') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.redraw.full_redraw = true;
         }
-        // The card at the bottom right goes at the first key (the key still does its job); an
-        // error stays until Esc, which it takes when nothing else is open.
+        if self.key_goes_to_card(key) || self.key_goes_to_open_input(key) {
+            return;
+        }
+        if self.key_changes_tab_or_column(key) {
+            return;
+        }
+        if let Some(action) = self.settings.keymap.action_for(&key) {
+            self.on_action_key(key, action);
+        }
+    }
+
+    /// The card at the bottom right goes at the first key (the key still does its job); an
+    /// error stays until Esc, which it takes when nothing else is open.
+    fn key_goes_to_card(&mut self, key: KeyEvent) -> bool {
         let now = self.notice_now();
         if self.windows.modal.is_none()
             && self.windows.address.is_none()
             && key.code == KeyCode::Esc
             && self.windows.notices.dismiss_error(now)
         {
-            return;
+            return true;
         }
         self.windows.notices.on_key(now);
+        false
+    }
+
+    /// A window, the address bar, the filter box or the file chooser takes the key.
+    fn key_goes_to_open_input(&mut self, key: KeyEvent) -> bool {
         if self.windows.modal.is_some() {
             self.on_modal_key(key);
-            return;
+            return true;
         }
         if self.windows.address.is_some() {
             self.on_address_key(key);
-            return;
+            return true;
         }
         if self.tab.filter.as_ref().is_some_and(|f| f.editing) {
             self.on_filter_key(key);
-            return;
+            return true;
         }
-        if self.session.chooser.is_some() && self.on_chooser_key(key) {
-            return;
-        }
-        // Alt+1 … Alt+9 jump to a tab.
+        self.session.chooser.is_some() && self.on_chooser_key(key)
+    }
+
+    /// Alt+1 … Alt+9 jump to a tab; in the Columns view Right goes into the folder under the
+    /// cursor and does nothing on a file (Left, the parent action, already goes to the folder
+    /// above).
+    fn key_changes_tab_or_column(&mut self, key: KeyEvent) -> bool {
         if key.modifiers.contains(KeyModifiers::ALT)
             && !key.modifiers.contains(KeyModifiers::CONTROL)
             && let KeyCode::Char(c @ '1'..='9') = key.code
         {
             self.go_tab(c as usize - '0' as usize);
-            return;
+            return true;
         }
-        // In the Columns view Right goes into the folder under the cursor and does nothing on a
-        // file; Left (the parent action) already goes to the folder above.
         if self.tab.view == ViewMode::Columns
             && !self.side_nav.focus
             && key.modifiers.is_empty()
@@ -316,94 +353,112 @@ impl App {
         {
             self.columns_right();
             self.redraw.dirty = true;
+            return true;
+        }
+        false
+    }
+
+    fn on_action_key(&mut self, key: KeyEvent, action: Action) {
+        if self.pane_takes_action(key, action) || self.step_across_grid(key, action) {
             return;
         }
-        if let Some(action) = self.settings.keymap.action_for(&key) {
-            // In NAV of the panels view the sideways arrows open and close the folders.
-            if self.frame.panels_shown
-                && self.side_nav.focus
-                && key.modifiers.is_empty()
-                && let Some(right) = match (action, key.code) {
-                    (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(true),
-                    (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(false),
-                    _ => None,
-                }
-                && self.on_nav_arrow(right)
-            {
-                self.redraw.dirty = true;
-                return;
+        self.dispatch(action);
+    }
+
+    /// The NAV box, the preview or the sidebar has the keyboard and wants this action.
+    fn pane_takes_action(&mut self, key: KeyEvent, action: Action) -> bool {
+        // In NAV of the panels view the sideways arrows open and close the folders.
+        if self.frame.panels_shown
+            && self.side_nav.focus
+            && key.modifiers.is_empty()
+            && let Some(right) = match (action, key.code) {
+                (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(true),
+                (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(false),
+                _ => None,
             }
-            if self.frame.panels_shown && self.preview.focus && self.on_preview_action(action) {
-                self.redraw.dirty = true;
-                return;
-            }
-            if self.side_nav.focus && self.on_side_action(action) {
-                self.redraw.dirty = true;
-                return;
-            }
-            // In the Icons view the arrows and h j k l move across the grid.
-            if self.tab.view == ViewMode::Icons
-                && !self.side_nav.focus
-                && key.modifiers.is_empty()
-                && let Some(step) = match (action, key.code) {
-                    (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(-1isize),
-                    (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(1),
-                    _ => None,
-                }
-            {
-                self.tab.sel.drop_anchor();
-                let to = (self.tab.sel.cursor as isize + step).max(0) as usize;
-                self.set_cursor(to);
-                self.redraw.dirty = true;
-                return;
-            }
-            self.dispatch(action);
+            && self.on_nav_arrow(right)
+        {
+            self.redraw.dirty = true;
+            return true;
         }
+        if self.frame.panels_shown && self.preview.focus && self.on_preview_action(action) {
+            self.redraw.dirty = true;
+            return true;
+        }
+        if self.side_nav.focus && self.on_side_action(action) {
+            self.redraw.dirty = true;
+            return true;
+        }
+        false
+    }
+
+    /// In the Icons view the arrows and h j k l move across the grid.
+    fn step_across_grid(&mut self, key: KeyEvent, action: Action) -> bool {
+        if self.tab.view == ViewMode::Icons
+            && !self.side_nav.focus
+            && key.modifiers.is_empty()
+            && let Some(step) = match (action, key.code) {
+                (Action::Parent, KeyCode::Left | KeyCode::Char('h')) => Some(-1isize),
+                (Action::Open, KeyCode::Right | KeyCode::Char('l')) => Some(1),
+                _ => None,
+            }
+        {
+            self.tab.sel.drop_anchor();
+            let to = (self.tab.sel.cursor as isize + step).max(0) as usize;
+            self.set_cursor(to);
+            self.redraw.dirty = true;
+            return true;
+        }
+        false
     }
 
     /// Do what an action says. Keys, clicks on hints and menu entries all end here.
     pub fn dispatch(&mut self, action: Action) {
-        use Action::*;
         self.redraw.dirty = true;
-        // A file chooser does what looks and moves, and nothing that changes a file.
-        if self.session.chooser.is_some() {
-            if !self
-                .session
-                .chooser
-                .as_ref()
-                .is_some_and(|c| c.allows(action))
-            {
-                self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 2);
-                return;
-            }
-            match action {
-                Action::Open => {
-                    self.chooser_navigate();
-                    return;
-                }
-                Action::ToggleMark if !self.chooser_may_mark() => return,
-                _ => {}
-            }
+        if self.chooser_gate(action) {
+            return;
         }
-        let page = self.tab.viewport.rows.saturating_sub(1).max(1);
-        if matches!(
-            action,
-            Up | Down
-                | Parent
-                | Back
-                | Forward
-                | Open
-                | First
-                | Last
-                | PageUp
-                | PageDown
-                | HalfPageUp
-                | HalfPageDown
-        ) {
+        if moves_cursor(action) {
             self.tab.sel.drop_anchor();
         }
-        // In the Icons view, up and down are a whole row, and a page is the tiles on screen.
-        let (line, page, half) = if self.tab.view == ViewMode::Icons {
+        let steps = self.cursor_steps();
+        let _done = self.move_action(action, steps)
+            || self.select_action(action, steps.0)
+            || self.file_action(action)
+            || self.view_action(action)
+            || self.window_action(action);
+    }
+
+    /// A file chooser does what looks and moves, and nothing that changes a file. True when the
+    /// action was refused or done here.
+    fn chooser_gate(&mut self, action: Action) -> bool {
+        if self.session.chooser.is_none() {
+            return false;
+        }
+        if !self
+            .session
+            .chooser
+            .as_ref()
+            .is_some_and(|c| c.allows(action))
+        {
+            self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 2);
+            return true;
+        }
+        match action {
+            Action::Open => {
+                self.chooser_navigate();
+                true
+            }
+            Action::ToggleMark => !self.chooser_may_mark(),
+            _ => false,
+        }
+    }
+
+    /// How far a line, a page and half a page move the cursor. In the Icons view, up and down
+    /// are a whole row, and a page is the tiles on screen.
+    fn cursor_steps(&self) -> (usize, usize, usize) {
+        let page = self.tab.viewport.rows.saturating_sub(1).max(1);
+        if self.tab.view == ViewMode::Icons {
             let cols = self.tab.viewport.grid_cols.max(1);
             let screenful = (self.tab.viewport.grid_rows.max(1) * cols)
                 .saturating_sub(cols)
@@ -411,7 +466,12 @@ impl App {
             (cols, screenful, screenful / 2)
         } else {
             (1, page, page / 2)
-        };
+        }
+    }
+
+    /// Actions that move the cursor or the folder. False for any other action.
+    fn move_action(&mut self, action: Action, (line, page, half): (usize, usize, usize)) -> bool {
+        use Action::*;
         match action {
             Up => self.set_cursor(self.tab.sel.cursor.saturating_sub(line)),
             Down => self.set_cursor(self.tab.sel.cursor + line),
@@ -429,27 +489,47 @@ impl App {
                 let home = self.svc.home.clone();
                 self.open_dir(home);
             }
+            _ => return false,
+        }
+        true
+    }
 
+    /// Actions that mark entries. False for any other action.
+    fn select_action(&mut self, action: Action, line: usize) -> bool {
+        use Action::*;
+        match action {
             ToggleMark => self.toggle_mark(),
             SelectAll => self.tab.mark_all(),
             SelectUp => self.extend_selection(self.tab.sel.cursor.saturating_sub(line)),
             SelectDown => self.extend_selection(self.tab.sel.cursor + line),
             SelectToFirst => self.extend_selection(0),
             SelectToLast => self.extend_selection(usize::MAX),
-            ClearSelection => {
-                if self.ops.cancel() {
-                    self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
-                } else if !self.tab.sel.marked.is_empty() {
-                    self.tab.sel.clear_marks();
-                } else if self.tab.filter.is_some() {
-                    self.set_filter(None);
-                } else if self.frame.size_notice_visible {
-                    // Nothing else for Esc to do: it closes the advice about the window size,
-                    // which then stays closed for the session.
-                    self.windows.size_notice_dismissed = true;
-                }
-            }
+            ClearSelection => self.clear_or_cancel(),
+            _ => return false,
+        }
+        true
+    }
 
+    /// Esc: stop the operation that runs, else drop the marks, else the filter, else close the
+    /// advice about the window size.
+    fn clear_or_cancel(&mut self) {
+        if self.ops.cancel() {
+            self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
+        } else if !self.tab.sel.marked.is_empty() {
+            self.tab.sel.clear_marks();
+        } else if self.tab.filter.is_some() {
+            self.set_filter(None);
+        } else if self.frame.size_notice_visible {
+            // Nothing else for Esc to do: it closes the advice about the window size,
+            // which then stays closed for the session.
+            self.windows.size_notice_dismissed = true;
+        }
+    }
+
+    /// Actions that start an operation on files. False for any other action.
+    fn file_action(&mut self, action: Action) -> bool {
+        use Action::*;
+        match action {
             Copy => self.yank(TransferMode::Copy),
             Cut => self.yank(TransferMode::Move),
             Paste => self.start_paste(),
@@ -457,30 +537,25 @@ impl App {
             DeletePermanently => self.start_trash(true),
             Rename => self.start_rename(),
             BulkRename => self.start_bulk_rename(),
-            NewFolder => {
-                if !self.refuse_in_archive(Key::WhatCreateFolder.tr())
-                    && !self.refuse_in_tag_view(Key::WhatCreateFolder.tr())
-                {
-                    self.windows.modal = Some(Modal::Input(InputView::new(
-                        InputKind::NewDir,
-                        String::new(),
-                    )))
-                }
-            }
+            NewFolder => self.ask_new_folder(),
+            NewFile => self.ask_new_file(),
             ExtractHere => self.start_extract(true),
             ExtractToFolder => self.start_extract(false),
             Compress => self.start_compress(),
             Undo => self.start_undo(None),
             Redo => self.start_redo(),
-            History => {
-                self.windows.modal = Some(Modal::History(HistoryView {
-                    entries: Vec::new(),
-                    selected: 0,
-                    loading: true,
-                }));
-                self.svc.jobs.load_history();
-            }
+            History => self.open_history(),
+            OpenWith => self.start_open_with(),
+            CopyPath => self.copy_path(),
+            _ => return false,
+        }
+        true
+    }
 
+    /// Actions that change how the folder is listed or shown. False for any other action.
+    fn view_action(&mut self, action: Action) -> bool {
+        use Action::*;
+        match action {
             Filter => self.start_bar(true),
             Palette => self.start_bar(false),
             Sort => self.set_sort(self.tab.sort.with_key(self.tab.sort.key.next())),
@@ -488,65 +563,47 @@ impl App {
                 reverse: !self.tab.sort.reverse,
                 ..self.tab.sort
             }),
-            ToggleHidden => {
-                let keep = self.tab.cursor_name();
-                self.settings.show_hidden = !self.settings.show_hidden;
-                self.rebuild_visible();
-                self.tab.restore_cursor(keep);
-                // A folder's preview lists what the list lists.
-                self.preview.invalidate();
-                self.request_preview();
-            }
-            ToggleHex => {
-                if !self.preview.toggle_hex() {
-                    self.toast(ToastKind::Info, Key::THexOnlyBinary.tr(), 2);
-                }
-            }
+            ToggleHidden => self.toggle_hidden(),
+            ToggleHex => self.toggle_hex(),
             PreviewDown => self.preview.scroll_down(5),
             PreviewUp => self.preview.scroll_up(5),
-            Bookmark => self.toggle_bookmark(),
-            SwitchPane => self.switch_pane(),
-            ToggleSidebar => self.toggle_sidebar(),
-
-            NewFile => {
-                if !self.refuse_if_busy()
-                    && !self.refuse_in_archive(Key::WhatCreateFile.tr())
-                    && !self.refuse_in_tag_view(Key::WhatCreateFile.tr())
-                {
-                    self.windows.modal = Some(Modal::Input(InputView::new(
-                        InputKind::NewFile,
-                        String::new(),
-                    )))
-                }
-            }
             Refresh => self.refresh(),
-            FocusAddress => self.start_address_edit(),
             ToggleDetails => self.toggle_details(),
             ViewDetails => self.set_view(ViewMode::Details),
             ViewIcons => self.set_view(ViewMode::Icons),
             ViewColumns => self.set_view(ViewMode::Columns),
             ToggleTags => self.toggle_tags_column(),
             ToggleView => self.set_view(self.tab.view.other()),
+            _ => return false,
+        }
+        true
+    }
+
+    /// Actions about the bookmarks, the panes, the tabs and the windows. False for any other
+    /// action.
+    fn window_action(&mut self, action: Action) -> bool {
+        use Action::*;
+        match action {
+            Bookmark => self.toggle_bookmark(),
+            SwitchPane => self.switch_pane(),
+            ToggleSidebar => self.toggle_sidebar(),
+            FocusAddress => self.start_address_edit(),
             Properties => self.open_properties(),
-            OpenWith => self.start_open_with(),
-            CopyPath => self.copy_path(),
             OpenTerminal => self.open_terminal_here(),
             ContextMenu => self.open_context_menu_at_cursor(),
             NewTab => self.new_tab(),
             CloseTab => self.close_tab(self.tabs.active),
             NextTab => self.next_tab(),
             PrevTab => self.prev_tab(),
-
             Update => self.start_update_action(),
             QuickLook => self.quick_look(),
             ShowPackage => self.show_package(),
             ShowInFolder => self.show_in_folder(),
-            Help => {
-                self.windows.help_scroll = 0;
-                self.windows.modal = Some(Modal::Help);
-            }
+            Help => self.open_help(),
             Quit => self.quit(),
+            _ => return false,
         }
+        true
     }
 
     // ------------------------------------------------------------------ the explorer's own actions

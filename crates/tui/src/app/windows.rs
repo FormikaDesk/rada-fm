@@ -32,6 +32,11 @@ impl Windows {
 }
 
 impl App {
+    pub(super) fn open_help(&mut self) {
+        self.windows.help_scroll = 0;
+        self.windows.modal = Some(Modal::Help);
+    }
+
     pub(super) fn on_note(&mut self, text: String, error: bool) {
         let kind = if error {
             ToastKind::Error

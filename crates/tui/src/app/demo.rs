@@ -7,7 +7,7 @@ use std::time::Duration;
 use rada_core::i18n::{Key, tf};
 use rada_core::ops::{ConflictPolicy, TransferMode, TransferOptions};
 
-use super::{App, Clip, HistoryView, MenuCmd, MenuKind, Modal, Notice, NoticeAction, NoticeKind};
+use super::{App, Clip, MenuCmd, MenuKind, Modal, Notice, NoticeAction, NoticeKind};
 use crate::fmt;
 use crate::keymap::Action;
 
@@ -24,7 +24,7 @@ impl App {
         match scene {
             "palette" => self.demo_palette(arg),
             "plan" | "progress" => self.demo_plan(scene == "progress", d.dest),
-            "history" => self.demo_history(),
+            "history" => self.open_history(),
             // The list of the files used lately (the demo home has a `recently-used.xbel`).
             "recenti" => self.open_dir(rada_core::recents::view_path()),
             "selection" => self.demo_selection(),
@@ -68,15 +68,6 @@ impl App {
         let opts = TransferOptions::copy(ConflictPolicy::Skip);
         let h = self.svc.jobs.plan_transfer(paths, dest, opts);
         self.begin_plan(Key::PlanningCopy.tr(), h);
-    }
-
-    fn demo_history(&mut self) {
-        self.windows.modal = Some(Modal::History(HistoryView {
-            entries: Vec::new(),
-            selected: 0,
-            loading: true,
-        }));
-        self.svc.jobs.load_history();
     }
 
     /// A selection and something on the clipboard, to show the bottom bar at work.

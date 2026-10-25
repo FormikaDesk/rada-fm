@@ -12,6 +12,29 @@ use rada_core::ops::{ConflictPolicy, ExtractInto, OpRequest, Pattern};
 use super::{App, InputKind, InputView, Modal};
 
 impl App {
+    pub(super) fn ask_new_folder(&mut self) {
+        if !self.refuse_in_archive(Key::WhatCreateFolder.tr())
+            && !self.refuse_in_tag_view(Key::WhatCreateFolder.tr())
+        {
+            self.windows.modal = Some(Modal::Input(InputView::new(
+                InputKind::NewDir,
+                String::new(),
+            )))
+        }
+    }
+
+    pub(super) fn ask_new_file(&mut self) {
+        if !self.refuse_if_busy()
+            && !self.refuse_in_archive(Key::WhatCreateFile.tr())
+            && !self.refuse_in_tag_view(Key::WhatCreateFile.tr())
+        {
+            self.windows.modal = Some(Modal::Input(InputView::new(
+                InputKind::NewFile,
+                String::new(),
+            )))
+        }
+    }
+
     pub(super) fn start_rename(&mut self) {
         if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatRename.tr()) {
             return;
