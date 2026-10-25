@@ -75,7 +75,7 @@ namcap PKGBUILD rada-*.pkg.tar.zst          # needs `sudo pacman -S namcap`
    ```sh
    cp packaging/aur/rada/PKGBUILD packaging/aur/rada/.SRCINFO /path/outside/rada-aur/
    cd /path/outside/rada-aur && git add PKGBUILD .SRCINFO
-   git commit -m "rada 0.6.0rc16" && git push origin HEAD:master
+   git commit -m "rada 0.6.0rc17" && git push origin HEAD:master
    ```
 4. In the repository of rada, replace "Arch Linux (AUR): coming soon" in `README.md` and the
    "Not published yet" paragraph of `docs/install.md` with `yay -S rada` (or `paru -S rada`).
