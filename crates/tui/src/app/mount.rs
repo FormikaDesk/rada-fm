@@ -4,7 +4,7 @@
 
 use rada_core::platform::{AccessDenied, Unmounted, Volume};
 
-use super::{App, ToastKind};
+use super::{App, ToastKind, demo_volumes};
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
 use std::collections::HashSet;
@@ -62,6 +62,28 @@ impl Devices {
 }
 
 impl App {
+    /// The worker listed the volumes (or, in the demo, made-up ones are shown instead).
+    pub(super) fn on_volumes(&mut self, volumes: Vec<Volume>) {
+        self.devices.volumes_seen = true;
+        self.devices.volumes = if self.hooks.demo_volumes {
+            demo_volumes()
+        } else {
+            volumes
+        };
+        self.folder_info
+            .sizes
+            .set_volumes(&self.devices.volumes, self.svc.platform.device_root());
+        self.refresh_palette();
+    }
+
+    pub(super) fn on_unmounted(&mut self, list: Vec<Unmounted>) {
+        self.devices.unmounted = if self.hooks.demo_volumes {
+            Vec::new()
+        } else {
+            list
+        };
+    }
+
     /// When the folder in view is inside a phone or a camera: the name the device goes by (the
     /// one the sidebar shows) and the folder that is the device, which stand for the long
     /// path of the virtual filesystem at the head of the path bar.

@@ -664,37 +664,14 @@ impl App {
             CoreEvent::Dir(d) => self.on_dir(d),
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),
-            CoreEvent::Volumes(v) => {
-                self.devices.volumes_seen = true;
-                self.devices.volumes = if self.hooks.demo_volumes {
-                    demo_volumes()
-                } else {
-                    v
-                };
-                self.folder_info
-                    .sizes
-                    .set_volumes(&self.devices.volumes, self.svc.platform.device_root());
-                self.refresh_palette();
-            }
-            CoreEvent::Unmounted(list) => {
-                self.devices.unmounted = if self.hooks.demo_volumes {
-                    Vec::new()
-                } else {
-                    list
-                };
-            }
+            CoreEvent::Volumes(v) => self.on_volumes(v),
+            CoreEvent::Unmounted(list) => self.on_unmounted(list),
             CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
-            CoreEvent::Paths(p) => {
-                self.places.paths = p;
-                self.refresh_palette();
-            }
+            CoreEvent::Paths(p) => self.on_paths(p),
             CoreEvent::Job(j) => self.on_job(j),
             CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
             CoreEvent::Git { dir, status } => self.on_git(dir, status),
-            CoreEvent::Tree { dir, hidden, kids } => {
-                self.side_nav.tree.answer(dir, hidden, kids);
-                self.redraw.dirty = true;
-            }
+            CoreEvent::Tree { dir, hidden, kids } => self.on_tree(dir, hidden, kids),
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
             CoreEvent::Update(u) => self.on_update_event(u),
@@ -710,17 +687,7 @@ impl App {
                 apps,
                 always,
             } => self.on_open_choices(path, kind, apps, always),
-            CoreEvent::Note { text, error } => {
-                self.toast(
-                    if error {
-                        ToastKind::Error
-                    } else {
-                        ToastKind::Info
-                    },
-                    text,
-                    5,
-                );
-            }
+            CoreEvent::Note { text, error } => self.on_note(text, error),
         }
     }
 

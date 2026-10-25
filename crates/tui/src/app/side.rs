@@ -165,6 +165,21 @@ impl Tags {
 }
 
 impl App {
+    pub(super) fn on_paths(&mut self, paths: rada_core::places::PathLists) {
+        self.places.paths = paths;
+        self.refresh_palette();
+    }
+
+    pub(super) fn on_tree(
+        &mut self,
+        dir: PathBuf,
+        hidden: bool,
+        kids: Vec<rada_core::workers::TreeKid>,
+    ) {
+        self.side_nav.tree.answer(dir, hidden, kids);
+        self.redraw.dirty = true;
+    }
+
     /// A folder could not be opened because the system is waiting for the person to allow it:
     /// say so with the way to do it, and remember it for the sidebar.
     pub(super) fn on_access_denied(&mut self, d: rada_core::platform::AccessDenied) {

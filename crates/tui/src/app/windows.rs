@@ -32,6 +32,15 @@ impl Windows {
 }
 
 impl App {
+    pub(super) fn on_note(&mut self, text: String, error: bool) {
+        let kind = if error {
+            ToastKind::Error
+        } else {
+            ToastKind::Info
+        };
+        self.toast(kind, text, 5);
+    }
+
     /// The time notifications go by: the clock, and what tests have moved it on.
     pub fn notice_now(&self) -> Instant {
         Instant::now() + self.hooks.notice_skew
