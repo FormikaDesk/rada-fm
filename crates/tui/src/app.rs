@@ -14,15 +14,15 @@ use rada_core::archive::ArchiveKind;
 use rada_core::events::{CoreEvent, FailureInfo, JobId};
 use rada_core::journal::JournalEntry;
 use rada_core::model::SortSpec;
+use rada_core::ops::WarningKind;
 use rada_core::ops::{Cancel, ErrorChoice, Plan, Scan, TransferMode, UndoPlan};
-use rada_core::ops::{OpKind, WarningKind};
 use rada_core::platform::Volume;
 use rada_core::preview::Limits;
 
-use crate::fmt::{self, DateFormat, DateStyle};
+use crate::fmt::{DateFormat, DateStyle};
 use crate::icons::IconSet;
 use crate::images::{ImageMode, ImageUi};
-use crate::keymap::{Action, Keymap};
+use crate::keymap::Keymap;
 use crate::palette::PaletteView;
 use crate::services::Services;
 use crate::theme::Theme;
@@ -451,6 +451,7 @@ impl TestHooks {
 
 mod address;
 mod archives;
+mod bar;
 mod chooser;
 mod columns;
 mod demo;
@@ -467,6 +468,7 @@ mod navigate;
 mod notice;
 mod openwith;
 mod ops;
+mod outcome;
 mod palette;
 mod panels;
 mod preview;

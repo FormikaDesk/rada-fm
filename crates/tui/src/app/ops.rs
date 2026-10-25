@@ -7,7 +7,7 @@ use rada_core::events::FailureInfo;
 use rada_core::i18n::{Key, tf};
 use rada_core::ops::{ConflictPolicy, ErrorChoice, TransferOptions};
 
-use super::{App, HistoryView, Modal, PlanView, Replan, ResultView, ToastKind, notice};
+use super::{App, HistoryView, Modal, PlanView, Replan, ResultView, ToastKind};
 use crate::fmt;
 use crate::keymap::Action;
 use rada_core::events::JobId;
@@ -35,7 +35,7 @@ pub struct Running {
     pub totals: Totals,
     pub reversible: bool,
     /// Where the result will be, for the card that says it is done.
-    pub outcome: notice::Outcome,
+    pub outcome: super::outcome::Outcome,
 }
 
 impl Running {
