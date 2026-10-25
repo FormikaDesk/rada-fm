@@ -4,8 +4,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use rada_core::events::{JobEvent, JobId};
+use crossbeam_channel::Sender;
+use rada_core::events::{FailureInfo, JobEvent, JobId};
 use rada_core::i18n::{Key, tf};
+use rada_core::journal::JournalEntry;
 use rada_core::ops::{
     ErrorChoice, ExecReport, OpKind, Plan, Recovered, RunStatus, Scan, TransferMode, UndoPlan,
 };
@@ -38,13 +40,7 @@ impl App {
             JobEvent::Progress { job, progress } => {
                 self.ops.progress(job, progress);
             }
-            JobEvent::AskFailure { job, info, reply } => {
-                if self.ops.is_running(job) {
-                    self.windows.modal = Some(Modal::Failure { job, info, reply });
-                } else {
-                    let _ = reply.send(ErrorChoice::Abort);
-                }
-            }
+            JobEvent::AskFailure { job, info, reply } => self.on_ask_failure(job, info, reply),
             JobEvent::Finished {
                 job,
                 title,
@@ -53,13 +49,23 @@ impl App {
                 ..
             } => self.on_finished(job, title, report, journal_errors),
             JobEvent::Recovered { items } => self.on_recovered(items),
-            JobEvent::History { entries, .. } => {
-                if let Some(Modal::History(h)) = &mut self.windows.modal {
-                    h.entries = entries;
-                    h.loading = false;
-                    h.selected = 0;
-                }
-            }
+            JobEvent::History { entries, .. } => self.on_history_loaded(entries),
+        }
+    }
+
+    fn on_ask_failure(&mut self, job: JobId, info: FailureInfo, reply: Sender<ErrorChoice>) {
+        if self.ops.is_running(job) {
+            self.windows.modal = Some(Modal::Failure { job, info, reply });
+        } else {
+            let _ = reply.send(ErrorChoice::Abort);
+        }
+    }
+
+    fn on_history_loaded(&mut self, entries: Vec<JournalEntry>) {
+        if let Some(Modal::History(h)) = &mut self.windows.modal {
+            h.entries = entries;
+            h.loading = false;
+            h.selected = 0;
         }
     }
 
