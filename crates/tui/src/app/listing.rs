@@ -3,6 +3,7 @@
 
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{Entry, SortKey, SortSpec};
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -57,6 +58,13 @@ impl TabState {
         self.ensure_visible();
     }
 
+    /// Forget the marks of entries that are no longer in the folder.
+    pub(super) fn drop_stale_marks(&mut self) {
+        let existing: BTreeSet<OsString> =
+            self.listing.all().iter().map(|e| e.name.clone()).collect();
+        self.sel.marked.retain(|n| existing.contains(n));
+    }
+
     pub(super) fn mark_all(&mut self) {
         let all: Vec<OsString> = self
             .visible
@@ -108,6 +116,16 @@ fn matches_tag(e: &Entry, want: &str) -> bool {
         .any(|t| t.name.to_lowercase().contains(want) || (hue.is_some() && t.color == hue))
 }
 
+/// Whether every one of `terms` (lower case) is in the name of an entry. The name shown and
+/// the name on disk both count: "Scrivania" and "Desktop" find the same folder.
+fn matches_name(e: &Entry, terms: &[&String]) -> bool {
+    let name = e.display.to_lowercase();
+    let real = e.name.to_string_lossy().to_lowercase();
+    terms
+        .iter()
+        .all(|t| name.contains(t.as_str()) || real.contains(t.as_str()))
+}
+
 impl App {
     pub(super) fn rebuild_visible(&mut self) {
         self.folder_info.date_cache.clear();
@@ -137,17 +155,7 @@ impl App {
             .enumerate()
             .filter(|(_, e)| show || !e.hidden)
             .filter(|(_, e)| !dirs_only || e.is_dir())
-            .filter(|(_, e)| {
-                name_terms.is_empty() || {
-                    // The name shown and the name on disk both count: "Scrivania" and
-                    // "Desktop" find the same folder.
-                    let name = e.display.to_lowercase();
-                    let real = e.name.to_string_lossy().to_lowercase();
-                    name_terms
-                        .iter()
-                        .all(|t| name.contains(t.as_str()) || real.contains(t.as_str()))
-                }
-            })
+            .filter(|(_, e)| name_terms.is_empty() || matches_name(e, &name_terms))
             .filter(|(_, e)| tag_terms.iter().all(|want| matches_tag(e, want)))
             .map(|(i, _)| i)
             .collect();
