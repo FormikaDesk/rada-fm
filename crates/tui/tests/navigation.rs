@@ -8,7 +8,7 @@ use crossterm::event::KeyCode;
 fn at(h: &mut H, name: &str) {
     let n = name.to_string();
     h.wait(&format!("in {name}"), move |a| {
-        a.tab.cwd.ends_with(&n) && !a.is_loading()
+        a.tab.cwd.ends_with(&n) && !a.tab.is_loading()
     });
 }
 
@@ -27,7 +27,7 @@ fn back_and_forward_walk_through_the_visited_folders() {
     at(&mut h, &start);
     assert!(!h.app.tab.nav.can_back() && h.app.tab.nav.can_forward());
     assert_eq!(
-        h.app.current().map(|e| e.display.clone()).as_deref(),
+        h.app.tab.current().map(|e| e.display.clone()).as_deref(),
         Some("sub"),
         "the cursor is back on the folder we came out of"
     );
@@ -112,7 +112,7 @@ fn change_behind_does_not_cancel_a_visit() {
         }));
     }
     h.wait("the folder asked for", |a| {
-        a.tab.cwd == target && !a.is_loading()
+        a.tab.cwd == target && !a.tab.is_loading()
     });
     assert_eq!(h.names(), ["inner.txt"]);
 }

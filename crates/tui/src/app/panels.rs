@@ -234,7 +234,11 @@ impl App {
     pub fn want_tree(&mut self) {
         if self.settings.nav_mode == NavMode::Path {
             // Only the folder shown is asked about: its subfolders are what the box lists.
-            let want = self.view_title().is_none().then(|| self.tab.cwd.clone());
+            let want = self
+                .tab
+                .view_title()
+                .is_none()
+                .then(|| self.tab.cwd.clone());
             if self.side_nav.tree.open.iter().ne(want.iter()) {
                 self.side_nav.tree.open = want.into_iter().collect();
             }
@@ -262,7 +266,8 @@ impl App {
     /// is still out. Called by the drawing: it only sends a request, the answer arrives as an
     /// event. A virtual folder (a tag, the recent files, an archive) is not in a repository.
     pub fn want_git(&mut self) {
-        if !self.svc.git.enabled() || self.tab.archive.is_some() || self.view_title().is_some() {
+        if !self.svc.git.enabled() || self.tab.archive.is_some() || self.tab.view_title().is_some()
+        {
             if self.folder_info.git.take().is_some() {
                 self.redraw.dirty = true;
             }
@@ -450,7 +455,7 @@ impl App {
     /// subfolders; both empty when the folder shown is a place itself, or a tag, the recent
     /// files or the like, which are not in a tree of folders.
     fn way_rows(&self, items: &[sidebar::Item]) -> (Vec<NavRow>, Vec<NavRow>) {
-        if self.view_title().is_some() {
+        if self.tab.view_title().is_some() {
             return Default::default();
         }
         // The places a folder can be in or be: not the recent files, a tag, a disk that is not

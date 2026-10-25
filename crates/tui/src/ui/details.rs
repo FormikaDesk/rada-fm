@@ -28,7 +28,7 @@ const KEY_W: usize = 12;
 
 /// The properties of the item under the cursor, as label and value.
 fn properties(app: &App) -> Vec<(Key, String)> {
-    let Some(e) = app.current() else {
+    let Some(e) = app.tab.current() else {
         return Vec::new();
     };
     let when = |t| app.settings.date_with_day(t, app.now());
@@ -205,7 +205,7 @@ fn draw_header(f: &mut Frame, app: &mut App, inner: Rect) -> Option<Entry> {
         draw_marked_summary(f, app, inner);
         return None;
     }
-    let Some(e) = app.current().cloned() else {
+    let Some(e) = app.tab.current().cloned() else {
         let hint = Span::styled(Key::SelectToSee.tr(), app.settings.th.dim());
         f.render_widget(Paragraph::new(hint), Rect { height: 1, ..inner });
         return None;
@@ -352,7 +352,11 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Properties, at the bottom, a blank row above the status bar.
     let props_y = inner.y + inner.height.saturating_sub(props_h + bottom_gap);
-    let tags = app.current().map(|e| e.tags.clone()).unwrap_or_default();
+    let tags = app
+        .tab
+        .current()
+        .map(|e| e.tags.clone())
+        .unwrap_or_default();
     let lines: Vec<Line> = props
         .iter()
         .map(|(k, v)| {

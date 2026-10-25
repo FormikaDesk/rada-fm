@@ -42,7 +42,7 @@ fn home_label(app: &App) -> String {
 fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
     // A tag's items are not on a path: one segment, which is the list itself.
-    if let Some(title) = app.view_title() {
+    if let Some(title) = app.tab.view_title() {
         return vec![(title, app.tab.cwd.clone())];
     }
     let home = app.home();
@@ -181,7 +181,7 @@ fn view_label(app: &App) -> (Glyph, &'static str) {
 fn idle_crumbs(app: &App, budget: usize, field: Style, bar: &mut Bar<'static>) {
     bar.push(Span::styled(" ", field));
     // A folder being read shows a spinner after the path.
-    let spin = if app.is_loading() { 2 } else { 0 };
+    let spin = if app.tab.is_loading() { 2 } else { 0 };
     for (span, target) in crumbs(app, budget.saturating_sub(1 + spin), field) {
         match target {
             Some(t) => bar.push_hit(span, t),

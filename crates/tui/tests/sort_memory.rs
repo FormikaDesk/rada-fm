@@ -174,7 +174,7 @@ fn what_is_written_has_the_order_only_for_a_tab_that_was_sorted() {
     });
     // Anything that saves the state, with no sort touched: no order in the file.
     h.press("ctrl+t");
-    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     let saved = wait_for_tabs(&state, 2);
     assert!(
         saved.tabs.iter().all(|t| t.sort.is_none() && !t.reverse),
@@ -230,7 +230,7 @@ fn new_config_wins_unless_a_choice_was_made() {
         c.sort = config_sort(SortKey::Name, false)
     });
     h.press("ctrl+t");
-    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     h.app.dispatch(Action::SortReverse); // tab 2: chosen
     // One write at a time: each is made by a thread of its own, so two close together may land
     // in either order.
@@ -249,7 +249,7 @@ fn new_config_wins_unless_a_choice_was_made() {
         s.tabs.len() == 2 && s.tabs.iter().any(|t| t.sort_chosen == Some(true))
     });
     h.press("alt+1");
-    h.wait("tab 1", |a| a.tabs.active == 0 && !a.is_loading());
+    h.wait("tab 1", |a| a.tabs.active == 0 && !a.tab.is_loading());
     let saved = wait_saved("the front tab", &|s| s.active_tab == 0 && s.tabs.len() == 2);
     drop(h);
     // Second session: the configuration now says date.
@@ -266,7 +266,7 @@ fn new_config_wins_unless_a_choice_was_made() {
     );
     assert!(!h.app.tab.sort_chosen);
     h.press("alt+2");
-    h.wait("tab 2", |a| a.tabs.active == 1 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.active == 1 && !a.tab.is_loading());
     assert_eq!(
         (h.app.tab.sort.key, h.app.tab.sort.reverse),
         (SortKey::Name, true),
@@ -282,11 +282,11 @@ fn a_new_tab_has_the_order_of_the_one_it_came_from_and_the_same_choice() {
         c.sort = config_sort(SortKey::Name, false)
     });
     h.press("ctrl+t");
-    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     assert!(!h.app.tab.sort_chosen, "nothing was chosen in the first");
     h.app.dispatch(Action::SortReverse);
     h.press("ctrl+t");
-    h.wait("tab 3", |a| a.tabs.count() == 3 && !a.is_loading());
+    h.wait("tab 3", |a| a.tabs.count() == 3 && !a.tab.is_loading());
     assert!(h.app.tab.sort.reverse && h.app.tab.sort_chosen);
 }
 

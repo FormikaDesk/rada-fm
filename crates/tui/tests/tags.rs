@@ -103,7 +103,7 @@ fn confirm(h: &mut H) {
     });
     // The folder is read again: an attribute change does not always reach the watcher.
     h.app.refresh();
-    h.wait("reloaded", |a| !a.is_loading());
+    h.wait("reloaded", |a| !a.tab.is_loading());
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn choosing_a_colour_in_the_menu_plans_runs_and_can_be_undone() {
         a.ops.running.is_none() && !matches!(a.windows.modal, Some(Modal::Scanning { .. }))
     });
     h.app.refresh();
-    h.wait("reloaded", |a| !a.is_loading());
+    h.wait("reloaded", |a| !a.tab.is_loading());
     assert!(tags_of(&h, "a.txt").is_empty());
 }
 
@@ -377,7 +377,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
     h.keys("j"); // a.txt
     // A file tagged "Rosso" is red: the dot is drawn in red, and the menu ticks Rosso.
     assert_eq!(
-        h.app.current().unwrap().tags[0].color,
+        h.app.tab.current().unwrap().tags[0].color,
         Some(rada_core::platform::TagColor::Red)
     );
     let (x, y) = h.where_is(&Target::Row(h.app.tab.sel.cursor));
@@ -421,6 +421,7 @@ fn the_colours_are_called_what_the_system_calls_them() {
     confirm(&mut h);
     let blu = h
         .app
+        .tab
         .current()
         .unwrap()
         .tags

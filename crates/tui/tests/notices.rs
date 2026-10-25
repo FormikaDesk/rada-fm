@@ -35,7 +35,7 @@ fn copy_all_to(h: &mut H, dest: &std::path::Path) {
     h.app.open_dir(dest.to_path_buf());
     let d = dest.to_path_buf();
     h.wait("the destination", move |a| {
-        a.tab.cwd == d && !a.is_loading()
+        a.tab.cwd == d && !a.tab.is_loading()
     });
     h.press("ctrl+v");
     confirm(h);
@@ -108,13 +108,13 @@ fn show_on_the_card_goes_to_the_result() {
     // Go elsewhere, then use the card: it brings us back to where the copies are.
     h.app.open_dir(dir.clone());
     let d = dir.clone();
-    h.wait("away", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("away", move |a| a.tab.cwd == d && !a.tab.is_loading());
     let id = h.app.current_notice().unwrap().id;
     let _ = h.screen();
     h.click(&Target::Notice(id, NoticeHit::Show));
     let d = dest.clone();
     h.wait("the destination", move |a| {
-        a.tab.cwd == d && !a.is_loading()
+        a.tab.cwd == d && !a.tab.is_loading()
     });
     assert!(h.app.current_notice().is_none(), "a click closes the card");
 }

@@ -169,7 +169,9 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
     let last = (app.tab.sel.scroll + rows).min(count);
     let mut lines: Vec<Line> = Vec::new();
     for vis in app.tab.sel.scroll..last {
-        let Some(e) = app.entry_at(vis) else { continue };
+        let Some(e) = app.tab.entry_at(vis) else {
+            continue;
+        };
         let marked = app.tab.sel.marked.contains(&e.name);
         let style = if vis == app.tab.sel.cursor {
             th.cursor_row()
@@ -189,6 +191,7 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
             ..area
         };
         let marked = app
+            .tab
             .entry_at(vis)
             .is_some_and(|e| app.tab.sel.marked.contains(&e.name));
         if vis == app.tab.sel.cursor {
@@ -203,7 +206,7 @@ fn draw_current(f: &mut Frame, app: &mut App, area: Rect) {
 /// The third column: the name and what it holds (a folder's items, a file's preview).
 fn draw_next(f: &mut Frame, app: &mut App, area: Rect) {
     let th = app.settings.th.clone();
-    let Some(e) = app.current().cloned() else {
+    let Some(e) = app.tab.current().cloned() else {
         return;
     };
     let (glyph, color) = icons::icon(&e, app.settings.icons, &th);

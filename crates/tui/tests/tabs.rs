@@ -61,13 +61,13 @@ fn seen(h: &H) -> Seen {
 fn new_tab(h: &mut H, count: usize) {
     h.press("ctrl+t");
     h.wait("the new tab", |a| {
-        a.tabs.count() == count && !a.is_loading()
+        a.tabs.count() == count && !a.tab.is_loading()
     });
 }
 
 fn go_to(h: &mut H, tab: usize) {
     h.app.switch_tab(tab);
-    h.wait("the tab", |a| a.tabs.active == tab && !a.is_loading());
+    h.wait("the tab", |a| a.tabs.active == tab && !a.tab.is_loading());
 }
 
 /// The cursor on `name`, counting from the top: Down alone never goes back up.
@@ -79,7 +79,9 @@ fn cursor_on(h: &mut H, name: &str) {
 fn enter(h: &mut H, folder: &str) {
     cursor_on(h, folder);
     h.press("enter");
-    h.wait(folder, |a| a.tab.cwd.ends_with(folder) && !a.is_loading());
+    h.wait(folder, |a| {
+        a.tab.cwd.ends_with(folder) && !a.tab.is_loading()
+    });
 }
 
 fn mark(h: &mut H, name: &str) {
@@ -132,12 +134,12 @@ fn a_folder_that_was_still_loading_when_the_tab_was_left_is_not_loading_when_it_
     let work = h.app.tab.cwd.clone();
     cursor_on(&mut h, "sub");
     h.press("enter");
-    assert!(h.app.is_loading(), "the folder is being read");
+    assert!(h.app.tab.is_loading(), "the folder is being read");
     new_tab(&mut h, 2);
     go_to(&mut h, 0);
     h.pump(200);
     assert!(
-        !h.app.is_loading(),
+        !h.app.tab.is_loading(),
         "the read of the first tab does not wait for an answer that is gone"
     );
     assert_eq!(
@@ -152,13 +154,13 @@ fn a_step_back_that_was_on_its_way_is_given_up_with_the_tab() {
     let work = h.app.tab.cwd.clone();
     enter(&mut h, "sub");
     h.press("alt+left");
-    assert!(h.app.is_loading(), "the step back has been asked for");
+    assert!(h.app.tab.is_loading(), "the step back has been asked for");
     new_tab(&mut h, 2);
     go_to(&mut h, 0);
     assert!(h.app.tab.cwd.ends_with("sub") && h.app.tab.nav.can_back());
     // Going to the folder it was asked for, by another way, is a visit and not that step.
     h.app.dispatch(Action::Parent);
-    h.wait("work", |a| a.tab.cwd == work && !a.is_loading());
+    h.wait("work", |a| a.tab.cwd == work && !a.tab.is_loading());
     assert!(
         !h.app.tab.nav.can_forward(),
         "a new visit, not the step back that was given up"
@@ -180,7 +182,9 @@ fn a_new_tab_that_is_closed_again_leaves_the_tab_it_came_from_as_it_was() {
     h.app.dispatch(Action::ViewDetails);
     enter(&mut h, "other");
     h.app.close_tab(1);
-    h.wait("the first tab", |a| a.tabs.count() == 1 && !a.is_loading());
+    h.wait("the first tab", |a| {
+        a.tabs.count() == 1 && !a.tab.is_loading()
+    });
     assert_eq!(h.app.tabs.active, 0);
     assert_eq!(seen(&h), before);
 }
@@ -213,14 +217,16 @@ fn closing_the_front_tab_goes_to_the_neighbour_it_leaves_in_its_place() {
 
     // The one in the middle: the tab that was after it takes its place.
     h.app.close_tab(1);
-    h.wait("sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("sub", |a| a.tab.cwd.ends_with("sub") && !a.tab.is_loading());
     assert_eq!((h.app.tabs.active, h.app.tabs.count()), (1, 2));
     assert_eq!(h.marked_names(), ["one.txt"]);
     assert_eq!(folders(&h), ["work", "sub"]);
 
     // The last one: the one before it.
     h.app.close_tab(1);
-    h.wait("work", |a| a.tab.cwd.ends_with("work") && !a.is_loading());
+    h.wait("work", |a| {
+        a.tab.cwd.ends_with("work") && !a.tab.is_loading()
+    });
     assert_eq!((h.app.tabs.active, h.app.tabs.count()), (0, 1));
     assert_eq!(h.marked_names(), ["alpha.txt"]);
 }
@@ -233,7 +239,7 @@ fn closing_the_first_tab_of_several_brings_in_the_next_one() {
     mark(&mut h, "two.txt");
     go_to(&mut h, 0);
     h.app.close_tab(0);
-    h.wait("sub", |a| a.tab.cwd.ends_with("sub") && !a.is_loading());
+    h.wait("sub", |a| a.tab.cwd.ends_with("sub") && !a.tab.is_loading());
     assert_eq!((h.app.tabs.active, h.app.tabs.count()), (0, 1));
     assert_eq!(h.marked_names(), ["two.txt"]);
 }

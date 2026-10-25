@@ -33,7 +33,7 @@ impl App {
         use Action::*;
         let ro = self.tab.archive.is_some();
         // Nothing is made *in* a list of tagged items.
-        let nowhere = ro || self.tag_view().is_some();
+        let nowhere = ro || self.tab.tag_view().is_some();
         match kind {
             MenuKind::New => vec![
                 MenuItem::act(NewFolder, !nowhere, false),
@@ -159,7 +159,8 @@ impl App {
                         Key::ItemMany,
                     )
                 } else {
-                    self.current()
+                    self.tab
+                        .current()
                         .map(|e| e.display.clone())
                         .unwrap_or_default()
                 };
@@ -190,7 +191,7 @@ impl App {
                 kind: String::new(),
             });
         }
-        let e = self.current()?;
+        let e = self.tab.current()?;
         let (icon, icon_color) = crate::icons::icon(e, self.settings.icons, th);
         Some(MenuTitle {
             icon,
@@ -206,13 +207,13 @@ impl App {
         let has_clip = self.ops.clipboard.is_some();
         let mut items: Vec<MenuItem> = Vec::new();
         let ro = self.tab.archive.is_some();
-        let nowhere = ro || self.tag_view().is_some();
+        let nowhere = ro || self.tab.tag_view().is_some();
         let on_archive = self.on_archive_item();
         if on_item {
-            let cur = self.current();
+            let cur = self.tab.current();
             // Opening.
             items.push(MenuItem::act(Open, true, false));
-            if self.tag_view().is_some() {
+            if self.tab.tag_view().is_some() {
                 items.push(MenuItem::act(ShowInFolder, true, false));
             }
             if cur.is_some_and(|e| e.package) {
@@ -339,7 +340,7 @@ impl App {
                 .filter(|e| self.tab.sel.marked.contains(&e.name))
                 .collect()
         } else {
-            self.current().into_iter().collect()
+            self.tab.current().into_iter().collect()
         }
     }
 
@@ -414,7 +415,7 @@ impl App {
 
     pub(super) fn run_tag_cmd(&mut self, cmd: TagCmd) {
         use rada_core::ops::TagChange;
-        let items = self.targets();
+        let items = self.tab.targets();
         if items.is_empty()
             || self.refuse_in_archive(Key::WhatChangeTags.tr())
             || self.refuse_if_busy()

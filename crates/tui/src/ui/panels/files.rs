@@ -103,7 +103,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     head.push(Span::styled(pad_left(&t, cols.size), st));
     if cols.date > 0 {
         head.push(gap());
-        let name = if app.recents_view() {
+        let name = if app.tab.recents_view() {
             Key::ColUsed
         } else {
             Key::ColModified
@@ -136,7 +136,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     app.frame.hits.add(body, Target::List);
 
     if app.tab.visible.is_empty() {
-        let msg = if app.is_loading() {
+        let msg = if app.tab.is_loading() {
             tf(Key::ListLoading, &[&SPIN[app.redraw.spinner % SPIN.len()]])
         } else if app.tab.filter.is_some() {
             Key::ListNoMatch.tr().to_string()
@@ -166,7 +166,9 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     app.want_folder_sizes(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
     for vis in app.tab.sel.scroll..last {
-        let Some(e) = app.entry_at(vis) else { continue };
+        let Some(e) = app.tab.entry_at(vis) else {
+            continue;
+        };
         lines.push(row(
             app,
             e,
@@ -184,6 +186,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             ..body
         };
         let marked = app
+            .tab
             .entry_at(vis)
             .is_some_and(|e| app.tab.sel.marked.contains(&e.name));
         if vis == app.tab.sel.cursor {

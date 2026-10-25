@@ -172,7 +172,7 @@ fn a_path_is_completed_and_gone_to_not_searched() {
     h.keys("..");
     h.key(KeyCode::Enter);
     h.wait("the parent", |a| {
-        a.tab.cwd.ends_with("work") && !a.is_loading()
+        a.tab.cwd.ends_with("work") && !a.tab.is_loading()
     });
 }
 

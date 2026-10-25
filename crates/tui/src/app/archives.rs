@@ -31,7 +31,11 @@ impl App {
 
     /// The cursor is on an archive (outside one): extraction is on offer.
     pub fn on_archive_item(&self) -> bool {
-        self.tab.archive.is_none() && self.current().is_some_and(|e| self.archive_candidate(e))
+        self.tab.archive.is_none()
+            && self
+                .tab
+                .current()
+                .is_some_and(|e| self.archive_candidate(e))
     }
 
     /// The entries an action applies to: the marked ones, else the one under the cursor.
@@ -45,7 +49,7 @@ impl App {
                 .filter(|e| self.tab.sel.marked.contains(&e.name))
                 .collect();
         }
-        self.current().into_iter().collect()
+        self.tab.current().into_iter().collect()
     }
 
     /// Extract here (or, with `here` false, into a folder named after the archive).
@@ -58,7 +62,8 @@ impl App {
             let only: Vec<PathBuf> = if self.tab.sel.marked.is_empty() {
                 Vec::new()
             } else {
-                self.targets()
+                self.tab
+                    .targets()
                     .iter()
                     .filter_map(|p| p.strip_prefix(&view.archive).ok().map(Path::to_path_buf))
                     .collect()
@@ -149,7 +154,7 @@ impl App {
         if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatCompressHere.tr()) {
             return;
         }
-        let sources = self.targets();
+        let sources = self.tab.targets();
         if sources.is_empty() {
             return;
         }
@@ -157,7 +162,7 @@ impl App {
         let base = if sources.len() == 1 {
             let n = sources[0].file_name().unwrap_or_default();
             // A file loses its extension (report.pdf → report.zip); a folder keeps its name.
-            let is_dir = self.current().is_some_and(|e| e.is_dir());
+            let is_dir = self.tab.current().is_some_and(|e| e.is_dir());
             if is_dir {
                 n.to_string_lossy().into_owned()
             } else {
@@ -171,7 +176,7 @@ impl App {
             self.tab
                 .cwd
                 .file_name()
-                .filter(|_| self.tag_view().is_none())
+                .filter(|_| self.tab.tag_view().is_none())
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "archive".into())
         };

@@ -132,7 +132,7 @@ fn the_plan_windows_speak_italian() {
         h.app.open_dir(dest.clone());
         let d = dest.clone();
         h.wait("the destination", move |a| {
-            a.tab.cwd == d && !a.is_loading()
+            a.tab.cwd == d && !a.tab.is_loading()
         });
         h.press("ctrl+v");
         plan_modal(&mut h);
@@ -147,7 +147,7 @@ fn the_plan_windows_speak_italian() {
         // The trash, and a permanent deletion.
         h.app.open_dir(dir.clone());
         let d = dir.clone();
-        h.wait("back", move |a| a.tab.cwd == d && !a.is_loading());
+        h.wait("back", move |a| a.tab.cwd == d && !a.tab.is_loading());
         h.keys("j");
         h.press("delete");
         plan_modal(&mut h);
@@ -189,7 +189,7 @@ fn the_cards_speak_italian() {
         h.app.open_dir(dest.clone());
         let d = dest.clone();
         h.wait("the destination", move |a| {
-            a.tab.cwd == d && !a.is_loading()
+            a.tab.cwd == d && !a.tab.is_loading()
         });
         h.press("ctrl+v");
         plan_modal(&mut h);

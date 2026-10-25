@@ -42,7 +42,7 @@ fn home_mark(icons: IconSet) -> &'static str {
 fn segments(app: &App) -> Vec<(String, PathBuf)> {
     use std::path::Component;
     // A tag's items are not on a path: one segment, which is the list itself.
-    if let Some(title) = app.view_title() {
+    if let Some(title) = app.tab.view_title() {
         return vec![(title, app.cwd.clone())];
     }
     let home = app.home();
@@ -224,7 +224,7 @@ fn right_side<'a>(app: &App, count: bool, keys: bool) -> Bar<'a> {
         };
         b.push(Span::styled(format!("  {text}"), th.dim().patch(band)));
     }
-    if app.is_loading() {
+    if app.tab.is_loading() {
         b.push(Span::styled(
             format!(" {}", SPIN[app.redraw.spinner % SPIN.len()]),
             th.fg(th.warn).patch(band),

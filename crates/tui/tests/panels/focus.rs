@@ -82,7 +82,7 @@ fn nav_is_driven_from_the_keyboard() {
     h.press("enter");
     h.wait("the folder", {
         let t = target.clone();
-        move |a| a.tab.cwd == t && !a.is_loading()
+        move |a| a.tab.cwd == t && !a.tab.is_loading()
     });
     assert!(
         !h.app.side_nav.focus,

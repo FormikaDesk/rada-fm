@@ -211,7 +211,7 @@ fn draw_left(f: &mut Frame, app: &mut App, area: Rect) {
 fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let th = app.settings.th.clone();
     let airy = is_airy(f);
-    let title = match app.view_title() {
+    let title = match app.tab.view_title() {
         Some(t) => t,
         None => crate::fmt::short_path(&app.tab.cwd, app.home()),
     };
@@ -247,7 +247,7 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     }
     if notice_h > 0 {
         let before = app.tab.sel.scroll;
-        app.ensure_visible();
+        app.tab.ensure_visible();
         if app.tab.sel.scroll != before {
             app.redraw.dirty = true;
         }

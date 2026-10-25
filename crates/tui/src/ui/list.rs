@@ -185,7 +185,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     if cols.date > 0 {
         head.push(gap());
         // In the list of recent files the date is the one of the last use.
-        let title = if app.recents_view() {
+        let title = if app.tab.recents_view() {
             Key::ColUsed
         } else {
             Key::ColModified
@@ -243,7 +243,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     app.frame.hits.add(body, Target::List);
 
     if app.tab.visible.is_empty() {
-        let msg = if app.is_loading() {
+        let msg = if app.tab.is_loading() {
             tf(Key::ListLoading, &[&SPIN[app.redraw.spinner % SPIN.len()]])
         } else if app.tab.filter.is_some() {
             Key::ListNoMatch.tr().to_string()
@@ -273,7 +273,9 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     app.want_folder_sizes(shown.iter().copied());
     let mut lines: Vec<Line> = Vec::with_capacity(rows);
     for vis in app.tab.sel.scroll..last {
-        let Some(e) = app.entry_at(vis) else { continue };
+        let Some(e) = app.tab.entry_at(vis) else {
+            continue;
+        };
         lines.push(row(
             app,
             e,
@@ -294,6 +296,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
         // The row under the cursor shades from one end to the other, the selected ones are
         // tinted; both have round ends where the font allows.
         let marked = app
+            .tab
             .entry_at(vis)
             .is_some_and(|e| app.tab.sel.marked.contains(&e.name));
         if vis == app.tab.sel.cursor {
@@ -407,7 +410,7 @@ fn row<'a>(
     spans.push(Span::styled(name_txt, with(name_style)));
     // In the list of a tag's items, or of recent files, the folder each one is in, dim after
     // the name.
-    if app.tag_view().is_some() {
+    if app.tab.tag_view().is_some() {
         let room = cols.name.saturating_sub(used);
         if room > 8
             && let Some(parent) = e.path.parent()

@@ -47,7 +47,7 @@ fn menus_windows_and_cards_fit_every_size_without_panicking() {
         hh.press("ctrl+c");
         hh.app.open_dir(dest.clone());
         let d = dest.clone();
-        hh.wait("dest", move |a| a.tab.cwd == d && !a.is_loading());
+        hh.wait("dest", move |a| a.tab.cwd == d && !a.tab.is_loading());
         hh.press("ctrl+v");
         plan_modal(&mut hh);
         let s = hh.screen();
@@ -123,7 +123,7 @@ fn in_the_basic_profile_popups_are_plain_ascii_with_plus_corners() {
     h.press("ctrl+c");
     h.app.open_dir(dest.clone());
     let d = dest.clone();
-    h.wait("dest", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("dest", move |a| a.tab.cwd == d && !a.tab.is_loading());
     h.press("ctrl+v");
     plan_modal(&mut h);
     let plan = basic_screen(&mut h, 120, 36);

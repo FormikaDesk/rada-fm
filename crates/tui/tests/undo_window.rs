@@ -12,7 +12,7 @@ fn copy_all(h: &mut H, dest: &std::path::Path) {
     h.app.open_dir(dest.to_path_buf());
     let d = dest.to_path_buf();
     h.wait("the destination", move |a| {
-        a.tab.cwd == d && !a.is_loading()
+        a.tab.cwd == d && !a.tab.is_loading()
     });
     h.press("ctrl+v");
     plan_modal(h);

@@ -23,14 +23,14 @@ fn members() -> Vec<Member> {
 fn in_archive(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("inside {tail}"), move |a| {
-        a.tab.archive.is_some() && !a.is_loading() && a.tab.cwd.ends_with(&t)
+        a.tab.archive.is_some() && !a.tab.is_loading() && a.tab.cwd.ends_with(&t)
     });
 }
 
 fn at(h: &mut H, tail: &str) {
     let t = tail.to_string();
     h.wait(&format!("in {tail}"), move |a| {
-        a.tab.archive.is_none() && !a.is_loading() && a.tab.cwd.ends_with(&t)
+        a.tab.archive.is_none() && !a.tab.is_loading() && a.tab.cwd.ends_with(&t)
     });
 }
 
@@ -311,7 +311,7 @@ fn a_broken_or_fake_archive_says_what_is_wrong() {
     put_cursor(&mut h, "fake.zip");
     h.key(KeyCode::Enter);
     h.wait("the message", |a| {
-        a.current_notice().is_some() && !a.is_loading()
+        a.current_notice().is_some() && !a.tab.is_loading()
     });
     let t = h.app.current_notice().unwrap().text.clone();
     assert!(t.contains("not an archive"), "{t}");

@@ -19,7 +19,7 @@ impl App {
         let view = if self.tab.sel.marked.len() > 1 {
             self.selection_properties()
         } else {
-            let Some(e) = self.current() else { return };
+            let Some(e) = self.tab.current() else { return };
             self.item_properties(e)
         };
         self.windows.modal = Some(Modal::Properties(view));
@@ -56,7 +56,7 @@ impl App {
             ),
             (
                 Key::PropLocation.tr().to_string(),
-                match self.view_title() {
+                match self.tab.view_title() {
                     Some(title) => title,
                     None => fmt::short_path(&self.tab.cwd, self.home()),
                 },

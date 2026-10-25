@@ -76,7 +76,7 @@ impl App {
 
     /// The folder being shown, when it is a real one a choice can be about.
     fn chooser_here(&self) -> Option<PathBuf> {
-        (self.tab.archive.is_none() && self.tag_view().is_none() && !self.recents_view())
+        (self.tab.archive.is_none() && self.tab.tag_view().is_none() && !self.tab.recents_view())
             .then(|| self.tab.cwd.clone())
     }
 
@@ -98,6 +98,7 @@ impl App {
             return;
         };
         let under = self
+            .tab
             .current()
             .map(|e| (e.path.clone(), e.is_dir(), e.is_navigable_dir()));
         match ch.kind {
@@ -115,7 +116,7 @@ impl App {
                     Some((path, _, true)) => self.open_dir(path),
                     Some((_, true, false)) => {}
                     Some((path, false, _)) => {
-                        if self.current().is_some_and(|e| e.error.is_none())
+                        if self.tab.current().is_some_and(|e| e.error.is_none())
                             && self.tab.archive.is_none()
                         {
                             self.chooser_finish(vec![path]);
@@ -174,6 +175,7 @@ impl App {
     /// The right arrow: into the folder under the cursor. A file is not opened, ever.
     pub(super) fn chooser_navigate(&mut self) {
         if let Some(path) = self
+            .tab
             .current()
             .filter(|e| e.is_navigable_dir())
             .map(|e| e.path.clone())
@@ -184,7 +186,7 @@ impl App {
 
     /// Space on an entry, where a file chooser takes only files.
     pub(super) fn chooser_may_mark(&mut self) -> bool {
-        let is_dir = self.current().is_some_and(|e| e.is_dir());
+        let is_dir = self.tab.current().is_some_and(|e| e.is_dir());
         if is_dir
             && self
                 .session

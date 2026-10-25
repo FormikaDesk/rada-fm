@@ -61,7 +61,7 @@ fn a_click_on_an_ancestor_of_the_way_shows_that_folder_in_the_middle_box() {
     h.click(&rada_tui::hits::Target::Place(b.clone()));
     h.wait("b", {
         let b = b.clone();
-        move |a| a.tab.cwd == b && !a.is_loading()
+        move |a| a.tab.cwd == b && !a.tab.is_loading()
     });
     h.settle();
     assert!(h.screen().contains("[ ~/a/b ]"));
@@ -78,7 +78,7 @@ fn a_click_on_an_ancestor_of_the_way_shows_that_folder_in_the_middle_box() {
         .expect("c is listed under b");
     h.app.side_nav.nav_cursor = at;
     h.press("enter");
-    h.wait("c", move |a| a.tab.cwd == c && !a.is_loading());
+    h.wait("c", move |a| a.tab.cwd == c && !a.tab.is_loading());
 }
 
 #[test]

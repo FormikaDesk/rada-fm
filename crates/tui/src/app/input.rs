@@ -436,7 +436,7 @@ impl App {
             }
 
             ToggleMark => self.toggle_mark(),
-            SelectAll => self.mark_all(),
+            SelectAll => self.tab.mark_all(),
             SelectUp => self.extend_selection(self.tab.sel.cursor.saturating_sub(line)),
             SelectDown => self.extend_selection(self.tab.sel.cursor + line),
             SelectToFirst => self.extend_selection(0),
@@ -494,10 +494,10 @@ impl App {
                 ..self.tab.sort
             }),
             ToggleHidden => {
-                let keep = self.cursor_name();
+                let keep = self.tab.cursor_name();
                 self.settings.show_hidden = !self.settings.show_hidden;
                 self.rebuild_visible();
-                self.restore_cursor(keep);
+                self.tab.restore_cursor(keep);
                 // A folder's preview lists what the list lists.
                 self.preview.invalidate();
                 self.request_preview();
@@ -569,7 +569,7 @@ impl App {
             return;
         }
         self.tab.view = mode;
-        self.ensure_visible();
+        self.tab.ensure_visible();
         self.save_ui_state();
         self.redraw.dirty = true;
     }
@@ -616,12 +616,12 @@ impl App {
         self.tab.viewport.grid_cols = cols;
         self.tab.viewport.grid_rows = rows;
         if self.tab.view == ViewMode::Icons {
-            self.ensure_visible();
+            self.tab.ensure_visible();
         }
     }
 
     fn start_open_with(&mut self) {
-        let Some((path, is_dir)) = self.current().map(|e| (e.path.clone(), e.is_dir())) else {
+        let Some((path, is_dir)) = self.tab.current().map(|e| (e.path.clone(), e.is_dir())) else {
             return;
         };
         if is_dir {
@@ -636,7 +636,7 @@ impl App {
 
     /// Put the path of the selection (or of the item under the cursor) on the system clipboard.
     fn copy_path(&mut self) {
-        let paths = self.targets();
+        let paths = self.tab.targets();
         if paths.is_empty() {
             return;
         }
@@ -660,11 +660,12 @@ impl App {
     fn open_terminal_here(&mut self) {
         let dir = match &self.tab.archive {
             Some(a) => a.archive.parent().map(Path::to_path_buf),
-            None if self.tag_view().is_some() => {
+            None if self.tab.tag_view().is_some() => {
                 // Where the item under the cursor is.
                 Some(
                     self.folder_for_new(
                         &self
+                            .tab
                             .current()
                             .map(|e| e.path.clone())
                             .into_iter()
@@ -696,7 +697,7 @@ impl App {
             .find(&Target::Row(self.tab.sel.cursor))
             .map(|r| (r.x.saturating_add(6), r.y.saturating_add(1)))
             .unwrap_or((8, 6));
-        let on_item = self.current().is_some();
+        let on_item = self.tab.current().is_some();
         self.windows.modal = Some(Modal::Menu(self.context_menu(on_item, at)));
     }
 
@@ -720,7 +721,7 @@ impl App {
 
     /// Set (or clear) the folder filter and keep the cursor where it makes sense.
     pub(super) fn set_filter(&mut self, f: Option<FilterState>) {
-        let keep = self.cursor_name();
+        let keep = self.tab.cursor_name();
         self.tab.filter = f;
         self.rebuild_visible();
         let found = keep.as_ref().is_some_and(|n| {
@@ -730,12 +731,12 @@ impl App {
                 .any(|&i| &self.tab.listing.all()[i].name == n)
         });
         if found {
-            self.restore_cursor(keep);
+            self.tab.restore_cursor(keep);
         } else {
             self.tab.sel.cursor = 0;
             self.tab.sel.scroll = 0;
         }
-        self.ensure_visible();
+        self.tab.ensure_visible();
         self.request_preview();
     }
 
@@ -789,7 +790,7 @@ impl App {
             return;
         };
         let names: Vec<OsString> = span
-            .filter_map(|v| self.entry_at(v).map(|e| e.name.clone()))
+            .filter_map(|v| self.tab.entry_at(v).map(|e| e.name.clone()))
             .collect();
         self.tab.sel.mark_span(names);
     }
@@ -977,7 +978,7 @@ impl App {
             }
             Some(Target::ViewMode(mode)) => self.set_view(mode),
             Some(Target::FullPreview) => {
-                if self.current().is_some() {
+                if self.tab.current().is_some() {
                     self.windows.modal = Some(Modal::FullPreview);
                 }
             }
@@ -1014,7 +1015,7 @@ impl App {
 
     /// Mark or unmark row `i`, which becomes where a selection extended next starts.
     fn toggle_mark_at(&mut self, i: usize) {
-        if let Some(name) = self.entry_at(i).map(|e| e.name.clone()) {
+        if let Some(name) = self.tab.entry_at(i).map(|e| e.name.clone()) {
             self.tab.sel.toggle(name);
         }
         self.tab.sel.anchor_at(i);
@@ -1121,6 +1122,7 @@ impl App {
         let on_item = match target {
             Some(Target::Row(i) | Target::Check(i)) if i < self.tab.visible.len() => {
                 let already = self
+                    .tab
                     .entry_at(i)
                     .is_some_and(|e| self.tab.sel.marked.contains(&e.name));
                 if !already {
@@ -1188,7 +1190,7 @@ impl App {
                 self.windows.modal = Some(Modal::Menu(child));
             }
             MenuCmd::OpenWithList => {
-                if let Some(path) = self.current().map(|e| e.path.clone()) {
+                if let Some(path) = self.tab.current().map(|e| e.path.clone()) {
                     self.open_with_window(path, Some(Box::new(m)));
                 } else {
                     self.windows.modal = None;

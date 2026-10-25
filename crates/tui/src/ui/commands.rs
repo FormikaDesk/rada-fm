@@ -60,8 +60,8 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     let bar = Style::default().bg(th.cmdbar);
     let set = app.settings.icons;
     let ro = app.tab.archive.is_some();
-    let nowhere = ro || app.tag_view().is_some();
-    let has_target = !app.tab.sel.marked.is_empty() || app.current().is_some();
+    let nowhere = ro || app.tab.tag_view().is_some();
+    let has_target = !app.tab.sel.marked.is_empty() || app.tab.current().is_some();
     let mut b = Bar::default();
     b.push(Span::styled(" ", bar));
 
@@ -152,7 +152,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut first,
             Glyph::Rename,
             Key::LRename.tr(),
-            app.current().is_some() && !ro,
+            app.tab.current().is_some() && !ro,
             Target::Act(Action::Rename),
         );
         button(

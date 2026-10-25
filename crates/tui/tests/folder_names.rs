@@ -38,7 +38,9 @@ fn mac_home(sb: &Sandbox) {
 fn go(h: &mut H, to: &Path) {
     h.click(&Target::Place(to.to_path_buf()));
     let to = to.to_path_buf();
-    h.wait("the folder", move |a| a.tab.cwd == to && !a.is_loading());
+    h.wait("the folder", move |a| {
+        a.tab.cwd == to && !a.tab.is_loading()
+    });
 }
 
 fn start(sb: Sandbox, at: &Path, tables: &Path) -> H {

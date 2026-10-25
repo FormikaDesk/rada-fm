@@ -102,7 +102,7 @@ impl App {
     pub fn want_folder_sizes(&mut self, indices: impl Iterator<Item = usize>) {
         if self.folder_size_mode() == SizeMode::Off
             || self.tab.archive.is_some()
-            || self.tag_view().is_some()
+            || self.tab.tag_view().is_some()
         {
             return;
         }
@@ -220,7 +220,7 @@ impl App {
     /// Give the listing the sizes counted so far (it is ordered again if it goes by size).
     pub(super) fn sync_folder_sizes(&mut self) {
         let cache = &self.folder_info.sizes.cache;
-        let keep = self.cursor_name();
+        let keep = self.tab.cursor_name();
         let moved = self
             .tab
             .listing
@@ -230,7 +230,7 @@ impl App {
             });
         if moved {
             self.rebuild_visible();
-            self.restore_cursor(keep);
+            self.tab.restore_cursor(keep);
         }
     }
 

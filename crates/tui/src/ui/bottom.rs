@@ -230,7 +230,7 @@ fn status_left<'a>(app: &App) -> Bar<'a> {
     }
     if app.settings.layout == LayoutKind::Compact {
         b.push(Span::styled(
-            match app.view_title() {
+            match app.tab.view_title() {
                 Some(title) => title,
                 None => fmt::short_path(&app.tab.cwd, app.home()),
             },

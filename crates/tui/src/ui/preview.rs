@@ -38,6 +38,7 @@ pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Title: the file's icon and name, then one line of facts.
     let (glyph, gcolor) = app
+        .tab
         .current()
         .map(|e| icons::icon(e, app.settings.icons, &th))
         .unwrap_or(("", th.text_dim));
@@ -52,7 +53,7 @@ pub fn draw_full(f: &mut Frame, app: &mut App, area: Rect) {
         Rect { height: 1, ..inner },
     );
 
-    let modified = app.current().and_then(|e| e.mtime);
+    let modified = app.tab.current().and_then(|e| e.mtime);
     let ago = fmt::relative(modified, app.now());
     let summary = summary_of(&app.preview.content, app.preview.hex, &ago);
     let mut sum_lines = fmt::wrap(&summary, w);

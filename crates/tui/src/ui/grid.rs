@@ -85,7 +85,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
     let count = app.tab.visible.len();
 
     if count == 0 {
-        let msg = if app.is_loading() {
+        let msg = if app.tab.is_loading() {
             rada_core::i18n::tf(
                 rada_core::i18n::Key::ListLoading,
                 &[&SPIN[app.redraw.spinner % SPIN.len()]],
@@ -115,7 +115,7 @@ pub fn draw_grid(f: &mut Frame, app: &mut App, area: Rect) {
         let mut tile_lines: Vec<Vec<Span>> = vec![Vec::new(); TILE_H];
         for c in 0..cols {
             let vis = first + r * cols + c;
-            let Some(e) = app.entry_at(vis) else {
+            let Some(e) = app.tab.entry_at(vis) else {
                 for line in tile_lines.iter_mut() {
                     line.push(Span::raw(" ".repeat(TILE_W)));
                 }

@@ -1,0 +1,155 @@
+//! What the front tab shows: the entries of the folder that pass the filter, which one is under
+//! the cursor, and what an operation would apply to.
+
+use rada_core::i18n::{Key, tf};
+use rada_core::model::Entry;
+use std::ffi::OsString;
+use std::path::PathBuf;
+
+use super::{App, LoadState, TabState};
+
+impl TabState {
+    pub fn entry_at(&self, vis_index: usize) -> Option<&Entry> {
+        self.visible
+            .get(vis_index)
+            .and_then(|&i| self.listing.all().get(i))
+    }
+
+    pub fn current(&self) -> Option<&Entry> {
+        self.entry_at(self.sel.cursor)
+    }
+
+    /// Paths an operation applies to: the marked entries, or else the one under the cursor.
+    pub fn targets(&self) -> Vec<PathBuf> {
+        if !self.sel.marked.is_empty() {
+            return self
+                .listing
+                .all()
+                .iter()
+                .filter(|e| self.sel.marked.contains(&e.name))
+                .map(|e| e.path.clone())
+                .collect();
+        }
+        self.current()
+            .map(|e| vec![e.path.clone()])
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn ensure_visible(&mut self) {
+        let (view, viewport) = (self.view, self.viewport);
+        self.sel.keep_visible(view, viewport, self.visible.len());
+    }
+
+    pub(super) fn cursor_name(&self) -> Option<OsString> {
+        self.current().map(|e| e.name.clone())
+    }
+
+    pub(super) fn restore_cursor(&mut self, name: Option<OsString>) {
+        let idx = name.and_then(|n| {
+            self.visible
+                .iter()
+                .position(|&i| self.listing.all()[i].name == n)
+        });
+        match idx {
+            Some(i) => self.sel.cursor = i,
+            None => self.sel.cursor = self.sel.cursor.min(self.visible.len().saturating_sub(1)),
+        }
+        self.ensure_visible();
+    }
+
+    pub(super) fn mark_all(&mut self) {
+        let all: Vec<OsString> = self
+            .visible
+            .iter()
+            .map(|&i| self.listing.all()[i].name.clone())
+            .collect();
+        self.sel.toggle_all(all);
+    }
+
+    /// The tag whose items the list shows, when it is not a folder but the view of a tag.
+    pub fn tag_view(&self) -> Option<String> {
+        rada_core::tagsearch::view_name(&self.cwd)
+    }
+
+    /// Whether the list shows the files used lately (the "Recent" entry of the sidebar).
+    pub fn recents_view(&self) -> bool {
+        rada_core::recents::is_view(&self.cwd)
+    }
+
+    /// What the list is when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
+    pub fn view_title(&self) -> Option<String> {
+        if self.recents_view() {
+            return Some(Key::PlaceRecent.tr().to_string());
+        }
+        self.tag_view().map(|tag| tf(Key::TagViewTitle, &[&tag]))
+    }
+
+    pub fn sort_label(&self) -> String {
+        let arrow = if self.sort.descending() { "↓" } else { "↑" };
+        format!("{} {arrow}", self.sort.key.label())
+    }
+
+    pub fn is_loading(&self) -> bool {
+        matches!(self.load, LoadState::Loading(_))
+    }
+}
+
+/// Whether an entry carries a tag matching `want` (lower case): a name that contains it, or
+/// the colour of that name. An empty `want` (`tag:` alone) means "any tag".
+fn matches_tag(e: &Entry, want: &str) -> bool {
+    use rada_core::platform::TagColor as Hue;
+    if want.is_empty() {
+        return !e.tags.is_empty();
+    }
+    // A colour by any of its names ("red", "rosso") is the tags of that colour.
+    let hue = Hue::from_name(want);
+    e.tags
+        .iter()
+        .any(|t| t.name.to_lowercase().contains(want) || (hue.is_some() && t.color == hue))
+}
+
+impl App {
+    pub(super) fn rebuild_visible(&mut self) {
+        self.folder_info.date_cache.clear();
+        let show = self.settings.show_hidden;
+        // Choosing a folder: only folders are listed.
+        let dirs_only = self
+            .session
+            .chooser
+            .as_ref()
+            .is_some_and(|c| c.folders_only());
+        let terms: Vec<String> = self
+            .tab
+            .filter
+            .as_ref()
+            .map(|f| f.text.split_whitespace().map(str::to_lowercase).collect())
+            .unwrap_or_default();
+        // `tag:red` keeps what carries a tag with that in its name (or of that colour); every
+        // other word is part of the name.
+        let (tag_terms, name_terms): (Vec<&String>, Vec<&String>) =
+            terms.iter().partition(|t| t.starts_with("tag:"));
+        let tag_terms: Vec<&str> = tag_terms.iter().map(|t| &t["tag:".len()..]).collect();
+        self.tab.visible = self
+            .tab
+            .listing
+            .all()
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| show || !e.hidden)
+            .filter(|(_, e)| !dirs_only || e.is_dir())
+            .filter(|(_, e)| {
+                name_terms.is_empty() || {
+                    // The name shown and the name on disk both count: "Scrivania" and
+                    // "Desktop" find the same folder.
+                    let name = e.display.to_lowercase();
+                    let real = e.name.to_string_lossy().to_lowercase();
+                    name_terms
+                        .iter()
+                        .all(|t| name.contains(t.as_str()) || real.contains(t.as_str()))
+                }
+            })
+            .filter(|(_, e)| tag_terms.iter().all(|want| matches_tag(e, want)))
+            .map(|(i, _)| i)
+            .collect();
+    }
+}

@@ -67,10 +67,10 @@ fn right_goes_into_the_folder_and_left_comes_back_to_where_it_was() {
     h.key(KeyCode::Right);
     let inside = dir.join("dir");
     let d = inside.clone();
-    h.wait("inside", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("inside", move |a| a.tab.cwd == d && !a.tab.is_loading());
     h.key(KeyCode::Left);
     let d = dir.clone();
-    h.wait("back", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("back", move |a| a.tab.cwd == d && !a.tab.is_loading());
     assert_eq!(h.cursor_name(), "dir", "the cursor is where it was");
 }
 
@@ -113,7 +113,9 @@ fn a_click_in_the_first_column_goes_to_that_folder() {
     assert!(h.app.frame.hits.find(&Target::Place(dir.clone())).is_some());
     h.click(&Target::Place(sibling.clone()));
     let d = sibling.clone();
-    h.wait("the sibling", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("the sibling", move |a| {
+        a.tab.cwd == d && !a.tab.is_loading()
+    });
 }
 
 #[test]

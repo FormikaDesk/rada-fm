@@ -131,7 +131,7 @@ fn ordering_by_size_uses_the_counted_size_of_folders() {
     // wait for that, not for a fixed time.
     h.wait("the order", |a| {
         let names: Vec<String> = (0..a.tab.visible.len())
-            .filter_map(|i| a.entry_at(i))
+            .filter_map(|i| a.tab.entry_at(i))
             .map(|e| e.display.clone())
             .collect();
         names == ["small", "big", "f"]

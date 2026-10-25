@@ -40,7 +40,7 @@ impl App {
     pub fn want_parent_column(&mut self) {
         if self.tab.view != ViewMode::Columns
             || self.tab.archive.is_some()
-            || self.tag_view().is_some()
+            || self.tab.tag_view().is_some()
         {
             return;
         }
@@ -103,7 +103,7 @@ impl App {
     /// Right in the Columns view: into the folder under the cursor. A file stays where it is
     /// (Enter opens it; Right only moves between columns).
     pub(super) fn columns_right(&mut self) {
-        let Some(e) = self.current() else { return };
+        let Some(e) = self.tab.current() else { return };
         if e.is_navigable_dir() {
             let target = e.path.clone();
             self.open_dir(target);

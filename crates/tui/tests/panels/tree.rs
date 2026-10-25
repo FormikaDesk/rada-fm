@@ -14,7 +14,7 @@ fn a_click_on_a_folder_of_the_tree_shows_it_in_the_middle_box() {
     h.click(&rada_tui::hits::Target::Place(docs.clone()));
     h.wait("Documents", {
         let d = docs.clone();
-        move |a| a.tab.cwd == d && !a.is_loading()
+        move |a| a.tab.cwd == d && !a.tab.is_loading()
     });
     h.settle();
     let s = h.screen();
@@ -28,7 +28,7 @@ fn a_click_on_a_folder_of_the_tree_shows_it_in_the_middle_box() {
     h.press("alt+left");
     h.wait("home again", {
         let d = home.clone();
-        move |a| a.tab.cwd == d && !a.is_loading()
+        move |a| a.tab.cwd == d && !a.tab.is_loading()
     });
 }
 
@@ -50,7 +50,7 @@ fn tree_enter_shows_arrow_only_opens() {
     h.press("enter");
     h.wait("Documents", {
         let d = docs.clone();
-        move |a| a.tab.cwd == d && !a.is_loading()
+        move |a| a.tab.cwd == d && !a.tab.is_loading()
     });
     // A click on the arrow of a folder opens its branch and goes nowhere.
     let projects = home.join("projects");
@@ -94,7 +94,7 @@ fn long_tree_scrolls_to_a_deep_folder() {
     h.app.open_dir(deep.clone());
     h.wait("the folder", {
         let d = deep.clone();
-        move |a| a.tab.cwd == d && !a.is_loading()
+        move |a| a.tab.cwd == d && !a.tab.is_loading()
     });
     // Every folder on the way is listed, whatever the order the answers come in.
     h.wait("the way down", {
@@ -204,7 +204,9 @@ fn a_click_on_a_folder_far_down_a_long_tree_shows_it() {
         ratatui::crossterm::event::KeyModifiers::NONE,
     );
     let want = h.app.home().join(&name);
-    h.wait("the folder", move |a| a.tab.cwd == want && !a.is_loading());
+    h.wait("the folder", move |a| {
+        a.tab.cwd == want && !a.tab.is_loading()
+    });
 }
 
 #[test]
@@ -239,7 +241,7 @@ fn nav_click_opens_folder() {
     );
     h.wait("Scaricati", {
         let d = dl.clone();
-        move |a| a.tab.cwd == d && !a.is_loading()
+        move |a| a.tab.cwd == d && !a.tab.is_loading()
     });
     assert!(
         h.screen().contains("fattura.pdf"),
@@ -256,7 +258,7 @@ fn nav_click_opens_folder() {
     h.app.side_nav.nav_cursor = h.app.nav_rows().iter().position(|r| r.path == dl).unwrap();
     h.press("enter");
     h.wait("Scaricati again", move |a| {
-        a.tab.cwd == dl && !a.is_loading()
+        a.tab.cwd == dl && !a.tab.is_loading()
     });
     assert!(h.screen().contains("fattura.pdf"));
 }

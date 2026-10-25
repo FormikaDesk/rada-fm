@@ -155,7 +155,7 @@ pub fn assert_pills(buf: &ratatui::buffer::Buffer, what: &str, behind: &[Color])
 pub fn go_and_wait(h: &mut H, dir: &std::path::Path) {
     h.app.open_dir(dir.to_path_buf());
     let d = dir.to_path_buf();
-    h.wait("the folder", move |a| a.tab.cwd == d && !a.is_loading());
+    h.wait("the folder", move |a| a.tab.cwd == d && !a.tab.is_loading());
     h.settle();
 }
 

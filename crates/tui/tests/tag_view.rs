@@ -70,7 +70,7 @@ fn open_tag(h: &mut H, name: &str) {
         h.app.open_dir(view_path(name));
     }
     h.wait("the tag list", |a| {
-        a.tab.cwd == view_path(name) && !a.is_loading()
+        a.tab.cwd == view_path(name) && !a.tab.is_loading()
     });
 }
 
@@ -89,7 +89,9 @@ fn sidebar_lists_seven_colours_then_tags() {
     h.app.tags.lang = "it".into();
     // The folder with a tag of the user's own is opened: it joins the list.
     h.app.open_dir(home.join("Work"));
-    h.wait("Work", |a| a.tab.cwd.ends_with("Work") && !a.is_loading());
+    h.wait("Work", |a| {
+        a.tab.cwd.ends_with("Work") && !a.tab.is_loading()
+    });
     h.settle();
     let s = h.screen();
     assert!(s.contains("TAGS"), "{s}");
@@ -173,7 +175,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     // The path copied is the real one.
     h.press("ctrl+shift+c");
     // Rename works on the item where it is.
-    let first = h.app.current().unwrap().path.clone();
+    let first = h.app.tab.current().unwrap().path.clone();
     h.press("F2");
     for _ in 0..10 {
         h.key(KeyCode::Backspace);
@@ -183,7 +185,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     h.wait("the renamed item in the list", |a| {
-        a.tag_view().is_some()
+        a.tab.tag_view().is_some()
             && a.tab
                 .listing
                 .all()
@@ -200,7 +202,9 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     );
     // Up leaves the list the way one came: the home folder here.
     h.press("alt+up");
-    h.wait("the folder", |a| a.tag_view().is_none() && !a.is_loading());
+    h.wait("the folder", |a| {
+        a.tab.tag_view().is_none() && !a.tab.is_loading()
+    });
     assert_eq!(h.app.tab.cwd, home);
 }
 

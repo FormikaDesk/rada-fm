@@ -310,7 +310,7 @@ impl H {
     }
 
     pub fn settle(&mut self) {
-        self.wait("initial load", |a| !a.is_loading());
+        self.wait("initial load", |a| !a.tab.is_loading());
     }
 
     pub fn key(&mut self, c: KeyCode) {
@@ -398,6 +398,7 @@ impl H {
 
     pub fn cursor_name(&self) -> String {
         self.app
+            .tab
             .current()
             .map(|e| e.display.clone())
             .unwrap_or_default()
@@ -407,7 +408,7 @@ impl H {
     /// at most once per entry: an empty list would never get there.
     pub fn cursor_to(&mut self, name: &str) {
         self.wait(&format!("{name} in the folder"), |a| {
-            (0..a.tab.visible.len()).any(|i| a.entry_at(i).is_some_and(|e| e.display == name))
+            (0..a.tab.visible.len()).any(|i| a.tab.entry_at(i).is_some_and(|e| e.display == name))
         });
         for _ in 0..self.app.tab.visible.len() {
             if self.cursor_name() == name {
@@ -459,7 +460,7 @@ impl H {
 
     pub fn names(&self) -> Vec<String> {
         (0..self.app.tab.visible.len())
-            .filter_map(|i| self.app.entry_at(i))
+            .filter_map(|i| self.app.tab.entry_at(i))
             .map(|e| e.display.clone())
             .collect()
     }

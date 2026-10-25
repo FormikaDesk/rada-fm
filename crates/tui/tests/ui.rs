@@ -58,13 +58,13 @@ fn navigating_into_a_folder_and_back_remembers_the_cursor() {
     let mut h = H::new(sb, dir.clone(), 120, 30);
     h.key(KeyCode::Enter); // into sub
     h.wait("sub loaded", |a| {
-        a.tab.cwd.ends_with("sub") && !a.is_loading()
+        a.tab.cwd.ends_with("sub") && !a.tab.is_loading()
     });
     assert_eq!(h.names(), ["inner.txt"]);
     h.keys("h");
-    h.wait("back", |a| a.tab.cwd == dir && !a.is_loading());
+    h.wait("back", |a| a.tab.cwd == dir && !a.tab.is_loading());
     assert_eq!(
-        h.app.current().unwrap().display,
+        h.app.tab.current().unwrap().display,
         "sub",
         "cursor returns to the folder we came from"
     );
@@ -116,7 +116,8 @@ fn a_file_created_from_outside_appears_without_pressing_anything() {
         || std::fs::write(dir.join("ext_created.txt"), "hi").unwrap(),
         |a| {
             (0..a.tab.visible.len()).any(|i| {
-                a.entry_at(i)
+                a.tab
+                    .entry_at(i)
                     .is_some_and(|e| e.display == "ext_created.txt")
             })
         },
@@ -131,7 +132,7 @@ fn copy_shows_a_plan_then_runs_then_u_undoes_it() {
     h.keys("j"); // a.txt
     h.keys("y");
     h.app.open_dir(dest.clone());
-    h.wait("destination", |a| a.tab.cwd == dest && !a.is_loading());
+    h.wait("destination", |a| a.tab.cwd == dest && !a.tab.is_loading());
     h.keys("p");
     plan_modal(&mut h);
     let s = h.screen();

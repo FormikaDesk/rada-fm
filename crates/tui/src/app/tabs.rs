@@ -263,13 +263,13 @@ impl App {
         let generation = self.tabs.next_generation();
         self.tab.load = LoadState::Loading(cwd.clone());
         self.svc.loader.load(cwd.clone(), generation);
-        if self.tab.archive.is_none() && self.tag_view().is_none() {
+        if self.tab.archive.is_none() && self.tab.tag_view().is_none() {
             self.svc.watcher.watch(cwd);
         }
         self.preview.invalidate();
         self.folder_info.date_cache.clear();
         self.rebuild_visible();
-        self.ensure_visible();
+        self.tab.ensure_visible();
         self.request_preview();
         self.redraw.dirty = true;
     }
@@ -334,7 +334,7 @@ impl App {
             self.toast(ToastKind::Warn, tf(Key::TTabLimit, &[&MAX_TABS]), 3);
             return;
         }
-        if let Some(name) = self.cursor_name() {
+        if let Some(name) = self.tab.cursor_name() {
             self.tab.remembered.insert(self.tab.cwd.clone(), name);
         }
         let fresh = self.tab.opened_beside();

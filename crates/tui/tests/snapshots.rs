@@ -174,7 +174,7 @@ fn plan_window_names_the_folders_once() {
     h.press("ctrl+c");
     h.app.open_dir(home.join("demo/backup"));
     h.wait("backup", |a| {
-        a.tab.cwd.ends_with("backup") && !a.is_loading()
+        a.tab.cwd.ends_with("backup") && !a.tab.is_loading()
     });
     h.press("ctrl+v");
     plan_modal(&mut h);

@@ -140,11 +140,15 @@ fn the_current_place_is_highlighted_and_a_click_opens_an_item() {
     );
     let docs = place(&h, "Documenti");
     h.click(&Target::Place(docs.clone()));
-    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| {
+        a.tab.cwd == docs && !a.tab.is_loading()
+    });
     // And a bookmark.
     let b = place(&h, "lavoro/progetto");
     h.click(&Target::Place(b.clone()));
-    h.wait("the bookmark", move |a| a.tab.cwd == b && !a.is_loading());
+    h.wait("the bookmark", move |a| {
+        a.tab.cwd == b && !a.tab.is_loading()
+    });
 }
 
 #[test]
@@ -180,7 +184,9 @@ fn tab_focuses_the_sidebar_enter_opens() {
     assert_eq!(h.app.side_items()[h.app.side_nav.side_cursor].path, docs);
     h.key(KeyCode::Enter);
     assert!(!h.app.side_nav.focus, "the focus goes back to the list");
-    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| {
+        a.tab.cwd == docs && !a.tab.is_loading()
+    });
 
     // Tab again and Esc: out.
     h.key(KeyCode::Tab);
@@ -339,7 +345,9 @@ fn the_menu_open_goes_there() {
     let docs = place(&h, "Documenti");
     h.right_click(&Target::Place(docs.clone()));
     h.key(KeyCode::Enter); // "Open" is first
-    h.wait("Documenti", move |a| a.tab.cwd == docs && !a.is_loading());
+    h.wait("Documenti", move |a| {
+        a.tab.cwd == docs && !a.tab.is_loading()
+    });
 }
 
 #[test]
@@ -517,7 +525,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
         h.click(&Target::Place(first.clone()));
         let want = first.clone();
         h.wait("the first folder", move |a| {
-            a.tab.cwd == want && !a.is_loading()
+            a.tab.cwd == want && !a.tab.is_loading()
         });
         // The keyboard goes entry by entry, not row by row, and opens the one it is on.
         h.press("tab");
@@ -535,7 +543,7 @@ fn every_entry_is_still_there_and_clicks_and_arrows_go_to_the_right_one() {
         h.key(KeyCode::Enter);
         let want = second.clone();
         h.wait("the second folder", move |a| {
-            a.tab.cwd == want && !a.is_loading()
+            a.tab.cwd == want && !a.tab.is_loading()
         });
     }
 }

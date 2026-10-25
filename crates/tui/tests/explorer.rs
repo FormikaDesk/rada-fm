@@ -67,7 +67,7 @@ fn busy_scene(w: u16, hh: u16) -> H {
     put_cursor(&mut h, "photo.jpg");
     h.app.ops.clipboard = Some(rada_tui::app::Clip {
         mode: rada_core::ops::TransferMode::Copy,
-        paths: vec![h.app.current().unwrap().path.clone(); 2],
+        paths: vec![h.app.tab.current().unwrap().path.clone(); 2],
     });
     h
 }
@@ -219,11 +219,15 @@ fn the_context_menus() {
 fn two_tabs_open() {
     let mut h = scene(120, 30);
     h.press("ctrl+t");
-    h.wait("the new tab", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("the new tab", |a| {
+        a.tabs.count() == 2 && !a.tab.is_loading()
+    });
     // The second tab goes to a folder of its own.
     put_cursor(&mut h, "docs");
     h.press("enter");
-    h.wait("docs", |a| a.tab.cwd.ends_with("docs") && !a.is_loading());
+    h.wait("docs", |a| {
+        a.tab.cwd.ends_with("docs") && !a.tab.is_loading()
+    });
     h.app.hooks.clock = Some(demo_now());
     insta::assert_snapshot!("two_tabs_120x30", shot(&mut h));
     let th = Theme::named("rada", ColorDepth::True).unwrap();
@@ -248,27 +252,29 @@ fn the_number_of_the_last_read_only_goes_up_whatever_the_tabs_do() {
     };
     h.press("ctrl+t");
     check(&mut h, "a second tab", true);
-    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     put_cursor(&mut h, "src");
     h.press("enter");
     check(&mut h, "tab 2 goes into src", true);
-    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.is_loading());
+    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.tab.is_loading());
     h.press("alt+1");
     check(&mut h, "back to tab 1", true);
-    h.wait("tab 1", |a| a.tabs.active == 0 && !a.is_loading());
+    h.wait("tab 1", |a| a.tabs.active == 0 && !a.tab.is_loading());
     put_cursor(&mut h, "docs");
     h.press("enter");
     check(&mut h, "tab 1 goes into docs", true);
-    h.wait("docs", |a| a.tab.cwd.ends_with("docs") && !a.is_loading());
+    h.wait("docs", |a| {
+        a.tab.cwd.ends_with("docs") && !a.tab.is_loading()
+    });
     h.app.close_tab(1);
     check(&mut h, "the tab behind is closed", false);
     h.press("ctrl+t");
     check(&mut h, "a tab is opened again", true);
-    h.wait("two tabs", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("two tabs", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     let front = h.app.tabs.active;
     h.app.close_tab(front);
     check(&mut h, "the front tab is closed", true);
-    h.wait("one tab", |a| a.tabs.count() == 1 && !a.is_loading());
+    h.wait("one tab", |a| a.tabs.count() == 1 && !a.tab.is_loading());
     h.pump(100);
     check(&mut h, "the workers answer", false);
 }
@@ -279,7 +285,7 @@ fn tabs_keep_their_own_folder_cursor_selection_and_sort() {
     let first = h.app.tab.cwd.clone();
     h.press("space"); // select photo.jpg in tab 1
     h.press("ctrl+t");
-    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("tab 2", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     assert_eq!(h.app.tabs.active, 1);
     assert_eq!(
         h.app.tab.cwd, first,
@@ -292,21 +298,21 @@ fn tabs_keep_their_own_folder_cursor_selection_and_sort() {
     // Tab 2: another folder and another order.
     put_cursor(&mut h, "src");
     h.press("enter");
-    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.is_loading());
+    h.wait("src", |a| a.tab.cwd.ends_with("src") && !a.tab.is_loading());
     h.press("S"); // reverse the order in this tab
     let reversed = h.app.tab.sort.reverse;
     assert!(reversed);
 
     h.press("alt+1");
     h.wait("back to tab 1", |a| {
-        a.tabs.active == 0 && a.tab.cwd.ends_with("demo") && !a.is_loading()
+        a.tabs.active == 0 && a.tab.cwd.ends_with("demo") && !a.tab.is_loading()
     });
     assert_eq!(h.app.tab.cwd, first);
     assert!(!h.app.tab.sort.reverse, "the sort order is per tab");
     assert_eq!(h.marked_names(), ["photo.jpg"], "so is the selection");
     h.press("alt+2");
     h.wait("tab 2 again", |a| {
-        a.tab.cwd.ends_with("src") && !a.is_loading()
+        a.tab.cwd.ends_with("src") && !a.tab.is_loading()
     });
     assert!(h.app.tab.sort.reverse);
     // The clipboard and the undo are shared: copy in tab 2, paste in tab 1.
@@ -318,23 +324,23 @@ fn the_keys_and_the_mouse_change_and_close_tabs() {
     let mut h = scene(140, 30);
     h.press("ctrl+t");
     h.press("ctrl+t");
-    h.wait("three tabs", |a| a.tabs.count() == 3 && !a.is_loading());
+    h.wait("three tabs", |a| a.tabs.count() == 3 && !a.tab.is_loading());
     assert_eq!(h.app.tabs.active, 2);
     h.press("ctrl+pagedown");
     h.wait("wraps to the first", |a| {
-        a.tabs.active == 0 && !a.is_loading()
+        a.tabs.active == 0 && !a.tab.is_loading()
     });
     h.press("ctrl+pageup");
-    h.wait("and back", |a| a.tabs.active == 2 && !a.is_loading());
+    h.wait("and back", |a| a.tabs.active == 2 && !a.tab.is_loading());
     h.press("ctrl+shift+tab");
-    h.wait("previous", |a| a.tabs.active == 1 && !a.is_loading());
+    h.wait("previous", |a| a.tabs.active == 1 && !a.tab.is_loading());
     h.press("alt+9");
     h.wait("Alt+9 is the last", |a| {
-        a.tabs.active == 2 && !a.is_loading()
+        a.tabs.active == 2 && !a.tab.is_loading()
     });
     // Click a tab.
     h.click(&Target::Tab(0));
-    h.wait("clicked", |a| a.tabs.active == 0 && !a.is_loading());
+    h.wait("clicked", |a| a.tabs.active == 0 && !a.tab.is_loading());
     // Middle click closes.
     let (x, y) = h.where_is(&Target::Tab(2));
     h.mouse(
@@ -348,12 +354,12 @@ fn the_keys_and_the_mouse_change_and_close_tabs() {
     h.click(&Target::TabClose(1));
     assert_eq!(h.app.tabs.count(), 1);
     h.press("ctrl+t");
-    h.wait("two again", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("two again", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     h.press("ctrl+w");
     assert_eq!(h.app.tabs.count(), 1);
     // The last one is not closed: it goes home.
     h.press("ctrl+w");
-    h.wait("home", |a| a.tab.cwd == a.home() && !a.is_loading());
+    h.wait("home", |a| a.tab.cwd == a.home() && !a.tab.is_loading());
     assert_eq!(h.app.tabs.count(), 1);
     // The new-tab button.
     h.click(&Target::TabNew);
@@ -365,14 +371,14 @@ fn on_a_narrow_terminal_the_tabs_fold() {
     let mut h = scene(50, 20);
     h.press("ctrl+t");
     h.press("ctrl+t");
-    h.wait("three", |a| a.tabs.count() == 3 && !a.is_loading());
+    h.wait("three", |a| a.tabs.count() == 3 && !a.tab.is_loading());
     let s = h.screen();
     assert!(
         s.lines().next().unwrap().contains("‹ 3/3 ›") || s.contains("3/3"),
         "{s}"
     );
     h.click(&Target::TabPrev);
-    h.wait("prev", |a| a.tabs.active == 1 && !a.is_loading());
+    h.wait("prev", |a| a.tabs.active == 1 && !a.tab.is_loading());
     assert!(h.screen().contains("2/3"));
 }
 
@@ -382,7 +388,7 @@ fn tabs_are_remembered_between_sessions_and_the_option_turns_it_off() {
     // Written as they change.
     let mut h = scene(140, 30);
     h.press("ctrl+t");
-    h.wait("two", |a| a.tabs.count() == 2 && !a.is_loading());
+    h.wait("two", |a| a.tabs.count() == 2 && !a.tab.is_loading());
     let dir = h.app.home().parent().unwrap().join("xdg/state/rada");
     let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
     loop {
@@ -424,11 +430,11 @@ fn tabs_are_remembered_between_sessions_and_the_option_turns_it_off() {
     assert_eq!(h.app.tabs.count(), 2);
     assert_eq!(h.app.tabs.active, 1);
     h.wait("the front tab", move |app| {
-        app.tab.cwd == b && !app.is_loading()
+        app.tab.cwd == b && !app.tab.is_loading()
     });
     h.press("alt+1");
     h.wait("the first tab", move |app| {
-        app.tab.cwd == a && !app.is_loading()
+        app.tab.cwd == a && !app.tab.is_loading()
     });
     assert_eq!(h.app.tab.view, ViewMode::Icons, "its view came back");
     assert!(h.app.tab.sort.reverse);
@@ -510,7 +516,7 @@ fn the_address_becomes_a_field_that_completes_and_goes() {
     h.keys("..");
     h.press("enter");
     h.wait("the parent", |a| {
-        a.tab.cwd.ends_with("projects") && !a.is_loading()
+        a.tab.cwd.ends_with("projects") && !a.tab.is_loading()
     });
     assert!(h.app.windows.address.is_none());
 }
@@ -756,7 +762,7 @@ fn checkbox_selects_double_click_opens() {
     // Double click on a folder name opens it.
     h.double_click(&Target::Row(0));
     h.wait("the folder", |a| {
-        a.tab.cwd.ends_with("assets") && !a.is_loading()
+        a.tab.cwd.ends_with("assets") && !a.tab.is_loading()
     });
     // The title's box selects everything.
     h.click(&Target::Act(Action::SelectAll));
@@ -807,7 +813,7 @@ fn cursor_row_solid_selected_rows_quiet() {
             .tab
             .sel
             .marked
-            .contains(&h.app.current().unwrap().name)
+            .contains(&h.app.tab.current().unwrap().name)
     );
     assert_eq!(buf[(r.x + 6, r.y)].bg, th.cursor);
     assert_eq!(buf[(r.x + 1, r.y)].symbol(), "☑");
@@ -859,7 +865,7 @@ fn the_icons_view_moves_in_two_dimensions_and_selects_like_the_table() {
     // A click on a tile moves the cursor, a double click opens.
     h.double_click(&Target::Row(0));
     h.wait("a folder", |a| {
-        a.tab.cwd.ends_with("assets") && !a.is_loading()
+        a.tab.cwd.ends_with("assets") && !a.tab.is_loading()
     });
 }
 

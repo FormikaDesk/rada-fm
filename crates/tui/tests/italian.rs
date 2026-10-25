@@ -91,7 +91,7 @@ fn a_selection_and_the_clipboard_are_in_italian() {
         }
         h.app.ops.clipboard = Some(rada_tui::app::Clip {
             mode: rada_core::ops::TransferMode::Copy,
-            paths: vec![h.app.current().unwrap().path.clone(); 2],
+            paths: vec![h.app.tab.current().unwrap().path.clone(); 2],
         });
         let s = h.screen();
         assert!(s.contains("3 selezionati"), "{s}");

@@ -121,7 +121,7 @@ pub fn draw_preview(f: &mut Frame, app: &mut App, area: Rect) {
         f.render_widget(Paragraph::new(lines), Rect { height: 2, ..inner });
         return;
     }
-    let Some(e) = app.current().cloned() else {
+    let Some(e) = app.tab.current().cloned() else {
         f.render_widget(
             Paragraph::new(Span::styled(Key::SelectToSee.tr(), th.dim())),
             Rect { height: 1, ..inner },
@@ -270,7 +270,7 @@ struct Detail {
 /// The rows of the box, in the order they are given up when it is short: the last goes first.
 fn details_rows(app: &App) -> Vec<Detail> {
     let th = &app.settings.th;
-    let Some(e) = app.current() else {
+    let Some(e) = app.tab.current() else {
         return vec![Detail {
             label: "",
             value: vec![Span::styled(Key::SelectToSee.tr(), th.dim())],
