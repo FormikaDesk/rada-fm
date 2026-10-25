@@ -11,12 +11,12 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::archive::ArchiveKind;
-use rada_core::events::{CoreEvent, FailureInfo, JobEvent, JobId};
+use rada_core::events::{CoreEvent, FailureInfo, JobId};
 use rada_core::journal::JournalEntry;
 use rada_core::model::SortSpec;
 use rada_core::ops::{
-    Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Scan, TransferMode,
-    TransferOptions, UndoPlan,
+    Cancel, ConflictPolicy, ErrorChoice, Pattern, Plan, Scan, TransferMode, TransferOptions,
+    UndoPlan,
 };
 use rada_core::ops::{ExtractInto, OpKind, OpRequest, WarningKind};
 use rada_core::platform::Volume;
@@ -456,9 +456,11 @@ mod address;
 mod archives;
 mod chooser;
 mod columns;
+mod demo;
 mod eject;
 mod font;
 mod input;
+mod jobs;
 mod listing;
 mod load;
 mod menus;
@@ -470,6 +472,7 @@ mod ops;
 mod palette;
 mod panels;
 mod preview;
+mod prompt;
 mod props;
 mod selection;
 mod settings;
@@ -656,279 +659,6 @@ impl App {
     pub fn use_git(&mut self, git: rada_core::git::Git) {
         self.svc.git = git;
         self.folder_info.forget_git();
-    }
-
-    fn on_job(&mut self, ev: JobEvent) {
-        match ev {
-            JobEvent::Scanning {
-                job,
-                files,
-                dirs,
-                bytes,
-                current,
-            } => {
-                if let Some(Modal::Scanning {
-                    job: j,
-                    files: f,
-                    dirs: d,
-                    bytes: b,
-                    current: c,
-                    ..
-                }) = &mut self.windows.modal
-                    && *j == job
-                {
-                    (*f, *d, *b, *c) = (files, dirs, bytes, current);
-                }
-            }
-            JobEvent::Planned {
-                job,
-                plan,
-                scan,
-                undo,
-            } => self.on_planned(job, *plan, scan, undo),
-            JobEvent::PlanFailed { job, message } | JobEvent::Error { job, message } => {
-                if self.ops.fail(job) {
-                    self.windows.modal = None;
-                    // A sentence that does not fit a one-line message is read in a window.
-                    if message.chars().count() > 70 {
-                        self.windows.modal = Some(Modal::Result(ResultView {
-                            title: Key::ResultCouldNot.tr().to_string(),
-                            lines: vec![(ToastKind::Error, message)],
-                            scroll: 0,
-                        }));
-                    } else {
-                        self.toast(ToastKind::Error, message, 6);
-                    }
-                }
-            }
-            JobEvent::UndoLabel { label, .. } => self.ops.undo_label = label,
-            JobEvent::NothingToUndo { job } => {
-                if self.ops.end_plan(job) {
-                    self.windows.modal = None;
-                    self.toast(ToastKind::Info, Key::TNothingUndo.tr(), 3);
-                }
-            }
-            JobEvent::NothingToRedo { job } => {
-                if self.ops.end_plan(job) {
-                    self.windows.modal = None;
-                    self.toast(ToastKind::Info, Key::TNothingRedo.tr(), 4);
-                }
-            }
-            JobEvent::Progress { job, progress } => {
-                self.ops.progress(job, progress);
-            }
-            JobEvent::AskFailure { job, info, reply } => {
-                if self.ops.is_running(job) {
-                    self.windows.modal = Some(Modal::Failure { job, info, reply });
-                } else {
-                    let _ = reply.send(ErrorChoice::Abort);
-                }
-            }
-            JobEvent::Finished {
-                job,
-                title,
-                report,
-                journal_errors,
-                ..
-            } => {
-                if let Some(done) = self.ops.finish(job) {
-                    self.finish(title, report, journal_errors, Some(done));
-                    // Refresh even if live updates are unavailable.
-                    let generation = self.tabs.next_generation();
-                    self.svc.loader.load(self.tab.cwd.clone(), generation);
-                    self.svc.jobs.load_undo_label();
-                }
-            }
-            JobEvent::Recovered { items } => {
-                let mut lines: Vec<(ToastKind, String)> = Vec::new();
-                for r in &items {
-                    lines.push((
-                        ToastKind::Warn,
-                        tf(
-                            Key::ResultRecovered,
-                            &[&r.title, &r.removed_temps.len(), &r.adopted.len()],
-                        ),
-                    ));
-                    for n in &r.notes {
-                        lines.push((ToastKind::Warn, n.clone()));
-                    }
-                }
-                lines.push((ToastKind::Info, Key::ResultOpenHistory.tr().to_string()));
-                self.windows.modal = Some(Modal::Result(ResultView {
-                    title: Key::ResultInterruptedTitle.tr().to_string(),
-                    lines,
-                    scroll: 0,
-                }));
-            }
-            JobEvent::History { entries, .. } => {
-                if let Some(Modal::History(h)) = &mut self.windows.modal {
-                    h.entries = entries;
-                    h.loading = false;
-                    h.selected = 0;
-                }
-            }
-        }
-    }
-
-    fn finish(
-        &mut self,
-        title: String,
-        report: ExecReport,
-        journal_errors: u64,
-        done: Option<Running>,
-    ) {
-        use rada_core::ops::RunStatus::*;
-        let mut lines: Vec<(ToastKind, String)> = Vec::new();
-        for f in &report.failed {
-            lines.push((ToastKind::Error, f.error.clone()));
-        }
-        if report.skipped_dependent > 0 {
-            lines.push((
-                ToastKind::Warn,
-                if report.skipped_dependent == 1 {
-                    Key::NSkippedFolderOne.tr().to_string()
-                } else {
-                    tf(Key::NSkippedFolderMany, &[&report.skipped_dependent])
-                },
-            ));
-        }
-        for (_, note) in &report.kept {
-            lines.push((ToastKind::Warn, note.clone()));
-        }
-        // What a copy could not carry over (owner, extended attributes, ACLs...), one line per
-        // kind with how many items and an example.
-        let mut lost: std::collections::BTreeMap<&str, Vec<&Path>> = Default::default();
-        for (path, what) in &report.not_preserved {
-            lost.entry(what.as_str()).or_default().push(path);
-        }
-        for (what, paths) in lost {
-            lines.push((
-                ToastKind::Warn,
-                tf(
-                    Key::NNotPreserved,
-                    &[
-                        &what,
-                        &fmt::count(paths.len() as u64, Key::ItemOne, Key::ItemMany),
-                        &fmt::short_path(paths[0], self.home()),
-                    ],
-                ),
-            ));
-        }
-        if journal_errors > 0 {
-            lines.push((
-                ToastKind::Warn,
-                if journal_errors == 1 {
-                    Key::NJournalErrorsOne.tr().to_string()
-                } else {
-                    tf(Key::NJournalErrorsMany, &[&journal_errors])
-                },
-            ));
-        }
-        let (kind, headline) = match report.status() {
-            Completed if report.kept.is_empty() && report.not_preserved.is_empty() => {
-                // The clean ending: a card with what was done, the way back and the way to see it.
-                if lines.is_empty() {
-                    let notice = match done.as_ref() {
-                        Some(r) => self.done_notice(r),
-                        None => Notice::new(NoticeKind::Ok, tf(Key::NDoneDefault, &[&title])),
-                    };
-                    self.notify(notice);
-                    return;
-                }
-                (ToastKind::Ok, tf(Key::NDoneDefault, &[&title]))
-            }
-            Completed if report.not_preserved.is_empty() => {
-                (ToastKind::Warn, tf(Key::NDoneKept, &[&title]))
-            }
-            Completed => (ToastKind::Warn, tf(Key::NDoneNotKept, &[&title])),
-            CompletedWithProblems => (
-                ToastKind::Warn,
-                tf(
-                    Key::NProblems,
-                    &[
-                        &title,
-                        &(report.failed.len() + report.skipped_dependent as usize),
-                    ],
-                ),
-            ),
-            Aborted => (ToastKind::Warn, tf(Key::NStopped, &[&title])),
-            Cancelled => (ToastKind::Warn, tf(Key::NCancelled, &[&title])),
-            Interrupted => (ToastKind::Warn, tf(Key::NInterrupted, &[&title])),
-        };
-        if lines.is_empty() {
-            self.toast(kind, headline, 4);
-        } else {
-            self.windows.modal = Some(Modal::Result(ResultView {
-                title: headline,
-                lines,
-                scroll: 0,
-            }));
-        }
-    }
-
-    fn on_planned(
-        &mut self,
-        job: JobId,
-        plan: Plan,
-        scan: Option<Arc<Scan>>,
-        undo: Option<Box<UndoPlan>>,
-    ) {
-        // Re-plan of an open plan window?
-        if let Some(Modal::Plan(pv)) = &mut self.windows.modal
-            && pv.replanning == Some(job)
-        {
-            pv.plan = plan;
-            pv.scan = scan.or(pv.scan.take());
-            pv.replanning = None;
-            pv.scroll = 0;
-            return;
-        }
-        if !self.ops.end_plan(job) {
-            return; // the user cancelled while it was being planned
-        }
-        let replan = match (&plan.kind, &plan.destination) {
-            (rada_core::ops::OpKind::Copy, Some(d)) => Replan::Transfer {
-                dest: d.clone(),
-                mode: TransferMode::Copy,
-            },
-            (rada_core::ops::OpKind::Move, Some(d)) => Replan::Transfer {
-                dest: d.clone(),
-                mode: TransferMode::Move,
-            },
-            (OpKind::Extract | OpKind::Compress, _) if plan.request.is_some() => Replan::Request,
-            (OpKind::Rename, _) if plan.has_conflicts() && plan.blocking().next().is_none() => {
-                Replan::Request
-            }
-            _ => Replan::None,
-        };
-        if self.hooks.demo_auto_run {
-            self.hooks.demo_auto_run = false;
-            self.windows.modal = None;
-            let pv = Box::new(PlanView {
-                plan,
-                scan,
-                undo,
-                replan,
-                scroll: 0,
-                typed: String::new(),
-                replanning: None,
-                details: false,
-                cancel_focus: false,
-            });
-            self.run_plan(pv);
-            return;
-        }
-        self.windows.modal = Some(Modal::Plan(Box::new(PlanView {
-            plan,
-            scan,
-            undo,
-            replan,
-            scroll: 0,
-            typed: String::new(),
-            replanning: None,
-            details: false,
-            cancel_focus: false,
-        })));
     }
 
     // ------------------------------------------------------------------ starting operations
