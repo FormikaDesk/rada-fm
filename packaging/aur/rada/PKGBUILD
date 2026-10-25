@@ -1,4 +1,4 @@
-# Maintainer: Alessandro Formica <alessandroformica6@gmail.com>
+# Maintainer: Alessandro Formica <alessandroformica6 at gmail dot com>
 #
 # rada, built from the tag of a release. `scripts/aur-bump <tag>` moves pkgver, _tag, the
 # checksum and .SRCINFO to another tag; nothing else needs touching for a new release.
