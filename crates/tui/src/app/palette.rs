@@ -1,5 +1,6 @@
 //! The palette of places: what it lists for the folder and the disks, and its keys.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,63 +10,97 @@ use super::{App, Modal};
 use crate::fmt;
 use crate::palette::{PaletteItem, PaletteKind, PaletteView};
 
+/// The list of the palette while it is made: every path once, a disk instead of its mount point.
+struct Items {
+    items: Vec<PaletteItem>,
+    seen: HashSet<PathBuf>,
+    mounts: HashSet<PathBuf>,
+    home: PathBuf,
+}
+
+impl Items {
+    fn add(
+        &mut self,
+        path: &Path,
+        kind: PaletteKind,
+        label: Option<String>,
+        detail: Option<String>,
+    ) {
+        if kind != PaletteKind::Disk && self.mounts.contains(path) {
+            return;
+        }
+        if !self.seen.insert(path.to_path_buf()) {
+            return;
+        }
+        let home = &self.home;
+        let label = label.unwrap_or_else(|| {
+            if path == home {
+                Key::HomeLabel.tr().to_string()
+            } else {
+                path.file_name()
+                    .map(rada_core::display::name)
+                    .unwrap_or_else(|| rada_core::display::path(path))
+            }
+        });
+        let detail = detail.unwrap_or_else(|| fmt::short_path(path, home));
+        self.items.push(PaletteItem {
+            label,
+            detail,
+            path: path.to_path_buf(),
+            kind,
+        });
+    }
+
+    fn plain(&mut self, path: &Path, kind: PaletteKind) {
+        self.add(path, kind, None, None);
+    }
+}
+
 impl App {
     pub(super) fn palette_items(&self) -> Vec<PaletteItem> {
-        let mut items: Vec<PaletteItem> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        let home = self.svc.home.clone();
-        let cwd = self.tab.cwd.clone();
         // A mount point is listed once, as a disk (so "/" is not both "System" and a disk).
-        let mounts: std::collections::HashSet<PathBuf> = self
-            .devices
-            .volumes
-            .iter()
-            .map(|v| v.mount_point.clone())
-            .collect();
-        let mut add = |items: &mut Vec<PaletteItem>,
-                       path: &Path,
-                       kind: PaletteKind,
-                       label: Option<String>,
-                       detail: Option<String>| {
-            if kind != PaletteKind::Disk && mounts.contains(path) {
-                return;
-            }
-            if !seen.insert(path.to_path_buf()) {
-                return;
-            }
-            let label = label.unwrap_or_else(|| {
-                if path == home {
-                    Key::HomeLabel.tr().to_string()
-                } else {
-                    path.file_name()
-                        .map(rada_core::display::name)
-                        .unwrap_or_else(|| rada_core::display::path(path))
-                }
-            });
-            let detail = detail.unwrap_or_else(|| fmt::short_path(path, &home));
-            items.push(PaletteItem {
-                label,
-                detail,
-                path: path.to_path_buf(),
-                kind,
-            });
+        let mut list = Items {
+            items: Vec::new(),
+            seen: HashSet::new(),
+            mounts: self
+                .devices
+                .volumes
+                .iter()
+                .map(|v| v.mount_point.clone())
+                .collect(),
+            home: self.svc.home.clone(),
         };
+        self.add_places(&mut list);
+        self.add_disks(&mut list);
+        self.add_nearby(&mut list);
+        list.items
+    }
+
+    fn add_places(&self, list: &mut Items) {
         for p in &self.places.bookmarks() {
-            add(&mut items, p, PaletteKind::Bookmark, None, None);
+            list.plain(p, PaletteKind::Bookmark);
         }
-        for p in self.places.paths.recents.iter().filter(|p| **p != cwd) {
-            add(&mut items, p, PaletteKind::Recent, None, None);
+        for p in self
+            .places
+            .paths
+            .recents
+            .iter()
+            .filter(|p| **p != self.tab.cwd)
+        {
+            list.plain(p, PaletteKind::Recent);
         }
         for place in &self.places.paths.places {
-            add(&mut items, &place.path, PaletteKind::Place, None, None);
+            list.plain(&place.path, PaletteKind::Place);
         }
-        add(
-            &mut items,
+        list.add(
             Path::new(std::path::MAIN_SEPARATOR_STR),
             PaletteKind::Place,
             Some(Key::DiskSystem.tr().into()),
             Some(std::path::MAIN_SEPARATOR_STR.into()),
         );
+    }
+
+    fn add_disks(&self, list: &mut Items) {
         for v in &self.devices.volumes {
             let label = v.label.clone().unwrap_or_else(|| {
                 if v.mount_point == Path::new(std::path::MAIN_SEPARATOR_STR) {
@@ -85,17 +120,15 @@ impl App {
                     }
                 });
             let detail = format!("{}{free}", rada_core::display::path(&v.mount_point));
-            add(
-                &mut items,
-                &v.mount_point,
-                PaletteKind::Disk,
-                Some(label),
-                Some(detail),
-            );
+            list.add(&v.mount_point, PaletteKind::Disk, Some(label), Some(detail));
         }
+    }
+
+    /// The folders above this one and the ones inside it.
+    fn add_nearby(&self, list: &mut Items) {
         if self.tab.tag_view().is_none() {
-            for anc in cwd.ancestors().skip(1).take(4) {
-                add(&mut items, anc, PaletteKind::Parent, None, None);
+            for anc in self.tab.cwd.ancestors().skip(1).take(4) {
+                list.plain(anc, PaletteKind::Parent);
             }
         }
         let dirs: Vec<PathBuf> = self
@@ -108,9 +141,8 @@ impl App {
             .map(|e| e.path.clone())
             .collect();
         for p in &dirs {
-            add(&mut items, p, PaletteKind::Folder, None, None);
+            list.plain(p, PaletteKind::Folder);
         }
-        items
     }
 
     pub(super) fn open_palette(&mut self) {
@@ -141,43 +173,26 @@ impl App {
                     self.open_dir(path);
                 }
             }
-            KeyCode::Down => {
-                p.move_by(1);
+            code => {
+                press(&mut p, code, ctrl);
                 self.windows.modal = Some(Modal::Palette(p));
             }
-            KeyCode::Up => {
-                p.move_by(-1);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::Char('n') | KeyCode::Char('j') if ctrl => {
-                p.move_by(1);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::Char('p') | KeyCode::Char('k') if ctrl => {
-                p.move_by(-1);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::PageDown => {
-                p.move_by(8);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::PageUp => {
-                p.move_by(-8);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::Char('u') if ctrl => {
-                p.clear();
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::Backspace => {
-                p.backspace();
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            KeyCode::Char(c) if !ctrl => {
-                p.insert(c);
-                self.windows.modal = Some(Modal::Palette(p));
-            }
-            _ => self.windows.modal = Some(Modal::Palette(p)),
         }
+    }
+}
+
+/// What a key does to the palette: move the choice, or edit the query.
+fn press(p: &mut PaletteView, code: KeyCode, ctrl: bool) {
+    match code {
+        KeyCode::Down => p.move_by(1),
+        KeyCode::Up => p.move_by(-1),
+        KeyCode::Char('n') | KeyCode::Char('j') if ctrl => p.move_by(1),
+        KeyCode::Char('p') | KeyCode::Char('k') if ctrl => p.move_by(-1),
+        KeyCode::PageDown => p.move_by(8),
+        KeyCode::PageUp => p.move_by(-8),
+        KeyCode::Char('u') if ctrl => p.clear(),
+        KeyCode::Backspace => p.backspace(),
+        KeyCode::Char(c) if !ctrl => p.insert(c),
+        _ => {}
     }
 }
