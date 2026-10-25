@@ -1393,27 +1393,6 @@ impl App {
         }
     }
 
-    /// Archives are read-only: say so, with the way to do what was meant.
-    pub(super) fn refuse_in_archive(&mut self, what: &str) -> bool {
-        if self.tab.archive.is_none() {
-            return false;
-        }
-        self.toast(
-            ToastKind::Warn,
-            tf(
-                Key::TArchiveReadOnly,
-                &[
-                    &what,
-                    &self
-                        .key_for(Action::Copy)
-                        .unwrap_or_else(|| Key::KeyCopyWord.tr().into()),
-                ],
-            ),
-            5,
-        );
-        true
-    }
-
     fn start_paste(&mut self) {
         if self.refuse_if_busy()
             || self.refuse_in_archive(Key::WhatPasteHere.tr())
