@@ -554,59 +554,109 @@ pub struct Outcome {
     pub subject: String,
 }
 
+fn name_of(p: &Path) -> std::ffi::OsString {
+    p.file_name()
+        .map(std::ffi::OsStr::to_os_string)
+        .unwrap_or_default()
+}
+
+/// The archive that was made is where the card shows, with the cursor on it.
+fn compressed_outcome(plan: &Plan) -> Outcome {
+    let archive = plan.destination.clone().unwrap_or_default();
+    Outcome {
+        folder: archive.parent().map(Path::to_path_buf),
+        subject: rada_core::display::name(&name_of(&archive)),
+        select: Some(name_of(&archive)),
+    }
+}
+
+/// The first item renamed is where the card shows, with the cursor on its new name.
+fn renamed_outcome(plan: &Plan) -> Outcome {
+    use rada_core::ops::Step;
+    let first = plan.steps.iter().find_map(|s| match s {
+        Step::Rename { to, .. } => Some(to.clone()),
+        _ => None,
+    });
+    Outcome {
+        folder: first
+            .as_deref()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf),
+        select: first.as_deref().map(name_of),
+        subject: first
+            .as_deref()
+            .map(|p| rada_core::display::name(&name_of(p)))
+            .unwrap_or_default(),
+    }
+}
+
+/// The folder or file that was made is where the card shows, with the cursor on it.
+fn made_outcome(plan: &Plan) -> Outcome {
+    use rada_core::ops::Step;
+    let made = plan.steps.iter().find_map(|s| match s {
+        Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => Some(path.clone()),
+        _ => None,
+    });
+    Outcome {
+        folder: plan.destination.clone(),
+        select: made.as_deref().map(name_of),
+        subject: made
+            .as_deref()
+            .map(|p| rada_core::display::name(&name_of(p)))
+            .unwrap_or_default(),
+    }
+}
+
+/// "1 item copied to X" / "3 items copied to X", and the ones with nothing to name.
+fn done_text(kind: OpKind, n: u64, dest: &str, subject: &str) -> String {
+    let count = fmt::thousands(n);
+    let one = n == 1;
+    let two = |a: Key, b: Key, last: &str| {
+        if one {
+            tf(a, &[&last])
+        } else {
+            tf(b, &[&count, &last])
+        }
+    };
+    let counted = |a: Key, b: Key| {
+        if one {
+            a.tr().to_string()
+        } else {
+            tf(b, &[&count])
+        }
+    };
+    match kind {
+        OpKind::Copy => two(Key::NCopyOne, Key::NCopyMany, dest),
+        OpKind::Move => two(Key::NMoveOne, Key::NMoveMany, dest),
+        OpKind::Trash => counted(Key::NTrashOne, Key::NTrashMany),
+        OpKind::Rename | OpKind::BulkRename => {
+            if one {
+                tf(Key::NRenameOne, &[&subject])
+            } else {
+                tf(Key::NRenameMany, &[&count])
+            }
+        }
+        OpKind::Compress => two(Key::NCompressOne, Key::NCompressMany, subject),
+        OpKind::Extract => two(Key::NExtractOne, Key::NExtractMany, dest),
+        OpKind::SetTags => counted(Key::NTagsOne, Key::NTagsMany),
+        OpKind::MakeDir => tf(Key::NFolderCreated, &[&subject]),
+        OpKind::MakeFile => tf(Key::NFileCreated, &[&subject]),
+        OpKind::Delete => counted(Key::NDeleteOne, Key::NDeleteMany),
+        OpKind::Undo => Key::NUndone.tr().to_string(),
+    }
+}
+
 impl App {
     /// What a plan will leave behind and where, worked out before it runs.
     pub(super) fn outcome_of(&self, plan: &Plan) -> Outcome {
-        use rada_core::ops::Step;
-        let name_of = |p: &Path| {
-            p.file_name()
-                .map(std::ffi::OsStr::to_os_string)
-                .unwrap_or_default()
-        };
         match plan.kind {
             OpKind::Copy | OpKind::Move | OpKind::Extract => Outcome {
                 folder: plan.destination.clone(),
                 ..Outcome::default()
             },
-            OpKind::Compress => {
-                let archive = plan.destination.clone().unwrap_or_default();
-                Outcome {
-                    folder: archive.parent().map(Path::to_path_buf),
-                    subject: rada_core::display::name(&name_of(&archive)),
-                    select: Some(name_of(&archive)),
-                }
-            }
-            OpKind::Rename | OpKind::BulkRename => {
-                let first = plan.steps.iter().find_map(|s| match s {
-                    Step::Rename { to, .. } => Some(to.clone()),
-                    _ => None,
-                });
-                Outcome {
-                    folder: first
-                        .as_deref()
-                        .and_then(Path::parent)
-                        .map(Path::to_path_buf),
-                    select: first.as_deref().map(name_of),
-                    subject: first
-                        .as_deref()
-                        .map(|p| rada_core::display::name(&name_of(p)))
-                        .unwrap_or_default(),
-                }
-            }
-            OpKind::MakeDir | OpKind::MakeFile => {
-                let made = plan.steps.iter().find_map(|s| match s {
-                    Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => Some(path.clone()),
-                    _ => None,
-                });
-                Outcome {
-                    folder: plan.destination.clone(),
-                    select: made.as_deref().map(name_of),
-                    subject: made
-                        .as_deref()
-                        .map(|p| rada_core::display::name(&name_of(p)))
-                        .unwrap_or_default(),
-                }
-            }
+            OpKind::Compress => compressed_outcome(plan),
+            OpKind::Rename | OpKind::BulkRename => renamed_outcome(plan),
+            OpKind::MakeDir | OpKind::MakeFile => made_outcome(plan),
             OpKind::Trash => Outcome {
                 folder: self
                     .places
@@ -646,49 +696,13 @@ impl App {
     /// and where, with the way to take it back and the way to see it.
     pub(super) fn done_notice(&self, r: &Running) -> Notice {
         let n = r.totals.items.max(1);
-        let count = fmt::thousands(n);
-        let one = n == 1;
         let dest = r
             .outcome
             .folder
             .as_deref()
             .map(|p| self.folder_label(p))
             .unwrap_or_default();
-        let subject = r.outcome.subject.clone();
-        // "1 item copied to X" / "3 items copied to X", and the ones with nothing to name.
-        let two = |a: Key, b: Key, last: &str| {
-            if one {
-                tf(a, &[&last])
-            } else {
-                tf(b, &[&count, &last])
-            }
-        };
-        let counted = |a: Key, b: Key| {
-            if one {
-                a.tr().to_string()
-            } else {
-                tf(b, &[&count])
-            }
-        };
-        let text = match r.kind {
-            OpKind::Copy => two(Key::NCopyOne, Key::NCopyMany, &dest),
-            OpKind::Move => two(Key::NMoveOne, Key::NMoveMany, &dest),
-            OpKind::Trash => counted(Key::NTrashOne, Key::NTrashMany),
-            OpKind::Rename | OpKind::BulkRename => {
-                if one {
-                    tf(Key::NRenameOne, &[&subject])
-                } else {
-                    tf(Key::NRenameMany, &[&count])
-                }
-            }
-            OpKind::Compress => two(Key::NCompressOne, Key::NCompressMany, &subject),
-            OpKind::Extract => two(Key::NExtractOne, Key::NExtractMany, &dest),
-            OpKind::SetTags => counted(Key::NTagsOne, Key::NTagsMany),
-            OpKind::MakeDir => tf(Key::NFolderCreated, &[&subject]),
-            OpKind::MakeFile => tf(Key::NFileCreated, &[&subject]),
-            OpKind::Delete => counted(Key::NDeleteOne, Key::NDeleteMany),
-            OpKind::Undo => Key::NUndone.tr().to_string(),
-        };
+        let text = done_text(r.kind, n, &dest, &r.outcome.subject);
         let action = match r.kind {
             OpKind::Undo => NoticeAction::Redo,
             _ if r.reversible => NoticeAction::Undo,
