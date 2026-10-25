@@ -5,10 +5,12 @@
 # Rust packaging follows https://wiki.archlinux.org/title/Rust_package_guidelines.
 
 pkgname=rada
-# The tag as GitHub has it. pkgver is the same without the dashes and dots of the suffix
-# (a pkgver cannot hold a hyphen): v0.6.0-rc.7 -> 0.6.0rc7, which pacman orders before 0.6.0.
-_tag=v0.6.0-rc.7
-pkgver=0.6.0rc7
+# The tag as GitHub has it. pkgver is the same without the hyphen and the dot of the suffix
+# (a pkgver cannot hold a hyphen): v0.6.0-rc.16 -> 0.6.0rc16. `vercmp 0.6.0rc16 0.6.0` is -1:
+# pacman orders the release candidate before 0.6.0 (with an underscore, 0.6.0_rc16, it would
+# come after it) and rc9 before rc10.
+_tag=v0.6.0-rc.16
+pkgver=0.6.0rc16
 pkgrel=1
 pkgdesc='A terminal file manager where every destructive action is planned first and can be undone'
 arch=('x86_64' 'aarch64')
@@ -28,7 +30,7 @@ optdepends=(
 # the binary is stripped by the build itself, so there is nothing for a debug package.
 options=('!lto' '!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$_tag.tar.gz")
-sha256sums=('da5f5f80a2fc2773182d63a7b7ba4b8c6761964f9c88d4d588d5ca668c415ea4')
+sha256sums=('6aff1db5b73547c3170b9bafa86f53236b54eac8d78cd456e545a3f05dcad718')
 
 _srcdir() {
   # GitHub names the folder of a tag archive after the repository and the tag without its "v".
@@ -49,8 +51,11 @@ build() {
 
 check() {
   cd "$(_srcdir)"
-  # The whole suite is a second build and several minutes: the project's CI runs it for every
-  # push, on Linux, macOS and Windows. Here, only that the binary starts and is the one of the tag.
+  export RUSTUP_TOOLCHAIN=stable
+  # The unit tests of the libraries: a few minutes of build, a few seconds to run. The tests
+  # that start programs and touch disks are the project's CI, which runs the whole suite on
+  # Linux, macOS and Windows for every push. Then that the binary is the one of the tag.
+  CARGO_TARGET_DIR=target cargo test --frozen --release --workspace --lib
   test "$(target/release/rada --version)" = "rada ${_tag#v}"
 }
 
