@@ -7,11 +7,11 @@
 [![crates.io](https://img.shields.io/crates/v/rada?include_prereleases)](https://crates.io/crates/rada)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![rada: look around, select three items, copy them with a plan first, see the card, take it back with Ctrl+Z](docs/media/demo.gif)
+![rada in the panels view on the Neon theme: look around, select three items, copy them with a plan first, settle the name conflict with Keep both, see the card, take it back with Ctrl+Z](docs/media/demo-panels.gif)
 
 rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual desktop shortcuts work together, the interface is in English and Italian, and it looks the same in any modern terminal.
 
-![The panels view on the Neon theme: NAV and disk space on the left, the folder in the middle, the preview and details on the right](docs/screenshots/principale-pannelli.png)
+![The panels view on the Neon theme: NAV and the ring of disk space on the left, the folder in the middle with a selection, the picture under the cursor and its details on the right](docs/screenshots/panels-neon.png)
 
 ## Why rada
 
@@ -36,11 +36,11 @@ rada chooses the layout from the size of the window (`layout = "auto"`, the defa
 - **Panels.** From 140×36 cells, NAV, the folder and the preview are three boxes. From 70×24 there are two, and `Alt+P` swaps NAV and the preview.
 - **Classic.** A sidebar and a list. Smaller windows get it by themselves; `layout = "classic"` or the View menu keeps it at any size.
 
-| ![Panels on the Neon theme: three boxes](docs/screenshots/principale-pannelli.png) | ![Panels on the Gesso theme, the light one](docs/screenshots/principale-pannelli-gesso.png) |
+| ![Panels on the Neon theme: three boxes, the disk ring and a real picture in the preview](docs/screenshots/panels-neon.png) | ![Panels on the Gesso theme, the light one](docs/screenshots/principale-pannelli-gesso.png) |
 |---|---|
-| Panels, dark theme. | Panels, light theme. |
-| ![Panels in a window of 78×45 cells: two boxes](docs/screenshots/principale-due-riquadri.png) | ![The classic layout: sidebar and list](docs/screenshots/principale-inglese.png) |
-| Two boxes in a narrower window. | Classic: sidebar and list. |
+| Panels, Neon theme: the ring is the disk space, the preview draws the photo. | Panels, light theme. |
+| ![Panels in a window of 78×45 cells: two boxes](docs/screenshots/principale-due-riquadri.png) | ![The classic layout on the default theme: sidebar, list with the cursor on a photo, and its preview](docs/screenshots/classic.png) |
+| Two boxes in a narrower window. | Classic: sidebar, list and preview, default theme. |
 
 ## Install
 

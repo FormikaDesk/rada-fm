@@ -18,3 +18,5 @@ a JetBrainsMono Nerd Font have to be installed; nothing needs `sudo`.
 VHS takes a screenshot of nothing now and then, so `scripts/docs-media` tries a tape up to six times
 and stops if it still made none of what it promises. The variables that name the terminal it is
 run from (`TERM_PROGRAM`, `GHOSTTY_*`, `RADA_*`…) are unset first: rada decides what to draw from them.
+
+Three images do **not** come from these tapes: `docs/screenshots/panels-neon.png`, `docs/screenshots/classic.png` and `docs/media/demo-panels.gif`. They were taken in a real Ghostty window, because VHS's terminal does not draw images: the ring of the SPACE box becomes a bar and the pictures in the preview become blocks, so a VHS picture is not what rada looks like in a terminal that can draw them. They were made on a home folder of `scripts/demo-home` with the Italian names changed to English (made-up files, nothing from the machine), with `--demo vetrina` for the panels, `--demo main` for the classic one and, for the GIF, keys like those of `demo.tape` sent to the window (plus `c` in the plan, to choose Keep both).
