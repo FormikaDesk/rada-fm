@@ -28,6 +28,9 @@ impl Session {
     }
 }
 
+/// The item under the cursor: its path, whether it is a folder, whether it can be gone into.
+type Under = Option<(PathBuf, bool, bool)>;
+
 impl App {
     /// A key that means something only to a chooser. `true` when it was taken.
     pub(super) fn on_chooser_key(&mut self, key: KeyEvent) -> bool {
@@ -102,73 +105,79 @@ impl App {
             .current()
             .map(|e| (e.path.clone(), e.is_dir(), e.is_navigable_dir()));
         match ch.kind {
-            Kind::File => {
-                if by_key && ch.multiple && !self.tab.sel.marked.is_empty() {
-                    let files = self.marked_paths(|e| !e.is_dir() && e.error.is_none());
-                    if files.is_empty() {
-                        self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
-                    } else {
-                        self.chooser_finish(files);
-                    }
-                    return;
-                }
-                match under {
-                    Some((path, _, true)) => self.open_dir(path),
-                    Some((_, true, false)) => {}
-                    Some((path, false, _)) => {
-                        if self.tab.current().is_some_and(|e| e.error.is_none())
-                            && self.tab.archive.is_none()
-                        {
-                            self.chooser_finish(vec![path]);
-                        }
-                    }
-                    None => {
-                        if ch.multiple && by_key {
-                            self.toast(ToastKind::Info, Key::ChooseNothingMarked.tr(), 3);
-                        }
-                    }
-                }
+            Kind::File => self.enter_to_choose_file(ch.multiple, under, by_key),
+            Kind::Folder => self.enter_to_choose_folder(ch.multiple, under, here, by_key),
+            Kind::Save { .. } => self.enter_to_save(under, here),
+        }
+    }
+
+    fn enter_to_choose_file(&mut self, multiple: bool, under: Under, by_key: bool) {
+        if by_key && multiple && !self.tab.sel.marked.is_empty() {
+            let files = self.marked_paths(|e| !e.is_dir() && e.error.is_none());
+            if files.is_empty() {
+                self.toast(ToastKind::Info, Key::ChooseOnlyFiles.tr(), 3);
+            } else {
+                self.chooser_finish(files);
             }
-            Kind::Folder => {
-                // A double click goes into a folder, as it does everywhere.
-                if !by_key {
-                    if let Some((path, _, true)) = under {
-                        self.open_dir(path);
-                    }
-                    return;
-                }
-                if ch.multiple && !here && !self.tab.sel.marked.is_empty() {
-                    let dirs = self.marked_paths(|e| e.is_dir());
-                    self.chooser_finish(dirs);
-                    return;
-                }
-                let picked = match under {
-                    Some((path, true, _)) if !here => Some(path),
-                    _ => self.chooser_here(),
-                };
-                if let Some(path) = picked {
+            return;
+        }
+        match under {
+            Some((path, _, true)) => self.open_dir(path),
+            Some((_, true, false)) => {}
+            Some((path, false, _)) => {
+                if self.tab.current().is_some_and(|e| e.error.is_none())
+                    && self.tab.archive.is_none()
+                {
                     self.chooser_finish(vec![path]);
-                } else {
-                    self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 3);
                 }
             }
-            Kind::Save { .. } => {
-                if here {
-                    self.chooser_save_prompt(None);
-                    return;
-                }
-                match under {
-                    Some((path, _, true)) => self.open_dir(path),
-                    Some((_, true, false)) => {}
-                    // A file under the cursor: saving over it is what Enter on it means,
-                    // and the name is asked for with its own name filled in.
-                    Some((path, false, _)) => {
-                        let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
-                        self.chooser_save_prompt(name);
-                    }
-                    None => self.chooser_save_prompt(None),
+            None => {
+                if multiple && by_key {
+                    self.toast(ToastKind::Info, Key::ChooseNothingMarked.tr(), 3);
                 }
             }
+        }
+    }
+
+    fn enter_to_choose_folder(&mut self, multiple: bool, under: Under, here: bool, by_key: bool) {
+        // A double click goes into a folder, as it does everywhere.
+        if !by_key {
+            if let Some((path, _, true)) = under {
+                self.open_dir(path);
+            }
+            return;
+        }
+        if multiple && !here && !self.tab.sel.marked.is_empty() {
+            let dirs = self.marked_paths(|e| e.is_dir());
+            self.chooser_finish(dirs);
+            return;
+        }
+        let picked = match under {
+            Some((path, true, _)) if !here => Some(path),
+            _ => self.chooser_here(),
+        };
+        if let Some(path) = picked {
+            self.chooser_finish(vec![path]);
+        } else {
+            self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 3);
+        }
+    }
+
+    fn enter_to_save(&mut self, under: Under, here: bool) {
+        if here {
+            self.chooser_save_prompt(None);
+            return;
+        }
+        match under {
+            Some((path, _, true)) => self.open_dir(path),
+            Some((_, true, false)) => {}
+            // A file under the cursor: saving over it is what Enter on it means,
+            // and the name is asked for with its own name filled in.
+            Some((path, false, _)) => {
+                let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+                self.chooser_save_prompt(name);
+            }
+            None => self.chooser_save_prompt(None),
         }
     }
 

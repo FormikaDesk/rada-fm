@@ -34,6 +34,20 @@ impl App {
             .iter()
             .filter(|e| self.tab.sel.marked.contains(&e.name))
             .collect();
+        let rows = self.selection_rows(&chosen);
+        PropsView {
+            title: if chosen.len() == 1 {
+                Key::PropsSelectedOne.tr().to_string()
+            } else {
+                tf(Key::PropsSelectedMany, &[&chosen.len()])
+            },
+            rows,
+            scroll: 0,
+        }
+    }
+
+    /// The rows of the window for several items: how many, their size, where they are.
+    fn selection_rows(&self, chosen: &[&Entry]) -> Vec<(String, String)> {
         let size: u64 = chosen.iter().filter(|e| !e.is_dir()).map(|e| e.size).sum();
         let folders = chosen.iter().filter(|e| e.is_dir()).count();
         let mut rows = vec![
@@ -69,19 +83,22 @@ impl App {
                 Key::PropInArchive.tr().to_string(),
             ));
         }
+        rows
+    }
+
+    fn item_properties(&self, e: &Entry) -> PropsView {
+        let mut rows = self.identity_rows(e);
+        rows.extend(self.measure_rows(e));
+        rows.extend(self.state_rows(e));
         PropsView {
-            title: if chosen.len() == 1 {
-                Key::PropsSelectedOne.tr().to_string()
-            } else {
-                tf(Key::PropsSelectedMany, &[&chosen.len()])
-            },
+            title: e.display.clone(),
             rows,
             scroll: 0,
         }
     }
 
-    fn item_properties(&self, e: &Entry) -> PropsView {
-        let when = |t| self.settings.date_with_day(t, self.now());
+    /// Its name, what it is, where it is and what it links to.
+    fn identity_rows(&self, e: &Entry) -> Vec<(String, String)> {
         let mut rows: Vec<(String, String)> = vec![
             (
                 Key::PropName.tr().into(),
@@ -105,6 +122,13 @@ impl App {
                 rada_core::display::path(&l.target),
             ));
         }
+        rows
+    }
+
+    /// Its size, its dates and its permissions.
+    fn measure_rows(&self, e: &Entry) -> Vec<(String, String)> {
+        let when = |t| self.settings.date_with_day(t, self.now());
+        let mut rows: Vec<(String, String)> = Vec::new();
         if !e.is_dir() {
             rows.push((
                 Key::PropSize.tr().into(),
@@ -124,6 +148,12 @@ impl App {
                 format!("{}  {:04o}", rada_core::preview::mode_string(m), m & 0o7777),
             ));
         }
+        rows
+    }
+
+    /// Its attributes, what is wrong with it, and that it is inside an archive.
+    fn state_rows(&self, e: &Entry) -> Vec<(String, String)> {
+        let mut rows: Vec<(String, String)> = Vec::new();
         let mut flags: Vec<&str> = Vec::new();
         if e.hidden {
             flags.push(Key::FlagHidden.tr());
@@ -146,11 +176,7 @@ impl App {
         if self.tab.archive.is_some() {
             rows.push((Key::PropInside.tr().into(), Key::PropInArchive.tr().into()));
         }
-        PropsView {
-            title: e.display.clone(),
-            rows,
-            scroll: 0,
-        }
+        rows
     }
 
     pub(super) fn on_properties_key(&mut self, mut p: PropsView, key: KeyEvent) {

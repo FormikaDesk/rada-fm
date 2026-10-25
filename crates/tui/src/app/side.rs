@@ -304,30 +304,8 @@ impl App {
                 }
             }
             Parent | ClearSelection | SwitchPane => self.side_nav.focus = false,
-            Bookmark => {
-                if let Some(item) = items.get(self.side_nav.side_cursor)
-                    && !matches!(item.origin, Origin::Unmounted(_))
-                {
-                    let add = !self.places.paths.bookmarks.contains(&item.path);
-                    self.set_bookmark(item.path.clone(), add);
-                }
-            }
-            Trash | DeletePermanently => {
-                match items.get(self.side_nav.side_cursor).map(|i| &i.origin) {
-                    Some(Origin::Device(_)) => {
-                        let mount = items[self.side_nav.side_cursor].path.clone();
-                        self.start_eject(&mount);
-                    }
-                    Some(Origin::Unmounted(_)) => {
-                        self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3)
-                    }
-                    Some(Origin::Bookmark { removable: true }) => {
-                        let path = items[self.side_nav.side_cursor].path.clone();
-                        self.set_bookmark(path, false);
-                    }
-                    _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
-                }
-            }
+            Bookmark => self.side_bookmark(&items),
+            Trash | DeletePermanently => self.side_remove(&items),
             Filter => {
                 // Typing a filter is about the list.
                 self.side_nav.focus = false;
@@ -340,6 +318,32 @@ impl App {
             }
         }
         true
+    }
+
+    /// The bookmark key on a place of the sidebar: pin it, or take it out.
+    fn side_bookmark(&mut self, items: &[Item]) {
+        if let Some(item) = items.get(self.side_nav.side_cursor)
+            && !matches!(item.origin, Origin::Unmounted(_))
+        {
+            let add = !self.places.paths.bookmarks.contains(&item.path);
+            self.set_bookmark(item.path.clone(), add);
+        }
+    }
+
+    /// Delete on a place of the sidebar: eject a disk, or take a pinned folder out.
+    fn side_remove(&mut self, items: &[Item]) {
+        match items.get(self.side_nav.side_cursor).map(|i| &i.origin) {
+            Some(Origin::Device(_)) => {
+                let mount = items[self.side_nav.side_cursor].path.clone();
+                self.start_eject(&mount);
+            }
+            Some(Origin::Unmounted(_)) => self.toast(ToastKind::Info, Key::TCannotEject.tr(), 3),
+            Some(Origin::Bookmark { removable: true }) => {
+                let path = items[self.side_nav.side_cursor].path.clone();
+                self.set_bookmark(path, false);
+            }
+            _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
+        }
     }
 
     /// The menu of a sidebar item: open it, and add or remove it from the bookmarks.
