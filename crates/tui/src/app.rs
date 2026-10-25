@@ -12,11 +12,10 @@ use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::archive::ArchiveKind;
 use rada_core::events::{CoreEvent, FailureInfo, JobEvent, JobId};
-use rada_core::jobs::JobHandle;
 use rada_core::journal::JournalEntry;
 use rada_core::model::SortSpec;
 use rada_core::ops::{
-    Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Progress, Scan, TransferMode,
+    Cancel, ConflictPolicy, ErrorChoice, ExecReport, Pattern, Plan, Scan, TransferMode,
     TransferOptions, UndoPlan,
 };
 use rada_core::ops::{ExtractInto, OpKind, OpRequest, WarningKind};
@@ -934,149 +933,6 @@ impl App {
 
     // ------------------------------------------------------------------ starting operations
 
-    fn begin_plan(&mut self, what: &str, handle: JobHandle) {
-        self.ops.plan_job = Some(handle.id);
-        self.windows.modal = Some(Modal::Scanning {
-            job: handle.id,
-            what: what.to_string(),
-            files: 0,
-            dirs: 0,
-            bytes: 0,
-            current: PathBuf::new(),
-            cancel: handle.cancel,
-        });
-    }
-
-    fn refuse_if_busy(&mut self) -> bool {
-        if self.ops.is_busy() {
-            self.toast(ToastKind::Warn, Key::TBusy.tr(), 3);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn start_paste(&mut self) {
-        if self.refuse_if_busy()
-            || self.refuse_in_archive(Key::WhatPasteHere.tr())
-            || self.refuse_in_tag_view(Key::WhatPaste.tr())
-        {
-            return;
-        }
-        let Some(clip) = self.ops.clipboard.clone() else {
-            self.toast(ToastKind::Info, Key::TNothingCopied.tr(), 3);
-            return;
-        };
-        let opts = TransferOptions {
-            mode: clip.mode,
-            policy: ConflictPolicy::Skip,
-            verify: false,
-        };
-        let h = self
-            .svc
-            .jobs
-            .plan_transfer(clip.paths, self.tab.cwd.clone(), opts);
-        self.begin_plan(
-            if clip.mode == TransferMode::Copy {
-                Key::PlanningCopy.tr()
-            } else {
-                Key::PlanningMove.tr()
-            },
-            h,
-        );
-    }
-
-    fn start_trash(&mut self, permanent: bool) {
-        if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatDelete.tr()) {
-            return;
-        }
-        let t = self.tab.targets();
-        if t.is_empty() {
-            return;
-        }
-        let h = if permanent {
-            self.svc.jobs.plan_delete(t)
-        } else {
-            self.svc.jobs.plan_trash(t)
-        };
-        self.begin_plan(Key::PlanningGeneric.tr(), h);
-    }
-
-    fn start_undo(&mut self, id: Option<String>) {
-        if self.refuse_if_busy() {
-            return;
-        }
-        let h = self.svc.jobs.plan_undo(id);
-        self.begin_plan(Key::PlanningUndo.tr(), h);
-    }
-
-    /// Ask for the same transfer again with another way of settling name clashes.
-    fn replan_with(&mut self, pv: &mut PlanView, policy: ConflictPolicy) {
-        if pv.needs_typed_confirmation() || pv.replanning.is_some() || pv.plan.policy == policy {
-            return;
-        }
-        match pv.replan.clone() {
-            Replan::Transfer { dest, mode } => {
-                if let Some(scan) = pv.scan.clone() {
-                    let h = self.svc.jobs.replan_transfer(
-                        scan,
-                        dest,
-                        TransferOptions {
-                            mode,
-                            policy,
-                            verify: false,
-                        },
-                    );
-                    pv.replanning = Some(h.id);
-                }
-            }
-            Replan::Request => {
-                if let Some(req) = pv
-                    .plan
-                    .request
-                    .as_ref()
-                    .and_then(|r| r.with_conflict(policy))
-                {
-                    let h = self.svc.jobs.plan_request(req);
-                    pv.replanning = Some(h.id);
-                }
-            }
-            Replan::None => {}
-        }
-    }
-
-    fn run_plan(&mut self, pv: Box<PlanView>) {
-        // A file chooser makes a folder and nothing else, whatever asked for more.
-        if self.session.chooser.is_some() && pv.plan.kind != OpKind::MakeDir {
-            self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 3);
-            return;
-        }
-        let title = pv.plan.title.clone();
-        let total = pv.plan.total_bytes();
-        let (kind, totals, reversible) = (pv.plan.kind, pv.plan.totals, pv.plan.reversible);
-        let outcome = self.outcome_of(&pv.plan);
-        let handle = match pv.undo {
-            Some(up) => self.svc.jobs.execute_undo(*up),
-            None => self.svc.jobs.execute(pv.plan),
-        };
-        self.ops.running = Some(Running {
-            job: handle.id,
-            title,
-            progress: Progress {
-                bytes_total: total,
-                ..Default::default()
-            },
-            started: Instant::now(),
-            handle,
-            samples: Vec::new(),
-            kind,
-            totals,
-            reversible,
-            outcome,
-        });
-        self.tab.sel.clear_marks();
-    }
-
     fn submit_input(&mut self, iv: InputView) {
         match &iv.kind {
             InputKind::Rename { from } => {
@@ -1204,38 +1060,6 @@ impl App {
     }
 
     // ------------------------------------------------------------------ keys
-
-    fn yank(&mut self, mode: TransferMode) {
-        if mode == TransferMode::Move && self.refuse_in_archive(Key::WhatCut.tr()) {
-            return;
-        }
-        let paths = self.tab.targets();
-        if paths.is_empty() {
-            return;
-        }
-        let n = paths.len();
-        self.ops.clipboard = Some(Clip { mode, paths });
-        self.tab.sel.clear_marks();
-        let verb = match (mode == TransferMode::Copy, n == 1) {
-            (true, true) => Key::TYankCopiedOne,
-            (true, false) => Key::TYankCopiedMany,
-            (false, true) => Key::TYankCutOne,
-            (false, false) => Key::TYankCutMany,
-        };
-        self.toast(
-            ToastKind::Info,
-            tf(
-                verb,
-                &[
-                    &fmt::count(n as u64, Key::ItemOne, Key::ItemMany),
-                    &self
-                        .key_for(Action::Paste)
-                        .unwrap_or_else(|| Key::KeyPasteWord.tr().into()),
-                ],
-            ),
-            3,
-        );
-    }
 
     fn start_rename(&mut self) {
         if self.refuse_if_busy() || self.refuse_in_archive(Key::WhatRename.tr()) {
