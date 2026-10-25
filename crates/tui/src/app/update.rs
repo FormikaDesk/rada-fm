@@ -2,7 +2,7 @@
 //! exists, a window with its release notes, and the progress of the update itself. The work
 //! is done by the update worker of `rada-core`; nothing here waits for it.
 
-use rada_core::update::{Applied, Mode, Notice, UpdateEvent};
+use rada_core::update::{Applied, Ctx, Mode, Notice, UpdateEvent};
 
 use super::{App, Modal, PropsView, ToastKind};
 use crate::fmt;
@@ -84,30 +84,8 @@ impl App {
 
     pub(super) fn on_update_event(&mut self, ev: UpdateEvent) {
         match ev {
-            UpdateEvent::Available { notice, how } => {
-                let asked = std::mem::take(&mut self.updates.update_asked);
-                // Never replace the news of an update that is running or has just finished.
-                if matches!(
-                    self.updates.update,
-                    UpdateStatus::Working { .. } | UpdateStatus::Done(_)
-                ) {
-                    return;
-                }
-                self.updates.update = UpdateStatus::Available { notice, how };
-                // Somebody asked: show what was found, not just a pill in a corner.
-                if asked && self.windows.modal.is_none() {
-                    self.start_update_action();
-                }
-            }
-            UpdateEvent::UpToDate => {
-                if std::mem::take(&mut self.updates.update_asked) {
-                    self.updates.update = UpdateStatus::None;
-                    self.toast(ToastKind::Ok, Key::TUpToDate.tr(), 4);
-                }
-                if matches!(self.updates.update, UpdateStatus::Working { .. }) {
-                    self.updates.update = UpdateStatus::None;
-                }
-            }
+            UpdateEvent::Available { notice, how } => self.on_update_available(notice, how),
+            UpdateEvent::UpToDate => self.on_up_to_date(),
             UpdateEvent::CheckFailed(e) => {
                 if std::mem::take(&mut self.updates.update_asked) {
                     self.toast(ToastKind::Warn, tf(Key::TCannotLookUpdates, &[&e]), 6);
@@ -120,26 +98,56 @@ impl App {
                 };
                 self.updates.update = UpdateStatus::Working { step, started };
             }
-            UpdateEvent::Done(applied) => {
-                let text = if applied.restart {
-                    tf(Key::UpDoneRestart, &[&applied.version])
-                } else {
-                    applied.note.clone()
-                };
-                self.toast(ToastKind::Ok, text, 10);
-                self.updates.update = UpdateStatus::Done(applied);
-            }
-            UpdateEvent::Failed { message, log } => {
-                self.updates.update = UpdateStatus::Failed {
-                    message: message.clone(),
-                    log: log.clone(),
-                };
-                if self.windows.modal.is_none() {
-                    self.windows.modal = Some(Modal::Update(UpdateView::Failed { message, log }));
-                } else {
-                    self.toast(ToastKind::Error, Key::TUpdateFailed.tr(), 6);
-                }
-            }
+            UpdateEvent::Done(applied) => self.on_update_done(applied),
+            UpdateEvent::Failed { message, log } => self.on_update_failed(message, log),
+        }
+    }
+
+    fn on_update_available(&mut self, notice: Notice, how: Result<Mode, String>) {
+        let asked = std::mem::take(&mut self.updates.update_asked);
+        // Never replace the news of an update that is running or has just finished.
+        if matches!(
+            self.updates.update,
+            UpdateStatus::Working { .. } | UpdateStatus::Done(_)
+        ) {
+            return;
+        }
+        self.updates.update = UpdateStatus::Available { notice, how };
+        // Somebody asked: show what was found, not just a pill in a corner.
+        if asked && self.windows.modal.is_none() {
+            self.start_update_action();
+        }
+    }
+
+    fn on_up_to_date(&mut self) {
+        if std::mem::take(&mut self.updates.update_asked) {
+            self.updates.update = UpdateStatus::None;
+            self.toast(ToastKind::Ok, Key::TUpToDate.tr(), 4);
+        }
+        if matches!(self.updates.update, UpdateStatus::Working { .. }) {
+            self.updates.update = UpdateStatus::None;
+        }
+    }
+
+    fn on_update_done(&mut self, applied: Applied) {
+        let text = if applied.restart {
+            tf(Key::UpDoneRestart, &[&applied.version])
+        } else {
+            applied.note.clone()
+        };
+        self.toast(ToastKind::Ok, text, 10);
+        self.updates.update = UpdateStatus::Done(applied);
+    }
+
+    fn on_update_failed(&mut self, message: String, log: PathBuf) {
+        self.updates.update = UpdateStatus::Failed {
+            message: message.clone(),
+            log: log.clone(),
+        };
+        if self.windows.modal.is_none() {
+            self.windows.modal = Some(Modal::Update(UpdateView::Failed { message, log }));
+        } else {
+            self.toast(ToastKind::Error, Key::TUpdateFailed.tr(), 6);
         }
     }
 
@@ -169,46 +177,7 @@ impl App {
     pub(super) fn open_about(&mut self) {
         let mut rows: Vec<(String, String)> = vec![(Key::AboutVersion.tr().into(), self.version())];
         match &self.svc.updater {
-            Some(u) => {
-                use rada_core::update::Channel;
-                let ctx = u.ctx();
-                let followed =
-                    rada_core::update::resolve_channel(ctx.settings.channel, &ctx.current);
-                let name = match followed {
-                    Channel::Prerelease => Key::AboutPre.tr(),
-                    _ => Key::AboutStable.tr(),
-                };
-                let why = if ctx.settings.channel == Channel::Auto {
-                    Key::AboutChosenVersion.tr()
-                } else {
-                    Key::AboutSetInConfig.tr()
-                };
-                rows.push((
-                    Key::AboutChannel.tr().into(),
-                    tf(Key::AboutChannelValue, &[&name, &why]),
-                ));
-                rows.push((
-                    Key::AboutMode.tr().into(),
-                    match ctx.mode() {
-                        Ok(Mode::Binary) => Key::AboutBinary.tr().into(),
-                        Ok(Mode::Source { dir }) => tf(Key::AboutSourceMode, &[&dir.display()]),
-                        Ok(Mode::Package { hint }) => hint,
-                        Err(e) => e,
-                    },
-                ));
-                rows.push((
-                    Key::AboutChecks.tr().into(),
-                    if ctx.settings.check {
-                        Key::AboutDaily.tr().into()
-                    } else {
-                        Key::AboutOnlyAsked.tr().into()
-                    },
-                ));
-                rows.push((
-                    Key::AboutProgram.tr().into(),
-                    rada_core::display::path(&ctx.exe),
-                ));
-            }
+            Some(u) => rows.extend(updater_rows(u.ctx())),
             None => rows.push((Key::AboutUpdates.tr().into(), Key::AboutNA.tr().into())),
         }
         rows.push((
@@ -318,24 +287,11 @@ impl App {
     /// click on it does something.
     pub fn update_notice(&self) -> Option<(Vec<String>, bool)> {
         let key = self.key_for(Action::Update);
-        let press = |what: &str| match &key {
-            Some(k) => tf(Key::UpPress, &[k, &what]),
-            None => String::new(),
-        };
-        let dot = |k: &Option<String>| k.as_ref().map(|k| format!(" · {k}")).unwrap_or_default();
         match &self.updates.update {
             UpdateStatus::None => None,
-            UpdateStatus::Available { notice, .. } => Some((
-                vec![
-                    tf(
-                        Key::UpNewVersion,
-                        &[&notice.version, &press(Key::UpWordUpdate.tr())],
-                    ),
-                    format!("{}{}", notice.version, dot(&key)),
-                    notice.version.clone(),
-                ],
-                true,
-            )),
+            UpdateStatus::Available { notice, .. } => {
+                Some((available_wording(&notice.version, &key), true))
+            }
             UpdateStatus::Working { step, started } => {
                 let t = fmt::duration(started.elapsed());
                 Some((
@@ -356,11 +312,79 @@ impl App {
             UpdateStatus::Done(_) => None,
             UpdateStatus::Failed { .. } => Some((
                 vec![
-                    tf(Key::UpFailedLong, &[&press(Key::UpWordSeeWhy.tr())]),
+                    tf(Key::UpFailedLong, &[&press(&key, Key::UpWordSeeWhy.tr())]),
                     tf(Key::UpFailedShort, &[&dot(&key)]),
                 ],
                 true,
             )),
         }
     }
+}
+
+/// The words for a new version, the longest first.
+fn available_wording(version: &str, key: &Option<String>) -> Vec<String> {
+    vec![
+        tf(
+            Key::UpNewVersion,
+            &[&version, &press(key, Key::UpWordUpdate.tr())],
+        ),
+        format!("{version}{}", dot(key)),
+        version.to_string(),
+    ]
+}
+
+/// "press U to update", when the Update action has a key.
+fn press(key: &Option<String>, what: &str) -> String {
+    match key {
+        Some(k) => tf(Key::UpPress, &[k, &what]),
+        None => String::new(),
+    }
+}
+
+/// " · U", when the Update action has a key.
+fn dot(key: &Option<String>) -> String {
+    key.as_ref().map(|k| format!(" · {k}")).unwrap_or_default()
+}
+
+/// The rows of "About" that come from the update worker: the channel followed, how an update
+/// would be made, how often it looks, and which program this is.
+fn updater_rows(ctx: &Ctx) -> Vec<(String, String)> {
+    use rada_core::update::Channel;
+    let followed = rada_core::update::resolve_channel(ctx.settings.channel, &ctx.current);
+    let name = match followed {
+        Channel::Prerelease => Key::AboutPre.tr(),
+        _ => Key::AboutStable.tr(),
+    };
+    let why = if ctx.settings.channel == Channel::Auto {
+        Key::AboutChosenVersion.tr()
+    } else {
+        Key::AboutSetInConfig.tr()
+    };
+    vec![
+        (
+            Key::AboutChannel.tr().into(),
+            tf(Key::AboutChannelValue, &[&name, &why]),
+        ),
+        (
+            Key::AboutMode.tr().into(),
+            match ctx.mode() {
+                Ok(Mode::Binary) => Key::AboutBinary.tr().into(),
+                Ok(Mode::Source { dir }) => tf(Key::AboutSourceMode, &[&dir.display()]),
+                Ok(Mode::Package { hint }) => hint,
+                Err(e) => e,
+            },
+        ),
+        (
+            Key::AboutChecks.tr().into(),
+            if ctx.settings.check {
+                Key::AboutDaily.tr().into()
+            } else {
+                Key::AboutOnlyAsked.tr().into()
+            },
+        ),
+        (
+            Key::AboutProgram.tr().into(),
+            rada_core::display::path(&ctx.exe),
+        ),
+    ]
 }

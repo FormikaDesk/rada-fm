@@ -223,35 +223,11 @@ impl App {
         match key.code {
             // Esc (or Left, with nothing typed) closes the list; if it came from the context
             // menu, that is given back.
-            KeyCode::Esc => {
-                if let Some(m) = v.under.take() {
-                    self.windows.modal = Some(Modal::Menu(*m));
-                }
-                return;
-            }
+            KeyCode::Esc => return self.give_back_menu(&mut v),
             KeyCode::Left if v.filter.is_empty() && v.under.is_some() => {
-                if let Some(m) = v.under.take() {
-                    self.windows.modal = Some(Modal::Menu(*m));
-                }
-                return;
+                return self.give_back_menu(&mut v);
             }
-            KeyCode::Enter => {
-                match v.current().cloned() {
-                    Some(app) => self.launch_chosen(&v, app),
-                    None => {
-                        // "Other program…": the field of a command, with what was typed.
-                        let mut iv = InputView::new(
-                            InputKind::OpenWith {
-                                path: v.path.clone(),
-                            },
-                            v.filter.clone(),
-                        );
-                        iv.cursor = iv.text.chars().count();
-                        self.windows.modal = Some(Modal::Input(iv));
-                    }
-                }
-                return;
-            }
+            KeyCode::Enter => return self.open_with_enter(v),
             KeyCode::Down => v.move_by(1),
             KeyCode::Up => v.move_by(-1),
             KeyCode::PageDown => v.move_by(8),
@@ -269,6 +245,30 @@ impl App {
             _ => {}
         }
         self.windows.modal = Some(Modal::OpenWith(v));
+    }
+
+    fn give_back_menu(&mut self, v: &mut OpenWithView) {
+        if let Some(m) = v.under.take() {
+            self.windows.modal = Some(Modal::Menu(*m));
+        }
+    }
+
+    /// Enter: open with the program chosen, or ask for another one.
+    fn open_with_enter(&mut self, v: Box<OpenWithView>) {
+        match v.current().cloned() {
+            Some(app) => self.launch_chosen(&v, app),
+            None => {
+                // "Other program…": the field of a command, with what was typed.
+                let mut iv = InputView::new(
+                    InputKind::OpenWith {
+                        path: v.path.clone(),
+                    },
+                    v.filter.clone(),
+                );
+                iv.cursor = iv.text.chars().count();
+                self.windows.modal = Some(Modal::Input(iv));
+            }
+        }
     }
 
     /// Start the program, and remember the choice: used lately, and, as the box says, always (or
