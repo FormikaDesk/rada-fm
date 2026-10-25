@@ -4,7 +4,8 @@
 
 use rada_core::platform::{AccessDenied, Unmounted, Volume};
 
-use super::{App, ToastKind, demo_volumes};
+use super::demo::demo_volumes;
+use super::{App, ToastKind};
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
 use std::collections::HashSet;

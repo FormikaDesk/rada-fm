@@ -9,7 +9,93 @@ use rada_core::events::CoreEvent;
 use rada_core::i18n::Key;
 use rada_core::ops::{ConflictPolicy, ExtractInto, OpRequest, Pattern};
 
-use super::{App, InputKind, InputView, Modal};
+use super::{App, Modal};
+
+pub enum InputKind {
+    Rename {
+        from: PathBuf,
+    },
+    NewDir,
+    /// The name of the file to save, when rada is the system's file chooser.
+    SaveAs,
+    BulkRename {
+        items: Vec<PathBuf>,
+    },
+    /// The folder to extract an archive into, named after the archive unless changed.
+    ExtractTo {
+        archive: PathBuf,
+        dest: PathBuf,
+        default: String,
+    },
+    /// The name (and so the format) of a new archive.
+    Compress {
+        sources: Vec<PathBuf>,
+        dir: PathBuf,
+        format: ArchiveKind,
+    },
+    /// The program to open a file with.
+    OpenWith {
+        path: PathBuf,
+    },
+    /// The name of a new empty file.
+    NewFile,
+    /// The name of a tag to give to the selected items.
+    NewTag {
+        items: Vec<PathBuf>,
+    },
+}
+
+pub struct InputView {
+    pub kind: InputKind,
+    pub text: String,
+    /// Cursor position in chars.
+    pub cursor: usize,
+    pub error: Option<String>,
+}
+
+impl InputView {
+    pub(super) fn new(kind: InputKind, text: String) -> Self {
+        let cursor = text.chars().count();
+        InputView {
+            kind,
+            text,
+            cursor,
+            error: None,
+        }
+    }
+
+    fn byte_at(&self, chars: usize) -> usize {
+        self.text
+            .char_indices()
+            .nth(chars)
+            .map(|(i, _)| i)
+            .unwrap_or(self.text.len())
+    }
+
+    fn insert(&mut self, c: char) {
+        let at = self.byte_at(self.cursor);
+        self.text.insert(at, c);
+        self.cursor += 1;
+        self.error = None;
+    }
+
+    fn backspace(&mut self) {
+        if self.cursor > 0 {
+            let at = self.byte_at(self.cursor - 1);
+            self.text.remove(at);
+            self.cursor -= 1;
+            self.error = None;
+        }
+    }
+
+    fn delete(&mut self) {
+        if self.cursor < self.text.chars().count() {
+            let at = self.byte_at(self.cursor);
+            self.text.remove(at);
+            self.error = None;
+        }
+    }
+}
 
 impl App {
     pub(super) fn ask_new_folder(&mut self) {

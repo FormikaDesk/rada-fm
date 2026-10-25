@@ -1,13 +1,18 @@
 //! What is being done to files: what waits on the clipboard, the plan being prepared, the
 //! operation that is running and the label of the undo.
 
+use std::sync::Arc;
+
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::events::FailureInfo;
 use rada_core::i18n::{Key, tf};
-use rada_core::ops::{ConflictPolicy, ErrorChoice, TransferOptions};
+use rada_core::journal::JournalEntry;
+use rada_core::ops::{
+    ConflictPolicy, ErrorChoice, Plan, Scan, TransferOptions, UndoPlan, WarningKind,
+};
 
-use super::{App, HistoryView, Modal, PlanView, Replan, ResultView, ToastKind};
+use super::{App, Modal, ToastKind};
 use crate::fmt;
 use crate::keymap::Action;
 use rada_core::events::JobId;
@@ -136,6 +141,73 @@ impl Operations {
     pub fn take_copied_text(&mut self) -> Option<String> {
         self.copied_text.take()
     }
+}
+
+#[derive(Clone)]
+pub enum Replan {
+    Transfer {
+        dest: PathBuf,
+        mode: TransferMode,
+    },
+    /// Asked again from the request the plan answers (an extraction, a new archive).
+    Request,
+    None,
+}
+
+pub struct PlanView {
+    pub plan: Plan,
+    pub scan: Option<Arc<Scan>>,
+    pub undo: Option<Box<UndoPlan>>,
+    pub replan: Replan,
+    pub scroll: usize,
+    /// Typed confirmation for irreversible plans.
+    pub typed: String,
+    /// A new plan (other conflict policy) is being computed.
+    pub replanning: Option<JobId>,
+    /// Show every step instead of the per-item summary.
+    pub details: bool,
+    /// The keyboard is on the Cancel button (Tab moves it between the two buttons).
+    pub cancel_focus: bool,
+}
+
+/// Whether what was typed is the word that confirms a dangerous operation: "yes", or "sì" /
+/// "si" (written the way the Italian interface asks for it).
+pub fn is_confirmation(typed: &str) -> bool {
+    matches!(
+        typed.trim().to_lowercase().as_str(),
+        "yes" | "si" | "s\u{ec}"
+    )
+}
+
+impl PlanView {
+    /// Permanent deletion, and the extraction of what may be an archive bomb, ask for a typed
+    /// confirmation (undoing something is not "irreversible" in that sense).
+    pub fn needs_typed_confirmation(&self) -> bool {
+        self.plan.kind == rada_core::ops::OpKind::Delete
+            || self
+                .plan
+                .warnings
+                .iter()
+                .any(|w| w.kind == WarningKind::ArchiveBomb)
+    }
+
+    pub fn can_run(&self) -> bool {
+        self.plan.is_executable()
+            && self.replanning.is_none()
+            && (!self.needs_typed_confirmation() || is_confirmation(&self.typed))
+    }
+}
+
+pub struct HistoryView {
+    pub entries: Vec<JournalEntry>,
+    pub selected: usize,
+    pub loading: bool,
+}
+
+pub struct ResultView {
+    pub title: String,
+    pub lines: Vec<(ToastKind, String)>,
+    pub scroll: usize,
 }
 
 impl App {

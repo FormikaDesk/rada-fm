@@ -6,10 +6,52 @@ use std::time::Duration;
 
 use rada_core::i18n::{Key, tf};
 use rada_core::ops::{ConflictPolicy, TransferMode, TransferOptions};
+use rada_core::platform::Volume;
 
 use super::{App, Clip, MenuCmd, MenuKind, Modal, Notice, NoticeAction, NoticeKind};
 use crate::fmt;
 use crate::keymap::Action;
+
+/// Disks that do not exist, for screenshots that must not show the machine's own.
+pub(super) fn demo_volumes() -> Vec<Volume> {
+    use rada_core::platform::VolumeKind;
+    let gb = 1_000_000_000u64;
+    let vol = |mount: &str, label: &str, kind, total: u64, free: u64| Volume {
+        mount_point: PathBuf::from(mount),
+        label: Some(label.into()),
+        fs_type: "ext4".into(),
+        device: "demo".into(),
+        kind,
+        drive_letter: None,
+        total: Some(total * gb),
+        available: Some(free * gb),
+        read_only: false,
+        responsive: true,
+    };
+    vec![
+        vol("/", Key::DiskSystem.tr(), VolumeKind::Fixed, 512, 212),
+        vol(
+            "/run/media/user/Data",
+            Key::DiskData.tr(),
+            VolumeKind::Fixed,
+            1000,
+            640,
+        ),
+        vol(
+            "/run/media/user/USB",
+            Key::DiskUsb.tr(),
+            VolumeKind::Removable,
+            64,
+            41,
+        ),
+    ]
+}
+
+/// Developer hook: put the interface in a ready-made state (for screenshots).
+pub struct Demo {
+    pub scene: String,
+    pub dest: Option<PathBuf>,
+}
 
 impl App {
     /// Developer hook (`--demo`): put the interface in a ready-made state, once.

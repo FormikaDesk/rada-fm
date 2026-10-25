@@ -10,13 +10,9 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use crossterm::event::KeyEvent;
-use rada_core::archive::ArchiveKind;
 use rada_core::events::{CoreEvent, FailureInfo, JobId};
-use rada_core::journal::JournalEntry;
 use rada_core::model::SortSpec;
-use rada_core::ops::WarningKind;
-use rada_core::ops::{Cancel, ErrorChoice, Plan, Scan, TransferMode, UndoPlan};
-use rada_core::platform::Volume;
+use rada_core::ops::{Cancel, ErrorChoice};
 use rada_core::preview::Limits;
 
 use crate::fmt::{DateFormat, DateStyle};
@@ -65,159 +61,6 @@ impl Default for Viewport {
             grid_rows: 3,
         }
     }
-}
-
-#[derive(Clone)]
-pub enum Replan {
-    Transfer {
-        dest: PathBuf,
-        mode: TransferMode,
-    },
-    /// Asked again from the request the plan answers (an extraction, a new archive).
-    Request,
-    None,
-}
-
-pub struct PlanView {
-    pub plan: Plan,
-    pub scan: Option<Arc<Scan>>,
-    pub undo: Option<Box<UndoPlan>>,
-    pub replan: Replan,
-    pub scroll: usize,
-    /// Typed confirmation for irreversible plans.
-    pub typed: String,
-    /// A new plan (other conflict policy) is being computed.
-    pub replanning: Option<JobId>,
-    /// Show every step instead of the per-item summary.
-    pub details: bool,
-    /// The keyboard is on the Cancel button (Tab moves it between the two buttons).
-    pub cancel_focus: bool,
-}
-
-/// Whether what was typed is the word that confirms a dangerous operation: "yes", or "sì" /
-/// "si" (written the way the Italian interface asks for it).
-pub fn is_confirmation(typed: &str) -> bool {
-    matches!(
-        typed.trim().to_lowercase().as_str(),
-        "yes" | "si" | "s\u{ec}"
-    )
-}
-
-impl PlanView {
-    /// Permanent deletion, and the extraction of what may be an archive bomb, ask for a typed
-    /// confirmation (undoing something is not "irreversible" in that sense).
-    pub fn needs_typed_confirmation(&self) -> bool {
-        self.plan.kind == rada_core::ops::OpKind::Delete
-            || self
-                .plan
-                .warnings
-                .iter()
-                .any(|w| w.kind == WarningKind::ArchiveBomb)
-    }
-
-    pub fn can_run(&self) -> bool {
-        self.plan.is_executable()
-            && self.replanning.is_none()
-            && (!self.needs_typed_confirmation() || is_confirmation(&self.typed))
-    }
-}
-
-pub enum InputKind {
-    Rename {
-        from: PathBuf,
-    },
-    NewDir,
-    /// The name of the file to save, when rada is the system's file chooser.
-    SaveAs,
-    BulkRename {
-        items: Vec<PathBuf>,
-    },
-    /// The folder to extract an archive into, named after the archive unless changed.
-    ExtractTo {
-        archive: PathBuf,
-        dest: PathBuf,
-        default: String,
-    },
-    /// The name (and so the format) of a new archive.
-    Compress {
-        sources: Vec<PathBuf>,
-        dir: PathBuf,
-        format: ArchiveKind,
-    },
-    /// The program to open a file with.
-    OpenWith {
-        path: PathBuf,
-    },
-    /// The name of a new empty file.
-    NewFile,
-    /// The name of a tag to give to the selected items.
-    NewTag {
-        items: Vec<PathBuf>,
-    },
-}
-
-pub struct InputView {
-    pub kind: InputKind,
-    pub text: String,
-    /// Cursor position in chars.
-    pub cursor: usize,
-    pub error: Option<String>,
-}
-
-impl InputView {
-    fn new(kind: InputKind, text: String) -> Self {
-        let cursor = text.chars().count();
-        InputView {
-            kind,
-            text,
-            cursor,
-            error: None,
-        }
-    }
-
-    fn byte_at(&self, chars: usize) -> usize {
-        self.text
-            .char_indices()
-            .nth(chars)
-            .map(|(i, _)| i)
-            .unwrap_or(self.text.len())
-    }
-
-    fn insert(&mut self, c: char) {
-        let at = self.byte_at(self.cursor);
-        self.text.insert(at, c);
-        self.cursor += 1;
-        self.error = None;
-    }
-
-    fn backspace(&mut self) {
-        if self.cursor > 0 {
-            let at = self.byte_at(self.cursor - 1);
-            self.text.remove(at);
-            self.cursor -= 1;
-            self.error = None;
-        }
-    }
-
-    fn delete(&mut self) {
-        if self.cursor < self.text.chars().count() {
-            let at = self.byte_at(self.cursor);
-            self.text.remove(at);
-            self.error = None;
-        }
-    }
-}
-
-pub struct HistoryView {
-    pub entries: Vec<JournalEntry>,
-    pub selected: usize,
-    pub loading: bool,
-}
-
-pub struct ResultView {
-    pub title: String,
-    pub lines: Vec<(ToastKind, String)>,
-    pub scroll: usize,
 }
 
 pub enum Modal {
@@ -342,47 +185,6 @@ pub struct Adaptive {
     pub transparent: bool,
 }
 
-/// Disks that do not exist, for screenshots that must not show the machine's own.
-fn demo_volumes() -> Vec<Volume> {
-    use rada_core::platform::VolumeKind;
-    let gb = 1_000_000_000u64;
-    let vol = |mount: &str, label: &str, kind, total: u64, free: u64| Volume {
-        mount_point: PathBuf::from(mount),
-        label: Some(label.into()),
-        fs_type: "ext4".into(),
-        device: "demo".into(),
-        kind,
-        drive_letter: None,
-        total: Some(total * gb),
-        available: Some(free * gb),
-        read_only: false,
-        responsive: true,
-    };
-    vec![
-        vol("/", Key::DiskSystem.tr(), VolumeKind::Fixed, 512, 212),
-        vol(
-            "/run/media/user/Data",
-            Key::DiskData.tr(),
-            VolumeKind::Fixed,
-            1000,
-            640,
-        ),
-        vol(
-            "/run/media/user/USB",
-            Key::DiskUsb.tr(),
-            VolumeKind::Removable,
-            64,
-            41,
-        ),
-    ]
-}
-
-/// Developer hook: put the interface in a ready-made state (for screenshots).
-pub struct Demo {
-    pub scene: String,
-    pub dest: Option<PathBuf>,
-}
-
 /// When the screen is drawn again, and the step of the spinner that moves between frames.
 #[derive(Default)]
 pub struct Redraw {
@@ -487,6 +289,7 @@ mod update;
 mod windows;
 
 pub use address::{AddressEdit, BarHit, BarItem, BarMode};
+pub use demo::Demo;
 pub use eject::{EjectStage, EjectView};
 pub use font::{FontStage, FontView};
 pub use input::FilterState;
@@ -494,9 +297,12 @@ pub use menus::MenuKind;
 pub use menuview::{MenuCmd, MenuIcon, MenuItem, MenuTitle, MenuView, TagCmd};
 pub use notice::{MAX_SHOWN, Notice, NoticeAction, NoticeKind, NoticeQueue};
 pub use openwith::{OpenRow, OpenWithView};
-pub use ops::{Clip, Operations, Running};
+pub use ops::{
+    Clip, HistoryView, Operations, PlanView, Replan, ResultView, Running, is_confirmation,
+};
 pub use panels::GitView;
 pub use preview::{ImageStatus, ImageView, PreviewPane};
+pub use prompt::{InputKind, InputView};
 pub use props::PropsView;
 pub use tabs::TabState;
 pub use update::{UpdateStatus, UpdateView, Updates};
