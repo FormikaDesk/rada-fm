@@ -2814,8 +2814,4 @@ impl App {
     pub fn is_loading(&self) -> bool {
         matches!(self.tab.load, LoadState::Loading(_))
     }
-
-    pub fn sort_key(&self) -> SortKey {
-        self.tab.sort.key
-    }
 }
