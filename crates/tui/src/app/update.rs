@@ -303,7 +303,7 @@ impl App {
     fn open_in_background(&mut self, path: PathBuf) {
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
-        self.after_launch();
+        self.redraw.after_launch();
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().open(&path) {
                 let _ = notes.send(CoreEvent::Note {

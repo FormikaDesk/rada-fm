@@ -266,7 +266,7 @@ fn event_loop(
         // below already folds a burst of events into a single frame.
         // From nothing: the screen is cleared and every cell is sent again, so that what
         // another program wrote on the terminal does not stay.
-        if app.take_full_redraw() {
+        if app.redraw.take_full_redraw() {
             app.redraw.dirty = true;
             if let Err(e) = clear_screen(terminal, &gate, &mut asks_cursor) {
                 survive(e, "clear the screen", &mut failed)?;

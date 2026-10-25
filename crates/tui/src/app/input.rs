@@ -678,7 +678,7 @@ impl App {
         let Some(dir) = dir else { return };
         let platform = self.svc.platform.clone();
         let notes = self.svc.notes.clone();
-        self.after_launch();
+        self.redraw.after_launch();
         std::thread::spawn(move || {
             if let Err(e) = platform.opener().open_terminal(&dir) {
                 let _ = notes.send(CoreEvent::Note {
