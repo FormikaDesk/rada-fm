@@ -60,6 +60,8 @@ libc = "0.2"
 # The names and the kinds of things the Finder shows (localized folder names, packages).
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSFileManager", "NSURL", "NSError", "NSArray", "NSDictionary", "NSObject", "NSValue", "NSEnumerator"] }
+# The Finder's preferences (a binary property list), for the names it gives the seven tag colours.
+plist = { version = "1.10", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 # Drive letters, Known Folders and ShellExecute: the Win32 calls, with no wrapper around them.
@@ -95,3 +97,5 @@ rada-core = { path = ".", features = ["testutil"] }
 proptest = "1.11.0"
 # Signs the stand-in releases of the update tests with keys made for the test.
 minisign = "0.10"
+# Writes the Finder's preferences of the tests (the program reads them only on a Mac).
+plist = { version = "1.10", default-features = false }

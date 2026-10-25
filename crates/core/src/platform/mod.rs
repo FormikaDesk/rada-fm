@@ -12,6 +12,7 @@ pub mod dirs;
 pub mod dirtrash;
 pub mod eject;
 pub mod fidelity;
+pub mod findernames;
 pub mod foldernames;
 #[cfg(unix)]
 pub mod freedesktop;

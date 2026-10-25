@@ -4,8 +4,9 @@
 //!   a binary property list holding strings of the form `Name` or `Name\n<colour number>`. The
 //!   seven colours of the Finder are numbered 1 (gray) to 7 (orange). The name of a standard
 //!   colour is written in the language of the system (`Blu\n4` on an Italian Mac). A tag called
-//!   after a standard colour has that colour, whatever number the file carries; any other tag has
-//!   the number, and none without one.
+//!   after a standard colour has that colour, whatever number the file carries; then a tag
+//!   renamed in the Finder's own list of names (see [`findernames`]) has the colour of its place
+//!   there; any other tag has the number, and none without one.
 //! * **Linux**: `user.xdg.tags`, the freedesktop convention that Dolphin and Baloo use: tag
 //!   names in UTF-8, separated by commas. It has no colours; a tag called "Red" is drawn red.
 //! * **Windows**: not supported; the interface offers nothing there.
@@ -22,6 +23,10 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 use crate::Result;
 use crate::tagsearch::{self, ScanLimits, TagQuery};
+
+use super::findernames;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use super::findernames::FinderNames;
 
 /// The Finder's colours, as the menu lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -273,9 +278,15 @@ pub fn encode_finder(tags: &[Tag]) -> Vec<u8> {
     crate::platform::bplist::encode_string_array(&items)
 }
 
-/// The tags in the value of `com.apple.metadata:_kMDItemUserTags`; `None` when it is not a
-/// list of strings.
+/// The tags in the value of `com.apple.metadata:_kMDItemUserTags`, for a system that keeps no
+/// list of renamed colours; `None` when it is not a list of strings.
 pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
+    decode_finder_with(bytes, &[])
+}
+
+/// The tags in the value of `com.apple.metadata:_kMDItemUserTags`, `renamed` being the Finder's
+/// clean list of names (empty when there is none); `None` when it is not a list of strings.
+pub fn decode_finder_with(bytes: &[u8], renamed: &[String]) -> Option<Vec<Tag>> {
     let items = crate::platform::bplist::decode_string_array(bytes)?;
     Some(
         items
@@ -285,17 +296,23 @@ pub fn decode_finder(bytes: &[u8]) -> Option<Vec<Tag>> {
                     Some((n, i)) => (n.to_string(), i.trim().parse::<u8>().ok()),
                     None => (s, None),
                 };
-                // A tag called after one of the seven colours (in any language) has that colour,
-                // whatever number the file carries: the Finder draws a file tagged "Verde\n1"
-                // green, though 1 is gray. Any other tag has the number the Finder wrote (0:
-                // none), and none when it wrote no number.
-                let color = TagColor::from_name(&name)
-                    .or_else(|| index.and_then(TagColor::from_finder_index));
+                let color = finder_colour(&name, index, renamed);
                 Tag { name, color }
             })
             .filter(|t| !t.name.is_empty())
             .collect(),
     )
+}
+
+/// The colour of a tag the Finder wrote, from its name and the number after it. The name wins:
+/// the Finder draws a file tagged "Verde\n1" green, though 1 is gray. First the seven standard
+/// names, in any language; then the names the person gave the colours (`renamed`, the Finder's
+/// own list: "👵🏼" is green when the list says so, whatever number the file carries); then the
+/// number (0: none); a tag with none of these has no colour.
+fn finder_colour(name: &str, index: Option<u8>, renamed: &[String]) -> Option<TagColor> {
+    TagColor::from_name(name)
+        .or_else(|| findernames::colour_of(renamed, name))
+        .or_else(|| index.and_then(TagColor::from_finder_index))
 }
 
 /// The tags as the value of `user.xdg.tags`.
@@ -360,6 +377,8 @@ pub struct XattrTags {
     format: Format,
     /// Where to look for the search tool (`mdfind`, `baloosearch`); `None`: in `PATH`.
     tool_dir: Option<std::path::PathBuf>,
+    /// The names the Finder gives its colours: the person's own, on a Mac; none elsewhere.
+    names: FinderNames,
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -376,7 +395,19 @@ impl XattrTags {
         XattrTags {
             format: Format::Finder,
             tool_dir: None,
+            names: if cfg!(target_os = "macos") {
+                FinderNames::standard()
+            } else {
+                FinderNames::none()
+            },
         }
+    }
+
+    /// Read the Finder's names of the colours from the preferences at `path` (for tests, with a
+    /// file of their own: the person's are never read there).
+    pub fn with_finder_prefs(mut self, path: std::path::PathBuf) -> XattrTags {
+        self.names = FinderNames::at(path);
+        self
     }
 
     /// `user.xdg.tags`.
@@ -384,6 +415,7 @@ impl XattrTags {
         XattrTags {
             format: Format::Freedesktop,
             tool_dir: None,
+            names: FinderNames::none(),
         }
     }
 
@@ -449,7 +481,7 @@ impl TagStore for XattrTags {
             return Ok(Vec::new());
         };
         match self.format {
-            Format::Finder => decode_finder(&bytes).ok_or_else(|| {
+            Format::Finder => decode_finder_with(&bytes, &self.names.list()).ok_or_else(|| {
                 Error::Invalid(format!(
                     "the tags of {} are in a form rada does not read",
                     crate::display::path(path)
