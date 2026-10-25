@@ -2,11 +2,11 @@
 //! the cursor, and what an operation would apply to.
 
 use rada_core::i18n::{Key, tf};
-use rada_core::model::Entry;
+use rada_core::model::{Entry, SortKey, SortSpec};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use super::{App, LoadState, TabState};
+use super::{App, LoadState, TabState, ToastKind};
 
 impl TabState {
     pub fn entry_at(&self, vis_index: usize) -> Option<&Entry> {
@@ -151,5 +151,54 @@ impl App {
             .filter(|(_, e)| tag_terms.iter().all(|want| matches_tag(e, want)))
             .map(|(i, _)| i)
             .collect();
+    }
+
+    pub(super) fn set_sort(&mut self, spec: SortSpec) {
+        let keep = self.tab.cursor_name();
+        self.tab.sort = spec;
+        // From now on this tab keeps its order, whatever the configuration says.
+        self.tab.sort_chosen = true;
+        self.save_ui_state();
+        self.tab.listing.set_sort(spec); // immediate, in memory
+        self.rebuild_visible();
+        self.tab.restore_cursor(keep);
+        let arrow = if spec.descending() { "↓" } else { "↑" };
+        self.toast(
+            ToastKind::Info,
+            tf(
+                Key::TSortedBy,
+                &[
+                    &match spec.key {
+                        SortKey::Name => Key::SortKeyName,
+                        SortKey::Size => Key::SortKeySize,
+                        SortKey::Modified => Key::SortKeyDate,
+                        SortKey::Type => Key::SortKeyType,
+                    }
+                    .tr(),
+                    &arrow,
+                ],
+            ),
+            2,
+        );
+    }
+
+    /// Work out the date text of these entries (indices into the listing), once; the list
+    /// reads them with [`FolderInfo::date_text`].
+    pub fn warm_dates(&mut self, indices: impl Iterator<Item = usize>) {
+        let hour = self
+            .now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() / 3600)
+            .unwrap_or(0);
+        let key = (hour, self.tab.listing.all().len());
+        self.folder_info.dates_for(key);
+        let now = self.now();
+        for i in indices {
+            if let Some(slot @ None) = self.folder_info.date_cache.get_mut(i)
+                && let Some(e) = self.tab.listing.all().get(i)
+            {
+                *slot = Some(self.settings.explorer_date(e.used.or(e.mtime), now));
+            }
+        }
     }
 }
