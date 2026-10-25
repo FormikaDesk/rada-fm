@@ -1,15 +1,36 @@
 //! The mouse: what a click, a double click, the wheel and the right button do.
 
+use std::path::PathBuf;
 use std::time::Instant;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use rada_core::model::SortSpec;
+use rada_core::model::{SortKey, SortSpec};
+use rada_core::ops::ConflictPolicy;
 
-use super::{App, MenuItem, MenuView, Modal, UpdateView};
+use super::{App, MenuItem, MenuKind, MenuView, Modal, UpdateView};
 use crate::hits::Target;
 use crate::view::ViewMode;
 
 const WHEEL_STEP: usize = 3;
+
+/// A button went down or the wheel turned: the events that mean something here.
+fn is_press_or_wheel(kind: MouseEventKind) -> bool {
+    matches!(
+        kind,
+        MouseEventKind::ScrollUp
+            | MouseEventKind::ScrollDown
+            | MouseEventKind::Down(MouseButton::Left | MouseButton::Right | MouseButton::Middle)
+    )
+}
+
+/// Where a text scrolled to `at` is after one turn of the wheel.
+fn wheel_scrolled(at: usize, down: bool) -> usize {
+    if down {
+        at + WHEEL_STEP
+    } else {
+        at.saturating_sub(WHEEL_STEP)
+    }
+}
 
 impl App {
     pub fn on_mouse(&mut self, m: MouseEvent) {
@@ -19,39 +40,16 @@ impl App {
         // Motion only matters for what is under the pointer in the sidebar (its names show
         // in the bottom bar when it is reduced to icons): redraw only when that changes.
         if m.kind == MouseEventKind::Moved {
-            let over = match self.frame.hits.at(m.column, m.row) {
-                Some(Target::Place(p)) => Some(p.clone()),
-                _ => None,
-            };
-            if self.side_nav.hover_over(over) {
-                self.redraw.dirty = true;
-            }
+            self.hover(m.column, m.row);
             return;
         }
         // Drag events arrive in floods and mean nothing here: no redraw.
-        if !matches!(
-            m.kind,
-            MouseEventKind::ScrollUp
-                | MouseEventKind::ScrollDown
-                | MouseEventKind::Down(
-                    MouseButton::Left | MouseButton::Right | MouseButton::Middle
-                )
-        ) {
+        if !is_press_or_wheel(m.kind) {
             return;
         }
         self.redraw.dirty = true;
         let target = self.frame.hits.at(m.column, m.row).cloned();
-        if self.frame.panels_shown
-            && self.windows.modal.is_none()
-            && matches!(
-                m.kind,
-                MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
-            )
-            && self
-                .frame
-                .nav_area
-                .contains(ratatui::layout::Position::new(m.column, m.row))
-        {
+        if self.wheel_over_nav(&m) {
             return self.scroll_nav(m.kind == MouseEventKind::ScrollDown);
         }
         match m.kind {
@@ -61,60 +59,47 @@ impl App {
                 self.click(target, m.modifiers, (m.column, m.row))
             }
             MouseEventKind::Down(MouseButton::Right) => self.right_click(target, m.column, m.row),
-            MouseEventKind::Down(MouseButton::Middle) => {
-                if self.windows.modal.is_none()
-                    && let Some(Target::Tab(i) | Target::TabClose(i)) = target
-                {
-                    self.close_tab(i);
-                }
-            }
+            MouseEventKind::Down(MouseButton::Middle) => self.middle_click(target),
             _ => {}
         }
     }
 
+    /// The middle button on a tab closes it.
+    fn middle_click(&mut self, target: Option<Target>) {
+        if self.windows.modal.is_none()
+            && let Some(Target::Tab(i) | Target::TabClose(i)) = target
+        {
+            self.close_tab(i);
+        }
+    }
+
+    fn hover(&mut self, column: u16, row: u16) {
+        let over = match self.frame.hits.at(column, row) {
+            Some(Target::Place(p)) => Some(p.clone()),
+            _ => None,
+        };
+        if self.side_nav.hover_over(over) {
+            self.redraw.dirty = true;
+        }
+    }
+
+    /// The wheel turned over the NAV box, with nothing open over it.
+    fn wheel_over_nav(&self, m: &MouseEvent) -> bool {
+        self.frame.panels_shown
+            && self.windows.modal.is_none()
+            && matches!(
+                m.kind,
+                MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+            )
+            && self
+                .frame
+                .nav_area
+                .contains(ratatui::layout::Position::new(m.column, m.row))
+    }
+
     fn wheel(&mut self, target: Option<Target>, down: bool) {
-        if let Some(modal) = &mut self.windows.modal {
-            match modal {
-                Modal::Palette(p) => p.move_by(if down { 1 } else { -1 }),
-                Modal::OpenWith(v) => v.move_by(if down { 1 } else { -1 }),
-                Modal::History(h) => {
-                    h.selected = if down {
-                        (h.selected + 1).min(h.entries.len().saturating_sub(1))
-                    } else {
-                        h.selected.saturating_sub(1)
-                    }
-                }
-                Modal::Plan(pv) => {
-                    pv.scroll = if down {
-                        pv.scroll + WHEEL_STEP
-                    } else {
-                        pv.scroll.saturating_sub(WHEEL_STEP)
-                    }
-                }
-                Modal::Help => {
-                    if down {
-                        self.windows.help_down(WHEEL_STEP);
-                    } else {
-                        self.windows.help_up(WHEEL_STEP);
-                    }
-                }
-                Modal::Update(UpdateView::Offer { scroll, .. }) => {
-                    *scroll = if down {
-                        *scroll + WHEEL_STEP
-                    } else {
-                        scroll.saturating_sub(WHEEL_STEP)
-                    }
-                }
-                Modal::Result(r) => {
-                    r.scroll = if down {
-                        r.scroll + WHEEL_STEP
-                    } else {
-                        r.scroll.saturating_sub(WHEEL_STEP)
-                    }
-                }
-                _ => {}
-            }
-            return;
+        if self.windows.modal.is_some() {
+            return self.wheel_in_modal(down);
         }
         if target == Some(Target::Preview) {
             if down {
@@ -139,6 +124,36 @@ impl App {
         self.set_cursor(to);
     }
 
+    fn wheel_in_modal(&mut self, down: bool) {
+        let Some(modal) = &mut self.windows.modal else {
+            return;
+        };
+        match modal {
+            Modal::Palette(p) => p.move_by(if down { 1 } else { -1 }),
+            Modal::OpenWith(v) => v.move_by(if down { 1 } else { -1 }),
+            Modal::History(h) => {
+                h.selected = if down {
+                    (h.selected + 1).min(h.entries.len().saturating_sub(1))
+                } else {
+                    h.selected.saturating_sub(1)
+                }
+            }
+            Modal::Plan(pv) => pv.scroll = wheel_scrolled(pv.scroll, down),
+            Modal::Help => {
+                if down {
+                    self.windows.help_down(WHEEL_STEP);
+                } else {
+                    self.windows.help_up(WHEEL_STEP);
+                }
+            }
+            Modal::Update(UpdateView::Offer { scroll, .. }) => {
+                *scroll = wheel_scrolled(*scroll, down)
+            }
+            Modal::Result(r) => r.scroll = wheel_scrolled(r.scroll, down),
+            _ => {}
+        }
+    }
+
     pub(super) fn click(&mut self, target: Option<Target>, mods: KeyModifiers, at: (u16, u16)) {
         if self.windows.modal.is_some() {
             return self.click_in_modal(target);
@@ -157,6 +172,10 @@ impl App {
         }
         // The keyboard follows the click: into the preview box when that is what was clicked.
         self.preview.focus = self.frame.panels_shown && matches!(target, Some(Target::Preview));
+        self.click_target(target, mods, at);
+    }
+
+    fn click_target(&mut self, target: Option<Target>, mods: KeyModifiers, at: (u16, u16)) {
         match target {
             Some(Target::TreeToggle(dir)) => self.toggle_tree(&dir),
             Some(Target::Row(i)) => {
@@ -168,13 +187,7 @@ impl App {
                 self.open_dir(path)
             }
             Some(Target::Crumb(path)) => self.open_dir(path),
-            Some(Target::Check(i)) => {
-                if i < self.tab.visible.len() {
-                    self.side_nav.focus = false;
-                    self.set_cursor(i);
-                    self.toggle_mark_at(i);
-                }
-            }
+            Some(Target::Check(i)) => self.click_check(i),
             Some(Target::Tab(i)) => self.switch_tab(i),
             Some(Target::TabClose(i)) => self.close_tab(i),
             Some(Target::TabNew) => self.new_tab(),
@@ -182,50 +195,66 @@ impl App {
             Some(Target::TabNext) => self.next_tab(),
             Some(Target::Address) => self.start_address_edit(),
             Some(Target::CheckUpdates) => self.check_updates_now(),
-            Some(Target::Menu(kind)) => {
-                let at = self
-                    .frame
-                    .hits
-                    .find(&Target::Menu(kind))
-                    .map(|r| (r.x, r.y + 1))
-                    .unwrap_or((at.0, at.1 + 1));
-                self.open_menu(kind, at);
-            }
+            Some(Target::Menu(kind)) => self.click_menu_title(kind, at),
             Some(Target::ViewMode(mode)) => self.set_view(mode),
             Some(Target::FullPreview) => {
                 if self.tab.current().is_some() {
                     self.windows.modal = Some(Modal::FullPreview);
                 }
             }
-            Some(Target::CrumbMore(hidden)) => {
-                // The folders folded into the "…", to pick one.
-                let items = hidden
-                    .into_iter()
-                    .map(|p| {
-                        let name = p
-                            .file_name()
-                            .map(rada_core::display::name)
-                            .unwrap_or_else(|| rada_core::display::path(&p));
-                        MenuItem::go(name, p)
-                    })
-                    .collect();
-                self.windows.modal = Some(Modal::Menu(MenuView::new((at.0, at.1 + 1), items)));
-            }
+            Some(Target::CrumbMore(hidden)) => self.click_crumb_more(hidden, at),
             Some(Target::Act(a)) => self.dispatch(a),
-            Some(Target::SortBy(key)) => {
-                let spec = if self.tab.sort.key == key {
-                    SortSpec {
-                        reverse: !self.tab.sort.reverse,
-                        ..self.tab.sort
-                    }
-                } else {
-                    self.tab.sort.with_key(key)
-                };
-                self.set_sort(spec);
-            }
+            Some(Target::SortBy(key)) => self.click_sort_title(key),
             Some(Target::List) => self.tab.sel.clear_marks(),
             _ => {}
         }
+    }
+
+    fn click_check(&mut self, i: usize) {
+        if i < self.tab.visible.len() {
+            self.side_nav.focus = false;
+            self.set_cursor(i);
+            self.toggle_mark_at(i);
+        }
+    }
+
+    /// A title of the menu bar: its menu opens under it.
+    fn click_menu_title(&mut self, kind: MenuKind, at: (u16, u16)) {
+        let at = self
+            .frame
+            .hits
+            .find(&Target::Menu(kind))
+            .map(|r| (r.x, r.y + 1))
+            .unwrap_or((at.0, at.1 + 1));
+        self.open_menu(kind, at);
+    }
+
+    /// The "…" of a long path: the folders folded into it, to pick one.
+    fn click_crumb_more(&mut self, hidden: Vec<PathBuf>, at: (u16, u16)) {
+        let items = hidden
+            .into_iter()
+            .map(|p| {
+                let name = p
+                    .file_name()
+                    .map(rada_core::display::name)
+                    .unwrap_or_else(|| rada_core::display::path(&p));
+                MenuItem::go(name, p)
+            })
+            .collect();
+        self.windows.modal = Some(Modal::Menu(MenuView::new((at.0, at.1 + 1), items)));
+    }
+
+    /// A column title: sort by it, or the other way round if the list already is.
+    fn click_sort_title(&mut self, key: SortKey) {
+        let spec = if self.tab.sort.key == key {
+            SortSpec {
+                reverse: !self.tab.sort.reverse,
+                ..self.tab.sort
+            }
+        } else {
+            self.tab.sort.with_key(key)
+        };
+        self.set_sort(spec);
     }
 
     /// Mark or unmark row `i`, which becomes where a selection extended next starts.
@@ -265,17 +294,7 @@ impl App {
             (Some(Modal::Properties(_)), Some(Target::Key(_))) => self.windows.modal = None,
             (Some(Modal::Properties(_)), None) => self.windows.modal = None,
             (Some(Modal::FullPreview), _) => self.windows.modal = None,
-            (Some(Modal::Menu(_)), Some(Target::MenuItem(i))) => {
-                if let Some(Modal::Menu(mut m)) = self.windows.modal.take() {
-                    if i < m.items.len() && m.items[i].enabled {
-                        m.selected = i;
-                        self.menu_activate(m);
-                    } else {
-                        // A disabled entry does nothing, and the menu stays.
-                        self.windows.modal = Some(Modal::Menu(m));
-                    }
-                }
-            }
+            (Some(Modal::Menu(_)), Some(Target::MenuItem(i))) => self.click_menu_item(i),
             (Some(Modal::Menu(_)), _) => self.windows.modal = None,
             (Some(Modal::Palette(p)), Some(Target::PaletteRow(i))) => {
                 if i < p.hits.len() {
@@ -298,25 +317,41 @@ impl App {
                 }
             }
             (Some(Modal::Plan(_)), Some(Target::PlanCancel)) => self.windows.modal = None,
-            (Some(Modal::Plan(_)), Some(Target::PlanRun)) => {
-                if let Some(Modal::Plan(pv)) = self.windows.modal.take() {
-                    if pv.can_run() {
-                        self.run_plan(pv);
-                    } else {
-                        self.windows.modal = Some(Modal::Plan(pv));
-                    }
-                }
-            }
-            (Some(Modal::Plan(_)), Some(Target::Policy(p))) => {
-                if let Some(Modal::Plan(mut pv)) = self.windows.modal.take() {
-                    self.replan_with(&mut pv, p);
-                    self.windows.modal = Some(Modal::Plan(pv));
-                }
-            }
+            (Some(Modal::Plan(_)), Some(Target::PlanRun)) => self.click_plan_run(),
+            (Some(Modal::Plan(_)), Some(Target::Policy(p))) => self.click_plan_policy(p),
             (Some(_), Some(Target::Key(code))) => {
                 self.on_key(KeyEvent::new(code, KeyModifiers::NONE));
             }
             _ => {}
+        }
+    }
+
+    fn click_menu_item(&mut self, i: usize) {
+        if let Some(Modal::Menu(mut m)) = self.windows.modal.take() {
+            if i < m.items.len() && m.items[i].enabled {
+                m.selected = i;
+                self.menu_activate(m);
+            } else {
+                // A disabled entry does nothing, and the menu stays.
+                self.windows.modal = Some(Modal::Menu(m));
+            }
+        }
+    }
+
+    fn click_plan_run(&mut self) {
+        if let Some(Modal::Plan(pv)) = self.windows.modal.take() {
+            if pv.can_run() {
+                self.run_plan(pv);
+            } else {
+                self.windows.modal = Some(Modal::Plan(pv));
+            }
+        }
+    }
+
+    fn click_plan_policy(&mut self, policy: ConflictPolicy) {
+        if let Some(Modal::Plan(mut pv)) = self.windows.modal.take() {
+            self.replan_with(&mut pv, policy);
+            self.windows.modal = Some(Modal::Plan(pv));
         }
     }
 
