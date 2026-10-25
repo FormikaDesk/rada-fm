@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::ops::RangeInclusive;
 
+use super::App;
 use super::Viewport;
 use crate::view::ViewMode;
 
@@ -118,6 +119,25 @@ impl Selection {
         let mut marked = base.clone();
         marked.extend(names);
         self.marked = marked;
+    }
+}
+
+impl App {
+    pub(super) fn set_cursor(&mut self, to: usize) {
+        if self.tab.sel.move_to(to, self.tab.visible.len()) {
+            self.preview.scroll = 0;
+        }
+        self.tab.ensure_visible();
+        self.request_preview();
+        self.redraw.dirty = true;
+    }
+
+    pub(super) fn toggle_mark(&mut self) {
+        if let Some(e) = self.tab.current() {
+            let name = e.name.clone();
+            self.tab.sel.toggle(name);
+        }
+        self.set_cursor(self.tab.sel.cursor + 1);
     }
 }
 

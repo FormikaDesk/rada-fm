@@ -645,15 +645,6 @@ impl App {
         }
     }
 
-    fn set_cursor(&mut self, to: usize) {
-        if self.tab.sel.move_to(to, self.tab.visible.len()) {
-            self.preview.scroll = 0;
-        }
-        self.tab.ensure_visible();
-        self.request_preview();
-        self.redraw.dirty = true;
-    }
-
     fn request_dir(&mut self, path: PathBuf) {
         if path != self.tab.cwd {
             self.tab.filter = None;
@@ -1743,14 +1734,6 @@ impl App {
         } else {
             self.session.should_quit = true;
         }
-    }
-
-    fn toggle_mark(&mut self) {
-        if let Some(e) = self.tab.current() {
-            let name = e.name.clone();
-            self.tab.sel.toggle(name);
-        }
-        self.set_cursor(self.tab.sel.cursor + 1);
     }
 
     fn yank(&mut self, mode: TransferMode) {
