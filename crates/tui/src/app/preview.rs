@@ -1,7 +1,11 @@
 //! The preview of the item under the cursor: what was asked of the worker, what it answered,
 //! the picture that goes with it and whether the keyboard is in the pane.
 
-use crate::images::ImageUi;
+use crossterm::event::{KeyCode, KeyEvent};
+
+use super::{App, Modal};
+use crate::images::{ImageUi, ResizeResult};
+use crate::keymap::Action;
 use rada_core::events::PreviewEvent;
 use rada_core::preview::{ImageInfo, ImagePreview, ImageState, Limits, Preview};
 use std::path::{Path, PathBuf};
@@ -186,6 +190,89 @@ impl PreviewPane {
             status,
             note: ip.note,
             text: ip.text,
+        }
+    }
+}
+
+impl App {
+    pub(super) fn request_preview(&mut self) {
+        let Some(e) = self.tab.current() else {
+            self.preview.clear();
+            return;
+        };
+        let path = e.path.clone();
+        if let Some((generation, limits)) = self.preview.ask(&path, self.settings.show_hidden) {
+            self.svc.previewer.request(path, generation, limits);
+        }
+    }
+
+    /// The cell is `cell` pixels now. If that is not what the pictures were made for, they
+    /// are made again, and the screen is cleared so that the terminal drops the old ones.
+    pub fn use_cell_px(&mut self, cell: (u16, u16)) {
+        if self.preview.use_cell_px(cell) {
+            self.frame.ring = None;
+            self.request_preview();
+            self.redraw.full_redraw = true;
+            self.redraw.dirty = true;
+        }
+    }
+
+    /// The terminal changed size, which is also what a zoom of its font looks like.
+    pub fn on_terminal_resized(&mut self) {
+        if let Some(cell) = crate::images::system_cell_px() {
+            self.use_cell_px(cell);
+        }
+        self.redraw.dirty = true;
+    }
+
+    pub(super) fn on_preview(&mut self, ev: PreviewEvent) {
+        // Rounded corners, blended into the colour behind the picture (the theme's own
+        // background, or its canvas).
+        let bg = if self.settings.basic {
+            None
+        } else {
+            crate::theme::rgb_of(self.settings.th.bg.unwrap_or(self.settings.th.canvas))
+        };
+        self.preview.show(ev, bg);
+    }
+
+    /// The encoder thread finished resizing/encoding the picture for the current area.
+    pub fn on_image_resized(&mut self, r: ResizeResult) {
+        if let Some(ui) = &mut self.preview.image_ui {
+            ui.on_resized(r);
+        }
+        self.redraw.dirty = true;
+    }
+
+    pub(super) fn on_full_preview_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.preview.scroll_down(1);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.preview.scroll_up(1);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::PageDown => {
+                self.preview.scroll_down(20);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::PageUp => {
+                self.preview.scroll_up(20);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Char('H') => {
+                self.dispatch(Action::ToggleHex);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            KeyCode::Char('Q') => {
+                self.dispatch(Action::QuickLook);
+                self.windows.modal = Some(Modal::FullPreview);
+            }
+            // Closing is deliberate: Esc, q, Space or Enter.
+            KeyCode::Esc | KeyCode::Char('q' | ' ') | KeyCode::Enter => {}
+            _ => self.windows.modal = Some(Modal::FullPreview),
         }
     }
 }
