@@ -1,6 +1,7 @@
 //! The Properties window: what is known about the item under the cursor, or about the
 //! selection, taken from the listing already in memory (nothing is read from the disk).
 
+use crossterm::event::{KeyCode, KeyEvent};
 use rada_core::i18n::{Key, tf};
 
 use super::{App, Modal};
@@ -149,6 +150,21 @@ impl App {
             title: e.display.clone(),
             rows,
             scroll: 0,
+        }
+    }
+
+    pub(super) fn on_properties_key(&mut self, mut p: PropsView, key: KeyEvent) {
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => {
+                p.scroll += 1;
+                self.windows.modal = Some(Modal::Properties(p));
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                p.scroll = p.scroll.saturating_sub(1);
+                self.windows.modal = Some(Modal::Properties(p));
+            }
+            KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
+            _ => self.windows.modal = Some(Modal::Properties(p)),
         }
     }
 }

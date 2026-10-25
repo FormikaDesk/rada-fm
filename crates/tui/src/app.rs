@@ -2432,21 +2432,6 @@ impl App {
         }
     }
 
-    fn on_properties_key(&mut self, mut p: PropsView, key: KeyEvent) {
-        match key.code {
-            KeyCode::Down | KeyCode::Char('j') => {
-                p.scroll += 1;
-                self.windows.modal = Some(Modal::Properties(p));
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                p.scroll = p.scroll.saturating_sub(1);
-                self.windows.modal = Some(Modal::Properties(p));
-            }
-            KeyCode::Esc | KeyCode::Char('q' | ' ' | 'i') | KeyCode::Enter => {}
-            _ => self.windows.modal = Some(Modal::Properties(p)),
-        }
-    }
-
     // ------------------------------------------------------------------ dates for the list
 
     /// Work out the date text of these entries (indices into the listing), once; the list
