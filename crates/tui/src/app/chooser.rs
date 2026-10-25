@@ -244,4 +244,22 @@ impl App {
         }
         self.chooser_finish(vec![target]);
     }
+
+    pub(super) fn quit(&mut self) {
+        if self.ops.is_busy() {
+            self.windows.modal = Some(Modal::ConfirmQuit);
+        } else {
+            self.session.should_quit = true;
+        }
+    }
+
+    pub(super) fn on_confirm_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Enter => {
+                self.ops.cancel();
+                self.session.should_quit = true;
+            }
+            _ => {}
+        }
+    }
 }

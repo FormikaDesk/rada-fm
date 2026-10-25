@@ -1677,14 +1677,6 @@ impl App {
 
     // ------------------------------------------------------------------ keys
 
-    fn quit(&mut self) {
-        if self.ops.is_busy() {
-            self.windows.modal = Some(Modal::ConfirmQuit);
-        } else {
-            self.session.should_quit = true;
-        }
-    }
-
     fn yank(&mut self, mode: TransferMode) {
         if mode == TransferMode::Move && self.refuse_in_archive(Key::WhatCut.tr()) {
             return;
@@ -2417,16 +2409,6 @@ impl App {
             KeyCode::Up | KeyCode::Char('k') => {
                 r.scroll = r.scroll.saturating_sub(1);
                 self.windows.modal = Some(Modal::Result(r));
-            }
-            _ => {}
-        }
-    }
-
-    fn on_confirm_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('y') | KeyCode::Enter => {
-                self.ops.cancel();
-                self.session.should_quit = true;
             }
             _ => {}
         }
