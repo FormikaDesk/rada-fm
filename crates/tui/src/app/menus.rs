@@ -32,120 +32,130 @@ impl App {
     pub(super) fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
         use Action::*;
         let ro = self.tab.archive.is_some();
-        // Nothing is made *in* a list of tagged items.
-        let nowhere = ro || self.tab.tag_view().is_some();
         match kind {
-            MenuKind::New => vec![
-                MenuItem::act(NewFolder, !nowhere, false),
-                MenuItem::act(NewFile, !nowhere, false),
-            ],
-            MenuKind::Sort => {
-                let key = |k: SortKey, label: &str, gap: bool| {
-                    MenuItem::choice(MenuCmd::SortBy(k), label, self.tab.sort.key == k, gap)
-                };
+            MenuKind::New => {
+                // Nothing is made *in* a list of tagged items.
+                let nowhere = ro || self.tab.tag_view().is_some();
                 vec![
-                    key(SortKey::Name, Key::ColName.tr(), false),
-                    key(SortKey::Modified, Key::SortModified.tr(), false),
-                    key(SortKey::Type, Key::ColType.tr(), false),
-                    key(SortKey::Size, Key::ColSize.tr(), false),
-                    MenuItem::choice(
-                        MenuCmd::SortOrder(false),
-                        Key::Ascending.tr(),
-                        !self.tab.sort.descending(),
-                        true,
-                    ),
-                    MenuItem::choice(
-                        MenuCmd::SortOrder(true),
-                        Key::Descending.tr(),
-                        self.tab.sort.descending(),
-                        false,
-                    ),
+                    MenuItem::act(NewFolder, !nowhere, false),
+                    MenuItem::act(NewFile, !nowhere, false),
                 ]
             }
-            MenuKind::View => vec![
-                MenuItem::choice(
-                    MenuCmd::View(ViewMode::Details),
-                    Key::ViewDetails.tr(),
-                    self.tab.view == ViewMode::Details,
-                    false,
-                ),
-                MenuItem::choice(
-                    MenuCmd::View(ViewMode::Icons),
-                    Key::ViewIcons.tr(),
-                    self.tab.view == ViewMode::Icons,
-                    false,
-                ),
-                MenuItem::choice(
-                    MenuCmd::View(ViewMode::Columns),
-                    Key::ViewColumns.tr(),
-                    self.tab.view == ViewMode::Columns,
-                    false,
-                ),
-                MenuItem::toggle(
-                    ToggleDetails,
-                    Key::MenuDetailsPane.tr(),
-                    self.details_visible(),
-                    true,
-                ),
-                MenuItem::toggle(
-                    ToggleHidden,
-                    Key::MenuHiddenFiles.tr(),
-                    self.settings.show_hidden,
-                    false,
-                ),
-                MenuItem::toggle(
-                    ToggleSidebar,
-                    Key::MenuNavPane.tr(),
-                    self.side_nav.wanted,
-                    false,
-                ),
-                MenuItem::toggle(
-                    ToggleTags,
-                    Key::MenuTagColumn.tr(),
-                    self.settings.show_tags,
-                    false,
-                ),
-                MenuItem::choice(
-                    MenuCmd::Layout(LayoutPref::Auto),
-                    Key::MenuLayoutAuto.tr(),
-                    self.settings.layout_pref == LayoutPref::Auto,
-                    true,
-                ),
-                MenuItem::choice(
-                    MenuCmd::Layout(LayoutPref::Panels),
-                    Key::MenuLayoutPanels.tr(),
-                    self.settings.layout_pref == LayoutPref::Panels,
-                    false,
-                ),
-                MenuItem::choice(
-                    MenuCmd::Layout(LayoutPref::Classic),
-                    Key::MenuLayoutClassic.tr(),
-                    self.settings.layout_pref == LayoutPref::Classic,
-                    false,
-                ),
-            ],
+            MenuKind::Sort => self.sort_menu_items(),
+            MenuKind::View => self.view_menu_items(),
             MenuKind::Tags => self.tag_menu_items(),
             MenuKind::Help => vec![
                 MenuItem::act(Help, true, false),
                 MenuItem::command(MenuCmd::CheckUpdates, Key::MenuCheckUpdates.tr(), true),
                 MenuItem::command(MenuCmd::About, Key::MenuAbout.tr(), false),
             ],
-            MenuKind::More => {
-                let mut v = vec![
-                    MenuItem::act(Redo, true, false),
-                    MenuItem::act(History, true, false),
-                    MenuItem::act(BulkRename, !ro, false),
-                ];
-                if ro || self.on_archive_item() {
-                    v.push(MenuItem::act(ExtractHere, true, true));
-                    v.push(MenuItem::act(ExtractToFolder, true, false));
-                }
-                v.push(MenuItem::act(OpenTerminal, !ro, true));
-                v.push(MenuItem::act(Refresh, true, false));
-                v.push(MenuItem::act(Help, true, true));
-                v
-            }
+            MenuKind::More => self.more_menu_items(ro),
         }
+    }
+
+    fn sort_menu_items(&self) -> Vec<MenuItem> {
+        let key = |k: SortKey, label: &str, gap: bool| {
+            MenuItem::choice(MenuCmd::SortBy(k), label, self.tab.sort.key == k, gap)
+        };
+        vec![
+            key(SortKey::Name, Key::ColName.tr(), false),
+            key(SortKey::Modified, Key::SortModified.tr(), false),
+            key(SortKey::Type, Key::ColType.tr(), false),
+            key(SortKey::Size, Key::ColSize.tr(), false),
+            MenuItem::choice(
+                MenuCmd::SortOrder(false),
+                Key::Ascending.tr(),
+                !self.tab.sort.descending(),
+                true,
+            ),
+            MenuItem::choice(
+                MenuCmd::SortOrder(true),
+                Key::Descending.tr(),
+                self.tab.sort.descending(),
+                false,
+            ),
+        ]
+    }
+
+    fn view_menu_items(&self) -> Vec<MenuItem> {
+        let mut items = self.view_mode_items();
+        items.extend(self.view_toggle_items());
+        items.extend(self.layout_items());
+        items
+    }
+
+    fn view_mode_items(&self) -> Vec<MenuItem> {
+        let mode = |m: ViewMode, label: &str| {
+            MenuItem::choice(MenuCmd::View(m), label, self.tab.view == m, false)
+        };
+        vec![
+            mode(ViewMode::Details, Key::ViewDetails.tr()),
+            mode(ViewMode::Icons, Key::ViewIcons.tr()),
+            mode(ViewMode::Columns, Key::ViewColumns.tr()),
+        ]
+    }
+
+    fn view_toggle_items(&self) -> Vec<MenuItem> {
+        use Action::*;
+        vec![
+            MenuItem::toggle(
+                ToggleDetails,
+                Key::MenuDetailsPane.tr(),
+                self.details_visible(),
+                true,
+            ),
+            MenuItem::toggle(
+                ToggleHidden,
+                Key::MenuHiddenFiles.tr(),
+                self.settings.show_hidden,
+                false,
+            ),
+            MenuItem::toggle(
+                ToggleSidebar,
+                Key::MenuNavPane.tr(),
+                self.side_nav.wanted,
+                false,
+            ),
+            MenuItem::toggle(
+                ToggleTags,
+                Key::MenuTagColumn.tr(),
+                self.settings.show_tags,
+                false,
+            ),
+        ]
+    }
+
+    fn layout_items(&self) -> Vec<MenuItem> {
+        let layout = |pref: LayoutPref, label: &str, gap: bool| {
+            MenuItem::choice(
+                MenuCmd::Layout(pref),
+                label,
+                self.settings.layout_pref == pref,
+                gap,
+            )
+        };
+        vec![
+            layout(LayoutPref::Auto, Key::MenuLayoutAuto.tr(), true),
+            layout(LayoutPref::Panels, Key::MenuLayoutPanels.tr(), false),
+            layout(LayoutPref::Classic, Key::MenuLayoutClassic.tr(), false),
+        ]
+    }
+
+    fn more_menu_items(&self, ro: bool) -> Vec<MenuItem> {
+        use Action::*;
+        let mut v = vec![
+            MenuItem::act(Redo, true, false),
+            MenuItem::act(History, true, false),
+            MenuItem::act(BulkRename, !ro, false),
+        ];
+        if ro || self.on_archive_item() {
+            v.push(MenuItem::act(ExtractHere, true, true));
+            v.push(MenuItem::act(ExtractToFolder, true, false));
+        }
+        v.push(MenuItem::act(OpenTerminal, !ro, true));
+        v.push(MenuItem::act(Refresh, true, false));
+        v.push(MenuItem::act(Help, true, true));
+        v
     }
 
     /// The head of a submenu: the tags of what is selected get a title, the others none.
@@ -203,95 +213,112 @@ impl App {
 
     /// The menu of the right button (or the Menu key): on an item, or on empty space.
     pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
-        use Action::*;
-        let has_clip = self.ops.clipboard.is_some();
-        let mut items: Vec<MenuItem> = Vec::new();
-        let ro = self.tab.archive.is_some();
-        let nowhere = ro || self.tab.tag_view().is_some();
-        let on_archive = self.on_archive_item();
-        if on_item {
-            let cur = self.tab.current();
-            // Opening.
-            items.push(MenuItem::act(Open, true, false));
-            if self.tab.tag_view().is_some() {
-                items.push(MenuItem::act(ShowInFolder, true, false));
-            }
-            if cur.is_some_and(|e| e.package) {
-                items.push(MenuItem::act(ShowPackage, true, false));
-            }
-            items.push(MenuItem::open_with(
-                cur.is_some_and(|e| !e.is_navigable_dir()) && !ro,
-            ));
-            if self.svc.platform.opener().can_quick_look() {
-                items.push(MenuItem::act(QuickLook, !ro, false));
-            }
-            if on_archive || ro {
-                items.push(MenuItem::act(ExtractHere, true, true));
-                items.push(MenuItem::act(ExtractToFolder, true, false));
-            }
-            // The clipboard.
-            items.push(MenuItem::act(Cut, !ro, true));
-            items.push(MenuItem::act(Copy, true, false));
-            items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
-            // Changing it.
-            items.push(MenuItem::act(Rename, !ro, true));
-            if !ro {
-                items.push(MenuItem::act(Compress, true, false));
-            }
-            // About it.
-            let mut gap = true;
-            if self.tags_available() {
-                items.push(MenuItem::sub(MenuKind::Tags, Key::MenuTags.tr(), !ro, gap));
-                gap = false;
-            }
-            if let Some(e) = cur
-                && e.is_navigable_dir()
-            {
-                let pinned = self.places.is_bookmarked(&e.path);
-                items.push(MenuItem::bookmark(e.path.clone(), !pinned, gap));
-                gap = false;
-            }
-            items.push(MenuItem::act(CopyPath, true, gap));
-            items.push(MenuItem::act(Properties, true, true));
-            // Taking it away: last, and red.
-            items.push(MenuItem::act(Trash, !ro, true));
-            if !ro {
-                items.push(MenuItem::act(DeletePermanently, true, false));
-            }
+        let items = if on_item {
+            self.item_menu_items()
         } else {
-            items.push(MenuItem::sub(
-                MenuKind::New,
-                Key::MenuNew.tr(),
-                !nowhere,
-                false,
-            ));
-            items.push(MenuItem::act(Paste, has_clip && !nowhere, false));
-            items.push(MenuItem::sub(
-                MenuKind::Sort,
-                Key::MenuSortBy.tr(),
-                true,
-                true,
-            ));
-            items.push(MenuItem::sub(
-                MenuKind::View,
-                Key::MenuView.tr(),
-                true,
-                false,
-            ));
-            items.push(MenuItem::act(Refresh, true, true));
-            items.push(MenuItem::act(SelectAll, true, false));
-            if ro {
-                items.push(MenuItem::act(ExtractHere, true, true));
-                items.push(MenuItem::act(ExtractToFolder, true, false));
-            } else {
-                items.push(MenuItem::act(OpenTerminal, true, true));
-            }
-        }
+            self.space_menu_items()
+        };
         MenuView::new(at, items).titled(if on_item {
             self.item_menu_title()
         } else {
             None
         })
+    }
+
+    fn item_menu_items(&self) -> Vec<MenuItem> {
+        let ro = self.tab.archive.is_some();
+        let mut items = self.item_opening_items(ro);
+        items.extend(self.item_edit_items(ro));
+        items.extend(self.item_about_items(ro));
+        items
+    }
+
+    fn item_opening_items(&self, ro: bool) -> Vec<MenuItem> {
+        use Action::*;
+        let cur = self.tab.current();
+        let mut items = vec![MenuItem::act(Open, true, false)];
+        if self.tab.tag_view().is_some() {
+            items.push(MenuItem::act(ShowInFolder, true, false));
+        }
+        if cur.is_some_and(|e| e.package) {
+            items.push(MenuItem::act(ShowPackage, true, false));
+        }
+        items.push(MenuItem::open_with(
+            cur.is_some_and(|e| !e.is_navigable_dir()) && !ro,
+        ));
+        if self.svc.platform.opener().can_quick_look() {
+            items.push(MenuItem::act(QuickLook, !ro, false));
+        }
+        if self.on_archive_item() || ro {
+            items.push(MenuItem::act(ExtractHere, true, true));
+            items.push(MenuItem::act(ExtractToFolder, true, false));
+        }
+        items
+    }
+
+    /// The clipboard, and changing the item.
+    fn item_edit_items(&self, ro: bool) -> Vec<MenuItem> {
+        use Action::*;
+        let nowhere = ro || self.tab.tag_view().is_some();
+        let has_clip = self.ops.clipboard.is_some();
+        let mut items = vec![
+            MenuItem::act(Cut, !ro, true),
+            MenuItem::act(Copy, true, false),
+            MenuItem::act(Paste, has_clip && !nowhere, false),
+            MenuItem::act(Rename, !ro, true),
+        ];
+        if !ro {
+            items.push(MenuItem::act(Compress, true, false));
+        }
+        items
+    }
+
+    /// About the item, and taking it away: last, and red.
+    fn item_about_items(&self, ro: bool) -> Vec<MenuItem> {
+        use Action::*;
+        let cur = self.tab.current();
+        let mut items = Vec::new();
+        let mut gap = true;
+        if self.tags_available() {
+            items.push(MenuItem::sub(MenuKind::Tags, Key::MenuTags.tr(), !ro, gap));
+            gap = false;
+        }
+        if let Some(e) = cur
+            && e.is_navigable_dir()
+        {
+            let pinned = self.places.is_bookmarked(&e.path);
+            items.push(MenuItem::bookmark(e.path.clone(), !pinned, gap));
+            gap = false;
+        }
+        items.push(MenuItem::act(CopyPath, true, gap));
+        items.push(MenuItem::act(Properties, true, true));
+        items.push(MenuItem::act(Trash, !ro, true));
+        if !ro {
+            items.push(MenuItem::act(DeletePermanently, true, false));
+        }
+        items
+    }
+
+    fn space_menu_items(&self) -> Vec<MenuItem> {
+        use Action::*;
+        let ro = self.tab.archive.is_some();
+        let nowhere = ro || self.tab.tag_view().is_some();
+        let has_clip = self.ops.clipboard.is_some();
+        let mut items = vec![
+            MenuItem::sub(MenuKind::New, Key::MenuNew.tr(), !nowhere, false),
+            MenuItem::act(Paste, has_clip && !nowhere, false),
+            MenuItem::sub(MenuKind::Sort, Key::MenuSortBy.tr(), true, true),
+            MenuItem::sub(MenuKind::View, Key::MenuView.tr(), true, false),
+            MenuItem::act(Refresh, true, true),
+            MenuItem::act(SelectAll, true, false),
+        ];
+        if ro {
+            items.push(MenuItem::act(ExtractHere, true, true));
+            items.push(MenuItem::act(ExtractToFolder, true, false));
+        } else {
+            items.push(MenuItem::act(OpenTerminal, true, true));
+        }
+        items
     }
 
     /// Do what a chosen menu entry says. The menu is already closed.
@@ -347,69 +374,10 @@ impl App {
     /// The entries of the Tags submenu: the seven colours, the other tags the items carry, a
     /// new tag, and removing them all. A tag is ticked when every item has it.
     pub(super) fn tag_menu_items(&self) -> Vec<MenuItem> {
-        use rada_core::platform::{Tag, TagColor as Hue};
         let targets = self.tag_targets();
-        let everyone = |name: &str| {
-            !targets.is_empty()
-                && targets
-                    .iter()
-                    .all(|e| e.tags.iter().any(|t| t.is_called(name)))
-        };
-        // The colours are called what the system calls them (a Mac in Italian says "Blu"): a
-        // tag of another name has no colour for the Finder. A tag with the colour counts
-        // whatever its name.
-        let lang = self.tags.lang.as_str();
-        let has_colour = |c: Hue| {
-            !targets.is_empty()
-                && targets.iter().all(|e| {
-                    e.tags
-                        .iter()
-                        .any(|t| t.color == Some(c) || t.is_called(c.label(lang)))
-                })
-        };
-        let mut items: Vec<MenuItem> = Hue::ALL
-            .into_iter()
-            .map(|c| {
-                MenuItem::choice(
-                    MenuCmd::Tag(TagCmd::Toggle(Tag::standard_in(c, lang))),
-                    c.label(lang),
-                    has_colour(c),
-                    false,
-                )
-                .with_icon(MenuIcon::Dot(Some(c)))
-            })
-            .collect();
-        // The tags of their own that the items already carry, so that they can be taken off.
-        let mut others: Vec<Tag> = Vec::new();
-        for e in &targets {
-            for t in &e.tags {
-                if Hue::from_name(&t.name).is_none() && !others.iter().any(|o| o.is_called(&t.name))
-                {
-                    others.push(t.clone());
-                }
-            }
-        }
-        for (i, t) in others.into_iter().enumerate() {
-            let on = everyone(&t.name);
-            items.push(
-                MenuItem::choice(MenuCmd::Tag(TagCmd::Toggle(t.clone())), &t.name, on, i == 0)
-                    .with_icon(MenuIcon::Dot(t.color)),
-            );
-        }
-        items.push(
-            MenuItem::command(MenuCmd::Tag(TagCmd::New), Key::MenuNewTag.tr(), true)
-                .with_icon(MenuIcon::Glyph(crate::icons::Glyph::New)),
-        );
-        items.last_mut().unwrap().enabled = !targets.is_empty();
-        items.push(
-            MenuItem::command(
-                MenuCmd::Tag(TagCmd::Clear),
-                Key::MenuRemoveAllTags.tr(),
-                false,
-            )
-            .with_icon(MenuIcon::Glyph(crate::icons::Glyph::Close)),
-        );
-        items.last_mut().unwrap().enabled = targets.iter().any(|e| !e.tags.is_empty());
+        let mut items = colour_items(&targets, self.tags.lang.as_str());
+        items.extend(own_tag_items(&targets));
+        items.extend(tag_commands(&targets));
         items
     }
 
@@ -439,4 +407,76 @@ impl App {
             .plan_request(OpRequest::SetTags { items, change });
         self.begin_plan(Key::PlanningGeneric.tr(), h);
     }
+}
+
+/// Whether every one of `targets` carries a tag called `name`.
+fn all_have(targets: &[&Entry], name: &str) -> bool {
+    !targets.is_empty()
+        && targets
+            .iter()
+            .all(|e| e.tags.iter().any(|t| t.is_called(name)))
+}
+
+/// The seven colours, ticked when every item has the colour. They are called what the system
+/// calls them (a Mac in Italian says "Blu"): a tag of another name has no colour for the
+/// Finder. A tag with the colour counts whatever its name.
+fn colour_items(targets: &[&Entry], lang: &str) -> Vec<MenuItem> {
+    use rada_core::platform::{Tag, TagColor as Hue};
+    let has_colour = |c: Hue| {
+        !targets.is_empty()
+            && targets.iter().all(|e| {
+                e.tags
+                    .iter()
+                    .any(|t| t.color == Some(c) || t.is_called(c.label(lang)))
+            })
+    };
+    Hue::ALL
+        .into_iter()
+        .map(|c| {
+            MenuItem::choice(
+                MenuCmd::Tag(TagCmd::Toggle(Tag::standard_in(c, lang))),
+                c.label(lang),
+                has_colour(c),
+                false,
+            )
+            .with_icon(MenuIcon::Dot(Some(c)))
+        })
+        .collect()
+}
+
+/// The tags of their own that the items already carry, so that they can be taken off.
+fn own_tag_items(targets: &[&Entry]) -> Vec<MenuItem> {
+    use rada_core::platform::{Tag, TagColor as Hue};
+    let mut others: Vec<Tag> = Vec::new();
+    for e in targets {
+        for t in &e.tags {
+            if Hue::from_name(&t.name).is_none() && !others.iter().any(|o| o.is_called(&t.name)) {
+                others.push(t.clone());
+            }
+        }
+    }
+    others
+        .into_iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let on = all_have(targets, &t.name);
+            MenuItem::choice(MenuCmd::Tag(TagCmd::Toggle(t.clone())), &t.name, on, i == 0)
+                .with_icon(MenuIcon::Dot(t.color))
+        })
+        .collect()
+}
+
+/// A new tag, and removing them all.
+fn tag_commands(targets: &[&Entry]) -> Vec<MenuItem> {
+    let mut new = MenuItem::command(MenuCmd::Tag(TagCmd::New), Key::MenuNewTag.tr(), true)
+        .with_icon(MenuIcon::Glyph(crate::icons::Glyph::New));
+    new.enabled = !targets.is_empty();
+    let mut clear = MenuItem::command(
+        MenuCmd::Tag(TagCmd::Clear),
+        Key::MenuRemoveAllTags.tr(),
+        false,
+    )
+    .with_icon(MenuIcon::Glyph(crate::icons::Glyph::Close));
+    clear.enabled = targets.iter().any(|e| !e.tags.is_empty());
+    vec![new, clear]
 }
