@@ -97,6 +97,37 @@ fn heading_row(name: &str) -> NavRow {
     plain_row(NavKind::Heading, name.to_string(), PathBuf::new())
 }
 
+/// The folders the person pinned, under a title and a blank row; none when there are none. The
+/// standard folders are in the tree under Home: only what was added is here.
+fn pinned_rows(items: &[sidebar::Item]) -> Vec<NavRow> {
+    let favorites: Vec<usize> = (0..items.len())
+        .filter(|&n| {
+            items[n].section == Section::Pinned
+                && matches!(items[n].origin, Origin::Bookmark { .. })
+        })
+        .collect();
+    if favorites.is_empty() {
+        return Vec::new();
+    }
+    let mut rows = vec![
+        gap_row(),
+        plain_row(
+            NavKind::Heading,
+            Key::SecPinned.tr().to_string(),
+            PathBuf::new(),
+        ),
+    ];
+    for n in favorites {
+        let kind = NavKind::Favorite(n);
+        rows.push(plain_row(
+            kind,
+            items[n].name.clone(),
+            items[n].path.clone(),
+        ));
+    }
+    rows
+}
+
 /// The rows of the places of the sidebar whose section `keep` accepts.
 fn favorite_rows(items: &[sidebar::Item], keep: impl Fn(Section) -> bool) -> Vec<NavRow> {
     (0..items.len())
@@ -313,6 +344,19 @@ impl App {
         if self.settings.nav_mode == NavMode::Path {
             return self.nav_rows_path();
         }
+        let mut rows = self.home_rows();
+        let items = sidebar::items(self, false);
+        rows.extend(pinned_rows(&items));
+        rows.extend(self.tags_rows(TAG_LINES_MOST));
+        if let Some(t) = items.iter().find(|i| i.section == Section::Trash) {
+            rows.push(gap_row());
+            rows.push(plain_row(NavKind::Trash, t.name.clone(), t.path.clone()));
+        }
+        rows
+    }
+
+    /// Home, and the tree under it when it is open.
+    fn home_rows(&self) -> Vec<NavRow> {
         let mut rows = Vec::new();
         let home = self.home().to_path_buf();
         let home_name = self
@@ -333,53 +377,6 @@ impl App {
         });
         if open {
             self.tree_rows(&mut rows, &home, 1);
-        }
-        let items = sidebar::items(self, false);
-        let favorites: Vec<usize> = items
-            .iter()
-            .enumerate()
-            // The standard folders are in the tree under Home: only what was added is here.
-            .filter(|(_, i)| {
-                i.section == Section::Pinned && matches!(i.origin, Origin::Bookmark { .. })
-            })
-            .map(|(n, _)| n)
-            .collect();
-        let gap = || NavRow {
-            kind: NavKind::Gap,
-            depth: 0,
-            path: PathBuf::new(),
-            name: String::new(),
-            count: None,
-        };
-        if !favorites.is_empty() {
-            rows.push(gap());
-            rows.push(NavRow {
-                kind: NavKind::Heading,
-                depth: 0,
-                path: PathBuf::new(),
-                name: Key::SecPinned.tr().to_string(),
-                count: None,
-            });
-            for n in favorites {
-                rows.push(NavRow {
-                    kind: NavKind::Favorite(n),
-                    depth: 0,
-                    path: items[n].path.clone(),
-                    name: items[n].name.clone(),
-                    count: None,
-                });
-            }
-        }
-        rows.extend(self.tags_rows(TAG_LINES_MOST));
-        if let Some(t) = items.iter().find(|i| i.section == Section::Trash) {
-            rows.push(gap());
-            rows.push(NavRow {
-                kind: NavKind::Trash,
-                depth: 0,
-                path: t.path.clone(),
-                name: t.name.clone(),
-                count: None,
-            });
         }
         rows
     }
@@ -785,38 +782,15 @@ impl App {
         let rows = self.nav_rows();
         let last = rows.len().saturating_sub(1);
         self.side_nav.nav_cursor = self.side_nav.nav_cursor.min(last);
-        let step = |from: usize, down: bool| -> usize {
-            let mut i = from;
-            loop {
-                let next = if down {
-                    (i + 1).min(last)
-                } else {
-                    i.saturating_sub(1)
-                };
-                if next == i {
-                    return from;
-                }
-                i = next;
-                if rows[i].selectable() {
-                    return i;
-                }
-            }
-        };
         let here = rows.get(self.side_nav.nav_cursor).cloned();
         match action {
-            Up => self.side_nav.nav_cursor = step(self.side_nav.nav_cursor, false),
-            Down => self.side_nav.nav_cursor = step(self.side_nav.nav_cursor, true),
+            Up => self.side_nav.nav_cursor = nav_step(&rows, self.side_nav.nav_cursor, false),
+            Down => self.side_nav.nav_cursor = nav_step(&rows, self.side_nav.nav_cursor, true),
             First => self.side_nav.nav_cursor = 0,
             Last => self.side_nav.nav_cursor = last,
             Open => {
-                if let Some(row) = here {
-                    let path = match row.kind {
-                        NavKind::Tags { first, len, .. } => self.nav_tag_path(first, len),
-                        NavKind::Heading | NavKind::Gap | NavKind::More => return true,
-                        _ => row.path,
-                    };
-                    self.side_nav.focus = false;
-                    self.open_dir(path);
+                if !self.nav_open(here) {
+                    return true;
                 }
             }
             Parent | ClearSelection | SwitchPane => {
@@ -826,26 +800,8 @@ impl App {
                     self.side_nav.focus = false;
                 }
             }
-            Bookmark => {
-                if let Some(row) = here
-                    && matches!(row.kind, NavKind::Folder { .. } | NavKind::Favorite(_))
-                {
-                    let add = !self.places.paths.bookmarks.contains(&row.path);
-                    self.set_bookmark(row.path, add);
-                }
-            }
-            Trash | DeletePermanently => {
-                let items = sidebar::items(self, false);
-                match here.map(|r| r.kind) {
-                    Some(NavKind::Favorite(n))
-                        if matches!(items[n].origin, Origin::Bookmark { removable: true }) =>
-                    {
-                        let path = items[n].path.clone();
-                        self.set_bookmark(path, false);
-                    }
-                    _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
-                }
-            }
+            Bookmark => self.nav_bookmark(here),
+            Trash | DeletePermanently => self.nav_remove_bookmark(here),
             Filter => {
                 self.side_nav.focus = false;
                 return false;
@@ -858,6 +814,45 @@ impl App {
         }
         self.keep_tag_column(&rows);
         true
+    }
+
+    /// Enter on a row of NAV: go to its folder. False for a row that is only a heading, a
+    /// gap or a "more": nothing is done.
+    fn nav_open(&mut self, here: Option<NavRow>) -> bool {
+        if let Some(row) = here {
+            let path = match row.kind {
+                NavKind::Tags { first, len, .. } => self.nav_tag_path(first, len),
+                NavKind::Heading | NavKind::Gap | NavKind::More => return false,
+                _ => row.path,
+            };
+            self.side_nav.focus = false;
+            self.open_dir(path);
+        }
+        true
+    }
+
+    /// The bookmark key on a folder of NAV: pin it, or take it out.
+    fn nav_bookmark(&mut self, here: Option<NavRow>) {
+        if let Some(row) = here
+            && matches!(row.kind, NavKind::Folder { .. } | NavKind::Favorite(_))
+        {
+            let add = !self.places.paths.bookmarks.contains(&row.path);
+            self.set_bookmark(row.path, add);
+        }
+    }
+
+    /// Delete on a row of NAV: only a pinned folder can be taken out.
+    fn nav_remove_bookmark(&mut self, here: Option<NavRow>) {
+        let items = sidebar::items(self, false);
+        match here.map(|r| r.kind) {
+            Some(NavKind::Favorite(n))
+                if matches!(items[n].origin, Origin::Bookmark { removable: true }) =>
+            {
+                let path = items[n].path.clone();
+                self.set_bookmark(path, false);
+            }
+            _ => self.toast(ToastKind::Info, Key::TOnlyBookmarksRemovable.tr(), 3),
+        }
     }
 
     /// A key while ANTEPRIMA has the focus: the arrows scroll the preview. `true`: dealt with.
@@ -878,5 +873,25 @@ impl App {
             _ => return false,
         }
         true
+    }
+}
+
+/// The next row from `from`, up or down, that can be chosen; `from` when there is none.
+fn nav_step(rows: &[NavRow], from: usize, down: bool) -> usize {
+    let last = rows.len().saturating_sub(1);
+    let mut i = from;
+    loop {
+        let next = if down {
+            (i + 1).min(last)
+        } else {
+            i.saturating_sub(1)
+        };
+        if next == i {
+            return from;
+        }
+        i = next;
+        if rows[i].selectable() {
+            return i;
+        }
     }
 }
