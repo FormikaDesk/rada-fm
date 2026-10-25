@@ -27,7 +27,7 @@ flowchart LR
     UP --> X
 ```
 
-1. **Input.** `app/input.rs` turns a key into a `keymap::Action` and calls the matching `App` method.
+1. **Input.** `app/input.rs` turns a key into a `keymap::Action` and calls the matching `App` method; `app/mouse.rs` does the same for clicks and the wheel.
 2. **Plan.** `Jobs::plan_request` scans the sources (`ops/scan.rs`) and builds a `Plan`: a list of `Step`s (`MakeDir`, `CopyFile`, `Rename`, `TrashItem`, …). Nothing on disk changes. The `App` shows the plan and waits.
 3. **Execute.** After the confirmation, `Jobs::execute` runs the plan on a worker thread (`ops/exec.rs`). Errors ask the person what to do (skip, retry, abort) through `JobEvent::AskFailure`.
 4. **Journal.** `ops/runner.rs` wraps the executor. Before a step it writes `pending`; after it, the inverse step. The journal is an append-only JSON-lines file in the state folder. If the journal cannot be written when an operation begins, the operation does not start. If the file could not be opened at launch, rada warns and runs without undo.
@@ -60,18 +60,20 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 | `preview` | The preview of the item under the cursor, its picture, and the keyboard focus in it. | `app/preview.rs` |
 | `devices` | Disks, sticks and phones, and the folders the system holds back. | `app/mount.rs` |
 | `places`, `tags` | The places the sidebar lists, and the tags the sidebar and the tag menu know. | `app/side.rs` |
-| `ops` | The clipboard, the plan being prepared, the operation running, the undo label. | `app/ops.rs` |
-| `windows` | The open window (`Modal`), the notification cards, the address bar, the help scroll. | `app/windows.rs` |
+| `ops` | The clipboard, the plan being prepared, the operation running, the undo label. | `app/ops.rs`, `app/jobs.rs`, `app/outcome.rs`, `app/prompt.rs` |
+| `windows` | The open window (`Modal`), the notification cards, the address bar, the help scroll. | `app/windows.rs`, `app/bar.rs` |
 | `columns` | The Columns view: the parent column and its read. | `app/columns.rs` |
 | `session` | How the session ends, and whether it is a file chooser. | `app/chooser.rs` |
 | `redraw` | Whether a frame is due, a full redraw, the spinner. | `app.rs` (`Redraw`) |
-| `side_nav` | The sidebar and the NAV box: the keyboard in them, their cursors, the tree. | `app/side.rs` |
+| `side_nav` | The sidebar and the NAV box: the keyboard in them, their cursors, the tree. | `app/side.rs`, `app/navrows.rs` |
 | `frame` | What the last frame drew (click rectangles, areas), for the mouse and the tests. | `ui/frame.rs` (`LastFrame`) |
-| `folder_info` | What is worked out about the folder shown: git status, folder sizes, date cache. | `app/panels.rs` |
+| `folder_info` | What is worked out about the folder shown: git status, folder sizes, date cache. | `app/panels.rs`, `app/sizes.rs` |
 | `updates` | The version, what the update worker last told, whether somebody waits for an answer. | `app/update.rs` |
 | `last_click` | The time and row of the last click, for the double click. | `app.rs` |
 
 A method sits next to the data it uses. One that reads only a group is a method of that group (`TabState::current`, `Redraw::after_launch`). One that reaches several groups, or the workers in `svc`, stays a method of `App` and sits in the file of its subject (`toast` in `app/windows.rs`). `app.rs` keeps what only the whole `App` can do: building it, the event loop's entry points and the sending of events to the groups.
+
+The rest of `app/` is by subject: `input.rs` (keys and `dispatch`), `mouse.rs`, `actions.rs` (the explorer's own commands), `menus.rs` and `menuview.rs`, `address.rs` and `bar.rs` (the address and search bar), `palette.rs`, `navigate.rs` (going to another folder), `load.rs` (reading one), `listing.rs`, `prompt.rs` (the questions asked with a line of text), `jobs.rs` (what the worker says about an operation), `outcome.rs` (the card that says it went through), `demo.rs` (the scenes of `--demo`). No function there is longer than 40 lines.
 
 ### Tabs
 

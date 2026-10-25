@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - **On a Mac a standard tag you renamed in the Finder keeps its colour.** A tag renamed to "🌈" (the orange one) or "👵🏼" (the green one) was drawn gray in the sidebar and on files that carry another number; rada now reads the Finder's list of names (`FavoriteTagNames` in its preferences) and gives a renamed tag the colour of its place in that list. The list is used only when it is the Finder's own (eight entries, the first empty, every standard colour name in its place, at least three of them) and is read again only when the file changes; otherwise it is ignored as a whole. The colour of a tag is now decided in this order: a standard colour name, a name from the list, the number in the file, none. Nothing changes on Linux and Windows.
 
+### Internal
+- The functions of `App` live with the groups they work on, and none is longer than 40 lines.
+
 ## [0.6.0-rc.16] - 2026-10-24
 
 Tags on a Mac show the colours of the Finder, and the panels view lists your own tags. Still a **pre-release**.
