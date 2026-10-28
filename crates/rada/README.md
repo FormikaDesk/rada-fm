@@ -12,7 +12,7 @@ checks what it wrote.
 cargo install rada --locked
 ```
 
-You need Rust 1.90 or newer ([rustup](https://rustup.rs)). The program is put in
+You need Rust 1.93 or newer ([rustup](https://rustup.rs)). The program is put in
 `~/.cargo/bin`; update it with the same command. Prebuilt binaries for Linux, macOS and
 Windows are on the [releases page](https://github.com/formikadesk/rada-fm/releases).
 

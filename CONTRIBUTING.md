@@ -27,7 +27,7 @@ If rada ever loses or damages a file, please say so first and keep the journal
 
 ## Build and run
 
-You need Rust 1.90 or newer ([rustup](https://rustup.rs)) on Linux, or on Windows or macOS (pre-release).
+You need Rust 1.93 or newer ([rustup](https://rustup.rs)) on Linux, or on Windows or macOS (pre-release).
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada

@@ -43,7 +43,7 @@ flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 bzip2 = "0.6"
 lzma-rust2 = { version = "0.21", default-features = false, features = ["std", "encoder", "xz"] }
 zstd = { version = "0.14", default-features = false }
-sevenz-rust2 = { version = "0.20", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
 # Updates: HTTPS with rustls (certificates bundled, nothing read from the system) and SHA-256.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = "0.10"

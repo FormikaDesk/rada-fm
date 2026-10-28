@@ -22,7 +22,7 @@ Not published yet. Until it is, use the binary or build from source.
 
 ## With cargo (crates.io)
 
-This builds rada from crates.io (it needs a Rust toolchain of version 1.90 or newer, [rustup](https://rustup.rs)) and puts it in `~/.cargo/bin`:
+This builds rada from crates.io (it needs a Rust toolchain of version 1.93 or newer, [rustup](https://rustup.rs)) and puts it in `~/.cargo/bin`:
 
 ```sh
 cargo install rada --locked --version 0.6.0-rc.17
@@ -32,7 +32,7 @@ cargo install rada --locked --version 0.6.0-rc.17
 
 ## From source
 
-You need a Rust toolchain of version 1.90 or newer ([rustup](https://rustup.rs)).
+You need a Rust toolchain of version 1.93 or newer ([rustup](https://rustup.rs)).
 
 ```sh
 git clone https://github.com/formikadesk/rada-fm rada

@@ -46,7 +46,7 @@ rada chooses the layout from the size of the window (`layout = "auto"`, the defa
 
 Prebuilt binaries (Linux x86_64 and aarch64, static; macOS Intel and Apple silicon; Windows x86_64) are on the [releases page](https://github.com/formikadesk/rada-fm/releases). Unpack the archive and put `rada` (`rada.exe`) on your `PATH`; commands for each system are in [docs/install.md](docs/install.md).
 
-With Rust 1.90 or newer ([rustup](https://rustup.rs)), from crates.io:
+With Rust 1.93 or newer ([rustup](https://rustup.rs)), from crates.io:
 
 ```sh
 cargo install rada --locked --version 0.6.0-rc.17

@@ -322,13 +322,6 @@ These are real, and we would rather you read them here than discover them.
   DOS one). Extraction does not restore the owner stored in a tar. A compressed tar has to be
   read once to be listed and once to be extracted. 7z cannot be created, only read. Listing a
   very large compressed archive in the preview stops after about 1.5 s and shows "at least".
-  **A forged 7z header can stop the program.** The 7z library in use (`sevenz-rust2` 0.20.2)
-  reads the number of files from the header and asks for memory for that many entries before it
-  checks it against anything: a header of 106 bytes (`tests/fixtures/fuzz`) that declares some
-  2^60 files makes the allocator end the program, whenever such an archive is listed, browsed,
-  previewed or extracted. Later versions of the library bound the count, but they need Rust 1.93
-  and the minimum version of rada is 1.90, so the library is not updated yet. Until then, do
-  not open a 7z from a source you do not trust.
 
 ## How this is tested
 
