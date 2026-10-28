@@ -41,12 +41,8 @@ fn sibling(exe: &Path, tag: &str) -> PathBuf {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "rada".into());
     let name = match exe.extension() {
-        Some(ext) => format!(
-            ".{stem}-{tag}-{}.{}",
-            std::process::id(),
-            ext.to_string_lossy()
-        ),
-        None => format!(".{stem}-{tag}-{}", std::process::id()),
+        Some(ext) => format!(".{stem}-{tag}-{}.{}", unique(), ext.to_string_lossy()),
+        None => format!(".{stem}-{tag}-{}", unique()),
     };
     exe.with_file_name(name)
 }
@@ -88,21 +84,27 @@ pub fn copy_new(from: &Path, to: &Path) -> io::Result<()> {
 /// write it to `dest`.
 pub fn extract_binary(archive: &Path, inner: &str, dest: &Path) -> Result<(), String> {
     let is_zip = inner.ends_with(".exe") || archive.extension().is_some_and(|e| e == "zip");
-    let result = if is_zip {
+    if is_zip {
         extract_from_zip(archive, inner, dest)
     } else {
         extract_from_tar_gz(archive, inner, dest)
-    };
-    if result.is_err() {
-        let _ = fs::remove_file(dest);
     }
-    result
 }
 
+/// Write `from` to the new file `dest`; if that fails after the file is made, it is removed.
 fn copy_limited(mut from: impl Read, dest: &Path) -> Result<(), String> {
     let mut out =
-        fs::File::create(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
-    let n = io::copy(&mut (&mut from).take(MAX_BINARY_BYTES + 1), &mut out)
+        create_new_file(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
+    let copied = copy_checked(&mut from, &mut out);
+    drop(out);
+    if copied.is_err() {
+        let _ = fs::remove_file(dest);
+    }
+    copied
+}
+
+fn copy_checked(from: &mut impl Read, out: &mut fs::File) -> Result<(), String> {
+    let n = io::copy(&mut from.take(MAX_BINARY_BYTES + 1), out)
         .map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))?;
     if n > MAX_BINARY_BYTES {
         return Err(Key::UpArchiveHuge.tr().to_string());
@@ -110,7 +112,7 @@ fn copy_limited(mut from: impl Read, dest: &Path) -> Result<(), String> {
     if n == 0 {
         return Err(Key::UpArchiveEmpty.tr().to_string());
     }
-    Ok(())
+    out.sync_all().map_err(|e| tf(Key::UpArchiveDamaged, &[&e]))
 }
 
 fn extract_from_tar_gz(archive: &Path, inner: &str, dest: &Path) -> Result<(), String> {
@@ -314,9 +316,9 @@ pub fn clean_leftovers(exe: &Path) {
         let Some(rest) = prefixes.iter().find_map(|p| name.strip_prefix(p.as_str())) else {
             continue;
         };
-        // The pid is what follows, up to the extension; a file of this very process (the old
-        // program, still running) is not ours to remove.
-        if rest.split('.').next() != Some(me.as_str()) {
+        // The pid is what follows, up to the next `-` or the extension; a file of this very
+        // process (the old program, still running) is not ours to remove.
+        if rest.split(['-', '.']).next() != Some(me.as_str()) {
             let _ = fs::remove_file(e.path());
         }
     }
@@ -458,7 +460,7 @@ pub fn rollback(
         return Err(Key::UpNoEarlier.tr().to_string());
     };
     let stage = stage_path(exe);
-    fs::copy(&bin, &stage).map_err(|e| tf(Key::UpCannotWrite, &[&stage.display(), &e]))?;
+    copy_new(&bin, &stage).map_err(|e| tf(Key::UpCannotWrite, &[&stage.display(), &e]))?;
     if run_check {
         check_saved(&stage)?;
     }
@@ -712,6 +714,70 @@ mod tests {
         let _ = save_backup(&exe, "0.1.0", &keep);
 
         assert_eq!(fs::read(&victim).unwrap(), b"precious");
+    }
+
+    #[test]
+    fn the_name_a_new_program_is_written_to_cannot_be_known_ahead() {
+        let exe = Path::new("/somewhere/rada");
+        let (a, b) = (stage_path(exe), stage_path(exe));
+        assert_ne!(a, b);
+        assert_eq!(a.parent(), exe.parent());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_where_the_new_program_is_to_be_written_is_not_followed() {
+        let d = tempfile::tempdir().unwrap();
+        let victim = d.path().join("victim");
+        fs::write(&victim, b"precious").unwrap();
+        let stage = d.path().join("stage");
+        std::os::unix::fs::symlink(&victim, &stage).unwrap();
+
+        let tar = tar_gz(d.path(), "a.tar.gz", &[("rada-1/rada", b"the program")]);
+        assert!(extract_binary(&tar, "rada-1/rada", &stage).is_err());
+        let zip = zip_file(d.path(), "a.zip", &[("rada-1/rada.exe", b"MZ program")]);
+        assert!(extract_binary(&zip, "rada-1/rada.exe", &stage).is_err());
+
+        assert_eq!(fs::read(&victim).unwrap(), b"precious");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_at_the_staging_name_of_a_rollback_is_not_written_through() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        let keep = d.path().join("keep");
+        let victim = d.path().join("victim");
+        fs::write(&exe, b"v1").unwrap();
+        fs::write(&victim, b"precious").unwrap();
+        save_backup(&exe, "0.1.0", &keep).unwrap();
+        fs::write(&exe, b"v2").unwrap();
+        std::os::unix::fs::symlink(&victim, stage_path(&exe)).unwrap();
+
+        let _ = rollback(&exe, "0.2.0", &keep, false);
+
+        assert_eq!(fs::read(&victim).unwrap(), b"precious");
+    }
+
+    #[test]
+    fn the_leftovers_of_other_processes_go_and_those_of_this_one_stay() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        fs::write(&exe, b"v1").unwrap();
+        let mine = stage_path(&exe);
+        fs::write(&mine, b"x").unwrap();
+        let ext = if cfg!(windows) { ".exe" } else { "" };
+        let other = d
+            .path()
+            .join(format!(".rada-update-1-0123456789abcdef{ext}"));
+        let older = d.path().join(format!(".rada-update-2{ext}"));
+        fs::write(&other, b"x").unwrap();
+        fs::write(&older, b"x").unwrap();
+
+        clean_leftovers(&exe);
+
+        assert!(mine.exists() && exe.exists());
+        assert!(!other.exists() && !older.exists());
     }
 
     fn exe_in(dir: &Path) -> PathBuf {

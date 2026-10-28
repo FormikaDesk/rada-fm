@@ -280,7 +280,7 @@ pub fn run(
     if !same_file {
         report(Key::UpPutting.tr().to_string());
         let stage = install::stage_path(&ctx.exe);
-        fs::copy(&built, &stage)
+        install::copy_new(&built, &stage)
             .map_err(|e| tf(Key::UpCannotWriteNext, &[&ctx.exe.display(), &e]))?;
         install::replace_exe(&stage, &ctx.exe)?;
     }

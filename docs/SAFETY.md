@@ -144,9 +144,15 @@ that was cut short, or whose length is not the one written down, is not offered 
 `--rollback`; what a stop left behind is removed by the next save. Descriptions written by
 earlier versions are still read.
 
+The new program is written beside the one it replaces under a name with a random part, to a
+file that must not exist yet (`create_new`; on Unix also `O_NOFOLLOW`), so a symbolic link left
+at that name is never written through. The same holds for the copy made for `--rollback` and
+for the program a source update has built.
+
 *Tests:* `update/install.rs` stops the saving after each of its steps and reads the way back,
 leaves a cut copy and a named but undescribed one in the folder, truncates the saved program,
-refuses a description that names a path, and reads and replaces the layout of earlier versions.
+refuses a description that names a path, and reads and replaces the layout of earlier versions. It also plants links at the
+names a new program is written to (from an archive, from a rollback) and checks nothing behind them changes.
 
 ### Nothing follows a link out of a tree
 
