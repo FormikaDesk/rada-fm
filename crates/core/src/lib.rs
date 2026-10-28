@@ -13,6 +13,7 @@ pub mod i18n;
 pub mod jobs;
 pub mod journal;
 pub mod model;
+pub mod oplock;
 pub mod ops;
 pub mod pathcodec;
 pub mod places;

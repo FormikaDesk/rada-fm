@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **An operation that is still running is never settled as interrupted, however long it takes.** A copy to a phone or a USB drive that lasted more than 24 hours, seen by a second rada, was closed as "interrupted" while its own process was still writing. Every running operation now holds a lock (a small file in `locks/` next to the journal, held with the system's file lock), and the recovery at start touches an operation only when it can take that lock. The lock goes away by itself when the process ends, `kill -9` included. The 24-hour limit is kept only for operations begun by an older rada, which have no lock.
+
 ## [0.6.0-rc.17] - 2026-10-25
 
 On a Mac the standard colours renamed in the Finder keep their colour, an Arch Linux package is ready, and the code of the interface is reorganised. Still a **pre-release**.

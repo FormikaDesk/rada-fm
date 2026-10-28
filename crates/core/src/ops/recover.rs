@@ -14,7 +14,12 @@
 //!   places: the copy is treated as not made (undo removes it), the source is untouched.
 //!
 //! Then the operation gets an `end` record (status `interrupted`) and is not looked at again.
-//! Operations of a process that is still alive are left alone.
+//!
+//! An operation is touched only after its lock has been taken (see `journal`): the process
+//! that runs an operation holds the lock for as long as it runs, however long that is, and
+//! the system lets go of it when the process dies. Only an operation begun by a rada that
+//! did not lock has no lock file; for those the process id decides, and the age is what
+//! tells a dead process from a number that something else has taken since.
 
 use std::path::{Path, PathBuf};
 
@@ -55,8 +60,8 @@ fn alive(_pid: u32) -> bool {
     true
 }
 
-/// Older than this, an interrupted operation is settled even if its process id is in use
-/// again (the number was reused by something else).
+/// Older than this, an interrupted operation without a lock file is settled even if its
+/// process id is in use again (the number was reused by something else).
 const STALE_AFTER_SECS: i64 = 24 * 3600;
 
 impl Engine {
@@ -71,14 +76,40 @@ impl Engine {
             let Some(pid) = pid_of(&it.entry.id) else {
                 continue;
             };
-            let fresh = now - it.entry.time < STALE_AFTER_SECS;
-            if fresh && (pid == std::process::id() || alive(pid)) {
-                continue; // still running (here or in another rada)
-            }
-            let r = self.settle_one(journal, &it, pid)?;
-            out.push(r);
+            let lock = match journal.claim(&it.entry.id) {
+                Ok(Some(lock)) => lock,
+                Ok(None) => continue, // still running (here or in another rada)
+                Err(e) => {
+                    // Never settle what cannot be locked; the next start tries again.
+                    tracing::warn!("operation {} left as it is: {e}", it.entry.id);
+                    continue;
+                }
+            };
+            let r = self.settle_claimed(journal, &it, pid, now, lock.created);
+            lock.release();
+            out.extend(r?);
         }
         Ok(out)
+    }
+
+    /// Settle `it`, the lock of which is held, unless it has finished in the meantime or is
+    /// an operation of a rada that did not lock (`no_lock_file`) that may still be running.
+    fn settle_claimed(
+        &self,
+        journal: &Journal,
+        it: &Interrupted,
+        pid: u32,
+        now: i64,
+        no_lock_file: bool,
+    ) -> Result<Option<Recovered>> {
+        if !journal.is_interrupted(&it.entry.id)? {
+            return Ok(None);
+        }
+        let fresh = now - it.entry.time < STALE_AFTER_SECS;
+        if no_lock_file && fresh && (pid == std::process::id() || alive(pid)) {
+            return Ok(None);
+        }
+        self.settle_one(journal, it, pid).map(Some)
     }
 
     fn settle_one(&self, journal: &Journal, it: &Interrupted, pid: u32) -> Result<Recovered> {

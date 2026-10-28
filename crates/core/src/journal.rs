@@ -7,6 +7,10 @@
 //! disk) leaves an exact account: at most the very last step is in doubt, and `pending`
 //! says which one, so that the next start can settle it (see `ops::recover`). Replaying the
 //! file reconstructs the history; nothing else is stored.
+//!
+//! An operation that is running holds a lock (see `oplock`) from its `begin` record to its
+//! `end` record. That is how another rada tells a copy that has been going on for two days
+//! from one whose process is dead: the lock of a dead process is free.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -19,6 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{t, tf};
+use crate::oplock::OpLock;
 use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
 use crate::pathcodec;
 use crate::{Error, Result};
@@ -254,6 +259,8 @@ pub struct Journal {
     path: PathBuf,
     writer: Mutex<Writer>,
     counter: AtomicU64,
+    /// The locks of the operations this process is running, by id.
+    running: Mutex<HashMap<String, OpLock>>,
 }
 
 fn now_secs() -> i64 {
@@ -280,11 +287,27 @@ impl Journal {
             path,
             writer: Mutex::new(Writer { file }),
             counter: AtomicU64::new(0),
+            running: Mutex::new(HashMap::new()),
         })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    fn lock_dir(&self) -> PathBuf {
+        self.path.parent().unwrap_or(Path::new("")).join("locks")
+    }
+
+    fn take_lock(&self, name: &str) -> Result<Option<OpLock>> {
+        let dir = self.lock_dir();
+        OpLock::try_take(&dir, name).map_err(|e| Error::io("lock", dir.join(name), e))
+    }
+
+    fn running(&self) -> Result<std::sync::MutexGuard<'_, HashMap<String, OpLock>>> {
+        self.running
+            .lock()
+            .map_err(|_| Error::Journal("journal lock poisoned".into()))
     }
 
     /// Write one record. It goes to the operating system at once, in one `write` call (lines
@@ -335,7 +358,11 @@ impl Journal {
             .map(|d| d.as_millis())
             .unwrap_or(0);
         let id = format!("{ms:x}-{:x}-{n}", std::process::id());
-        self.append(
+        // Before the record: whoever sees the operation in the file finds its lock taken.
+        let lock = self
+            .take_lock(&format!("{id}.lock"))?
+            .ok_or_else(|| Error::Journal(format!("operation {id} is locked already")))?;
+        let written = self.append(
             &Record::Begin {
                 id: id.clone(),
                 time: now_secs(),
@@ -347,7 +374,14 @@ impl Journal {
                 redo_of: redo_of.map(str::to_string),
             },
             true,
-        )?;
+        );
+        match written {
+            Ok(()) => self.running()?.insert(id.clone(), lock),
+            Err(e) => {
+                lock.release();
+                return Err(e);
+            }
+        };
         Ok(id)
     }
 
@@ -389,7 +423,13 @@ impl Journal {
                 bytes,
             },
             true,
-        )
+        )?;
+        // Only once the operation is on record as finished: if the record could not be
+        // written the lock file stays, and the operation is settled like an interrupted one.
+        if let Some(lock) = self.running()?.remove(id) {
+            lock.release();
+        }
+        Ok(())
     }
 
     /// One step of an undo has just been carried out.
@@ -476,6 +516,33 @@ impl Journal {
             0,
             0,
         )
+    }
+
+    /// Take the lock of an interrupted operation, which is what allows settling it. `None`
+    /// when a running process holds it. `created` on the lock says that no lock file existed:
+    /// the operation was begun by a rada that did not lock, so only its process id and its age
+    /// say whether it is still running.
+    pub fn claim(&self, id: &str) -> Result<Option<OpLock>> {
+        self.take_lock(&format!("{id}.lock"))
+    }
+
+    /// Is `id` still without an `end` record? (Asked again once the lock is held, because the
+    /// operation may have finished between the listing and the lock.)
+    pub fn is_interrupted(&self, id: &str) -> Result<bool> {
+        Ok(self
+            .entries()?
+            .iter()
+            .any(|e| e.id == id && e.status == EntryStatus::Interrupted))
+    }
+
+    /// Hold the undo of `id` for as long as the lock lives. A second rada undoing the same
+    /// operation would run the same steps against the same files.
+    pub fn lock_undo(&self, id: &str) -> Result<OpLock> {
+        self.take_lock(&format!("{id}.undo.lock"))?.ok_or_else(|| {
+            Error::Journal(format!(
+                "\"{id}\" is being undone by another rada right now; wait for it to finish"
+            ))
+        })
     }
 
     /// All operations, oldest first.

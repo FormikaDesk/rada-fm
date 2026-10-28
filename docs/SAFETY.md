@@ -88,13 +88,21 @@ at the one step that was in doubt and settles it:
   removes the copy;
 - the operation is marked *interrupted* in the history, and you are told once.
 
-An operation that is still running in another rada instance is never touched. An undo that was
+An operation that is still running, in this rada or in another one, is never touched, however
+long it has been going on (a copy to a phone can take a day). Each running operation holds a
+lock: a small file in `locks/` next to the journal, locked with the system's own file lock
+(`flock` on Unix, `LockFileEx` on Windows), from its first journal record to its last. The
+start-up recovery settles an operation only after taking that lock, and the system lets go of
+it when the process ends in any way, so a killed process never leaves an operation that looks
+alive. Only an operation begun by an older rada, which wrote no lock, is judged by its process
+id and its age (older than 24 hours counts as dead, in case the number was reused). An undo that was
 cut short remembers the steps it had done and resumes from where it stopped. A half-written
 last line in the journal (the process died while writing it) is ignored.
 
 *Tests:* `crash.rs` kills a real child process with `SIGKILL` before a file, in the middle of
 a big file, just after the rename, inside a folder, in the middle of a cross-filesystem move,
-and between the copy and the removal of a move.
+and between the copy and the removal of a move. `op_lock.rs` ages an operation held by a live
+child to two days and checks it is left alone, then kills the child and checks it is settled.
 
 ### Nothing follows a link out of a tree
 
