@@ -263,7 +263,10 @@ impl Engine {
                     if ix.single_top_folder().is_some() || matches!(ix.format, Format::Single(_)) {
                         dest.to_path_buf()
                     } else {
-                        dest.join(archive_stem(&archive_name))
+                        let folder = archive_stem(&archive_name);
+                        names::validate(&self.platform.path_rules(), &folder)
+                            .map_err(Error::Invalid)?;
+                        dest.join(folder)
                     }
                 }
                 ExtractInto::Folder { name } => {

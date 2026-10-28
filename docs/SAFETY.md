@@ -177,6 +177,12 @@ it loop. A filesystem root is never accepted as a source.
 Newlines, escape sequences, bidirectional controls and invalid UTF-8 in names are shown as
 visible escapes. Paths are never handled as text.
 
+Where Windows rules apply, the names it keeps for devices are refused for a rename, a new
+folder or file, every member of an archive and the folder an extraction makes: `CON`, `PRN`,
+`AUX`, `NUL`, `COM1`-`COM9` and `LPT1`-`LPT9` in any case, with an extension (`NUL.txt`), with
+trailing dots or spaces (`NUL.`, `CON .txt`) and with superscript digits (`COM¹`). The tests
+(`windows_names.rs`) run these rules on every system.
+
 ### Archives are read, never trusted
 
 An archive is data from a stranger, and rada treats it so. The checks below are on the plan

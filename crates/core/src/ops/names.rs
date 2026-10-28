@@ -37,7 +37,7 @@ pub fn validate(rules: &PathRules, name: &OsStr) -> Result<(), String> {
         ));
     }
     if !rules.reserved_names.is_empty() {
-        let stem = text.split('.').next().unwrap_or("").to_ascii_uppercase();
+        let stem = device_stem(&text);
         if rules.reserved_names.contains(&stem.as_str()) {
             return Err(format!("{stem} is a reserved name"));
         }
@@ -46,6 +46,23 @@ pub fn validate(rules: &PathRules, name: &OsStr) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// What Windows looks at to tell a device from a file: the name up to the first dot, without
+/// the spaces before it, in capitals, with `¹ ² ³` read as `1 2 3` (they name devices too).
+fn device_stem(text: &str) -> String {
+    text.split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(' ')
+        .chars()
+        .map(|c| match c {
+            '\u{b9}' => '1',
+            '\u{b2}' => '2',
+            '\u{b3}' => '3',
+            c => c.to_ascii_uppercase(),
+        })
+        .collect()
 }
 
 /// Split a *file name* into stem and extension (with its dot). `.tar.gz` stays together
