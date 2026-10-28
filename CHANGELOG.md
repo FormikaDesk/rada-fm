@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Undo no longer removes the last name of a file with several names whose contents were rewritten.** The check that tells an undo whether a file was changed ignores the status-change time for a file with several hard links (making a link changes it for every name), so contents rewritten with the same size and modification time (`touch -r`, `rsync -t`) went unseen and the undo of a copy could delete them. For these files only, the copy now records a hash of the contents in the history, and an undo that is about to remove the last remaining name compares it: a file that differs is kept and listed as modified after the operation. A name that has another name elsewhere is removed as before, since the contents stay.
 - **Two instances of rada can no longer undo the same operation at once.** Both would run the same steps against the same files and each write its own account to the history. An undo now holds a lock for as long as it runs, and a second one is refused with a message that says another rada is undoing it. A plan shown before another rada undid the operation is refused as well ("already undone") instead of running again.
 
+### Internal
+- The zstd library crates are updated (`zstd` 0.14.3, `zstd-safe` 8.2.0, `zstd-sys` 2.1.2) for fixes of memory-safety flaws in parts of them that rada does not use (reused contexts, seekable archives, the writing decoder).
+
 ## [0.6.0-rc.17] - 2026-10-25
 
 On a Mac the standard colours renamed in the Finder keep their colour, an Arch Linux package is ready, and the code of the interface is reorganised. Still a **pre-release**.
