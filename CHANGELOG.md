@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 - **An operation that is still running is never settled as interrupted, however long it takes.** A copy to a phone or a USB drive that lasted more than 24 hours, seen by a second rada, was closed as "interrupted" while its own process was still writing. Every running operation now holds a lock (a small file in `locks/` next to the journal, held with the system's file lock), and the recovery at start touches an operation only when it can take that lock. The lock goes away by itself when the process ends, `kill -9` included. The 24-hour limit is kept only for operations begun by an older rada, which have no lock.
+- **A damaged line in the middle of the history no longer goes unnoticed, and a crash no longer eats the next record.** A line of `journal.jsonl` that cannot be read was skipped in silence, wherever it was. Now the last line without its newline (a write cut by a crash) and a record of a newer rada are still skipped, but any other unreadable line with more lines after it stops the automatic settling and the undo of the operations that had not finished before it, and rada tells you at start which line it is and where the file is. Also, the record written right after a crash used to be glued to the cut line and lost; it is now kept.
 
 ## [0.6.0-rc.17] - 2026-10-25
 

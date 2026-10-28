@@ -968,6 +968,7 @@ strings! {
     TQuickLookErr => "Quick Look: {0}", "Anteprima rapida: {0}";
     ResultCouldNot => "Could not go on", "Non si è potuto continuare";
     ResultRecovered => "\"{0}\" was interrupted last time: {1} leftover temporary file(s) removed, {2} finished step(s) added to the history", "\"{0}\" era stata interrotta l'ultima volta: {1} file temporanei rimasti eliminati, {2} passaggi conclusi aggiunti alla cronologia";
+    JournalDamaged => "Line {0} of the history file {1} cannot be read. Operations from that point on are neither settled nor undone by rada; the ones before it are fine. Repair or remove that line, or restore the file from a backup.", "La riga {0} del file della cronologia {1} non è leggibile. Le operazioni da quel punto in poi non vengono né sistemate né annullate da rada; quelle prima sono a posto. Correggi o togli quella riga, oppure ripristina il file da una copia di riserva.";
     ResultOpenHistory => "Open the history to undo what was done before the interruption.", "Apri la cronologia per annullare ciò che era stato fatto prima dell'interruzione.";
     ResultInterruptedTitle => "An earlier operation was interrupted", "Un'operazione precedente è stata interrotta";
     PalNotResponding => " · not responding", " · non risponde";

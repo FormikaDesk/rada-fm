@@ -49,6 +49,13 @@ impl App {
                 ..
             } => self.on_finished(job, title, report, journal_errors),
             JobEvent::Recovered { items } => self.on_recovered(items),
+            JobEvent::JournalDamaged { path, line } => {
+                let text = tf(
+                    Key::JournalDamaged,
+                    &[&line, &rada_core::display::path(&path)],
+                );
+                self.notify(Notice::new(NoticeKind::Error, text));
+            }
             JobEvent::History { entries, .. } => self.on_history_loaded(entries),
         }
     }

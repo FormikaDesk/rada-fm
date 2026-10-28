@@ -8,6 +8,14 @@
 //! says which one, so that the next start can settle it (see `ops::recover`). Replaying the
 //! file reconstructs the history; nothing else is stored.
 //!
+//! A line that cannot be read is one of three things. The last line of the file without its
+//! newline is a write cut short by a crash: it is skipped, and the next record that is written
+//! closes it with a mark (`#torn`) so that it does not swallow that record. A well-formed line
+//! of a record type this version does not know was written by a newer rada: it is skipped. Any
+//! other line that cannot be read, with more lines after it, is damage: the operations that
+//! had not finished before it are neither settled nor undone (`JournalEntry::damaged`), and
+//! the person is told where the file is.
+//!
 //! An operation that is running holds a lock (see `oplock`) from its `begin` record to its
 //! `end` record. That is how another rada tells a copy that has been going on for two days
 //! from one whose process is dead: the lock of a dead process is free.
@@ -215,19 +223,26 @@ pub struct JournalEntry {
     pub request: Option<OpRequest>,
     /// Fully undone, and nothing but other undos happened since: `Ctrl+Y` can redo it.
     pub redoable: bool,
+    /// The line of the first unreadable record of the journal, when this operation had not
+    /// finished before it: what the journal says about it cannot be trusted, so it is neither
+    /// settled nor undone.
+    pub damaged: Option<usize>,
 }
 
 impl JournalEntry {
     /// Can `u` offer to undo this?
     pub fn is_undoable(&self) -> bool {
         self.reversible
+            && self.damaged.is_none()
             && self.undo_steps > 0
             && self.undo_state == UndoState::NotUndone
             && self.kind != OpKind::Undo
     }
 
     pub fn can_retry_undo(&self) -> bool {
-        self.reversible && matches!(self.undo_state, UndoState::Partial { .. })
+        self.reversible
+            && self.damaged.is_none()
+            && matches!(self.undo_state, UndoState::Partial { .. })
     }
 
     /// The operation in a few words, as the Undo button says what it would undo:
@@ -263,6 +278,52 @@ pub struct Journal {
     running: Mutex<HashMap<String, OpLock>>,
 }
 
+/// Closes a line that a crash cut short (see the module documentation).
+const TORN: &[u8] = b"#torn";
+
+/// The record types this version writes; a well-formed line of another type is from a newer
+/// rada.
+const KNOWN: [&str; 6] = ["pending", "begin", "undo", "end", "undone", "undone_step"];
+
+/// Does the file end with a newline (or is it empty)?
+fn ends_with_newline(file: &File) -> std::io::Result<bool> {
+    let len = file.metadata()?.len();
+    if len == 0 {
+        return Ok(true);
+    }
+    let mut last = [0u8; 1];
+    #[cfg(unix)]
+    let n = std::os::unix::fs::FileExt::read_at(file, &mut last, len - 1)?;
+    #[cfg(windows)]
+    let n = std::os::windows::fs::FileExt::seek_read(file, &mut last, len - 1)?;
+    Ok(n == 0 || last[0] == b'\n')
+}
+
+/// What a line is: a record, `None` for a line to skip without worry (a write cut by a
+/// crash, a record of a newer rada), or why it is damaged. `complete`: it ended with a newline.
+fn classify(line: &[u8], complete: bool) -> std::result::Result<Option<Record>, String> {
+    let (body, closed) = match line.strip_suffix(TORN) {
+        Some(body) => (body, true),
+        None => (line, false),
+    };
+    let err = match serde_json::from_slice::<Record>(body) {
+        Ok(r) => return Ok(Some(r)),
+        Err(e) => e,
+    };
+    if !complete || closed {
+        return Ok(None);
+    }
+    let unknown_type = serde_json::from_slice::<serde_json::Value>(line)
+        .ok()
+        .and_then(|v| v.get("t")?.as_str().map(|t| !KNOWN.contains(&t)))
+        .unwrap_or(false);
+    if unknown_type {
+        Ok(None)
+    } else {
+        Err(err.to_string())
+    }
+}
+
 fn now_secs() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -281,6 +342,7 @@ impl Journal {
         let file = crate::statefile::private_file_options()
             .create(true)
             .append(true)
+            .read(true)
             .open(&path)
             .map_err(|e| Error::io("open journal", &path, e))?;
         Ok(Journal {
@@ -319,6 +381,11 @@ impl Journal {
             .writer
             .lock()
             .map_err(|_| Error::Journal("journal lock poisoned".into()))?;
+        // A process that died in the middle of a write left a line without its end: close it,
+        // in the same write, so that this record is not glued to it.
+        if !ends_with_newline(&w.file).map_err(|e| Error::io("read journal", &self.path, e))? {
+            line.splice(0..0, TORN.iter().chain(b"\n").copied());
+        }
         w.file
             .write_all(&line)
             .map_err(|e| Error::io("write journal", &self.path, e))?;
@@ -458,20 +525,37 @@ impl Journal {
 
     // ---------------------------------------------------------------- reading
 
-    fn read_records(&self, mut f: impl FnMut(Record)) -> Result<()> {
+    /// Hand every readable record, with its line number, to `f`. The answer is the line of
+    /// the first damaged one, if any (see the module documentation).
+    fn read_records(&self, mut f: impl FnMut(usize, Record)) -> Result<Option<usize>> {
         let file = File::open(&self.path).map_err(|e| Error::io("read journal", &self.path, e))?;
-        for (n, line) in BufReader::new(file).split(b'\n').enumerate() {
-            let line = line.map_err(|e| Error::io("read journal", &self.path, e))?;
+        let mut reader = BufReader::new(file);
+        let (mut line, mut n, mut damage) = (Vec::new(), 0, None);
+        loop {
+            line.clear();
+            let got = reader
+                .read_until(b'\n', &mut line)
+                .map_err(|e| Error::io("read journal", &self.path, e))?;
+            if got == 0 {
+                return Ok(damage);
+            }
+            n += 1;
+            let complete = line.last() == Some(&b'\n');
+            if complete {
+                line.pop();
+            }
             if line.is_empty() {
                 continue;
             }
-            match serde_json::from_slice::<Record>(&line) {
-                Ok(r) => f(r),
-                // A torn last line after a crash, or a record from a newer version.
-                Err(e) => tracing::warn!("journal line {}: {e}", n + 1),
+            match classify(&line, complete) {
+                Ok(Some(r)) => f(n, r),
+                Ok(None) => tracing::debug!("journal line {n}: not a record of this version"),
+                Err(e) => {
+                    tracing::warn!("journal line {n} cannot be read: {e}");
+                    damage.get_or_insert(n);
+                }
             }
         }
-        Ok(())
     }
 
     /// Operations that never wrote their `end` record (the process died), with the step that was
@@ -479,7 +563,7 @@ impl Journal {
     pub fn interrupted(&self) -> Result<Vec<Interrupted>> {
         let entries = self.entries()?;
         let mut last: HashMap<String, (Intent, bool)> = HashMap::new();
-        self.read_records(|r| match r {
+        self.read_records(|_, r| match r {
             Record::Pending { id, intent } => {
                 last.insert(id, (intent, false));
             }
@@ -492,7 +576,7 @@ impl Journal {
         })?;
         Ok(entries
             .into_iter()
-            .filter(|e| e.status == EntryStatus::Interrupted)
+            .filter(|e| e.status == EntryStatus::Interrupted && e.damaged.is_none())
             .map(|entry| {
                 let in_doubt = last
                     .remove(&entry.id)
@@ -545,6 +629,14 @@ impl Journal {
         })
     }
 
+    /// The line (counted from 1) of the first record in the middle of the file that cannot be
+    /// read. A write cut short at the end of the file, and a record of a newer rada, are not
+    /// damage. Operations that finished before that line can still be trusted; those after it
+    /// can neither be settled nor undone by rada.
+    pub fn damage(&self) -> Result<Option<usize>> {
+        self.read_records(|_, _| {})
+    }
+
     /// All operations, oldest first.
     pub fn entries(&self) -> Result<Vec<JournalEntry>> {
         Ok(self.replay()?.0)
@@ -557,7 +649,9 @@ impl Journal {
         let mut redo_stack: Vec<String> = Vec::new();
         // Undo steps still outstanding for entries whose undo is under way.
         let mut left: HashMap<String, usize> = HashMap::new();
-        self.read_records(|r| match r {
+        // The line each operation's `end` record is on.
+        let mut ended: HashMap<String, usize> = HashMap::new();
+        let damage = self.read_records(|n, r| match r {
             Record::Begin {
                 id,
                 time,
@@ -591,6 +685,7 @@ impl Journal {
                         undo_state: UndoState::NotUndone,
                         request,
                         redoable: false,
+                        damaged: None,
                     },
                 );
             }
@@ -607,6 +702,7 @@ impl Journal {
                 failed,
                 bytes,
             } => {
+                ended.insert(id.clone(), n);
                 if let Some(e) = map.get_mut(&id) {
                     e.status = EntryStatus::Finished(status);
                     e.done = done;
@@ -642,9 +738,16 @@ impl Journal {
                 }
             }
         })?;
+        if let Some(bad) = damage {
+            for (id, e) in map.iter_mut() {
+                if !ended.get(id).is_some_and(|&n| n < bad) {
+                    e.damaged = Some(bad);
+                }
+            }
+        }
         for id in &redo_stack {
             if let Some(e) = map.get_mut(id) {
-                e.redoable = e.request.is_some() && e.reversible;
+                e.redoable = e.request.is_some() && e.reversible && e.damaged.is_none();
             }
         }
         Ok((
@@ -678,7 +781,7 @@ impl Journal {
         let mut remaining: Option<Vec<usize>> = None;
         // Steps carried out since the last full account (or from the start).
         let mut done_since: Vec<usize> = Vec::new();
-        self.read_records(|r| match r {
+        self.read_records(|_, r| match r {
             Record::Undo { id: rid, step } if rid == id => steps.push(step),
             Record::Undone {
                 id: rid,

@@ -268,6 +268,13 @@ impl Engine {
             .into_iter()
             .find(|e| e.id == entry_id)
             .ok_or_else(|| Error::Journal(format!("no such operation: {entry_id}")))?;
+        if let Some(line) = entry.damaged {
+            return Err(Error::Journal(format!(
+                "\"{}\" cannot be undone: line {line} of {} cannot be read, so what the journal says about it is not to be trusted; repair or remove that line, or restore the file from a backup",
+                entry.title,
+                display::path(journal.path())
+            )));
+        }
         if !entry.reversible {
             return Err(Error::Invalid(format!(
                 "\"{}\" is permanent and cannot be undone",

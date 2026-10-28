@@ -67,6 +67,12 @@ pub enum JobEvent {
     Recovered {
         items: Vec<crate::ops::Recovered>,
     },
+    /// At start, a line in the middle of the journal could not be read: what comes after it is
+    /// neither settled nor undone.
+    JournalDamaged {
+        path: PathBuf,
+        line: usize,
+    },
     /// What the next undo would undo, in a few words; `None` when there is nothing to undo.
     UndoLabel {
         job: JobId,

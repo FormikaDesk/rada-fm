@@ -97,12 +97,23 @@ it when the process ends in any way, so a killed process never leaves an operati
 alive. Only an operation begun by an older rada, which wrote no lock, is judged by its process
 id and its age (older than 24 hours counts as dead, in case the number was reused). An undo that was
 cut short remembers the steps it had done and resumes from where it stopped. A half-written
-last line in the journal (the process died while writing it) is ignored.
+last line in the journal (the process died while writing it) is ignored, and the next record
+written closes it with a mark (`#torn`) so that it is not glued to the fragment.
+
+An unreadable line is one of three things. The last line of the file without its newline is a
+write cut short by a crash, and a well-formed line of a record type this version does not know
+is from a newer rada: both are skipped. Any other line that cannot be read, with more lines after
+it, is **damage** (an edit by hand, a full disk, a bad block). rada then stops trusting the
+journal from that point: the operations that had not finished before the damaged line are not
+settled at start and not offered for undo, and you are told, at start and when you try to undo
+one, which line it is and where `journal.jsonl` is. The operations before it are not affected.
+Repair or remove the line, or restore the file from a backup.
 
 *Tests:* `crash.rs` kills a real child process with `SIGKILL` before a file, in the middle of
 a big file, just after the rename, inside a folder, in the middle of a cross-filesystem move,
 and between the copy and the removal of a move. `op_lock.rs` ages an operation held by a live
 child to two days and checks it is left alone, then kills the child and checks it is settled.
+`journal_lines.rs` covers the three kinds of unreadable line.
 
 ### Nothing follows a link out of a tree
 

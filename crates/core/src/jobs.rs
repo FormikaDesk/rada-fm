@@ -54,12 +54,22 @@ impl Jobs {
         let out = self.out.clone();
         let _ = std::thread::Builder::new()
             .name("rada-recover".into())
-            .spawn(move || match engine.recover_interrupted(&journal) {
-                Ok(items) if !items.is_empty() => {
-                    let _ = out.send(CoreEvent::Job(JobEvent::Recovered { items }));
+            .spawn(move || {
+                match journal.damage() {
+                    Ok(Some(line)) => {
+                        let path = journal.path().to_path_buf();
+                        let _ = out.send(CoreEvent::Job(JobEvent::JournalDamaged { path, line }));
+                    }
+                    Ok(None) => {}
+                    Err(e) => tracing::error!("reading the journal: {e}"),
                 }
-                Ok(_) => {}
-                Err(e) => tracing::error!("recovering interrupted operations: {e}"),
+                match engine.recover_interrupted(&journal) {
+                    Ok(items) if !items.is_empty() => {
+                        let _ = out.send(CoreEvent::Job(JobEvent::Recovered { items }));
+                    }
+                    Ok(_) => {}
+                    Err(e) => tracing::error!("recovering interrupted operations: {e}"),
+                }
             });
     }
 

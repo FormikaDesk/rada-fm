@@ -37,7 +37,17 @@ fn lock_child() {
     }
 }
 
-fn start_other_rada(sb: &Sandbox) -> Child {
+/// The other rada, killed when the test ends however it ends.
+struct Other(Child);
+
+impl Drop for Other {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn start_other_rada(sb: &Sandbox) -> Other {
     let marker = sb.root.join("marker");
     let child = Command::new(std::env::current_exe().unwrap())
         .args([
@@ -57,6 +67,7 @@ fn start_other_rada(sb: &Sandbox) -> Child {
     while !marker.exists() && Instant::now() < end {
         std::thread::sleep(Duration::from_millis(10));
     }
+    let child = Other(child);
     assert!(
         marker.exists(),
         "the other process never began its operation"
@@ -116,8 +127,8 @@ fn an_old_operation_held_by_a_live_process_is_not_touched_until_it_dies() {
     );
     assert!(!settled(&j));
 
-    child.kill().unwrap(); // SIGKILL / TerminateProcess: no chance to clean up
-    child.wait().unwrap();
+    child.0.kill().unwrap(); // SIGKILL / TerminateProcess: no chance to clean up
+    child.0.wait().unwrap();
     let rec = e.recover_interrupted(&j).unwrap();
     assert_eq!(rec.len(), 1, "the lock should have gone with the process");
     assert!(settled(&j));
