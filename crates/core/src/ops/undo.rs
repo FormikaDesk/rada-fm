@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use super::engine::Engine;
 use super::exec::{Cancel, ExecHandler, ExecReport, Failure, Progress};
+use super::names;
 use super::plan::*;
 use crate::fs::FileKind;
 use crate::fs::local::content_hash;
@@ -33,32 +34,46 @@ pub struct UndoPlan {
 /// whole instead of step by step against the *current* state.
 struct Sim<'a> {
     engine: &'a Engine,
+    /// Names that differ only in case are one name (macOS, Windows).
+    fold: bool,
     overlay: HashMap<PathBuf, bool>,
 }
 
 impl Sim<'_> {
+    fn key(&self, p: &Path) -> PathBuf {
+        if self.fold {
+            PathBuf::from(p.to_string_lossy().to_lowercase())
+        } else {
+            p.to_path_buf()
+        }
+    }
+
+    fn set(&mut self, p: &Path, exists: bool) {
+        self.overlay.insert(self.key(p), exists);
+    }
+
     fn exists(&self, p: &Path) -> bool {
         self.overlay
-            .get(p)
+            .get(&self.key(p))
             .copied()
             .unwrap_or_else(|| self.engine.fs.lstat(p).is_ok())
     }
 
     fn touched(&self, p: &Path) -> bool {
-        self.overlay.contains_key(p)
+        self.overlay.contains_key(&self.key(p))
     }
 
     fn apply(&mut self, step: &Step) {
         match step {
             Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => {
-                self.overlay.insert(path.clone(), true);
+                self.set(path, true);
             }
             Step::RemoveFile { path, .. } | Step::RemoveDir { path } | Step::TrashItem { path } => {
-                self.overlay.insert(path.clone(), false);
+                self.set(path, false);
             }
             Step::Rename { from, to } => {
-                self.overlay.insert(from.clone(), false);
-                self.overlay.insert(to.clone(), true);
+                self.set(from, false);
+                self.set(to, true);
             }
             Step::CopyFile {
                 src,
@@ -72,25 +87,25 @@ impl Sim<'_> {
                 remove_source,
                 ..
             } => {
-                self.overlay.insert(dst.clone(), true);
+                self.set(dst, true);
                 if *remove_source {
-                    self.overlay.insert(src.clone(), false);
+                    self.set(src, false);
                 }
             }
             Step::HardLink { link, src_link, .. } => {
-                self.overlay.insert(link.clone(), true);
+                self.set(link, true);
                 if let Some(s) = src_link {
-                    self.overlay.insert(s.clone(), false);
+                    self.set(s, false);
                 }
             }
             Step::Restore { item } => {
-                self.overlay.insert(item.original.clone(), true);
+                self.set(&item.original, true);
             }
             Step::SetTags { .. } => {}
             Step::ExtractFile { dst, .. }
             | Step::ExtractSymlink { dst, .. }
             | Step::Compress { dst, .. } => {
-                self.overlay.insert(dst.clone(), true);
+                self.set(dst, true);
             }
             Step::FinishDir { .. } => {}
         }
@@ -126,7 +141,7 @@ impl Sim<'_> {
             Step::Rename { from, to } => {
                 if !self.exists(from) {
                     Err(format!("{} is no longer there", display::path(from)))
-                } else if self.exists(to) {
+                } else if self.exists(to) && !names::is_case_alias(&*self.engine.fs, from, to) {
                     Err(format!(
                         "{} is occupied; refusing to overwrite it",
                         display::path(to)
@@ -339,6 +354,7 @@ impl Engine {
         let (steps, remaining) = journal.load_undo(entry_id)?;
         let mut sim = Sim {
             engine: self,
+            fold: self.platform.path_rules().case_insensitive,
             overlay: HashMap::new(),
         };
         let mut plan = Plan::empty(

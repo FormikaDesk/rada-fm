@@ -177,6 +177,12 @@ it loop. A filesystem root is never accepted as a source.
 Newlines, escape sequences, bidirectional controls and invalid UTF-8 in names are shown as
 visible escapes. Paths are never handled as text.
 
+Where the filesystem ignores case (macOS, Windows), a rename that changes only the case of a
+name is a rename, not a conflict: the new name is taken by the file itself, which is checked
+(same folder, same file, and the folder lists only the old spelling) before the rename goes on,
+and the undo, alone or as part of a bulk rename, compares names without regard to case.
+`rename_case.rs` runs this on a stand-in filesystem that ignores case, so on every system.
+
 A name that starts with `-` (`-rf`, `--help`) is never read by a program rada runs as an
 option: paths are handed over absolute, and a relative one gets `./` in front. Git is given the
 folder as the value of `-C`, the archive tools get `--` before the archive, and `zoxide` too.

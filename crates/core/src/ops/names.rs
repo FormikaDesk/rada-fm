@@ -5,6 +5,7 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
+use crate::fs::FsEngine;
 use crate::platform::PathRules;
 
 /// `Ok` if `name` can be created as a single directory entry on this platform.
@@ -63,6 +64,28 @@ fn device_stem(text: &str) -> String {
             c => c.to_ascii_uppercase(),
         })
         .collect()
+}
+
+/// Whether `to` is the name of `from` spelled with other capitals, on a filesystem that ignores
+/// case: the same folder, names equal but for case, the same file under both, and a folder that
+/// lists the one name `from` has and not `to`. Where case matters, two such names are two files
+/// (or two links to one) and both are listed.
+pub fn is_case_alias(fs: &dyn FsEngine, from: &Path, to: &Path) -> bool {
+    let (Some(dir), Some(a), Some(b)) = (from.parent(), from.file_name(), to.file_name()) else {
+        return false;
+    };
+    let lower = |n: &OsStr| n.to_string_lossy().to_lowercase();
+    if to.parent() != Some(dir) || a == b || lower(a) != lower(b) {
+        return false;
+    }
+    let (Ok(x), Ok(y)) = (fs.lstat(from), fs.lstat(to)) else {
+        return false;
+    };
+    let one_file = x.ino.is_some() && x.ino == y.ino && x.dev == y.dev;
+    one_file
+        && fs
+            .read_dir(dir)
+            .is_ok_and(|items| items.iter().all(|i| i.name != b))
 }
 
 /// Split a *file name* into stem and extension (with its dot). `.tar.gz` stays together

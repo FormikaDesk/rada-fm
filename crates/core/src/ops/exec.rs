@@ -1068,6 +1068,17 @@ impl Engine {
     fn rename(&self, from: &Path, to: &Path) -> Result<StepResult> {
         match self.fs.rename_noreplace(from, to) {
             Ok(()) => Ok(StepResult::done()),
+            // Only the case changes, on a volume that ignores it: the name is taken by this
+            // very file, and nothing is replaced.
+            Err(e)
+                if e.kind() == io::ErrorKind::AlreadyExists
+                    && super::names::is_case_alias(&*self.fs, from, to) =>
+            {
+                self.fs
+                    .rename(from, to)
+                    .map(|()| StepResult::done())
+                    .map_err(|e| Error::io2("rename", from, to, e))
+            }
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
                 Err(Error::AlreadyExists(to.to_path_buf()))
             }
