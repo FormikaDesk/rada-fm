@@ -1,9 +1,13 @@
 //! Running an operation with journaling.
 
+use std::collections::HashMap;
+
 use super::engine::Engine;
 use super::exec::{Cancel, ErrorChoice, ExecHandler, ExecReport, Failure, Progress};
 use super::plan::*;
 use crate::Result;
+use crate::fs::local::content_hash;
+use crate::fs::{FileKind, FsEngine, LocalFs};
 use crate::journal::Journal;
 
 pub struct RunOutcome {
@@ -19,6 +23,47 @@ struct Recording<'a> {
     id: &'a str,
     reversible: bool,
     errors: u64,
+    /// Contents already hashed in this run, by (device, file): the names of one file.
+    hashed: HashMap<(u64, u64), String>,
+}
+
+impl Recording<'_> {
+    /// A file made with several names has a fingerprint without a status-change time, which
+    /// cannot see contents rewritten with the same size and modification time: its contents
+    /// are hashed now, so that undo can tell before it removes the last name.
+    fn record_digest(&mut self, inverse: &Step) {
+        let Step::RemoveFile {
+            path,
+            expect: Some(fp),
+        } = inverse
+        else {
+            return;
+        };
+        if fp.ctime.is_some() || fp.kind != FileKind::File {
+            return;
+        }
+        let key = LocalFs
+            .lstat(path)
+            .ok()
+            .and_then(|m| Some((m.dev?, m.ino?)));
+        let hash = match key.and_then(|k| self.hashed.get(&k)) {
+            Some(h) => h.clone(),
+            None => match content_hash(path) {
+                Ok(h) => h,
+                Err(e) => {
+                    tracing::warn!("journal: cannot hash {}: {e}", path.display());
+                    return;
+                }
+            },
+        };
+        if let Some(k) = key {
+            self.hashed.insert(k, hash.clone());
+        }
+        if let Err(e) = self.journal.record_digest(self.id, path, &hash) {
+            tracing::error!("journal: {e}");
+            self.errors += 1;
+        }
+    }
 }
 
 impl ExecHandler for Recording<'_> {
@@ -46,10 +91,12 @@ impl ExecHandler for Recording<'_> {
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
         if self.reversible
             && let Some(inv) = step.inverse(result)
-            && let Err(e) = self.journal.record_undo(self.id, inv)
         {
-            tracing::error!("journal: {e}");
-            self.errors += 1;
+            if let Err(e) = self.journal.record_undo(self.id, inv.clone()) {
+                tracing::error!("journal: {e}");
+                self.errors += 1;
+            }
+            self.record_digest(&inv);
         }
         self.inner.step_finished(index, step, result);
     }
@@ -80,6 +127,7 @@ impl Engine {
             id: &id,
             reversible: plan.reversible,
             errors: 0,
+            hashed: HashMap::new(),
         };
         let report = self.execute(plan, &mut rec, cancel);
         let mut errors = rec.errors;

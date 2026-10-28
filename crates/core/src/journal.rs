@@ -163,6 +163,14 @@ enum Record {
         id: String,
         step: Step,
     },
+    /// The hash of the contents of a file an undo step will remove, taken when the file was
+    /// made: for files with several names, whose fingerprint cannot see a change of contents.
+    Digest {
+        id: String,
+        #[serde(with = "pathcodec::path")]
+        path: PathBuf,
+        hash: String,
+    },
     End {
         id: String,
         status: RunStatus,
@@ -283,7 +291,15 @@ const TORN: &[u8] = b"#torn";
 
 /// The record types this version writes; a well-formed line of another type is from a newer
 /// rada.
-const KNOWN: [&str; 6] = ["pending", "begin", "undo", "end", "undone", "undone_step"];
+const KNOWN: [&str; 7] = [
+    "pending",
+    "begin",
+    "undo",
+    "digest",
+    "end",
+    "undone",
+    "undone_step",
+];
 
 /// Does the file end with a newline (or is it empty)?
 fn ends_with_newline(file: &File) -> std::io::Result<bool> {
@@ -468,6 +484,17 @@ impl Journal {
             &Record::Undo {
                 id: id.to_string(),
                 step,
+            },
+            false,
+        )
+    }
+
+    pub fn record_digest(&self, id: &str, path: &Path, hash: &str) -> Result<()> {
+        self.append(
+            &Record::Digest {
+                id: id.to_string(),
+                path: path.to_path_buf(),
+                hash: hash.to_string(),
             },
             false,
         )
@@ -689,7 +716,7 @@ impl Journal {
                     },
                 );
             }
-            Record::Pending { .. } => {}
+            Record::Pending { .. } | Record::Digest { .. } => {}
             Record::Undo { id, .. } => {
                 if let Some(e) = map.get_mut(&id) {
                     e.undo_steps += 1;
@@ -773,6 +800,23 @@ impl Journal {
             .into_iter()
             .rev()
             .find(JournalEntry::is_undoable))
+    }
+
+    /// The hashes recorded for the files of `id` (see `record_digest`), by path.
+    pub fn load_digests(&self, id: &str) -> Result<HashMap<PathBuf, String>> {
+        let mut out = HashMap::new();
+        self.read_records(|_, r| {
+            if let Record::Digest {
+                id: rid,
+                path,
+                hash,
+            } = r
+                && rid == id
+            {
+                out.insert(path, hash);
+            }
+        })?;
+        Ok(out)
     }
 
     /// Undo steps of one entry, in execution order, with the indices still outstanding.

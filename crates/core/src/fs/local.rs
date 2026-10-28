@@ -876,6 +876,12 @@ fn copy_sparse(
     }))
 }
 
+/// A hash of the contents of the file at `p`, as 32 hex digits: what undo compares to know that
+/// a file is as it was left.
+pub fn content_hash(p: &Path) -> io::Result<String> {
+    hash_path(p, &mut |_| true).map(|(_, digest)| format!("{digest:032x}"))
+}
+
 /// Hash an open file from its start (holes read as zeros, which is what they are).
 fn hash_fd(f: &mut File, ctl: &mut dyn CopyControl) -> io::Result<(u64, u128)> {
     use std::io::Seek;

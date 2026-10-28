@@ -65,13 +65,19 @@ nothing else). Undo of a move moves back, with the same contents, permissions, t
 links and holes. Undo of trash restores from the trash. Undo of an overwrite brings the old
 file back. A file that was **modified after** the operation is left alone and reported,
 rather than overwritten or deleted; this is decided by comparing a fingerprint (size, times,
-inode) taken when the step ran. Read-only folders come back read-only; undo opens a folder
+inode) taken when the step ran. A file with several names has no status-change time in its
+fingerprint (making a link changes it for every name), so one more check covers it: a copy
+records a hash of its contents, and an undo that is about to remove its **last** name compares
+it. Contents rewritten with the same size and times are kept and reported; a name that has
+another name elsewhere is removed as usual, because the contents stay. A copy made by an older
+rada has no hash recorded and is judged by the fingerprint alone. Read-only folders come back read-only; undo opens a folder
 only for as long as the run needs, and puts its permissions back.
 
 A file that changed after the operation is not removed even if it changes after the plan was
 shown: undo looks at it again when it gets to it. *Tests:* `remove_race.rs` replaces the copy
 between the plan and the run, and in the instant before it is removed, and puts a link in its
-place; `fs/remove.rs` swaps the folder for a link after it was opened.
+place; `fs/remove.rs` swaps the folder for a link after it was opened. `hardlink_undo.rs` rewrites
+a hard-linked copy keeping its size and times.
 
 *Tests:* `properties.rs` generates random trees (symlinks including broken ones, hard links,
 sparse files, odd names, read-only files and folders) and checks that copy → undo and

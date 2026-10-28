@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use super::engine::Engine;
 use super::exec::{Cancel, ExecHandler, ExecReport, Failure, Progress};
 use super::plan::*;
+use crate::fs::FileKind;
+use crate::fs::local::content_hash;
 use crate::journal::{Journal, JournalEntry};
 use crate::{Error, Result, display};
 
@@ -199,6 +201,59 @@ impl Sim<'_> {
     }
 }
 
+/// The extra look at the last name of a file that had several when it was made. Its fingerprint
+/// has no status-change time, so a rewrite that keeps the size and the modification time goes
+/// unseen; the hash taken when it was made (see `runner`) tells. Another name that stays
+/// keeps the contents, and then nothing is checked.
+struct LastName<'a> {
+    engine: &'a Engine,
+    journal: &'a Journal,
+    id: &'a str,
+    digests: Option<HashMap<PathBuf, String>>,
+    /// Names removed so far by this plan, by (device, file).
+    removed: HashMap<(u64, u64), u64>,
+}
+
+impl LastName<'_> {
+    fn check(&mut self, step: &Step) -> std::result::Result<(), String> {
+        let Step::RemoveFile {
+            path,
+            expect: Some(exp),
+        } = step
+        else {
+            return Ok(());
+        };
+        if exp.ctime.is_some() || exp.kind != FileKind::File {
+            return Ok(());
+        }
+        let Ok(now) = self.engine.fs.lstat(path) else {
+            return Ok(());
+        };
+        let (Some(dev), Some(ino)) = (now.dev, now.ino) else {
+            return Ok(());
+        };
+        let n = self.removed.entry((dev, ino)).or_insert(0);
+        *n += 1;
+        if now.nlink.unwrap_or(1) > *n {
+            return Ok(());
+        }
+        if self.digests.is_none() {
+            self.digests = Some(self.journal.load_digests(self.id).unwrap_or_default());
+        }
+        // Nothing recorded (made by an older rada) or unreadable: as before, no comparison.
+        let Some(want) = self.digests.as_ref().and_then(|d| d.get(path)) else {
+            return Ok(());
+        };
+        match content_hash(path) {
+            Ok(have) if have != *want => Err(format!(
+                "{} was modified after the operation (its contents differ)",
+                display::path(path)
+            )),
+            _ => Ok(()),
+        }
+    }
+}
+
 /// The order undo runs the steps in: newest first, except that a moved hard link goes back as a
 /// link of the file it was a link of, so it runs right after the step that brings that file
 /// back (and still before the folders it sits in are removed).
@@ -294,6 +349,13 @@ impl Engine {
         let mut index_map = Vec::new();
         let mut blocked = Vec::new();
         let mut ws = WarningSet::default();
+        let mut last_name = LastName {
+            engine: self,
+            journal,
+            id: entry_id,
+            digests: None,
+            removed: HashMap::new(),
+        };
 
         // Undo runs the recorded inverses newest first.
         let mut todo: Vec<usize> = remaining.into_iter().filter(|&i| i < steps.len()).collect();
@@ -301,7 +363,7 @@ impl Engine {
         let order = undo_order(&steps, todo.iter().rev().copied().collect());
         for &i in order.iter() {
             let step = &steps[i];
-            match sim.check(step) {
+            match sim.check(step).and_then(|()| last_name.check(step)) {
                 Ok(()) => {
                     sim.apply(step);
                     plan.steps.push(step.clone());
