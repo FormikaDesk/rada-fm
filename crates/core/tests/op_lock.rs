@@ -149,11 +149,19 @@ fn an_operation_of_an_older_rada_is_judged_by_its_process_and_its_age() {
         e.recover_interrupted(&j).unwrap().is_empty(),
         "fresh and alive: left alone"
     );
-    // A process number that nothing has: the operation is settled.
-    append_begin(j.path(), "2-ffffff7-0", now - 3600);
+    // A process number that nothing has: the operation is settled (where the system can say).
+    #[cfg(unix)]
+    {
+        append_begin(j.path(), "2-ffffff7-0", now - 3600);
+        let rec = e.recover_interrupted(&j).unwrap();
+        assert_eq!(rec.len(), 1);
+        assert_eq!(rec[0].id, "2-ffffff7-0");
+    }
+    // Older than a day: settled whatever the process number says.
+    let old = format!("{:x}-{:x}-1", 3, std::process::id());
+    append_begin(j.path(), &old, now - 48 * 3600);
     let rec = e.recover_interrupted(&j).unwrap();
     assert_eq!(rec.len(), 1);
-    assert_eq!(rec[0].id, "2-ffffff7-0");
 }
 
 #[test]
