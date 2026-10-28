@@ -161,9 +161,10 @@ renames, the second undone if it fails.
 
 *Tests:* `update/install.rs` stops the saving after each of its steps and reads the way back,
 leaves a cut copy and a named but undescribed one in the folder, truncates the saved program,
-refuses a description that names a path, and reads and replaces the layout of earlier versions. On Windows the CI replaces a copy of the
-test program that is running, with `ReplaceFileW` alone and through `replace_exe`. It also plants links at the
-names a new program is written to (from an archive, from a rollback) and checks nothing behind them changes.
+refuses a description that names a path, and reads and replaces the layout of earlier versions.
+It also plants links at the names a new program is written to (from an archive, from a
+rollback) and checks nothing behind them changes. On Windows the CI replaces a copy of the
+test program that is running, with `ReplaceFileW` alone and through `replace_exe`.
 
 ### Nothing follows a link out of a tree
 
@@ -188,8 +189,11 @@ and on the executor, and each has a test (`archives.rs`, `archives_write.rs`,
   go through a symbolic link that the same archive created (the classic way round a path check).
 - **Links stay links.** A symlink in an archive is created as a link and never followed. If it
   points outside the extracted folder the plan says so first.
-- **Permissions are not a way in.** Setuid and setgid bits are dropped from extracted files (the
-  plan counts them). Other permissions and times are kept as the archive gives them.
+- **Permissions are not a way in.** Setuid, setgid and sticky bits are dropped from everything
+  an archive extracts, files and folders alike (the plan counts the setuid files); the executor
+  drops them again from a plan it is given. Other permissions and times are kept as the archive
+  gives them. A copy of your own files is a different thing and keeps all of these bits, as
+  said under "Copies keep what they can".
 - **Bombs ask for a typed `yes`.** An extraction that would write more than 8 GiB, or that
   unpacks to more than 200 times the archive's size (from 256 MiB up), carries a warning
   that has to be confirmed by typing; both limits are in `[archives]`. Independently of the

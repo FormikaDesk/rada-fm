@@ -991,6 +991,45 @@ fn setuid_bits_are_dropped_on_extraction_and_the_plan_says_so() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn special_bits_of_files_and_folders_never_survive_an_extraction() {
+    use std::os::unix::fs::PermissionsExt;
+    let mode_of = |p: std::path::PathBuf| std::fs::metadata(p).unwrap().permissions().mode();
+    let members = [
+        Member::dir("shared").mode(0o3777),
+        Member::file("shared/suid", "x").mode(0o4755),
+        Member::file("shared/sgid", "x").mode(0o2755),
+        Member::file("sticky", "x").mode(0o1755),
+    ];
+    for zip in [false, true] {
+        let sb = Sandbox::new();
+        let e = sb.engine();
+        let out = sb.mkdir("out");
+        let a = sb.path(if zip { "s.zip" } else { "s.tar" });
+        if zip {
+            write_zip(&a, &members);
+        } else {
+            write_tar(&a, &members, Compression::None);
+        }
+        let plan = plan_req(&e, &extract_req(&a, &out, ExtractInto::Here));
+        run(&e, &plan);
+
+        assert_eq!(mode_of(out.join("shared")) & 0o7777, 0o777, "zip: {zip}");
+        assert_eq!(
+            mode_of(out.join("shared/suid")) & 0o7777,
+            0o755,
+            "zip: {zip}"
+        );
+        assert_eq!(
+            mode_of(out.join("shared/sgid")) & 0o7777,
+            0o755,
+            "zip: {zip}"
+        );
+        assert_eq!(mode_of(out.join("sticky")) & 0o7777, 0o755, "zip: {zip}");
+    }
+}
+
 #[test]
 fn a_big_member_is_extracted_with_real_byte_progress_and_can_be_cancelled() {
     let sb = Sandbox::new();

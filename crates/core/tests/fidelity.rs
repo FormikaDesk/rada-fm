@@ -190,6 +190,20 @@ fn a_copy_keeps_permissions_including_special_bits_and_both_times() {
 }
 
 #[test]
+fn a_copied_folder_keeps_setgid_and_sticky_like_the_original() {
+    // Only an archive's folders lose them: a folder of the user's own is copied as it is.
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    sb.write("src/shared/f", "x");
+    chmod(&sb.path("src/shared"), 0o3777);
+    let dest = sb.mkdir("dest");
+    let (_plan, rep) = copy_tree(&sb, &e, &sb.path("src"), &dest);
+    assert!(rep.failed.is_empty(), "{rep:?}");
+    let m = std::fs::metadata(dest.join("src/shared")).unwrap();
+    assert_eq!(m.mode() & 0o7777, 0o3777);
+}
+
+#[test]
 fn a_read_only_file_still_gets_its_extended_attributes() {
     let sb = Sandbox::new();
     let e = sb.engine();

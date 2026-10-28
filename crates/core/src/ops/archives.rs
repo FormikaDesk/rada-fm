@@ -464,7 +464,8 @@ impl Engine {
             match e.kind {
                 EntryKind::Dir => {
                     let was_there = ex.made.contains(&dst);
-                    if ex.ensure_dir(&dst, e.mode).is_err() {
+                    let mode = e.mode.map(extracted_mode);
+                    if ex.ensure_dir(&dst, mode).is_err() {
                         continue;
                     }
                     if ex.made.contains(&dst) {
@@ -472,7 +473,7 @@ impl Engine {
                             counts[sel_ix].dirs += 1;
                         }
                         ex.explicit_dirs
-                            .insert(dst.clone(), (e.mode, e.mtime.map(Stamp::from)));
+                            .insert(dst.clone(), (mode, e.mtime.map(Stamp::from)));
                     } else {
                         ex.ws.add(WarningKind::Merge, Severity::Info, Some(&dst));
                     }
@@ -487,7 +488,7 @@ impl Engine {
                     let Some(dst) = ex.claim(&dst) else { continue };
                     match e.kind {
                         EntryKind::File => {
-                            let mode = e.mode.map(|m| m & 0o1777);
+                            let mode = e.mode.map(extracted_mode);
                             if e.mode.is_some_and(|m| m & 0o6000 != 0) {
                                 setuid += 1;
                             }
@@ -942,6 +943,12 @@ fn estimate_of(name: &OsStr, size: u64, kind: ArchiveKind) -> f64 {
         ArchiveKind::TarXz => 0.32,
     };
     size as f64 * ratio
+}
+
+/// What a mode in an archive becomes on disk: the permission bits alone. setuid, setgid and
+/// sticky are never taken from an archive, for a file or a folder.
+fn extracted_mode(mode: u32) -> u32 {
+    mode & 0o777
 }
 
 #[allow(clippy::too_many_arguments)]

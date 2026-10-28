@@ -517,6 +517,9 @@ impl Engine {
             .fs
             .create_file(&tmp, 0o600)
             .map_err(|e| Error::io("create", dst, e))?;
+        // The plan has dropped the special bits already; a plan read back from elsewhere
+        // gets no say in them.
+        let mode = mode.map(|m| m & 0o777);
         let ready = stream_member(ctl, run, &member, dst, sink)
             .and_then(|()| self.prepare_extracted(&tmp, dst, device, member.size, mode, mtime));
         if let Err(e) = ready {
