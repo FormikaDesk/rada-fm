@@ -588,6 +588,7 @@ mod native_open {
 
     use super::*;
     use crate::platform::launch::{self, Spawn, Stream, Task};
+    use crate::platform::spawn::operand;
     use crate::platform::split_command;
 
     fn wide(s: &std::ffi::OsStr) -> Vec<u16> {
@@ -715,7 +716,7 @@ mod native_open {
             // Windows' own "Open with" window, with no shell in between: the path is one
             // argument, so quotes and blanks in it are no problem.
             let mut cmd = Command::new("rundll32.exe");
-            cmd.arg("shell32.dll,OpenAs_RunDLL").arg(path);
+            cmd.arg("shell32.dll,OpenAs_RunDLL").arg(operand(path));
             return detach(
                 cmd,
                 "show the Open with window for",
@@ -728,7 +729,7 @@ mod native_open {
             return Err(Error::Invalid("no program given".into()));
         };
         let mut cmd = Command::new(exe);
-        cmd.args(args).arg(path);
+        cmd.args(args).arg(operand(path));
         detach(
             cmd,
             "start the program for",

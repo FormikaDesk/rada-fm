@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 use crate::platform::openwith::{self, AppDirs, DesktopEntry, MimeDb, OpenApp, OpenChoices};
+use crate::platform::spawn::operand;
 use crate::platform::which::on_path;
 use crate::platform::{Opener, split_command};
 use crate::{Error, Result};
@@ -47,7 +48,7 @@ fn detach(mut cmd: Command, what: &'static str, subject: &Path) -> Result<()> {
 
 fn spawn_detached(program: &str, arg: &Path) -> Result<()> {
     let mut cmd = Command::new(program);
-    cmd.arg(arg);
+    cmd.arg(operand(arg));
     detach(cmd, "start xdg-open for", arg)
 }
 
@@ -212,6 +213,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(words(&c), ["edit", "--new", "/d/a b.txt"]);
+    }
+
+    #[test]
+    fn a_file_named_like_an_option_reaches_the_program_as_a_file() {
+        for name in ["-rf", "--help", "-"] {
+            let c = command_for(Path::new(name), &app("edit --new %f", false), || None).unwrap();
+            assert_eq!(words(&c), ["edit", "--new", &format!("./{name}")], "{name}");
+        }
+        // An absolute path is a file already.
+        let c = command_for(Path::new("/d/-rf"), &app("edit %F", false), || None).unwrap();
+        assert_eq!(words(&c), ["edit", "/d/-rf"]);
     }
 
     #[test]

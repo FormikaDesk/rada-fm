@@ -177,6 +177,12 @@ it loop. A filesystem root is never accepted as a source.
 Newlines, escape sequences, bidirectional controls and invalid UTF-8 in names are shown as
 visible escapes. Paths are never handled as text.
 
+A name that starts with `-` (`-rf`, `--help`) is never read by a program rada runs as an
+option: paths are handed over absolute, and a relative one gets `./` in front. Git is given the
+folder as the value of `-C`, the archive tools get `--` before the archive, and `zoxide` too.
+`dash_names.rs` runs the poppler tools (stand-ins that write down what they were given) and a
+real git on folders and files with such names.
+
 Where Windows rules apply, the names it keeps for devices are refused for a rename, a new
 folder or file, every member of an archive and the folder an extraction makes: `CON`, `PRN`,
 `AUX`, `NUL`, `COM1`-`COM9` and `LPT1`-`LPT9` in any case, with an extension (`NUL.txt`), with

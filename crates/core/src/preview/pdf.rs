@@ -17,7 +17,7 @@ use std::time::{Duration, Instant, SystemTime};
 use xxhash_rust::xxh3::xxh3_64;
 
 use super::image::{ImageInfo, ImageLimits};
-use crate::platform::spawn::spawn_retrying_busy;
+use crate::platform::spawn::{operand, spawn_retrying_busy};
 use crate::platform::which::which_in;
 
 /// Title, author and number of pages, when the PDF says.
@@ -252,7 +252,7 @@ pub fn facts(
         .as_ref()
         .ok_or(PdfProblem::NoTool("pdfinfo"))?;
     let mut cmd = Command::new(exe);
-    cmd.arg(path);
+    cmd.arg(operand(path));
     let run = run_limited(cmd, limits.pdf_timeout, 64 * 1024, abandon)?;
     if !run.status_ok {
         return Err(problem_of(&run.stderr));
@@ -340,7 +340,7 @@ pub fn first_page_text(
         .ok_or(PdfProblem::NoTool("pdftotext"))?;
     let mut cmd = Command::new(exe);
     cmd.args(["-f", "1", "-l", "1", "-layout", "-nopgbrk", "-enc", "UTF-8"])
-        .arg(path)
+        .arg(operand(path))
         .arg("-");
     let run = run_limited(cmd, limits.pdf_timeout, max_bytes, abandon)?;
     if !run.status_ok {
@@ -411,7 +411,7 @@ pub fn render_first_page(
     let mut cmd = Command::new(exe);
     cmd.args(["-png", "-f", "1", "-l", "1", "-singlefile", "-scale-to"])
         .arg(limits.max_edge.to_string())
-        .arg(path)
+        .arg(operand(path))
         .arg(&stem);
     let run = run_limited(cmd, limits.pdf_timeout, 16 * 1024, abandon);
     let made = stem.with_extension("part.png");

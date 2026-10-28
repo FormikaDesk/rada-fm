@@ -388,6 +388,7 @@ mod native_open {
     use std::process::{Command, Stdio};
 
     use super::*;
+    use crate::platform::spawn::operand;
     use crate::platform::split_command;
 
     fn detach(mut cmd: Command, op: &'static str, subject: &Path) -> Result<()> {
@@ -406,20 +407,20 @@ mod native_open {
 
     pub fn open(path: &Path) -> Result<()> {
         let mut c = Command::new("open");
-        c.arg(path);
+        c.arg(operand(path));
         detach(c, "start open for", path)
     }
 
     pub fn reveal(path: &Path) -> Result<()> {
         let mut c = Command::new("open");
-        c.arg("-R").arg(path);
+        c.arg("-R").arg(operand(path));
         detach(c, "start open -R for", path)
     }
 
     /// `open -a <application> <file>`.
     pub fn open_with_app(path: &Path, app: &crate::platform::OpenApp) -> Result<()> {
         let mut c = Command::new("open");
-        c.arg("-a").arg(&app.exec).arg(path);
+        c.arg("-a").arg(&app.exec).arg(operand(path));
         detach(c, "start open -a for", path)
     }
 
@@ -434,10 +435,10 @@ mod native_open {
         if rest.is_empty() && !first.contains('/') {
             // An application's name, as `open -a` takes it.
             c = Command::new("open");
-            c.arg("-a").arg(first).arg(path);
+            c.arg("-a").arg(first).arg(operand(path));
         } else {
             c = Command::new(first);
-            c.args(rest).arg(path);
+            c.args(rest).arg(operand(path));
         }
         detach(c, "start the program for", path)
     }
@@ -445,7 +446,7 @@ mod native_open {
     /// `qlmanage -p`: the preview window of the Finder's Quick Look, for as long as it is open.
     pub fn quick_look(path: &Path) -> Result<()> {
         let mut c = Command::new("qlmanage");
-        c.arg("-p").arg(path);
+        c.arg("-p").arg(operand(path));
         detach(c, "start Quick Look for", path)
     }
 

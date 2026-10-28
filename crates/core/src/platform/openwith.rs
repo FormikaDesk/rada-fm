@@ -304,7 +304,13 @@ pub fn expand_exec(
     let mut out: Vec<String> = Vec::new();
     for w in &words {
         if w == "%F" {
-            out.extend(files.iter().map(|f| f.to_string_lossy().into_owned()));
+            out.extend(files.iter().map(|f| operand_text(f)));
+            continue;
+        }
+        if w == "%f"
+            && let Some(f) = files.first()
+        {
+            out.push(operand_text(f));
             continue;
         }
         if w == "%U" {
@@ -357,9 +363,14 @@ pub fn expand_exec(
         }
     }
     if !has_file_code {
-        out.extend(files.iter().map(|f| f.to_string_lossy().into_owned()));
+        out.extend(files.iter().map(|f| operand_text(f)));
     }
     out
+}
+
+/// A file as a word of its own in a command line.
+fn operand_text(file: &Path) -> String {
+    super::spawn::operand(file).to_string_lossy().into_owned()
 }
 
 // ------------------------------------------------------------------------------ where things are
@@ -968,6 +979,17 @@ mod tests {
             icon: Some("viewer-icon".into()),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_relative_file_that_starts_with_a_dash_never_stands_where_an_option_could() {
+        let f = Path::new("--help");
+        let go = |exec: &str| expand_exec(exec, &[f], &entry(exec), None);
+        assert_eq!(go("app %f"), ["app", "./--help"]);
+        assert_eq!(go("app %F"), ["app", "./--help"]);
+        assert_eq!(go("app --new"), ["app", "--new", "./--help"]);
+        // Inside a word it follows something that makes it a value.
+        assert_eq!(go("app --file=%f"), ["app", "--file=--help"]);
     }
 
     #[test]

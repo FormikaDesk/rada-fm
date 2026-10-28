@@ -188,7 +188,7 @@ fn mac_render_pdf(
     let mut cmd = Command::new(sips);
     cmd.args(["-s", "format", "png", "-Z"])
         .arg(limits.max_edge.to_string())
-        .arg(path)
+        .arg(crate::platform::spawn::operand(path))
         .arg("--out")
         .arg(out);
     let run = pdf::run_limited(cmd, limits.pdf_timeout, 16 * 1024, abandon)?;
@@ -230,7 +230,7 @@ fn mac_thumbnail(
         .arg(limits.max_edge.to_string())
         .arg("-o")
         .arg(&dir)
-        .arg(path);
+        .arg(crate::platform::spawn::operand(path));
     let run = pdf::run_limited(cmd, limits.pdf_timeout, 16 * 1024, abandon);
     // It writes `<dir>/<file name>.png`; it exits 0 even when there is nothing to show.
     let made = path.file_name().map(|n| {

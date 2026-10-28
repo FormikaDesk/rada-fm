@@ -1,8 +1,20 @@
 //! Starting a program that may have been written a moment ago.
 
 use std::io;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::time::Duration;
+
+/// A path as an argument of a program: a file, never an option. A relative path gets `./` in
+/// front, so that a name like `-rf` or `--help` cannot be read as a flag; an absolute path
+/// cannot start with a dash and is returned as it is.
+pub fn operand(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        Path::new(".").join(path)
+    }
+}
 
 /// Start `cmd`. A program that was written a moment ago can still be "busy" for writing
 /// ("Text file busy", ETXTBSY): another process that was being started at that very moment
@@ -32,5 +44,21 @@ pub fn is_text_file_busy(e: &io::Error) -> bool {
     {
         let _ = e;
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_relative_path_cannot_be_read_as_an_option_and_an_absolute_one_is_left_alone() {
+        for name in ["-rf", "--help", "-", "a/-b", "--"] {
+            let o = operand(Path::new(name));
+            assert!(o.starts_with("."), "{o:?}");
+            assert_eq!(o.file_name(), Path::new(name).file_name());
+        }
+        let abs = std::env::temp_dir().join("-rf");
+        assert_eq!(operand(&abs), abs);
     }
 }
