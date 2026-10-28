@@ -130,6 +130,24 @@ child to two days and checks it is left alone, then kills the child and checks i
 `journal_lines.rs` covers the three kinds of unreadable line, and `undo_twice.rs` the second
 instance that undoes the same operation while the first runs and after it has finished.
 
+### An update keeps a way back, whole at every moment
+
+Before a new program replaces the running one, the old one is copied to the folder of saved
+programs (`update/previous`), under a name made for the occasion, and written to the disk.
+`previous.json` says which version it is, where it was installed, which file it is and how
+long that file is; it is written whole and atomically (a temporary file, written to the disk,
+then renamed over it), and the write is what makes the copy "the saved program". The old copy
+and the old description stay valid until the new description replaces them, and only then is
+the old copy removed. A stop at any step (a power cut, `kill -9`) leaves either the old way
+back or the new one, never a description without its program or with the wrong one; a copy
+that was cut short, or whose length is not the one written down, is not offered to
+`--rollback`; what a stop left behind is removed by the next save. Descriptions written by
+earlier versions are still read.
+
+*Tests:* `update/install.rs` stops the saving after each of its steps and reads the way back,
+leaves a cut copy and a named but undescribed one in the folder, truncates the saved program,
+refuses a description that names a path, and reads and replaces the layout of earlier versions.
+
 ### Nothing follows a link out of a tree
 
 Symbolic links are copied as links (broken and circular ones too) and never followed. The

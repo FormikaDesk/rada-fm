@@ -9,7 +9,10 @@
 
 use crate::i18n::{Key, tf};
 use crate::platform::spawn::spawn_retrying_busy;
+use crate::statefile;
+use std::collections::hash_map::RandomState;
 use std::fs;
+use std::hash::{BuildHasher, Hasher};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -20,6 +23,16 @@ use serde::{Deserialize, Serialize};
 /// The most a program inside an archive may weigh: far above any real build, far below
 /// something that fills a disk.
 const MAX_BINARY_BYTES: u64 = 512 << 20;
+
+/// The process id and a random number, for a name nobody else can know ahead of time. The id
+/// comes first: `clean_leftovers` tells by it whose file a name is.
+fn unique() -> String {
+    format!(
+        "{}-{:016x}",
+        std::process::id(),
+        RandomState::new().build_hasher().finish()
+    )
+}
 
 /// Name of the temporary file a new program is written to, beside the one it will replace.
 fn sibling(exe: &Path, tag: &str) -> PathBuf {
@@ -38,9 +51,37 @@ fn sibling(exe: &Path, tag: &str) -> PathBuf {
     exe.with_file_name(name)
 }
 
-/// The file the new program is written to.
+/// A name for the file the new program is written to, different every time.
 pub fn stage_path(exe: &Path) -> PathBuf {
     sibling(exe, "update")
+}
+
+/// Create `path` as a new, empty file to write: it must not exist, and a link in its place is
+/// never followed (so it cannot send the write to another file).
+fn create_new_file(path: &Path) -> io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    options.open(path)
+}
+
+/// Copy `from` to the new file `to` (see `create_new_file`), all the way to the disk. What is
+/// half written is removed.
+pub fn copy_new(from: &Path, to: &Path) -> io::Result<()> {
+    let mut src = fs::File::open(from)?;
+    let mut out = create_new_file(to)?;
+    let copied = io::copy(&mut src, &mut out)
+        .and_then(|_| out.set_permissions(src.metadata()?.permissions()))
+        .and_then(|()| out.sync_all());
+    drop(out);
+    if copied.is_err() {
+        let _ = fs::remove_file(to);
+    }
+    copied
 }
 
 /// Take the program `inner` (a path inside the archive, `/`-separated) out of `archive` and
@@ -289,44 +330,120 @@ pub struct BackupInfo {
     pub version: String,
     /// Where it was installed.
     pub exe: PathBuf,
+    /// The name of the saved program in its folder. A name different each time, so that a new
+    /// copy is written beside the old one and the switch is the one atomic write of this file;
+    /// files from before that do not say, and the program is `rada`.
+    #[serde(default = "plain_backup_name")]
+    pub file: String,
+    /// How long the saved program is, to tell a whole copy from one that was cut short.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
 }
 
-fn backup_binary(dir: &Path) -> PathBuf {
-    dir.join(if cfg!(windows) { "rada.exe" } else { "rada" })
+fn plain_backup_name() -> String {
+    if cfg!(windows) { "rada.exe" } else { "rada" }.to_string()
 }
 
 fn backup_meta(dir: &Path) -> PathBuf {
     dir.join("previous.json")
 }
 
-/// The saved previous program, if there is one.
+/// A name that is one plain file name, not a path: the description is read from a file.
+fn is_plain_name(name: &str) -> bool {
+    let mut parts = Path::new(name).components();
+    matches!(
+        (parts.next(), parts.next()),
+        (Some(std::path::Component::Normal(_)), None)
+    )
+}
+
+/// The saved previous program, if there is one: its description is readable and the program
+/// it names is there, whole.
 pub fn read_backup(dir: &Path) -> Option<(PathBuf, BackupInfo)> {
     let info: BackupInfo = serde_json::from_slice(&fs::read(backup_meta(dir)).ok()?).ok()?;
-    let bin = backup_binary(dir);
-    bin.is_file().then_some((bin, info))
+    if !is_plain_name(&info.file) {
+        return None;
+    }
+    let bin = dir.join(&info.file);
+    let found = fs::metadata(&bin).ok()?;
+    let whole = info.size.is_none_or(|n| n == found.len());
+    (found.is_file() && whole).then_some((bin, info))
 }
 
 /// Keep a copy of `exe` (which is `version`) to go back to.
 pub fn save_backup(exe: &Path, version: &str, dir: &Path) -> Result<(), String> {
-    fs::create_dir_all(dir).map_err(|e| tf(Key::UpCannotCreate, &[&dir.display(), &e]))?;
-    let tmp = dir.join("incoming");
-    fs::copy(exe, &tmp).map_err(|e| tf(Key::UpCannotKeepCopy, &[&exe.display(), &e]))?;
-    commit_backup(&tmp, exe, version, dir)
+    let incoming = copy_incoming(exe, dir)?;
+    commit_backup(&incoming, exe, version, dir)
 }
 
-fn commit_backup(tmp: &Path, exe: &Path, version: &str, dir: &Path) -> Result<(), String> {
-    let bin = backup_binary(dir);
-    let _ = fs::remove_file(&bin);
-    fs::rename(tmp, &bin).map_err(|e| tf(Key::UpCannotKeepOld, &[&e]))?;
-    let info = BackupInfo {
-        version: version.to_string(),
-        exe: exe.to_path_buf(),
+/// Copy `exe` into a new file of the saved programs' folder, complete on the disk, under a
+/// name that marks it as not yet kept.
+fn copy_incoming(exe: &Path, dir: &Path) -> Result<PathBuf, String> {
+    fs::create_dir_all(dir).map_err(|e| tf(Key::UpCannotCreate, &[&dir.display(), &e]))?;
+    let incoming = dir.join(format!("incoming-{}", unique()));
+    copy_new(exe, &incoming).map_err(|e| tf(Key::UpCannotKeepCopy, &[&exe.display(), &e]))?;
+    Ok(incoming)
+}
+
+/// Make the copy `incoming` the saved program. The way back is whole at every step: the old
+/// copy and its description stay as they are until the new description, which names the new
+/// copy, replaces them in one atomic write; only then is the old copy removed.
+fn commit_backup(incoming: &Path, exe: &Path, version: &str, dir: &Path) -> Result<(), String> {
+    let result = name_incoming(incoming, dir).and_then(|(file, size)| {
+        let info = BackupInfo {
+            version: version.to_string(),
+            exe: exe.to_path_buf(),
+            file,
+            size: Some(size),
+        };
+        publish_backup(dir, &info).inspect_err(|_| {
+            let _ = fs::remove_file(dir.join(&info.file));
+        })?;
+        remove_stale_backups(dir, &info.file);
+        Ok(())
+    });
+    if result.is_err() {
+        let _ = fs::remove_file(incoming);
+    }
+    result
+}
+
+/// Give the copy its name in the folder; returns the name and the length of the copy.
+fn name_incoming(incoming: &Path, dir: &Path) -> Result<(String, u64), String> {
+    let name = match Path::new(&plain_backup_name()).extension() {
+        Some(ext) => format!("rada-{}.{}", unique(), ext.to_string_lossy()),
+        None => format!("rada-{}", unique()),
     };
-    fs::write(
-        backup_meta(dir),
-        serde_json::to_vec_pretty(&info).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| tf(Key::UpCannotWrite, &[&backup_meta(dir).display(), &e]))
+    let bin = dir.join(&name);
+    fs::rename(incoming, &bin).map_err(|e| tf(Key::UpCannotKeepOld, &[&e]))?;
+    let size = fs::metadata(&bin)
+        .map_err(|e| tf(Key::UpCannotKeepOld, &[&e]))?
+        .len();
+    Ok((name, size))
+}
+
+/// Write the description of the saved program: from this moment it is the way back.
+fn publish_backup(dir: &Path, info: &BackupInfo) -> Result<(), String> {
+    let bytes = serde_json::to_vec_pretty(info).map_err(|e| e.to_string())?;
+    statefile::write_atomic(&backup_meta(dir), &bytes)
+        .map_err(|e| tf(Key::UpCannotWrite, &[&backup_meta(dir).display(), &e]))
+}
+
+/// Remove what is in the folder and is not the saved program `keep`: the copy it replaces, and
+/// what an update that was cut short left.
+fn remove_stale_backups(dir: &Path, keep: &str) {
+    let Ok(rd) = fs::read_dir(dir) else { return };
+    let old = plain_backup_name();
+    for e in rd.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let ours = name == old
+            || ["incoming-", "rada-", ".previous.json."]
+                .iter()
+                .any(|p| name.starts_with(p));
+        if ours && name != keep {
+            let _ = fs::remove_file(e.path());
+        }
+    }
 }
 
 /// Go back to the saved program. The program being replaced becomes the saved one, so that
@@ -343,28 +460,35 @@ pub fn rollback(
     let stage = stage_path(exe);
     fs::copy(&bin, &stage).map_err(|e| tf(Key::UpCannotWrite, &[&stage.display(), &e]))?;
     if run_check {
-        make_executable(&stage).map_err(|e| e.to_string())?;
-        match run_version(&stage, Duration::from_secs(10)) {
-            Ok(out) if out.starts_with("rada ") => {}
-            Ok(out) => {
-                let _ = fs::remove_file(&stage);
-                return Err(tf(Key::UpSavedSays, &[&out]));
-            }
-            Err(e) => {
-                let _ = fs::remove_file(&stage);
-                return Err(e);
-            }
-        }
+        check_saved(&stage)?;
     }
-    let outgoing = dir.join("incoming");
-    fs::create_dir_all(dir).map_err(|e| tf(Key::UpCannotCreate, &[&dir.display(), &e]))?;
-    if let Err(e) = fs::copy(exe, &outgoing) {
+    let outgoing = copy_incoming(exe, dir).inspect_err(|_| {
         let _ = fs::remove_file(&stage);
-        return Err(tf(Key::UpCannotKeepCopy, &[&exe.display(), &e]));
+    })?;
+    if let Err(e) = replace_exe(&stage, exe) {
+        let _ = fs::remove_file(&outgoing);
+        return Err(e);
     }
-    replace_exe(&stage, exe)?;
     commit_backup(&outgoing, exe, current_version, dir)?;
     Ok(info.version)
+}
+
+/// Run the saved program once, to see that it is `rada`; removes it when it is not.
+fn check_saved(stage: &Path) -> Result<(), String> {
+    let said = make_executable(stage)
+        .map_err(|e| e.to_string())
+        .and_then(|()| run_version(stage, Duration::from_secs(10)));
+    match said {
+        Ok(out) if out.starts_with("rada ") => Ok(()),
+        Ok(out) => {
+            let _ = fs::remove_file(stage);
+            Err(tf(Key::UpSavedSays, &[&out]))
+        }
+        Err(e) => {
+            let _ = fs::remove_file(stage);
+            Err(e)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -547,6 +671,161 @@ mod tests {
         assert_eq!(rollback(&exe, "0.1.0", &keep, false).unwrap(), "0.2.0");
         assert_eq!(fs::read(&exe).unwrap(), b"v2");
         clean_leftovers(&exe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_save_that_fails_halfway_never_pairs_a_version_with_the_wrong_program() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let exe = d.path().join("rada");
+        let keep = d.path().join("keep");
+        fs::write(&exe, b"v1").unwrap();
+        save_backup(&exe, "0.1.0", &keep).unwrap();
+        fs::write(&exe, b"v2").unwrap();
+        // The description of the saved program cannot be written in place.
+        fs::set_permissions(backup_meta(&keep), fs::Permissions::from_mode(0o444)).unwrap();
+
+        let _ = save_backup(&exe, "0.2.0", &keep);
+
+        let (bin, info) = read_backup(&keep).expect("a way back is still there");
+        let want: &[u8] = if info.version == "0.1.0" {
+            b"v1"
+        } else {
+            b"v2"
+        };
+        assert_eq!(fs::read(bin).unwrap(), want, "version {}", info.version);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_at_the_name_a_copy_is_written_to_is_not_followed() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = d.path().join("rada");
+        let keep = d.path().join("keep");
+        let victim = d.path().join("victim");
+        fs::write(&exe, b"v1").unwrap();
+        fs::write(&victim, b"precious").unwrap();
+        fs::create_dir(&keep).unwrap();
+        std::os::unix::fs::symlink(&victim, keep.join("incoming")).unwrap();
+
+        let _ = save_backup(&exe, "0.1.0", &keep);
+
+        assert_eq!(fs::read(&victim).unwrap(), b"precious");
+    }
+
+    fn exe_in(dir: &Path) -> PathBuf {
+        dir.join(if cfg!(windows) { "rada.exe" } else { "rada" })
+    }
+
+    /// The saved program as `rollback` would find it: its version and what the file holds.
+    fn way_back(keep: &Path) -> (String, Vec<u8>) {
+        let (bin, info) = read_backup(keep).expect("a way back exists");
+        (info.version, fs::read(bin).unwrap())
+    }
+
+    #[test]
+    fn a_way_back_exists_after_a_stop_at_every_step_of_saving() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        let keep = d.path().join("keep");
+        fs::write(&exe, b"v1").unwrap();
+        save_backup(&exe, "0.1.0", &keep).unwrap();
+        fs::write(&exe, b"v2").unwrap();
+        let old = || (String::from("0.1.0"), b"v1".to_vec());
+
+        // Each line is a stop after one more step; what the stop leaves is what a later start
+        // finds.
+        let incoming = copy_incoming(&exe, &keep).unwrap();
+        assert_eq!(way_back(&keep), old(), "after copying");
+        let (file, size) = name_incoming(&incoming, &keep).unwrap();
+        assert_eq!(way_back(&keep), old(), "after naming the copy");
+        let info = BackupInfo {
+            version: "0.2.0".into(),
+            exe: exe.clone(),
+            file: file.clone(),
+            size: Some(size),
+        };
+        publish_backup(&keep, &info).unwrap();
+        assert_eq!(
+            way_back(&keep),
+            ("0.2.0".into(), b"v2".to_vec()),
+            "after the switch"
+        );
+        remove_stale_backups(&keep, &file);
+        assert_eq!(
+            way_back(&keep),
+            ("0.2.0".into(), b"v2".to_vec()),
+            "after the clean-up"
+        );
+        assert_eq!(
+            fs::read_dir(&keep).unwrap().count(),
+            2,
+            "the copy and its description"
+        );
+    }
+
+    #[test]
+    fn a_cut_copy_is_never_taken_for_the_way_back_and_the_next_save_removes_it() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        let keep = d.path().join("keep");
+        fs::write(&exe, b"v1").unwrap();
+        save_backup(&exe, "0.1.0", &keep).unwrap();
+        // A copy that stopped half way, and a new one named but never described.
+        fs::write(keep.join("incoming-1-ab"), b"v").unwrap();
+        fs::write(keep.join("rada-1-cd"), b"v").unwrap();
+        assert_eq!(way_back(&keep).0, "0.1.0");
+
+        fs::write(&exe, b"v2").unwrap();
+        save_backup(&exe, "0.2.0", &keep).unwrap();
+        assert_eq!(way_back(&keep), ("0.2.0".into(), b"v2".to_vec()));
+        assert_eq!(fs::read_dir(&keep).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn a_saved_program_that_is_not_the_length_written_down_is_not_a_way_back() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        let keep = d.path().join("keep");
+        fs::write(&exe, b"a whole program").unwrap();
+        save_backup(&exe, "0.1.0", &keep).unwrap();
+        let (bin, _) = read_backup(&keep).unwrap();
+        fs::write(&bin, b"a whole").unwrap();
+        assert!(read_backup(&keep).is_none());
+        assert!(rollback(&exe, "0.2.0", &keep, false).is_err());
+    }
+
+    #[test]
+    fn a_saved_program_of_an_earlier_rada_is_read_and_then_replaced() {
+        let d = tempfile::tempdir().unwrap();
+        let exe = exe_in(d.path());
+        let keep = d.path().join("keep");
+        fs::create_dir(&keep).unwrap();
+        fs::write(&exe, b"v2").unwrap();
+        // The layout of before: the program under its plain name, a description without more.
+        fs::write(keep.join(plain_backup_name()), b"v1").unwrap();
+        let meta = format!(
+            r#"{{"version":"0.1.0","exe":{:?}}}"#,
+            exe.display().to_string()
+        );
+        fs::write(backup_meta(&keep), meta).unwrap();
+        assert_eq!(way_back(&keep), ("0.1.0".into(), b"v1".to_vec()));
+
+        save_backup(&exe, "0.2.0", &keep).unwrap();
+        assert_eq!(way_back(&keep), ("0.2.0".into(), b"v2".to_vec()));
+        assert!(!keep.join(plain_backup_name()).exists());
+    }
+
+    #[test]
+    fn a_description_that_names_a_path_is_not_followed() {
+        let d = tempfile::tempdir().unwrap();
+        let keep = d.path().join("keep");
+        fs::create_dir(&keep).unwrap();
+        fs::write(d.path().join("elsewhere"), b"x").unwrap();
+        let meta = r#"{"version":"0.1.0","exe":"/x","file":"../elsewhere"}"#;
+        fs::write(backup_meta(&keep), meta).unwrap();
+        assert!(read_backup(&keep).is_none());
     }
 
     #[cfg(unix)]
