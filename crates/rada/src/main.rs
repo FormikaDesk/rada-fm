@@ -260,9 +260,26 @@ fn log_fatal(e: &anyhow::Error) {
     tracing::error!("rada ends with an error: {e:#}");
 }
 
+/// Windows: started from the old file of an update that stopped before the new program took
+/// its place, so that the program's own name is empty. The name goes back to this file, and
+/// that is all this run does.
+fn put_name_back_after_cut_update() -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let Some(name) = rada_core::update::install::restore_missing(&exe) else {
+        return false;
+    };
+    println!("{}", tf(Key::UpRestored, &[&name.display()]));
+    true
+}
+
 fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> Result<()> {
     run_launch_helper_if_asked();
     early_language();
+    if cfg!(windows) && put_name_back_after_cut_update() {
+        return Ok(());
+    }
     let matches = cli_text::command::<Cli>().get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     if run_exiting_command(&cli)? {

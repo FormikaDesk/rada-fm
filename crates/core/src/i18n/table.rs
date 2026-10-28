@@ -1182,6 +1182,7 @@ strings! {
     UpCannotPut => "cannot put the new program at {0}: {1}", "impossibile mettere il programma nuovo in {0}: {1}";
     UpCannotMove => "cannot move {0} out of the way: {1}", "impossibile spostare {0} per fare posto: {1}";
     UpCannotPutKept => "cannot put the new program at {0}: {1}; the old one is at {2} ({3})", "impossibile mettere il programma nuovo in {0}: {1}; il vecchio è in {2} ({3})";
+    UpRestored => "an update was cut short and {0} was missing: the program that was there before has been put back. Start rada again.", "un aggiornamento si era interrotto e {0} mancava: il programma che c'era prima è stato rimesso al suo posto. Avvia di nuovo rada.";
     UpCannotKeepCopy => "cannot keep a copy of {0}: {1}", "impossibile tenere una copia di {0}: {1}";
     UpCannotKeepOld => "cannot keep the old program: {0}", "impossibile tenere il programma vecchio: {0}";
     UpNoEarlier => "there is no earlier version saved to go back to", "non c'è nessuna versione precedente salvata a cui tornare";

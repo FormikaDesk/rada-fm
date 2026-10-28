@@ -283,21 +283,87 @@ fn replace_inner(stage: &Path, exe: &Path) -> Result<(), String> {
     }
     #[cfg(windows)]
     {
-        let away = sibling(exe, "old");
-        let _ = fs::remove_file(&away);
-        fs::rename(exe, &away).map_err(|e| tf(Key::UpCannotMove, &[&exe.display(), &e]))?;
-        if let Err(e) = fs::rename(stage, exe) {
-            let back = fs::rename(&away, exe);
-            return Err(match back {
-                Ok(()) => tf(Key::UpCannotPut, &[&exe.display(), &e]),
-                Err(b) => tf(
-                    Key::UpCannotPutKept,
-                    &[&exe.display(), &e, &away.display(), &b],
-                ),
-            });
-        }
-        Ok(())
+        swap_running(stage, exe)
     }
+}
+
+/// Windows: a running program cannot be overwritten, but it can be renamed. One call to
+/// `ReplaceFileW` moves the old file aside and the new one into its place, and puts the first
+/// back itself if the second fails; if the call cannot be used the two renames are done here,
+/// the second undone when it fails.
+#[cfg(windows)]
+fn swap_running(stage: &Path, exe: &Path) -> Result<(), String> {
+    let away = sibling(exe, "old");
+    if replace_file(exe, stage, &away).is_ok() {
+        return Ok(());
+    }
+    // A call that stopped between its renames left the name empty.
+    if !exe.exists() && away.exists() {
+        let _ = fs::rename(&away, exe);
+    }
+    fs::rename(exe, &away).map_err(|e| tf(Key::UpCannotMove, &[&exe.display(), &e]))?;
+    if let Err(e) = fs::rename(stage, exe) {
+        let back = fs::rename(&away, exe);
+        return Err(match back {
+            Ok(()) => tf(Key::UpCannotPut, &[&exe.display(), &e]),
+            Err(b) => tf(
+                Key::UpCannotPutKept,
+                &[&exe.display(), &e, &away.display(), &b],
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// `ReplaceFileW`: `stage` takes the name of `exe`, and `exe` becomes `backup`.
+#[cfg(windows)]
+pub(crate) fn replace_file(exe: &Path, stage: &Path, backup: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{REPLACEFILE_IGNORE_MERGE_ERRORS, ReplaceFileW};
+    let wide = |p: &Path| -> Vec<u16> { p.as_os_str().encode_wide().chain(Some(0)).collect() };
+    let (replaced, replacement, saved) = (wide(exe), wide(stage), wide(backup));
+    // SAFETY: three NUL-terminated strings that live through the call; the two optional
+    // pointers are null, as the documentation allows.
+    let done = unsafe {
+        ReplaceFileW(
+            replaced.as_ptr(),
+            replacement.as_ptr(),
+            saved.as_ptr(),
+            REPLACEFILE_IGNORE_MERGE_ERRORS,
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    };
+    if done != 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+/// The name a program had before an update moved it aside (`.rada-old-<id>[.exe]` is what the
+/// update on Windows calls the old file), if `running` is such a file.
+fn name_before_move(running: &Path) -> Option<PathBuf> {
+    let name = running.file_name()?.to_string_lossy();
+    let (stem, tail) = name.strip_prefix('.')?.split_once("-old-")?;
+    let original = match tail.rsplit_once('.') {
+        Some((_, ext)) => format!("{stem}.{ext}"),
+        None => stem.to_string(),
+    };
+    (!stem.is_empty()).then(|| running.with_file_name(original))
+}
+
+/// An update on Windows moves the old program aside and then puts the new one in its place; a
+/// stop between the two leaves the program's own name empty, and the old file is the only
+/// program that can run. When `running` is that file and the name is empty, give it the name
+/// back and return the name. Nothing else is touched.
+pub fn restore_missing(running: &Path) -> Option<PathBuf> {
+    let target = name_before_move(running)?;
+    if fs::symlink_metadata(&target).is_ok() {
+        return None;
+    }
+    fs::rename(running, &target).ok()?;
+    Some(target)
 }
 
 /// Remove what an earlier update left beside the program: the old file on Windows, or a
@@ -778,6 +844,127 @@ mod tests {
 
         assert!(mine.exists() && exe.exists());
         assert!(!other.exists() && !older.exists());
+    }
+
+    #[test]
+    fn the_old_file_of_a_cut_update_takes_the_name_of_the_program_back() {
+        let d = tempfile::tempdir().unwrap();
+        let ext = if cfg!(windows) { ".exe" } else { "" };
+        let exe = d.path().join(format!("rada{ext}"));
+        fs::write(&exe, b"old").unwrap();
+        // The state a stop between the two renames leaves: the old file under its other
+        // name, the new one finished beside it, and nothing under the program's name.
+        let away = sibling(&exe, "old");
+        fs::rename(&exe, &away).unwrap();
+        fs::write(stage_path(&exe), b"new").unwrap();
+
+        assert_eq!(restore_missing(&away), Some(exe.clone()));
+        assert_eq!(fs::read(&exe).unwrap(), b"old");
+        assert!(!away.exists());
+    }
+
+    #[test]
+    fn a_name_that_is_taken_or_a_program_that_is_not_an_old_file_is_left_alone() {
+        let d = tempfile::tempdir().unwrap();
+        let ext = if cfg!(windows) { ".exe" } else { "" };
+        let exe = d.path().join(format!("rada{ext}"));
+        fs::write(&exe, b"new").unwrap();
+        let away = sibling(&exe, "old");
+        fs::write(&away, b"old").unwrap();
+        assert_eq!(restore_missing(&away), None);
+        assert_eq!(fs::read(&exe).unwrap(), b"new");
+        assert!(away.exists());
+        // The program itself, and a file that only looks a little like one.
+        assert_eq!(restore_missing(&exe), None);
+        let odd = d.path().join(".-old-1");
+        fs::write(&odd, b"x").unwrap();
+        assert_eq!(restore_missing(&odd), None);
+        assert!(odd.exists());
+    }
+
+    /// Not a test: a process of this very program that does nothing for a while, so that a
+    /// copy of the test program can be run and kept running.
+    #[test]
+    #[ignore = "started by the tests that need a program that is running"]
+    fn hold_still() {
+        if std::env::var_os("RADA_TEST_HOLD").is_some() {
+            std::thread::sleep(Duration::from_secs(60));
+        }
+    }
+
+    /// A running process, killed when this is dropped, test failed or not.
+    #[cfg(windows)]
+    struct Running(std::process::Child);
+
+    #[cfg(windows)]
+    impl Drop for Running {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    /// `rada.exe` in `dir`: a copy of the test program, running.
+    #[cfg(windows)]
+    fn running_exe(dir: &Path) -> (PathBuf, Running) {
+        let exe = dir.join("rada.exe");
+        fs::copy(std::env::current_exe().unwrap(), &exe).unwrap();
+        let child = Command::new(&exe)
+            .args(["--ignored", "--exact", "update::install::tests::hold_still"])
+            .env("RADA_TEST_HOLD", "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut running = Running(child);
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(
+            running.0.try_wait().unwrap().is_none(),
+            "it did not stay up"
+        );
+        (exe, running)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn replacefilew_replaces_a_program_that_is_running_and_keeps_its_file_aside() {
+        let d = tempfile::tempdir().unwrap();
+        let (exe, _running) = running_exe(d.path());
+        let stage = stage_path(&exe);
+        fs::write(&stage, b"new").unwrap();
+        let aside = sibling(&exe, "old");
+
+        replace_file(&exe, &stage, &aside).expect("the swap works on a running program");
+
+        assert_eq!(fs::read(&exe).unwrap(), b"new");
+        assert!(!stage.exists());
+        assert!(
+            fs::metadata(&aside).unwrap().len() > 1000,
+            "the old program is kept"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_running_program_is_replaced_whole_by_replace_exe() {
+        let d = tempfile::tempdir().unwrap();
+        let (exe, running) = running_exe(d.path());
+        let stage = stage_path(&exe);
+        fs::write(&stage, b"new").unwrap();
+
+        replace_exe(&stage, &exe).unwrap();
+
+        assert_eq!(fs::read(&exe).unwrap(), b"new");
+        let aside: Vec<_> = fs::read_dir(d.path())
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".rada-old-"))
+            .collect();
+        assert_eq!(aside.len(), 1);
+        // Once the old program has stopped its file can go.
+        drop(running);
+        fs::remove_file(aside[0].path()).unwrap();
     }
 
     fn exe_in(dir: &Path) -> PathBuf {

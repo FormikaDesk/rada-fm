@@ -149,9 +149,20 @@ file that must not exist yet (`create_new`; on Unix also `O_NOFOLLOW`), so a sym
 at that name is never written through. The same holds for the copy made for `--rollback` and
 for the program a source update has built.
 
+On Windows a running program cannot be overwritten but can be renamed, so the new program is
+swapped in with one `ReplaceFileW` call, which moves the old file aside (`.rada-old-…exe`, in
+the same folder) and puts the new one in its place. That call is not transactional (nothing on
+Windows is, short of the deprecated transactional file system), so a power cut inside it can
+still leave `rada.exe` missing, and with it nothing to start by that name. What rada does about
+it: the old file is a complete, working program, and when it is started it sees that the name
+is empty, takes it back, says so and exits; the same can be done by hand by renaming
+`.rada-old-…exe` to `rada.exe`. The fallback, when `ReplaceFileW` cannot be used, is the two
+renames, the second undone if it fails.
+
 *Tests:* `update/install.rs` stops the saving after each of its steps and reads the way back,
 leaves a cut copy and a named but undescribed one in the folder, truncates the saved program,
-refuses a description that names a path, and reads and replaces the layout of earlier versions. It also plants links at the
+refuses a description that names a path, and reads and replaces the layout of earlier versions. On Windows the CI replaces a copy of the
+test program that is running, with `ReplaceFileW` alone and through `replace_exe`. It also plants links at the
 names a new program is written to (from an archive, from a rollback) and checks nothing behind them changes.
 
 ### Nothing follows a link out of a tree
