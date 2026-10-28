@@ -322,6 +322,13 @@ These are real, and we would rather you read them here than discover them.
   DOS one). Extraction does not restore the owner stored in a tar. A compressed tar has to be
   read once to be listed and once to be extracted. 7z cannot be created, only read. Listing a
   very large compressed archive in the preview stops after about 1.5 s and shows "at least".
+  **A forged 7z header can stop the program.** The 7z library in use (`sevenz-rust2` 0.20.2)
+  reads the number of files from the header and asks for memory for that many entries before it
+  checks it against anything: a header of 106 bytes (`tests/fixtures/fuzz`) that declares some
+  2^60 files makes the allocator end the program, whenever such an archive is listed, browsed,
+  previewed or extracted. Later versions of the library bound the count, but they need Rust 1.93
+  and the minimum version of rada is 1.90, so the library is not updated yet. Until then, do
+  not open a 7z from a source you do not trust.
 
 ## How this is tested
 
@@ -330,6 +337,10 @@ runs in a sandbox with `HOME` and every `XDG_*` variable pointed into it. Cross-
 tests use `/dev/shm` against the project disk. The fault tests inject failures (a write that
 fails after N bytes, a rename that returns `EACCES`) through a wrapper filesystem; the crash
 tests run a child process and kill it for real.
+
+Outside the test run, `fuzz/` holds `cargo-fuzz` targets for the names of archive members, the
+journal and the zip and tar listings (see `fuzz/README.md`). They are run by hand and not by
+the CI. What they find becomes an ordinary test in `archive_fuzz.rs`.
 
 Review of the operations engine (`crates/core/src/ops/`, `journal.rs`) by people who did not
 write it is the most valuable contribution this project can get. See
