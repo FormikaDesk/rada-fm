@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = ["crates/core", "crates/tui", "crates/rada"]
+# The fuzz targets have a workspace of their own (cargo-fuzz, rust nightly).
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.6.0-rc.17"

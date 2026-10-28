@@ -1,0 +1,45 @@
+# Fuzz targets (cargo-fuzz, rust nightly). Not part of the workspace, not published, and not run
+# by the CI: see fuzz/README.md.
+[package]
+name = "rada-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rada-core = { path = "../crates/core" }
+
+# Its own workspace: the one at the top of the repository does not take this folder in.
+[workspace]
+
+[[bin]]
+name = "sanitize"
+path = "fuzz_targets/sanitize.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "journal"
+path = "fuzz_targets/journal.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zip_index"
+path = "fuzz_targets/zip_index.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tar_index"
+path = "fuzz_targets/tar_index.rs"
+test = false
+doc = false
+bench = false
