@@ -106,7 +106,10 @@ lock: a small file in `locks/` next to the journal, locked with the system's own
 start-up recovery settles an operation only after taking that lock, and the system lets go of
 it when the process ends in any way, so a killed process never leaves an operation that looks
 alive. Only an operation begun by an older rada, which wrote no lock, is judged by its process
-id and its age (older than 24 hours counts as dead, in case the number was reused). An undo that was
+id and its age (older than 24 hours counts as dead, in case the number was reused). An undo holds a lock of its
+own while it runs (`locks/<operation>.undo.lock`), so two instances of rada cannot undo the same
+operation at the same time: the second is refused with a message, and so is a plan that was shown
+before the other instance undid the operation. An undo that was
 cut short remembers the steps it had done and resumes from where it stopped. A half-written
 last line in the journal (the process died while writing it) is ignored, and the next record
 written closes it with a mark (`#torn`) so that it is not glued to the fragment.
@@ -124,7 +127,8 @@ Repair or remove the line, or restore the file from a backup.
 a big file, just after the rename, inside a folder, in the middle of a cross-filesystem move,
 and between the copy and the removal of a move. `op_lock.rs` ages an operation held by a live
 child to two days and checks it is left alone, then kills the child and checks it is settled.
-`journal_lines.rs` covers the three kinds of unreadable line.
+`journal_lines.rs` covers the three kinds of unreadable line, and `undo_twice.rs` the second
+instance that undoes the same operation while the first runs and after it has finished.
 
 ### Nothing follows a link out of a tree
 

@@ -417,7 +417,8 @@ impl Engine {
         })
     }
 
-    /// Execute an undo plan and record the outcome in the journal.
+    /// Execute an undo plan and record the outcome in the journal. Refused while another rada
+    /// is undoing the same operation, and when the plan was made before it was undone.
     pub fn run_undo(
         &self,
         journal: &Journal,
@@ -425,6 +426,26 @@ impl Engine {
         handler: &mut dyn ExecHandler,
         cancel: &Cancel,
     ) -> Result<ExecReport> {
+        let lock = journal.lock_undo(&up.entry.id)?;
+        let r = self.run_undo_locked(journal, up, handler, cancel);
+        lock.release();
+        r
+    }
+
+    fn run_undo_locked(
+        &self,
+        journal: &Journal,
+        up: &UndoPlan,
+        handler: &mut dyn ExecHandler,
+        cancel: &Cancel,
+    ) -> Result<ExecReport> {
+        let (_, outstanding) = journal.load_undo(&up.entry.id)?;
+        if up.index_map.iter().any(|i| !outstanding.contains(i)) {
+            return Err(Error::Journal(format!(
+                "\"{}\" was already undone, in part or whole, by another rada since this plan was made; nothing was done",
+                up.entry.title
+            )));
+        }
         struct Tracker<'a> {
             inner: &'a mut dyn ExecHandler,
             index_map: &'a [usize],
