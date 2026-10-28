@@ -68,6 +68,11 @@ rather than overwritten or deleted; this is decided by comparing a fingerprint (
 inode) taken when the step ran. Read-only folders come back read-only; undo opens a folder
 only for as long as the run needs, and puts its permissions back.
 
+A file that changed after the operation is not removed even if it changes after the plan was
+shown: undo looks at it again when it gets to it. *Tests:* `remove_race.rs` replaces the copy
+between the plan and the run, and in the instant before it is removed, and puts a link in its
+place; `fs/remove.rs` swaps the folder for a link after it was opened.
+
 *Tests:* `properties.rs` generates random trees (symlinks including broken ones, hard links,
 sparse files, odd names, read-only files and folders) and checks that copy → undo and
 move → undo, on one filesystem and across two, give back exactly the starting state, and that
@@ -201,6 +206,19 @@ These are real, and we would rather you read them here than discover them.
 - **Races you cause.** rada checks that a destination name is free at the moment it creates
   it, never earlier, but it cannot stop another program from changing the folder between two
   of its steps.
+- **Removing a name is checked, not guaranteed.** Before it removes a file (undo of a copy,
+  delete) rada compares the file with its fingerprint (size, times, kind) at the last moment:
+  on Linux and macOS it opens the folder once, looks at the name with `fstatat` (never
+  following a link) and takes it off with `unlinkat` through that same open folder, so a
+  folder swapped for a link in between is not followed; on Windows it opens the file so that
+  nobody can write, rename or delete it, looks at it through that handle and deletes it through
+  the same handle. What stays open on Linux and macOS is the instant between `fstatat` and
+  `unlinkat`: POSIX has no call that removes a name only if it still points at the same file,
+  so a program that renames another file over the name in that instant has it removed. The
+  window is a few microseconds and needs another program aimed at exactly that name; the
+  fingerprint check on either side of it is what makes it unlikely to matter. A file that is
+  open for writing in another program cannot be deleted on Windows (the system refuses; rada
+  says so and nothing is lost).
 - **Phones and cameras** (MTP and PTP, through the desktop's virtual filesystem) are not a
   filesystem rada can make promises about. A copy there is the same plan with a progress bar,
   a cancel and a journal entry, and the plan says what is different before anything is done:

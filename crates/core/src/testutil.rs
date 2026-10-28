@@ -15,7 +15,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::SystemTime;
 
-use crate::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
+use crate::fs::{
+    CopyControl, CopyOutcome, CopyRequest, DirItem, Fingerprint, FsEngine, FsMeta, LocalFs, Removed,
+};
 use crate::journal::Journal;
 use crate::ops::{
     Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, ExecReport, Failure, Plan, Progress,
@@ -1033,6 +1035,10 @@ impl FsEngine for FaultFs {
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         self.check(Op::RemoveFile, p)?;
         self.inner.remove_file(p)
+    }
+    fn remove_file_if(&self, p: &Path, expect: &Fingerprint) -> io::Result<Removed> {
+        self.check(Op::RemoveFile, p)?;
+        self.inner.remove_file_if(p, expect)
     }
     fn remove_dir(&self, p: &Path) -> io::Result<()> {
         self.check(Op::RemoveDir, p)?;

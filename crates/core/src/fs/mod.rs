@@ -6,6 +6,7 @@
 //! be added later without touching the engine.
 
 pub mod local;
+mod remove;
 pub mod tree;
 
 use std::ffi::OsString;
@@ -204,19 +205,13 @@ impl FsMeta {
     }
 
     pub fn fingerprint(&self) -> Fingerprint {
-        // Creating or removing a hard link changes the status-change time of every name of
-        // the file: for a file with several names it says nothing about its contents.
-        let shared = self.kind == FileKind::File && self.nlink.unwrap_or(1) > 1;
-        Fingerprint {
-            kind: self.kind,
-            size: self.size,
-            mtime: self.mtime.map(Stamp::from),
-            ctime: if shared {
-                None
-            } else {
-                self.ctime.map(Stamp::from)
-            },
-        }
+        Fingerprint::new(
+            self.kind,
+            self.size,
+            self.mtime,
+            self.ctime,
+            self.nlink.unwrap_or(1),
+        )
     }
 
     /// Like [`fingerprint`](Self::fingerprint) without the status-change time: for a file
@@ -309,6 +304,24 @@ pub struct Fingerprint {
 }
 
 impl Fingerprint {
+    pub fn new(
+        kind: FileKind,
+        size: u64,
+        mtime: Option<SystemTime>,
+        ctime: Option<SystemTime>,
+        nlink: u64,
+    ) -> Fingerprint {
+        // Creating or removing a hard link changes the status-change time of every name of
+        // the file: for a file with several names it says nothing about its contents.
+        let shared = kind == FileKind::File && nlink > 1;
+        Fingerprint {
+            kind,
+            size,
+            mtime: mtime.map(Stamp::from),
+            ctime: if shared { None } else { ctime.map(Stamp::from) },
+        }
+    }
+
     /// Describe how `now` differs from `self`, or `None` when unchanged.
     pub fn diff(&self, now: &Fingerprint) -> Option<String> {
         if self.kind != now.kind {
@@ -393,6 +406,16 @@ pub struct CopyOutcome {
 pub trait FileSink: std::io::Write + std::io::Seek + Send {}
 impl<T: std::io::Write + std::io::Seek + Send> FileSink for T {}
 
+/// What [`FsEngine::remove_file_if`] did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Removed {
+    Done,
+    /// There was nothing at the path.
+    Gone,
+    /// The file is not what was expected, and was left alone: how it differs.
+    Changed(String),
+}
+
 pub trait FsEngine: Send + Sync {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta>;
     fn stat(&self, p: &Path) -> io::Result<FsMeta>;
@@ -408,6 +431,14 @@ pub trait FsEngine: Send + Sync {
     /// Rename that fails with `AlreadyExists` instead of replacing the destination.
     fn rename_noreplace(&self, from: &Path, to: &Path) -> io::Result<()>;
     fn remove_file(&self, p: &Path) -> io::Result<()>;
+    /// Remove the file at `p` unless it no longer looks like `expect`. The look is taken as
+    /// close to the removal as the system allows, and on the same folder the name is removed
+    /// from; a file that took the name in the meantime is not removed. What stays open (a
+    /// file replaced after the last look and before the name goes, on systems that cannot
+    /// remove a name only if it is still the same file) is in `docs/SAFETY.md`.
+    fn remove_file_if(&self, p: &Path, expect: &Fingerprint) -> io::Result<Removed> {
+        remove::remove_if_by_path(self, p, expect)
+    }
     fn remove_dir(&self, p: &Path) -> io::Result<()>;
     /// Remove the folder `p` and everything in it. Never follows a link, not even one put in
     /// place of a folder while this runs (the standard library walks with open folders).

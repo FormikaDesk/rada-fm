@@ -7,7 +7,10 @@ use std::time::SystemTime;
 
 use xxhash_rust::xxh3::Xxh3;
 
-use super::{CopyControl, CopyMethod, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta};
+use super::{
+    CopyControl, CopyMethod, CopyOutcome, CopyRequest, DirItem, Fingerprint, FsEngine, FsMeta,
+    Removed,
+};
 
 /// Failures of [`FsEngine::copy_file`] that are not plain OS errors. They are carried
 /// inside an `io::Error` and recovered with [`copy_fault`].
@@ -238,6 +241,17 @@ impl FsEngine for LocalFs {
 
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         fs::remove_file(p)
+    }
+
+    fn remove_file_if(&self, p: &Path, expect: &Fingerprint) -> io::Result<Removed> {
+        #[cfg(any(unix, windows))]
+        {
+            super::remove::remove_if(p, expect)
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            super::remove::remove_if_by_path(self, p, expect)
+        }
     }
 
     fn remove_dir(&self, p: &Path) -> io::Result<()> {

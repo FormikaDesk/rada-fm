@@ -11,7 +11,7 @@ use super::engine::Engine;
 use super::plan::*;
 use crate::archive::{self, ArchiveError, ListControl, Session};
 use crate::fs::local::{CopyFault, copy_fault};
-use crate::fs::{CopyControl, CopyRequest, FileSink, Fingerprint, FsMeta, Stamp};
+use crate::fs::{CopyControl, CopyRequest, FileSink, Fingerprint, FsMeta, Removed, Stamp};
 use crate::platform::{Preserve, Tag, TrashedItem};
 use crate::{Error, Result, display};
 
@@ -1081,20 +1081,25 @@ impl Engine {
         path: &Path,
         expect: Option<&Fingerprint>,
     ) -> Result<StepResult> {
-        let Some(meta) = self.inspect(path)? else {
-            return Ok(StepResult::noop("already gone"));
+        let Some(exp) = expect else {
+            if self.inspect(path)?.is_none() {
+                return Ok(StepResult::noop("already gone"));
+            }
+            self.retry_unlocked(st, path, || self.fs.remove_file(path))
+                .map_err(|e| Error::io("delete", path, e))?;
+            return Ok(StepResult::done());
         };
-        if let Some(exp) = expect
-            && let Some(reason) = exp.diff(&meta.fingerprint())
+        match self
+            .retry_unlocked(st, path, || self.fs.remove_file_if(path, exp))
+            .map_err(|e| Error::io("delete", path, e))?
         {
-            return Err(Error::Modified {
+            Removed::Done => Ok(StepResult::done()),
+            Removed::Gone => Ok(StepResult::noop("already gone")),
+            Removed::Changed(reason) => Err(Error::Modified {
                 path: path.to_path_buf(),
                 reason,
-            });
+            }),
         }
-        self.retry_unlocked(st, path, || self.fs.remove_file(path))
-            .map_err(|e| Error::io("delete", path, e))?;
-        Ok(StepResult::done())
     }
 
     fn remove_dir(&self, st: &mut RunState, path: &Path) -> Result<StepResult> {
