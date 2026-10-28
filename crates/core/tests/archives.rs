@@ -273,6 +273,146 @@ fn tar_slip_names_are_blocked_too() {
     assert_eq!(read(&dir.join("good.txt")), "good");
 }
 
+/// Every file under `root`, relative, with links listed and not followed.
+#[cfg(unix)]
+fn tree_of(root: &Path) -> Vec<String> {
+    fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) {
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            let p = e.path();
+            out.push(p.strip_prefix(root).unwrap().display().to_string());
+            if e.file_type().unwrap().is_dir() {
+                walk(&p, root, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.sort();
+    out
+}
+
+/// A link in an archive followed by members "under" it never lets a write out of the
+/// destination: not through a link to an absolute or relative place, a chain of links, a link
+/// inside a folder, a folder replaced by a link, in a tar or a zip, whatever is done about a
+/// name that is already taken.
+#[cfg(unix)]
+#[test]
+fn no_member_after_a_link_is_written_outside_the_destination() {
+    let sb = Sandbox::new();
+    let victim = sb.mkdir("victim");
+    let outside = victim.to_str().unwrap().to_string();
+    let cases: Vec<(&str, Vec<Member>)> = vec![
+        (
+            "absolute",
+            vec![
+                Member::symlink("link", &outside),
+                Member::file("link/file", "evil"),
+            ],
+        ),
+        (
+            "relative",
+            vec![
+                Member::symlink("link", "../victim"),
+                Member::file("link/file", "evil"),
+            ],
+        ),
+        (
+            "chain",
+            vec![
+                Member::symlink("l1", "l2"),
+                Member::symlink("l2", &outside),
+                Member::file("l1/file", "evil"),
+            ],
+        ),
+        (
+            "nested",
+            vec![
+                Member::dir("sub"),
+                Member::symlink("sub/link", "../../victim"),
+                Member::file("sub/link/file", "evil"),
+                Member::file("sub/link/deeper/file", "evil"),
+            ],
+        ),
+        (
+            "dir replaced by a link",
+            vec![
+                Member::dir("d"),
+                Member::symlink("d", &outside),
+                Member::file("d/file", "evil"),
+            ],
+        ),
+        (
+            "link first, then the same name as a folder",
+            vec![
+                Member::symlink("d", &outside),
+                Member::dir("d"),
+                Member::file("d/file", "evil"),
+            ],
+        ),
+        (
+            "dot-dot through the link",
+            vec![
+                Member::symlink("link", &outside),
+                Member::file("link/../escape", "evil"),
+            ],
+        ),
+        (
+            "hard link under a link",
+            vec![
+                Member::file("real", "x"),
+                Member::symlink("link", &outside),
+                Member::hardlink("link/hard", "real"),
+            ],
+        ),
+    ];
+    for zip in [false, true] {
+        for policy in [
+            ConflictPolicy::Skip,
+            ConflictPolicy::KeepBoth,
+            ConflictPolicy::Overwrite,
+        ] {
+            for (what, members) in &cases {
+                let e = sb.engine();
+                let dir = sb.mkdir("out");
+                let a = sb.path(if zip { "l.zip" } else { "l.tar" });
+                if zip {
+                    write_zip(&a, members);
+                } else {
+                    write_tar(&a, members, Compression::None);
+                }
+                let before = tree_of(&sb.path("."));
+                let mut req = extract_req(&a, &dir, ExtractInto::Here);
+                if let OpRequest::Extract { conflict, .. } = &mut req {
+                    *conflict = policy;
+                }
+                if let Ok(plan) = plan_try(&e, &req) {
+                    run(&e, &plan);
+                }
+                let after = tree_of(&sb.path("."));
+                let new_outside: Vec<_> = after
+                    .iter()
+                    .filter(|p| !before.contains(p) && !p.starts_with("out"))
+                    .collect();
+                assert!(
+                    new_outside.is_empty(),
+                    "{what} (zip: {zip}, {policy:?}): wrote {new_outside:?}"
+                );
+                assert!(
+                    std::fs::read_dir(&victim).unwrap().next().is_none(),
+                    "{what} (zip: {zip}, {policy:?}): the victim folder got something"
+                );
+                if *what == "absolute" {
+                    // The extraction did run: the link is there, as a link.
+                    let made = std::fs::symlink_metadata(dir.join("link"));
+                    assert!(made.is_ok_and(|m| m.is_symlink()), "{what} (zip: {zip})");
+                }
+                std::fs::remove_dir_all(&dir).unwrap();
+                let _ = std::fs::remove_file(&a);
+            }
+        }
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn nothing_is_written_through_a_link_the_archive_made() {
