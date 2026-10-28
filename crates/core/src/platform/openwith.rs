@@ -984,10 +984,11 @@ mod tests {
     #[test]
     fn a_relative_file_that_starts_with_a_dash_never_stands_where_an_option_could() {
         let f = Path::new("--help");
+        let safe = Path::new(".").join(f).to_string_lossy().into_owned();
         let go = |exec: &str| expand_exec(exec, &[f], &entry(exec), None);
-        assert_eq!(go("app %f"), ["app", "./--help"]);
-        assert_eq!(go("app %F"), ["app", "./--help"]);
-        assert_eq!(go("app --new"), ["app", "--new", "./--help"]);
+        assert_eq!(go("app %f"), ["app", safe.as_str()]);
+        assert_eq!(go("app %F"), ["app", safe.as_str()]);
+        assert_eq!(go("app --new"), ["app", "--new", safe.as_str()]);
         // Inside a word it follows something that makes it a value.
         assert_eq!(go("app --file=%f"), ["app", "--file=--help"]);
     }
