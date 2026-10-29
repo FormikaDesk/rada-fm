@@ -7,14 +7,14 @@
 use std::ffi::OsString;
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::time::{Duration, SystemTime};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use image::imageops::FilterType;
 use image::metadata::Orientation;
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, RgbaImage};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader};
 
 use super::{Preview, pdf};
 use crate::display;
@@ -34,6 +34,9 @@ pub struct ImageLimits {
     pub pdf_max_file_bytes: u64,
     /// Each poppler tool may run this long before it is stopped.
     pub pdf_timeout: Duration,
+    /// An SVG that takes longer than this to read and draw is given up on: the file is small,
+    /// the drawing can be endless (filters over a large canvas, patterns within patterns).
+    pub svg_timeout: Duration,
     /// Where rendered first pages are kept; `None` is a folder under the system's temporary one.
     pub pdf_cache: Option<PathBuf>,
     /// The cache is pruned down to this size, and of anything older than `pdf_cache_max_age`.
@@ -58,6 +61,7 @@ impl Default for ImageLimits {
             max_edge: 1600,
             pdf_max_file_bytes: 512 << 20,
             pdf_timeout: Duration::from_secs(8),
+            svg_timeout: Duration::from_secs(8),
             pdf_cache: None,
             pdf_cache_max_bytes: 200 << 20,
             pdf_cache_max_age: Duration::from_secs(30 * 24 * 3600),
@@ -302,19 +306,6 @@ fn header_dims(path: &Path, fmt: ImageFormat) -> Result<(u32, u32), String> {
 
 // --------------------------------------------------------------------------- decoding
 
-static FONTS: OnceLock<Arc<resvg::usvg::fontdb::Database>> = OnceLock::new();
-
-fn fonts() -> Arc<resvg::usvg::fontdb::Database> {
-    FONTS
-        .get_or_init(|| {
-            // Loading system fonts takes a moment: only ever done once, in the worker.
-            let mut db = resvg::usvg::fontdb::Database::new();
-            db.load_system_fonts();
-            Arc::new(db)
-        })
-        .clone()
-}
-
 /// Pictures with transparency (PNG logos, every SVG) are drawn over a discreet light
 /// checkerboard, so that a black shape stays visible on a dark terminal.
 fn on_checkerboard(img: DynamicImage) -> DynamicImage {
@@ -350,107 +341,6 @@ fn downscale(img: DynamicImage, max_edge: u32) -> DynamicImage {
     } else {
         img.resize(max_edge, max_edge, FilterType::Triangle)
     }
-}
-
-/// The largest SVG that is drawn. The renderer has no time limit and the whole file is held in
-/// memory (and again as a tree): a bigger one is said so, not drawn.
-const MAX_SVG_BYTES: u64 = 20 << 20;
-
-/// The content of an SVG file, if it is not bigger than [`MAX_SVG_BYTES`] (checked while
-/// reading too, for a file that grows meanwhile).
-fn read_svg(path: &Path) -> Result<Vec<u8>, String> {
-    use std::io::Read;
-    let too_big = || {
-        format!(
-            "the SVG is bigger than {} MB: not drawn",
-            MAX_SVG_BYTES >> 20
-        )
-    };
-    let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
-    if file.metadata().map_err(|e| e.to_string())?.len() > MAX_SVG_BYTES {
-        return Err(too_big());
-    }
-    let mut data = Vec::new();
-    file.take(MAX_SVG_BYTES + 1)
-        .read_to_end(&mut data)
-        .map_err(|e| e.to_string())?;
-    if data.len() as u64 > MAX_SVG_BYTES {
-        return Err(too_big());
-    }
-    Ok(data)
-}
-
-fn load_svg(
-    path: &Path,
-    limits: &ImageLimits,
-    info: &mut ImageInfo,
-) -> Result<DynamicImage, String> {
-    let data = read_svg(path)?;
-    let opt = resvg::usvg::Options {
-        fontdb: fonts(),
-        ..Default::default()
-    };
-    let tree = resvg::usvg::Tree::from_data(&data, &opt).map_err(|e| e.to_string())?;
-    let size = tree.size();
-    let (sw, sh) = (size.width(), size.height());
-    if !(sw.is_finite() && sh.is_finite()) || sw <= 0.0 || sh <= 0.0 {
-        return Err("the SVG has no usable size".into());
-    }
-    info.width = Some(sw.round().max(1.0) as u32);
-    info.height = Some(sh.round().max(1.0) as u32);
-    // Vector art is rendered at a comfortable preview size, whatever its nominal size.
-    let target = limits.max_edge.min(1024) as f32;
-    let scale = target / sw.max(sh);
-    let (w, h) = (
-        ((sw * scale).round() as u32).max(1),
-        ((sh * scale).round() as u32).max(1),
-    );
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h).ok_or("cannot allocate the SVG canvas")?;
-    resvg::render(
-        &tree,
-        resvg::tiny_skia::Transform::from_scale(scale, scale),
-        &mut pixmap.as_mut(),
-    );
-    let mut raw = Vec::with_capacity((w * h * 4) as usize);
-    for p in pixmap.pixels() {
-        let c = p.demultiply();
-        raw.extend_from_slice(&[c.red(), c.green(), c.blue(), c.alpha()]);
-    }
-    RgbaImage::from_raw(w, h, raw)
-        .map(DynamicImage::ImageRgba8)
-        .ok_or_else(|| "bad SVG canvas".into())
-}
-
-/// An SVG drawn square at `edge` pixels (its longer side), transparent where it has no
-/// ink: for the icons rada makes from its own logo.
-pub fn render_svg(data: &[u8], edge: u32) -> Result<RgbaImage, String> {
-    let opt = resvg::usvg::Options {
-        fontdb: fonts(),
-        ..Default::default()
-    };
-    let tree = resvg::usvg::Tree::from_data(data, &opt).map_err(|e| e.to_string())?;
-    let size = tree.size();
-    let (sw, sh) = (size.width(), size.height());
-    if !(sw.is_finite() && sh.is_finite()) || sw <= 0.0 || sh <= 0.0 {
-        return Err("the SVG has no usable size".into());
-    }
-    let scale = edge as f32 / sw.max(sh);
-    let (w, h) = (
-        ((sw * scale).round() as u32).max(1),
-        ((sh * scale).round() as u32).max(1),
-    );
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h).ok_or("cannot allocate the SVG canvas")?;
-    resvg::render(
-        &tree,
-        resvg::tiny_skia::Transform::from_scale(scale, scale),
-        &mut pixmap.as_mut(),
-    );
-    let mut raw = Vec::with_capacity((w * h * 4) as usize);
-    for p in pixmap.pixels() {
-        let c = p.demultiply();
-        raw.extend_from_slice(&[c.red(), c.green(), c.blue(), c.alpha()]);
-    }
-    RgbaImage::from_raw(w, h, raw).ok_or_else(|| "bad SVG canvas".into())
 }
 
 fn load_raster(
@@ -491,7 +381,7 @@ pub fn load(
         return load_pdf(path, info, limits, abandon);
     }
     let result = if info.format == "SVG" {
-        load_svg(path, limits, &mut info)
+        super::svg::load(path, limits, &mut info, abandon)
     } else {
         load_raster(path, limits, &mut info)
     };

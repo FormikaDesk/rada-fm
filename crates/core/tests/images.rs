@@ -417,6 +417,82 @@ fn an_svg_over_the_size_limit_is_refused() {
     assert!(matches!(settled(&rx, 2).state, ImageState::Ready(_)));
 }
 
+/// A small file that takes the renderer very long: a few circles, each blurred over a canvas
+/// of 3000 by 3000 pixels.
+fn slow_svg(circles: usize) -> String {
+    let mut s = String::from(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000"><defs><filter id="f" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="40"/></filter></defs>"##,
+    );
+    for i in 0..circles {
+        s.push_str(&format!(
+            r##"<circle cx="{}" cy="500" r="400" fill="red" filter="url(#f)"/>"##,
+            i * 50
+        ));
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[test]
+fn an_svg_that_takes_too_long_is_given_up_on_and_the_next_one_is_drawn() {
+    let sb = Sandbox::new();
+    let slow = sb.write("slow.svg", slow_svg(6));
+    let (w, rx) = worker();
+    let limits = Limits {
+        image: ImageLimits {
+            svg_timeout: Duration::from_millis(300),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let asked = Instant::now();
+    request(&w, &slow, 1, limits);
+    let state = loop {
+        match next_for(&rx, 1, 10).preview {
+            Preview::Image(i) if matches!(i.state, ImageState::Loading) => continue,
+            Preview::Image(i) => break i.state,
+            other => panic!("{other:?}"),
+        }
+    };
+    let ImageState::Failed(why) = state else {
+        panic!("a slow SVG must not be drawn");
+    };
+    assert!(why.contains("too complex"), "{why}");
+    assert!(
+        asked.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        asked.elapsed()
+    );
+
+    // The worker is free: a simple one right after is drawn.
+    let ok = sb.write(
+        "ok.svg",
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#,
+    );
+    request(&w, &ok, 2, Limits::default());
+    let state = settled(&rx, 2).state;
+    assert!(matches!(state, ImageState::Ready(_)), "{state:?}");
+}
+
+#[test]
+fn an_svg_that_expands_into_millions_of_elements_is_refused() {
+    let sb = Sandbox::new();
+    let mut s = String::from(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100"><defs><g id="g0"><rect width="1" height="1"/></g>"##,
+    );
+    for i in 1..=28 {
+        s.push_str(&format!(
+            r##"<g id="g{i}"><use xlink:href="#g{p}"/><use xlink:href="#g{p}"/></g>"##,
+            p = i - 1
+        ));
+    }
+    s.push_str(r##"</defs><use xlink:href="#g28"/></svg>"##);
+    let p = sb.write("bomb.svg", s);
+    let (w, rx) = worker();
+    request(&w, &p, 1, Limits::default());
+    assert!(matches!(settled(&rx, 1).state, ImageState::Failed(_)));
+}
+
 /// JPEG with an EXIF orientation tag inserted right after SOI.
 fn with_orientation(jpeg: &[u8], orientation: u16) -> Vec<u8> {
     let mut exif = b"Exif\0\0".to_vec();

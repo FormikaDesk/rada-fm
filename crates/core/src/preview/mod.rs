@@ -6,6 +6,7 @@ pub mod archive;
 pub mod card;
 pub mod image;
 pub mod pdf;
+mod svg;
 pub mod syntax;
 pub mod system;
 
@@ -15,7 +16,8 @@ use std::path::{Path, PathBuf};
 
 pub use archive::ArchivePreview;
 pub use card::{ExecInfo, FileCard, mode_string};
-pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker, render_svg};
+pub use image::{ImageInfo, ImageLimits, ImagePreview, ImageState, ImageWorker};
+pub use svg::render_svg;
 
 use crate::display;
 use crate::fs::{FileKind, FsEngine, FsMeta, SpecialKind};

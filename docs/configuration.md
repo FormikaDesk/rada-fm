@@ -21,6 +21,7 @@ image_max_megapixels = 50
 image_max_file_mb = 128
 pdf_max_file_mb = 512     # larger PDFs are not drawn
 pdf_timeout_seconds = 8   # a PDF that takes longer to draw is given up on
+svg_timeout_seconds = 8   # an SVG that takes longer to draw is "too complex" and is not drawn
 syntax_highlight = true  # colour the preview of source files and the like with the colours of the theme (only the first 64 KB; a language that is not known stays plain). false: plain text
 mouse = true          # false: rada never captures the mouse
 sidebar = true        # the navigation pane; Ctrl+B toggles it and remembers

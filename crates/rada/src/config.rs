@@ -27,6 +27,7 @@
 //! image_max_file_mb = 128
 //! pdf_max_file_mb = 512      # larger PDFs are not drawn (needs poppler: pdftoppm, pdfinfo)
 //! pdf_timeout_seconds = 8    # a PDF that takes longer to draw is given up on
+//! svg_timeout_seconds = 8    # an SVG that takes longer to draw is "too complex" and is not drawn
 //! mouse = true                # false: no mouse capture at all
 //! keymap = "vim+classic"      # vim+classic (default) | vim | classic
 //! cmd_keys = true            # macOS: ask the terminal to report Cmd, for Cmd+C/V/X… (classic keys)
@@ -261,6 +262,7 @@ struct Raw {
     image_max_file_mb: Option<u64>,
     pdf_max_file_mb: Option<u64>,
     pdf_timeout_seconds: Option<u64>,
+    svg_timeout_seconds: Option<u64>,
     mouse: Option<bool>,
     hints: Option<bool>,
     show_hints: Option<bool>,
@@ -398,6 +400,10 @@ pub fn load(dirs: &Dirs) -> FileConfig {
                     .pdf_timeout_seconds
                     .map(|s| std::time::Duration::from_secs(s.clamp(1, 120)))
                     .unwrap_or(d.pdf_timeout),
+                svg_timeout: raw
+                    .svg_timeout_seconds
+                    .map(|s| std::time::Duration::from_secs(s.clamp(1, 120)))
+                    .unwrap_or(d.svg_timeout),
                 pdf_cache: Some(dirs.rada_cache().join("previews")),
                 ..d
             }
@@ -426,6 +432,15 @@ mod tests {
         let d = with_config("sidebar = true\n");
         assert_eq!(d.archive_limits, ArchiveLimits::default());
         assert_eq!(d.archive_preview_entries, 200);
+    }
+
+    #[test]
+    fn the_time_an_svg_may_take_is_read_and_kept_between_one_and_120_seconds() {
+        let c = |t: &str| with_config(t).image_limits.svg_timeout.as_secs();
+        assert_eq!(c("svg_timeout_seconds = 3\n"), 3);
+        assert_eq!(c("svg_timeout_seconds = 0\n"), 1);
+        assert_eq!(c("svg_timeout_seconds = 9999\n"), 120);
+        assert_eq!(c("sidebar = true\n"), 8);
     }
 
     #[test]

@@ -322,6 +322,12 @@ These are real, and we would rather you read them here than discover them.
 - **Network and FUSE filesystems** may report sizes, times and links the way their server
   decides. Nothing here has been tested against a flaky network share beyond the
   per-mount timeout used when listing disks.
+- **SVG previews have a time limit, not a way to stop.** The drawing library cannot be
+  interrupted, so a file that takes longer than `svg_timeout_seconds` (8 by default) is said to
+  be "too complex" and the worker goes on; the thread that was drawing it runs until it is done
+  (an endless one lasts until rada ends). At most two such threads are let to run: while two
+  are busy, other SVGs are not drawn either. A file that expands into millions of elements by
+  `<use>` is refused by the library itself, and one over 20 MB is not read.
 - **Archives.** RAR is read only through `7z`, `7zz` or `unrar` when one is installed; that
   path is tested with 7-Zip (on a 7z) and with a stand-in program that prints what `unrar` prints,
   not with a real RAR file, which cannot be made without the proprietary compressor. Archives
