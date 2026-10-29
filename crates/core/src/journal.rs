@@ -45,6 +45,8 @@ pub enum Intent {
     Create {
         #[serde(with = "pathcodec::path")]
         dst: PathBuf,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        temp: Option<String>,
     },
     /// A cross-device move of a file (`symlink: false`) or a link.
     Move {
@@ -53,6 +55,8 @@ pub enum Intent {
         #[serde(with = "pathcodec::path")]
         dst: PathBuf,
         symlink: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        temp: Option<String>,
     },
     Dir {
         #[serde(with = "pathcodec::path")]
@@ -73,10 +77,23 @@ pub enum Intent {
         src_link: Option<PathBuf>,
         #[serde(with = "pathcodec::opt_path", default)]
         src_existing: Option<PathBuf>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        temp: Option<String>,
     },
 }
 
 impl Intent {
+    /// The name the step gives its temporary file (see `ExecHandler::temp_tag`), so that
+    /// settling the step removes that file and no other.
+    pub fn with_temp(mut self, tag: Option<String>) -> Intent {
+        if let Intent::Create { temp, .. } | Intent::Move { temp, .. } | Intent::Link { temp, .. } =
+            &mut self
+        {
+            *temp = tag;
+        }
+        self
+    }
+
     /// The intent of a step, for the steps that create something.
     pub fn of(step: &Step) -> Option<Intent> {
         Some(match step {
@@ -91,9 +108,13 @@ impl Intent {
                         src: src.clone(),
                         dst: dst.clone(),
                         symlink: false,
+                        temp: None,
                     }
                 } else {
-                    Intent::Create { dst: dst.clone() }
+                    Intent::Create {
+                        dst: dst.clone(),
+                        temp: None,
+                    }
                 }
             }
             Step::CopySymlink {
@@ -107,9 +128,13 @@ impl Intent {
                         src: src.clone(),
                         dst: dst.clone(),
                         symlink: true,
+                        temp: None,
                     }
                 } else {
-                    Intent::Create { dst: dst.clone() }
+                    Intent::Create {
+                        dst: dst.clone(),
+                        temp: None,
+                    }
                 }
             }
             Step::HardLink {
@@ -122,12 +147,19 @@ impl Intent {
                 link: link.clone(),
                 src_link: src_link.clone(),
                 src_existing: src_existing.clone(),
+                temp: None,
             },
             Step::ExtractFile { dst, .. }
             | Step::ExtractSymlink { dst, .. }
-            | Step::Compress { dst, .. } => Intent::Create { dst: dst.clone() },
+            | Step::Compress { dst, .. } => Intent::Create {
+                dst: dst.clone(),
+                temp: None,
+            },
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
-            Step::MakeFile { path, .. } => Intent::Create { dst: path.clone() },
+            Step::MakeFile { path, .. } => Intent::Create {
+                dst: path.clone(),
+                temp: None,
+            },
             Step::Rename { from, to } => Intent::Rename {
                 from: from.clone(),
                 to: to.clone(),

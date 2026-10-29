@@ -5,8 +5,9 @@
 //! finish) and which step was about to run (the `pending` record before it). That leaves one
 //! step in doubt, the last one, and the disk answers it:
 //!
-//! * the step's temporary file (`.rada-part-<pid>-<n>`, a sibling of the destination that is
-//!   renamed into place only when complete) is removed;
+//! * the step's temporary file (`.rada-part-<tag>-<n>`, the tag being the one its `pending`
+//!   record names, or `.rada-part-<pid>-<n>` for a record that names none; a sibling of the
+//!   destination that is renamed into place only when complete) is removed;
 //! * a destination that is there but has no `undo` record is a completed step the journal
 //!   missed: its undo is recorded, so that undoing the operation still brings everything
 //!   back;
@@ -131,16 +132,19 @@ impl Engine {
         Ok(rec)
     }
 
-    /// The temporary files of the step that was running: `.rada-part-<pid>-*` next to its
-    /// destination.
+    /// The temporary files of the step that was running: `.rada-part-<tag>-*` next to its
+    /// destination (`.rada-part-<pid>-*` for a record that has no tag).
     fn remove_temps(&self, intent: &Intent, pid: u32, rec: &mut Recovered) {
-        let dst = match intent {
-            Intent::Create { dst } | Intent::Move { dst, .. } => dst,
-            Intent::Link { link, .. } => link,
+        let (dst, temp) = match intent {
+            Intent::Create { dst, temp } | Intent::Move { dst, temp, .. } => (dst, temp),
+            Intent::Link { link, temp, .. } => (link, temp),
             _ => return,
         };
         let Some(dir) = dst.parent() else { return };
-        let prefix = format!(".rada-part-{pid}-");
+        // The step's own name when its record has one; the process id (which another rada
+        // may have taken since) only for a record written without it.
+        let owner = temp.clone().unwrap_or_else(|| pid.to_string());
+        let prefix = format!(".rada-part-{owner}-");
         let Ok(items) = self.fs.read_dir(dir) else {
             return;
         };
@@ -161,14 +165,16 @@ impl Engine {
         let fs = &self.fs;
         let exists = |p: &Path| fs.lstat(p).is_ok();
         let step = match intent {
-            Intent::Create { dst } => {
+            Intent::Create { dst, .. } => {
                 let meta = fs.lstat(dst).ok()?;
                 Step::RemoveFile {
                     path: dst.clone(),
                     expect: Some(meta.fingerprint()),
                 }
             }
-            Intent::Move { src, dst, symlink } => {
+            Intent::Move {
+                src, dst, symlink, ..
+            } => {
                 let meta = fs.lstat(dst).ok()?;
                 if exists(src) {
                     // In two places: the copy counts as not made.
@@ -212,6 +218,7 @@ impl Engine {
                 link,
                 src_link,
                 src_existing,
+                ..
             } => {
                 let meta = fs.lstat(link).ok()?;
                 match (src_link, src_existing) {

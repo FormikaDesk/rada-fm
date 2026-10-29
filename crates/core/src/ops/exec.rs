@@ -87,6 +87,12 @@ pub trait ExecHandler {
     fn step_starting(&mut self, _index: usize, _step: &Step) {}
     /// Called after every successful step (the journal hooks in here).
     fn step_finished(&mut self, _index: usize, _step: &Step, _result: &StepResult) {}
+    /// The name the running step gives its temporary file (`.rada-part-<tag>-<n>`) when the
+    /// journal has recorded it, so that settling the step finds exactly that file. Without
+    /// one the name carries the process id.
+    fn temp_tag(&self) -> Option<String> {
+        None
+    }
 }
 
 /// A handler that never asks: skip every failure.
@@ -143,10 +149,11 @@ impl ExecReport {
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-fn temp_sibling(dst: &Path) -> PathBuf {
+fn temp_sibling(dst: &Path, tag: Option<String>) -> PathBuf {
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let owner = tag.unwrap_or_else(|| std::process::id().to_string());
     // Short and independent of the target name, so a 255-byte name still fits.
-    dst.with_file_name(format!(".rada-part-{}-{n}", std::process::id()))
+    dst.with_file_name(format!(".rada-part-{owner}-{n}"))
 }
 
 struct RunState {
@@ -511,7 +518,7 @@ impl Engine {
         let tmp = if device {
             dst.to_path_buf()
         } else {
-            temp_sibling(dst)
+            temp_sibling(dst, ctl.handler.temp_tag())
         };
         let sink = self
             .fs
@@ -627,7 +634,7 @@ impl Engine {
         items: &[archive::writer::CompressItem],
     ) -> Result<StepResult> {
         self.require_free(dst)?;
-        let tmp = temp_sibling(dst);
+        let tmp = temp_sibling(dst, ctl.handler.temp_tag());
         let sink = self
             .fs
             .create_file(&tmp, 0o666)
@@ -870,7 +877,7 @@ impl Engine {
         let tmp = if to_device {
             dst.to_path_buf()
         } else {
-            temp_sibling(dst)
+            temp_sibling(dst, ctl.handler.temp_tag())
         };
         let req = CopyRequest {
             src: src.to_path_buf(),
@@ -1009,7 +1016,7 @@ impl Engine {
         let meta = fs
             .lstat(existing)
             .map_err(|e| Error::io("inspect", existing, e))?;
-        let tmp = temp_sibling(link);
+        let tmp = temp_sibling(link, ctl.handler.temp_tag());
         let req = CopyRequest {
             src: existing.to_path_buf(),
             dst: tmp.clone(),

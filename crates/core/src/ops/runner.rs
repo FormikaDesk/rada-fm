@@ -25,6 +25,8 @@ struct Recording<'a> {
     errors: u64,
     /// Contents already hashed in this run, by (device, file): the names of one file.
     hashed: HashMap<(u64, u64), String>,
+    /// The name the running step gives its temporary file, as its pending record says.
+    tag: Option<String>,
 }
 
 impl Recording<'_> {
@@ -78,14 +80,27 @@ impl ExecHandler for Recording<'_> {
     fn step_starting(&mut self, index: usize, step: &Step) {
         // Written before the step runs: if the process dies in it, the next start can see
         // from the disk whether it happened.
+        self.tag = None;
         if self.reversible
             && let Some(intent) = crate::journal::Intent::of(step)
-            && let Err(e) = self.journal.pending(self.id, intent)
         {
-            tracing::error!("journal: {e}");
-            self.errors += 1;
+            let tag = format!("{}-{index}", self.id);
+            match self
+                .journal
+                .pending(self.id, intent.with_temp(Some(tag.clone())))
+            {
+                Ok(()) => self.tag = Some(tag),
+                Err(e) => {
+                    tracing::error!("journal: {e}");
+                    self.errors += 1;
+                }
+            }
         }
         self.inner.step_starting(index, step);
+    }
+
+    fn temp_tag(&self) -> Option<String> {
+        self.tag.clone()
     }
 
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
@@ -128,6 +143,7 @@ impl Engine {
             reversible: plan.reversible,
             errors: 0,
             hashed: HashMap::new(),
+            tag: None,
         };
         let report = self.execute(plan, &mut rec, cancel);
         let mut errors = rec.errors;
