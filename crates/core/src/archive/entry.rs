@@ -92,13 +92,15 @@ impl Entry {
 }
 
 /// Clean a stored name. `backslash_separates` is for ZIP, whose names are written with `/`
-/// but come from Windows tools that sometimes wrote `\`.
+/// but come from Windows tools that sometimes wrote `\`. On Windows a `\` separates in every
+/// format, because that is how the path is split when it is joined to the destination.
 pub fn sanitize(raw: &[u8], backslash_separates: bool) -> (PathBuf, Option<NameIssue>) {
     if raw.contains(&0) {
         return (PathBuf::new(), Some(NameIssue::Invalid));
     }
     let mut issue = None;
     let mut parts: Vec<Vec<u8>> = Vec::new();
+    let backslash_separates = backslash_separates || cfg!(windows);
     let is_sep = |b: u8| b == b'/' || (backslash_separates && b == b'\\');
     let mut first = true;
     for comp in raw.split(|b| is_sep(*b)) {
@@ -250,8 +252,25 @@ mod tests {
         assert_eq!(p, PathBuf::from("evil"));
         let (p, i) = sanitize(b"dir\\file.txt", true);
         assert_eq!((p, i), (PathBuf::from("dir/file.txt"), None));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_backslash_is_a_letter_of_the_name_where_it_does_not_separate() {
         let (p, i) = sanitize(b"dir\\file.txt", false);
         assert_eq!((p, i), (PathBuf::from("dir\\file.txt"), None));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn on_windows_a_backslash_separates_in_every_format() {
+        let s = |raw: &str| sanitize(raw.as_bytes(), false).1;
+        assert_eq!(s("..\\..\\fuori.txt"), Some(NameIssue::Traversal));
+        assert_eq!(s("a\\..\\..\\b"), Some(NameIssue::Traversal));
+        assert_eq!(s("C:\\x"), Some(NameIssue::Absolute));
+        assert_eq!(s("\\\\server\\share\\x"), Some(NameIssue::Absolute));
+        let (p, i) = sanitize(b"dir\\file.txt", false);
+        assert_eq!((p, i), (PathBuf::from("dir/file.txt"), None));
     }
 
     #[test]

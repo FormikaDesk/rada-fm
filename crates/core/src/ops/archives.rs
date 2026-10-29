@@ -76,6 +76,24 @@ struct Ex<'a> {
     refused: HashSet<PathBuf>,
 }
 
+impl<'a> Ex<'a> {
+    fn new(engine: &'a Engine, policy: ConflictPolicy) -> Ex<'a> {
+        Ex {
+            engine,
+            policy,
+            ws: WarningSet::default(),
+            steps: Vec::new(),
+            made: HashSet::new(),
+            taken: HashSet::new(),
+            case_insensitive: engine.platform.path_rules().case_insensitive,
+            explicit_dirs: HashMap::new(),
+            placed: HashMap::new(),
+            existing: HashSet::new(),
+            refused: HashSet::new(),
+        }
+    }
+}
+
 impl Ex<'_> {
     fn key(&self, p: &Path) -> OsString {
         if self.case_insensitive {
@@ -277,19 +295,7 @@ impl Engine {
             }
         };
 
-        let mut ex = Ex {
-            engine: self,
-            policy,
-            ws: WarningSet::default(),
-            steps: Vec::new(),
-            made: HashSet::new(),
-            taken: HashSet::new(),
-            case_insensitive: self.platform.path_rules().case_insensitive,
-            explicit_dirs: HashMap::new(),
-            placed: HashMap::new(),
-            existing: HashSet::new(),
-            refused: HashSet::new(),
-        };
+        let mut ex = Ex::new(self, policy);
 
         // The destination folder must be there and writable.
         let problem = match self.fs.stat(dest) {
@@ -412,6 +418,17 @@ impl Engine {
                     Severity::Warning,
                     Some(&archive.join(&e.path)),
                     Some(issue.reason().to_string()),
+                );
+                continue;
+            }
+            // Whatever the format reader let through, the path joined to the destination
+            // must be plain names only.
+            if clean_inner(&rel).is_none() {
+                ex.ws.add_with(
+                    WarningKind::UnsafePath,
+                    Severity::Warning,
+                    Some(&archive.join(&e.path)),
+                    Some(NameIssue::Traversal.reason().to_string()),
                 );
                 continue;
             }
@@ -1048,4 +1065,69 @@ fn nearest_existing(fs: &dyn crate::fs::FsEngine, p: &Path) -> Option<PathBuf> {
     p.ancestors()
         .find(|a| !a.as_os_str().is_empty() && fs.stat(a).is_ok())
         .map(Path::to_path_buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::archive::{Compression, Entry};
+    use crate::testutil::Sandbox;
+
+    fn member(path: &str, kind: EntryKind) -> Entry {
+        Entry {
+            index: 0,
+            path: PathBuf::from(path),
+            kind,
+            size: 0,
+            compressed: None,
+            mode: None,
+            mtime: None,
+            link: None,
+            encrypted: false,
+            issue: None,
+        }
+    }
+
+    /// An index the name cleaner never saw: whatever a format reader lets through.
+    #[test]
+    fn a_member_whose_path_is_not_plain_is_refused_whatever_the_format() {
+        let sb = Sandbox::new();
+        let engine = sb.engine();
+        let dest = sb.mkdir("out");
+        let mut ix = Index::new(&sb.path("odd.tar"), Format::Tar(Compression::None), 0);
+        ix.push(member("a/../../outside.txt", EntryKind::File));
+        ix.push(member("../up", EntryKind::Dir));
+        ix.push(member("fine.txt", EntryKind::File));
+        let ix = ix.finish();
+        let mut ex = Ex::new(&engine, ConflictPolicy::Skip);
+        ex.existing.insert(dest.clone());
+
+        let plan = engine
+            .plan_extract_at(
+                &sb.path("odd.tar"),
+                &dest,
+                ConflictPolicy::Skip,
+                &ix,
+                &[],
+                dest.clone(),
+                ex,
+            )
+            .unwrap();
+
+        let unsafe_paths = plan
+            .warnings
+            .iter()
+            .find(|w| w.kind == WarningKind::UnsafePath)
+            .map_or(0, |w| w.count);
+        assert_eq!(unsafe_paths, 2);
+        for step in &plan.steps {
+            let at = step.destination().expect("steps of an extraction write");
+            assert!(at.starts_with(&dest), "{} is outside", at.display());
+        }
+        assert!(
+            plan.steps
+                .iter()
+                .any(|s| s.destination() == Some(&dest.join("fine.txt")))
+        );
+    }
 }

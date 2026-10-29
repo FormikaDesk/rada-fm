@@ -273,6 +273,64 @@ fn tar_slip_names_are_blocked_too() {
     assert_eq!(read(&dir.join("good.txt")), "good");
 }
 
+const BACKSLASH_NAMES: [&[u8]; 4] = [
+    b"..\\..\\fuori.txt",
+    b"a\\..\\..\\b",
+    b"C:\\x",
+    b"\\\\server\\share\\x",
+];
+
+fn backslash_tar(sb: &Sandbox) -> PathBuf {
+    let a = sb.path("work/slash.tar");
+    let mut members = vec![Member::file("good.txt", "good")];
+    for name in BACKSLASH_NAMES {
+        members.push(Member::file("x", "evil").raw_name(name));
+    }
+    write_tar(&a, &members, Compression::None);
+    a
+}
+
+#[test]
+fn tar_names_with_backslashes_never_plan_a_step_outside_the_destination() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let dir = sb.mkdir("work/out");
+    let plan = plan_req(
+        &e,
+        &extract_req(&backslash_tar(&sb), &dir, ExtractInto::Here),
+    );
+    for step in &plan.steps {
+        let at = step.destination().expect("steps of an extraction write");
+        assert!(at.starts_with(&dir), "{} is outside", at.display());
+    }
+    assert!(run(&e, &plan).failed.is_empty());
+    assert_eq!(read(&dir.join("good.txt")), "good");
+    assert!(!sb.path("work/fuori.txt").exists());
+    assert!(!sb.path("work/b").exists());
+}
+
+/// Where `\` separates names, those four members are paths that climb out or ignore the
+/// destination, and none of them is extracted.
+#[cfg(windows)]
+#[test]
+fn on_windows_tar_backslashes_are_separators() {
+    let sb = Sandbox::new();
+    let e = sb.engine();
+    let dir = sb.mkdir("work/out");
+    let plan = plan_req(
+        &e,
+        &extract_req(&backslash_tar(&sb), &dir, ExtractInto::Here),
+    );
+    let w = warning(&plan, WarningKind::UnsafePath).expect("unsafe paths are reported");
+    assert_eq!(w.count, 4);
+    let files = plan
+        .steps
+        .iter()
+        .filter(|s| matches!(s, Step::ExtractFile { .. }))
+        .count();
+    assert_eq!(files, 1);
+}
+
 /// Every file under `root`, relative, with links listed and not followed.
 #[cfg(unix)]
 fn tree_of(root: &Path) -> Vec<String> {

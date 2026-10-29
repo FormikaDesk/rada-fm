@@ -103,7 +103,7 @@ pub struct Index {
 }
 
 impl Index {
-    pub(super) fn new(path: &Path, format: Format, packed: u64) -> Index {
+    pub(crate) fn new(path: &Path, format: Format, packed: u64) -> Index {
         Index {
             path: path.to_path_buf(),
             format,
@@ -127,7 +127,7 @@ impl Index {
         self.note = Some(why.into());
     }
 
-    pub(super) fn finish(mut self) -> Index {
+    pub(crate) fn finish(mut self) -> Index {
         (self.files, self.dirs, self.symlinks, self.bytes) = (0, 0, 0, 0);
         self.encrypted_members = 0;
         for e in &self.entries {
@@ -306,7 +306,7 @@ impl Index {
         Ok(ix.finish())
     }
 
-    pub(super) fn push(&mut self, mut e: Entry) {
+    pub(crate) fn push(&mut self, mut e: Entry) {
         e.index = self.entries.len();
         self.entries.push(e);
     }

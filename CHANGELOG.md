@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Security
+- **On Windows a name in a TAR archive written with backslashes (`..\..\x.txt`, `a\..\..\b`, `C:\x`, `\\server\share\x`) is read as the path it is** and refused, instead of being taken for one odd file name. Extracting also checks, whatever the archive format, that every member lands under the destination folder by plain names only.
+
 ### Fixed
 - **A download for an update never overwrites a file that is already there and never follows a link.** If the place it is saved to is taken, the download stops with an error and that file is left as it is; a download that fails or is stopped removes what it had written.
 - **A version with a sign or a leading zero in a number is no longer read as a version.** `1.+2.3`, `01.2.3` and `1.2.3-rc.01` are refused, as SemVer says; `0.6.0-rc.18`, `v1.0.0` and `1.2.3-rc.1+abc` are read as before.
