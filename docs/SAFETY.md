@@ -277,6 +277,9 @@ These are real, and we would rather you read them here than discover them.
   extended-attribute interface carries.
 - **Undo is bounded by what is still true.** If you changed or removed a file after the
   operation, or the destination is gone, undo does what is safe and tells you what it left.
+- **Moving to the trash has no *pending* record.** The move into the trash is recorded once it
+  has happened. If rada is stopped between the move and that record, the item is in the
+  system's trash but rada's history does not bring it back: restore it from the trash itself.
 - **A file that changes while it is being copied** is copied as it was read; with verification
   (cross-filesystem moves) the mismatch is detected and the step fails, with the source kept.
 - **Races you cause.** rada checks that a destination name is free at the moment it creates
