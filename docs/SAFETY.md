@@ -94,7 +94,10 @@ at the one step that was in doubt and settles it:
 
 - the half-written temporary file is deleted;
 - a copy that had finished but was not yet recorded is added to the journal, so undo still
-  covers it;
+  covers it, but only if what is at the destination is what the step declared: when the
+  pending record holds a size and a modification time, both must match. Otherwise the file is
+  left where it is, it does not enter the history (undo never removes it), and the summary of
+  the recovery says so;
 - a move killed between the copy and the removal of the source keeps **both**; undo then
   removes the copy;
 - the operation is marked *interrupted* in the history, and you are told once.
