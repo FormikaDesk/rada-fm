@@ -54,7 +54,7 @@ pub fn stage_path(exe: &Path) -> PathBuf {
 
 /// Create `path` as a new, empty file to write: it must not exist, and a link in its place is
 /// never followed (so it cannot send the write to another file).
-fn create_new_file(path: &Path) -> io::Result<fs::File> {
+pub(crate) fn create_new_file(path: &Path) -> io::Result<fs::File> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]

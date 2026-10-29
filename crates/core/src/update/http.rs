@@ -1,8 +1,9 @@
 //! The little HTTP client updates use. Nothing is sent but the request itself and a
 //! `User-Agent` of `rada/<version>`.
 
+use super::install::create_new_file;
 use crate::i18n::{Key, tf};
-use std::fs::File;
+use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Duration;
@@ -90,7 +91,7 @@ impl Http {
 
     /// Download `url` into the new file `dest`. `progress(done, total)` is called as bytes
     /// arrive; returning `false` stops the download. A file larger than `max_bytes` is
-    /// refused.
+    /// refused. What is half written is removed.
     pub fn download(
         &self,
         url: &str,
@@ -114,30 +115,123 @@ impl Http {
         }
         let mut reader = resp.body_mut().with_config().limit(max_bytes).reader();
         let mut out =
-            File::create(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
-        let mut buf = vec![0u8; 64 * 1024];
-        let mut done = 0u64;
-        loop {
-            let n = reader
-                .read(&mut buf)
-                .map_err(|e| tf(Key::UpHttpBroke, &[&url, &e]))?;
-            if n == 0 {
-                break;
-            }
-            out.write_all(&buf[..n])
-                .map_err(|e| tf(Key::UpCannotWrite, &[&dest.display(), &e]))?;
-            done += n as u64;
-            if !progress(done, total) {
-                return Err("stopped".into());
-            }
+            create_new_file(dest).map_err(|e| tf(Key::UpCannotCreate, &[&dest.display(), &e]))?;
+        let written = write_body(&mut reader, &mut out, url, dest, total, progress);
+        drop(out);
+        if written.is_err() {
+            let _ = fs::remove_file(dest);
         }
-        out.flush()
+        written
+    }
+}
+
+fn write_body(
+    reader: &mut impl Read,
+    out: &mut fs::File,
+    url: &str,
+    dest: &Path,
+    total: Option<u64>,
+    progress: &mut dyn FnMut(u64, Option<u64>) -> bool,
+) -> Result<(), String> {
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut done = 0u64;
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| tf(Key::UpHttpBroke, &[&url, &e]))?;
+        if n == 0 {
+            break;
+        }
+        out.write_all(&buf[..n])
             .map_err(|e| tf(Key::UpCannotWrite, &[&dest.display(), &e]))?;
-        if let Some(t) = total
-            && done != t
-        {
-            return Err(tf(Key::UpHttpEarly, &[&url, &done, &t]));
+        done += n as u64;
+        if !progress(done, total) {
+            return Err("stopped".into());
         }
-        Ok(())
+    }
+    out.flush()
+        .map_err(|e| tf(Key::UpCannotWrite, &[&dest.display(), &e]))?;
+    if let Some(t) = total
+        && done != t
+    {
+        return Err(tf(Key::UpHttpEarly, &[&url, &done, &t]));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testweb::Server;
+    use std::fs;
+
+    fn fetch(server: &Server, dest: &Path) -> Result<(), String> {
+        Http::new("rada/test", true).download(&server.url("/file"), dest, 1 << 20, &mut |_, _| true)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_in_place_of_the_destination_is_not_followed() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target");
+        fs::write(&target, b"precious").unwrap();
+        let dest = dir.path().join("download");
+        std::os::unix::fs::symlink(&target, &dest).unwrap();
+        let server = Server::start();
+        server.route("/file", 200, b"new bytes".to_vec());
+
+        assert!(fetch(&server, &dest).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"precious");
+    }
+
+    #[test]
+    fn a_file_already_there_is_not_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("download");
+        fs::write(&dest, b"already here").unwrap();
+        let server = Server::start();
+        server.route("/file", 200, b"new bytes".to_vec());
+
+        assert!(fetch(&server, &dest).is_err());
+        assert_eq!(fs::read(&dest).unwrap(), b"already here");
+    }
+
+    #[test]
+    fn a_download_that_breaks_leaves_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("download");
+        let server = Server::start();
+        server.route_truncated("/file", b"half of it".to_vec());
+
+        assert!(fetch(&server, &dest).is_err());
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn a_download_that_is_stopped_leaves_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("download");
+        let server = Server::start();
+        server.route("/file", 200, b"new bytes".to_vec());
+
+        let stopped = Http::new("rada/test", true).download(
+            &server.url("/file"),
+            &dest,
+            1 << 20,
+            &mut |_, _| false,
+        );
+        assert!(stopped.is_err());
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn a_whole_download_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("download");
+        let server = Server::start();
+        server.route("/file", 200, b"new bytes".to_vec());
+
+        fetch(&server, &dest).unwrap();
+        assert_eq!(fs::read(&dest).unwrap(), b"new bytes");
     }
 }

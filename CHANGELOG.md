@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **A download for an update never overwrites a file that is already there and never follows a link.** If the place it is saved to is taken, the download stops with an error and that file is left as it is; a download that fails or is stopped removes what it had written.
+
 ## [0.6.0-rc.18] - 2026-10-29
 
 A safety review of operations, undo, updates and archives, `:` and `m` in the vim keys, and whatever can be clicked lights up under the pointer. Still a **pre-release**.
