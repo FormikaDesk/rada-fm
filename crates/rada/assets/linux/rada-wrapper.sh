@@ -70,6 +70,13 @@ have() {
 # The terminal: TERMCMD as it is, else $TERMINAL, else the first of the usual ones. For the
 # ones rada knows, the options that give the window a name of its own (a rule can then make it
 # float) and the ones that keep the program in front until the window is closed.
+#
+# TERMCMD (and TERMINAL) go through `eval` on purpose: they are a command line with its own
+# quoting (`foot --title "choose a file"`), and that is how the other wrappers of
+# xdg-desktop-portal-termfilechooser read it. They are the user's own configuration, set in the
+# environment or in the portal's `env=` lines, like the script itself; nothing the portal is
+# given by a program (the folder, the name to suggest) reaches the `eval`: those arrive as
+# arguments and are only ever expanded as "$@".
 title="rada: choose"
 if [ -n "${TERMCMD:-}" ]; then
     eval "set -- $TERMCMD \"\$@\""
