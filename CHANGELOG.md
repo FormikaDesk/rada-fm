@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- **The installation guide is complete for every system.** `docs/install.md` now says which file is yours, and gives commands to copy for Linux, Arch, macOS and Windows (download, check, install, `PATH`, what to do when macOS or SmartScreen stops the program), then the font, the shell and the launcher, updating and uninstalling. The README keeps a few lines per system and points to it.
+
 ## [0.6.0-rc.19] - 2026-10-29
 
 Fixes to archives on Windows, to undo, to the recovery after a crash and to downloads for updates. Still a **pre-release**.
