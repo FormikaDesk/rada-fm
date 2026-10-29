@@ -112,6 +112,15 @@ fn done_text(kind: OpKind, n: u64, dest: &str, subject: &str) -> String {
     }
 }
 
+/// ", 1 skipped": the items the plan left alone, said after what was done; nothing if none.
+fn left_out_text(n: u64) -> String {
+    match n {
+        0 => String::new(),
+        1 => Key::NLeftOutOne.tr().to_string(),
+        n => tf(Key::NLeftOutMany, &[&fmt::thousands(n)]),
+    }
+}
+
 impl App {
     /// What a plan will leave behind and where, worked out before it runs.
     pub(super) fn outcome_of(&self, plan: &Plan) -> Outcome {
@@ -161,14 +170,15 @@ impl App {
     /// The card for an operation that went through cleanly: what was done, to how many items
     /// and where, with the way to take it back and the way to see it.
     pub(super) fn done_notice(&self, r: &Running) -> Notice {
-        let n = r.totals.items.max(1);
+        let n = r.totals.items.saturating_sub(r.skipped).max(1);
         let dest = r
             .outcome
             .folder
             .as_deref()
             .map(|p| self.folder_label(p))
             .unwrap_or_default();
-        let text = done_text(r.kind, n, &dest, &r.outcome.subject);
+        let mut text = done_text(r.kind, n, &dest, &r.outcome.subject);
+        text.push_str(&left_out_text(r.skipped));
         let action = match r.kind {
             OpKind::Undo => NoticeAction::Redo,
             _ if r.reversible => NoticeAction::Undo,

@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use common::*;
 use crossterm::event::KeyCode;
-use rada_tui::app::{NoticeAction, NoticeKind};
+use rada_core::ops::ConflictPolicy;
+use rada_tui::app::{Modal, NoticeAction, NoticeKind};
 use rada_tui::hits::{NoticeHit, Target};
 
 /// A folder with a few files and another to copy them into.
@@ -237,5 +238,89 @@ fn the_cards_are_in_italian_when_the_language_is() {
         let s = h.screen();
         assert!(s.contains("3 elementi copiati in Documenti"), "{s}");
         assert!(s.contains("Annulla") && s.contains("Mostra"), "{s}");
+    });
+}
+
+/// The three files again, with one of them already in the destination, copied or moved with
+/// the policy chosen in the plan window.
+fn clash_then(h: &mut H, dest: &std::path::Path, cut: bool, policy: ConflictPolicy) {
+    std::fs::write(dest.join("b.txt"), "already").unwrap();
+    h.press("ctrl+a");
+    h.press(if cut { "ctrl+x" } else { "ctrl+c" });
+    h.app.open_dir(dest.to_path_buf());
+    let d = dest.to_path_buf();
+    h.wait("the destination", move |a| {
+        a.tab.cwd == d && !a.tab.is_loading()
+    });
+    h.press("ctrl+v");
+    plan_modal(h);
+    h.click(&Target::Policy(policy));
+    h.wait("the plan with that policy", move |a| {
+        match &a.windows.modal {
+            Some(Modal::Plan(pv)) => pv.plan.policy == policy && pv.replanning.is_none(),
+            _ => false,
+        }
+    });
+    run_plan_and_wait(h);
+}
+
+fn card_text(h: &H) -> String {
+    h.app.current_notice().expect("a card").text.clone()
+}
+
+#[test]
+fn the_card_counts_only_what_was_copied_and_says_what_was_skipped() {
+    let (mut h, _dir, dest) = files();
+    clash_then(&mut h, &dest, false, ConflictPolicy::Skip);
+    assert_eq!(card_text(&h), "2 items copied to Documenti, 1 skipped");
+    assert!(
+        h.screen()
+            .contains("2 items copied to Documenti, 1 skipped")
+    );
+    assert_eq!(
+        std::fs::read_to_string(dest.join("b.txt")).unwrap(),
+        "already"
+    );
+}
+
+#[test]
+fn the_card_says_the_same_of_a_move() {
+    let (mut h, dir, dest) = files();
+    clash_then(&mut h, &dest, true, ConflictPolicy::Skip);
+    assert_eq!(card_text(&h), "2 items moved to Documenti, 1 skipped");
+    assert!(dir.join("b.txt").exists(), "the skipped one did not move");
+}
+
+#[test]
+fn keeping_both_or_replacing_counts_every_item_and_skips_none() {
+    for policy in [ConflictPolicy::KeepBoth, ConflictPolicy::Overwrite] {
+        let (mut h, _dir, dest) = files();
+        clash_then(&mut h, &dest, false, policy);
+        assert_eq!(card_text(&h), "3 items copied to Documenti", "{policy:?}");
+    }
+}
+
+#[test]
+fn several_skipped_are_counted() {
+    let (mut h, dir, dest) = files();
+    std::fs::write(dest.join("a.txt"), "already").unwrap();
+    std::fs::write(dir.join("d.txt"), "d").unwrap();
+    h.app.open_dir(dir.clone());
+    let d = dir.clone();
+    h.wait("the source", move |a| a.tab.cwd == d && !a.tab.is_loading());
+    clash_then(&mut h, &dest, false, ConflictPolicy::Skip);
+    assert_eq!(card_text(&h), "2 items copied to Documenti, 2 skipped");
+}
+
+#[test]
+fn the_card_says_it_in_italian_too() {
+    rada_core::i18n::with_lang(rada_core::i18n::Lang::It, || {
+        let (mut h, _dir, dest) = files();
+        clash_then(&mut h, &dest, false, ConflictPolicy::Skip);
+        assert_eq!(card_text(&h), "2 elementi copiati in Documenti, 1 saltato");
+        let (mut h, _dir, dest) = files();
+        std::fs::write(dest.join("a.txt"), "already").unwrap();
+        clash_then(&mut h, &dest, true, ConflictPolicy::Skip);
+        assert_eq!(card_text(&h), "1 elemento spostato in Documenti, 2 saltati");
     });
 }

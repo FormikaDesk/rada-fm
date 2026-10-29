@@ -38,6 +38,8 @@ pub struct Running {
     /// What it is doing, for the message when it ends.
     pub kind: OpKind,
     pub totals: Totals,
+    /// Of `totals.items`, those the plan leaves alone.
+    pub skipped: u64,
     pub reversible: bool,
     /// Where the result will be, for the card that says it is done.
     pub outcome: super::outcome::Outcome,
@@ -373,6 +375,7 @@ impl App {
         let title = pv.plan.title.clone();
         let total = pv.plan.total_bytes();
         let (kind, totals, reversible) = (pv.plan.kind, pv.plan.totals, pv.plan.reversible);
+        let skipped = pv.plan.skipped_items();
         let outcome = self.outcome_of(&pv.plan);
         let handle = match pv.undo {
             Some(up) => self.svc.jobs.execute_undo(*up),
@@ -390,6 +393,7 @@ impl App {
             samples: Vec::new(),
             kind,
             totals,
+            skipped,
             reversible,
             outcome,
         });

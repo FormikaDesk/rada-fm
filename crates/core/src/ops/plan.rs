@@ -922,6 +922,15 @@ impl Plan {
         }
     }
 
+    /// How many of the selected items the plan leaves alone (a name that is taken and a policy
+    /// that skips it, nothing to extract): what a finished operation did not do.
+    pub fn skipped_items(&self) -> u64 {
+        self.items
+            .iter()
+            .filter(|i| i.action == ItemAction::Skip)
+            .count() as u64
+    }
+
     pub fn blocking(&self) -> impl Iterator<Item = &Warning> {
         self.warnings
             .iter()

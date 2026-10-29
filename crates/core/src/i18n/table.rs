@@ -811,6 +811,8 @@ strings! {
     NFileCreated => "File created: {0}", "File creato: {0}";
     NDeleteOne => "1 item deleted permanently", "1 elemento eliminato definitivamente";
     NDeleteMany => "{0} items deleted permanently", "{0} elementi eliminati definitivamente";
+    NLeftOutOne => ", 1 skipped", ", 1 saltato";
+    NLeftOutMany => ", {0} skipped", ", {0} saltati";
     NUndone => "Undone", "Annullato";
     NDoneDefault => "{0}: done", "{0}: fatto";
     NDoneKept => "{0}: done, some items were kept", "{0}: fatto, alcuni elementi sono rimasti";
