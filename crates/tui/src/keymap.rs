@@ -430,7 +430,19 @@ impl Chord {
     }
 
     pub fn from_event(k: &KeyEvent) -> Chord {
-        Chord::new(k.code, k.modifiers)
+        let mut chord = Chord::new(k.code, k.modifiers);
+        // A terminal that reports the key and not the character (kitty's protocol with every
+        // key as an escape code, no alternate keys) sends the `:` of an Italian keyboard as
+        // Shift and the dot. The dot's own meaning, hidden files, must not answer for it, so
+        // Shift stays on this one chord, which nothing is bound to. Windows reports `:` as
+        // the character with Shift set and never the dot, so it is not touched.
+        if k.code == KeyCode::Char('.')
+            && chord.mods.is_empty()
+            && k.modifiers == KeyModifiers::SHIFT
+        {
+            chord.mods = KeyModifiers::SHIFT;
+        }
+        chord
     }
 
     /// Parse `ctrl+shift+delete`, `F2`, `G`, `space`, `ctrl+a`…
@@ -606,7 +618,8 @@ const VIM: &[(Action, &[&str])] = &[
     (Action::Redo, &["ctrl+r"]),
     (Action::History, &["U"]),
     (Action::Filter, &["/"]),
-    (Action::Palette, &["m"]),
+    (Action::Palette, &[":"]),
+    (Action::ContextMenu, &["m"]),
     (Action::Sort, &["s"]),
     (Action::SortReverse, &["S"]),
     (Action::ToggleHidden, &["."]),
@@ -1460,6 +1473,138 @@ mod tests {
             0
         );
         assert!(km.warnings.iter().any(|w| w.contains("now means")));
+    }
+
+    fn key_of(km: &Keymap, code: KeyCode, mods: KeyModifiers) -> Option<Action> {
+        km.action_for(&ev(code, mods))
+    }
+
+    /// The Italian layout types `:` as Shift and the dot, and the dot alone hides files.
+    /// A terminal sends the `:` as the character (with or without Shift, as Windows does) or,
+    /// when it reports keys and not characters, as the dot with Shift.
+    #[test]
+    fn the_colon_opens_the_palette_and_never_toggles_hidden_files() {
+        let km = Keymap::default();
+        let none = KeyModifiers::NONE;
+        let shift = KeyModifiers::SHIFT;
+        assert_eq!(
+            key_of(&km, KeyCode::Char(':'), none),
+            Some(Action::Palette),
+            "the character, as most terminals send it"
+        );
+        assert_eq!(
+            key_of(&km, KeyCode::Char(':'), shift),
+            Some(Action::Palette),
+            "the character with Shift set, as Windows sends it"
+        );
+        assert_eq!(
+            key_of(&km, KeyCode::Char('.'), shift),
+            None,
+            "the dot with Shift, as a terminal that reports keys sends the colon"
+        );
+        assert_eq!(
+            key_of(&km, KeyCode::Char('.'), none),
+            Some(Action::ToggleHidden)
+        );
+        // Cmd+Shift+. is the Finder's way to show hidden files and keeps working.
+        let mac = mac_keymap();
+        for mods in [KeyModifiers::SUPER, KeyModifiers::SUPER | shift] {
+            assert_eq!(
+                key_of(&mac, KeyCode::Char('.'), mods),
+                Some(Action::ToggleHidden)
+            );
+        }
+        // The alternate-keys form of the same report arrives as the colon itself.
+        assert_eq!(
+            key_of(&km, KeyCode::Char(':'), none),
+            key_of(&km, KeyCode::Char(':'), shift)
+        );
+    }
+
+    #[test]
+    fn m_is_the_context_menu_in_the_vim_keys_and_the_palette_keeps_ctrl_p() {
+        let km = Keymap::default();
+        let none = KeyModifiers::NONE;
+        assert_eq!(
+            key_of(&km, KeyCode::Char('m'), none),
+            Some(Action::ContextMenu)
+        );
+        assert_eq!(
+            key_of(&km, KeyCode::Char('p'), KeyModifiers::CONTROL),
+            Some(Action::Palette)
+        );
+        assert_eq!(km.keys_text(Action::Palette, Scheme::Vim), ":");
+        assert_eq!(
+            km.keys_text(Action::ContextMenu, Scheme::Vim),
+            "m Shift+F10 Menu"
+        );
+        assert_eq!(km.hint(Action::Palette).as_deref(), Some("Ctrl+P"));
+        assert_eq!(km.hint(Action::ContextMenu).as_deref(), Some("Shift+F10"));
+        // The classic scheme has no `m` and no `:`, and keeps both of its own ways.
+        let classic = Keymap::new(Preset::Classic, &HashMap::new());
+        assert_eq!(key_of(&classic, KeyCode::Char('m'), none), None);
+        assert_eq!(key_of(&classic, KeyCode::Char(':'), none), None);
+        assert_eq!(
+            key_of(&classic, KeyCode::F(10), KeyModifiers::SHIFT),
+            Some(Action::ContextMenu)
+        );
+        assert_eq!(
+            key_of(&classic, KeyCode::Menu, none),
+            Some(Action::ContextMenu)
+        );
+        assert_eq!(
+            key_of(&classic, KeyCode::Char('p'), KeyModifiers::CONTROL),
+            Some(Action::Palette)
+        );
+        // With only the vim keys, `:` works and Ctrl+P is still there.
+        let vim = Keymap::new(Preset::Vim, &HashMap::new());
+        assert_eq!(vim.hint(Action::Palette).as_deref(), Some("Ctrl+P"));
+        assert_eq!(
+            key_of(&vim, KeyCode::Char(':'), none),
+            Some(Action::Palette)
+        );
+    }
+
+    #[test]
+    fn a_configuration_that_binds_the_palette_or_the_context_menu_works_as_before() {
+        let none = KeyModifiers::NONE;
+        let with = |pairs: &[(&str, &[&str])]| {
+            let o: HashMap<String, Vec<String>> = pairs
+                .iter()
+                .map(|(id, keys)| (id.to_string(), keys.iter().map(|k| k.to_string()).collect()))
+                .collect();
+            Keymap::new(Preset::VimClassic, &o)
+        };
+        // The old default written out: `m` is the palette again, `:` is free, the menu keeps
+        // its other keys.
+        let km = with(&[("palette", &["m"])]);
+        assert_eq!(key_of(&km, KeyCode::Char('m'), none), Some(Action::Palette));
+        assert_eq!(key_of(&km, KeyCode::Char(':'), none), None);
+        assert_eq!(key_of(&km, KeyCode::Menu, none), Some(Action::ContextMenu));
+        // Another key for the palette: it is that key, and `m` is the menu.
+        let km = with(&[("palette", &["ctrl+k"])]);
+        assert_eq!(
+            key_of(&km, KeyCode::Char('k'), KeyModifiers::CONTROL),
+            Some(Action::Palette)
+        );
+        assert_eq!(key_of(&km, KeyCode::Char(':'), none), None);
+        assert!(km.warnings.is_empty(), "{:?}", km.warnings);
+        // Keys of the menu that were set before stay the only ones.
+        let km = with(&[("context_menu", &["c"])]);
+        assert_eq!(
+            key_of(&km, KeyCode::Char('c'), none),
+            Some(Action::ContextMenu)
+        );
+        assert_eq!(key_of(&km, KeyCode::Char('m'), none), None);
+        assert_eq!(key_of(&km, KeyCode::Menu, none), None);
+        assert_eq!(key_of(&km, KeyCode::Char(':'), none), Some(Action::Palette));
+        // Both set at once, in either order of the file.
+        let km = with(&[("palette", &["m"]), ("context_menu", &["M"])]);
+        assert_eq!(key_of(&km, KeyCode::Char('m'), none), Some(Action::Palette));
+        assert_eq!(
+            key_of(&km, KeyCode::Char('M'), none),
+            Some(Action::ContextMenu)
+        );
     }
 
     #[test]

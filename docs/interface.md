@@ -69,7 +69,7 @@ From the top: a row of **tabs**, the **bar**, the **command bar**, then the body
 
 One pill holds the path and the search. At rest it shows the path as clickable crumbs (`…` folds a long one; click it to pick a hidden folder) and *Cerca file o digita un comando…* with a **Ctrl+P** chip  At the left sit back `‹`, forward `›`, up `↑` and refresh `⟳` (`Alt+←`, `Alt+→`, `Alt+↑`, `F5`; `Backspace` goes back with the classic keys alone and to the parent with the vim keys), at the right the pill of the view (*Colonne*, *Dettagli*, *Icone*).
 
-`Ctrl+P` (`m` in the vim keys), `Ctrl+L`, `Alt+D`, `F4`, `Ctrl+F`, `/` or a click on the pill start typing, and what you type decides what happens:
+`Ctrl+P` (`:` in the vim keys), `Ctrl+L`, `Alt+D`, `F4`, `Ctrl+F`, `/` or a click on the pill start typing, and what you type decides what happens:
 
 - a **path** (`~/Documenti`, `/etc`, `../x`): `~` is your home, relative paths start at the current folder, `Tab` completes with the subfolders (listed by a background worker, never while you type), `Enter` goes. `Ctrl+L` selects the old path, so typing replaces it;
 - **words**: the files of this folder are filtered as you type (`tag:red` finds by tag), and under the bar the **commands** that match (*Copia*, *Nuova cartella*, *Vista a colonne*…) and the places (folders, recents, pinned, disks) are offered. `↑` `↓` choose, `Enter` runs the one chosen; with none chosen it keeps the filter if files match, otherwise it runs the best command;
@@ -132,4 +132,4 @@ Hidden folders and the Mac's `Library` are left out.
 
 ### Context menu
 
-Right click (or `Shift+F10`, or the Menu key). The menu has the name and the type of the item on top, an icon on each entry, its key at the right, groups set apart by a dashed line, and what takes files away in red at the bottom; *Apri con*, *Tag*, *Ordina* and *Nuovo* open a submenu beside it (`→` or `Enter` opens, `←` or `Esc` goes back; entries that are greyed out are skipped). The key bar says which keys work. On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.
+Right click (or `m` in the vim keys, or `Shift+F10`, or the Menu key). The menu has the name and the type of the item on top, an icon on each entry, its key at the right, groups set apart by a dashed line, and what takes files away in red at the bottom; *Apri con*, *Tag*, *Ordina* and *Nuovo* open a submenu beside it (`→` or `Enter` opens, `←` or `Esc` goes back; entries that are greyed out are skipped). The key bar says which keys work. On an item: Open, Open with…, Cut, Copy, Paste, Rename, Compress…, Extract here / Extract to… on archives, Pin to navigation, Copy path, Delete, Properties. On empty space: New, Paste, Sort by, View, Refresh, Open a terminal here.

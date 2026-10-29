@@ -76,10 +76,10 @@ Run `rada`, `rada ~/Pictures`, or `rada photo.png`. Press `?` for every key; bot
 | Move to trash | `d` | `Del` |
 | Rename | `r` | `F2` |
 | Undo · history of operations | `u` · `U` | `Ctrl+Z` · `F3` |
-| Jump to a path, search, run a command | `m` | `Ctrl+P` |
+| Jump to a path, search, run a command | `:` | `Ctrl+P` |
 | Filter this folder | `/` | `Ctrl+F` |
 | New tab · close tab | `Ctrl+T` · `Ctrl+W` | same |
-| Context menu | right click | `Shift+F10` |
+| Context menu (right click) | `m` | `Shift+F10` / `Menu` |
 | Help · quit | `?` · `q` | `F1` · `Ctrl+Q` |
 
 ## A closer look

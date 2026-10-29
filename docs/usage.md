@@ -59,11 +59,12 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | back · forward in the folder history | `Alt+←` · `Alt+→`, or `Ctrl+O` · `Ctrl+G` (both schemes) | |
 | history of operations | `U` | `F3` |
 | filter this folder (in the bar) | `/` | `Ctrl+F` |
-| the bar: commands, files, folders, recents, pinned, disks | `m` | `Ctrl+P` |
+| the bar: commands, files, folders, recents, pinned, disks | `:` | `Ctrl+P` |
 | edit the address · refresh | `Ctrl+L` `Alt+D` `F4` · `F5` (both schemes) | |
 | properties · open with… · copy path · terminal here | `i` · `O` · `Y` · `t` | `Alt+Enter` · `Alt+O` · `Ctrl+Shift+C` · `Ctrl+Alt+T` |
 | tabs: new · close · next · previous · jump | `Ctrl+T` `Ctrl+W` `Ctrl+Tab` `Ctrl+Shift+Tab` `Alt+1…9` (both schemes) | |
-| details pane · Details / Icons / Columns · context menu · Tag column | `Alt+P` or `F6` · `Ctrl+1` `Ctrl+2` `Ctrl+3` or `v` · `Shift+F10` or `Menu` · `F8` | |
+| details pane · Details / Icons / Columns · Tag column | `Alt+P` or `F6` · `Ctrl+1` `Ctrl+2` `Ctrl+3` or `v` · `F8` | |
+| context menu (right click) | `m` (`Shift+F10` and `Menu` too) | `Shift+F10` · `Menu` |
 | sort key · reverse · hidden files | `s` `S` `.` | |
 | hex dump of a binary · scroll preview | `H` · `J` `K` | |
 | pin this folder (or the item in the navigation pane) · home | `B` · `~` | |

@@ -154,7 +154,10 @@ fn every_operation_is_reachable_with_the_vim_key_and_with_the_classic_key() {
         ("new folder", "ctrl+n", |h| {
             matches!(h.app.windows.modal, Some(Modal::Input(_)))
         }),
-        ("commands", "m", |h| h.app.windows.address.is_some()),
+        ("commands", ":", |h| h.app.windows.address.is_some()),
+        ("context menu", "m", |h| {
+            matches!(h.app.windows.modal, Some(Modal::Menu(_)))
+        }),
         ("address", "ctrl+l", |h| h.app.windows.address.is_some()),
         ("address", "alt+d", |h| h.app.windows.address.is_some()),
         ("new folder", "ctrl+shift+n", |h| {
