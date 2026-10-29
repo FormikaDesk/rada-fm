@@ -37,8 +37,9 @@ impl App {
         if !self.settings.mouse {
             return;
         }
-        // Motion only matters for what is under the pointer in the sidebar (its names show
-        // in the bottom bar when it is reduced to icons): redraw only when that changes.
+        // Motion only matters for what is under the pointer (it is lit, and the names of the
+        // sidebar show in the bottom bar when it is reduced to icons): redraw only when that
+        // changes.
         if m.kind == MouseEventKind::Moved {
             self.hover(m.column, m.row);
             return;
@@ -74,11 +75,8 @@ impl App {
     }
 
     fn hover(&mut self, column: u16, row: u16) {
-        let over = match self.frame.hits.at(column, row) {
-            Some(Target::Place(p)) => Some(p.clone()),
-            _ => None,
-        };
-        if self.side_nav.hover_over(over) {
+        let under = self.frame.hits.at(column, row).and_then(Target::lit);
+        if self.hover.moved(column, row, under) {
             self.redraw.dirty = true;
         }
     }

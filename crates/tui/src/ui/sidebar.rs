@@ -170,13 +170,10 @@ pub fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect, mode: Mode) {
                 let item = &items[*i];
                 let is_current = current == Some(*i);
                 let is_focus = focused == Some(*i);
-                let is_hover = app.side_nav.hover.as_ref() == Some(&item.path);
                 let row_style = if is_focus {
                     Style::default().bg(th.cursor)
                 } else if is_current {
                     th.current_place()
-                } else if is_hover {
-                    Style::default().bg(th.mark)
                 } else {
                     Style::default()
                 };

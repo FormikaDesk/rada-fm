@@ -261,6 +261,7 @@ mod columns;
 mod demo;
 mod eject;
 mod font;
+mod hover;
 mod input;
 mod jobs;
 mod listing;
@@ -354,6 +355,8 @@ pub struct App {
     /// What the last frame drew, for the keyboard, the mouse and the tests.
     pub frame: crate::ui::LastFrame,
     last_click: Option<(Instant, usize)>,
+    /// The pointer and what is highlighted under it.
+    pub hover: hover::Hover,
 
     // ---- the explorer interface
     /// What is worked out about the folder shown.
@@ -387,6 +390,7 @@ impl App {
             side_nav: side::SideNav::new(cfg.sidebar),
             frame: Default::default(),
             last_click: None,
+            hover: Default::default(),
             folder_info: Default::default(),
             updates: Updates::new(&svc),
             hooks: TestHooks::new(cfg.demo.take()),

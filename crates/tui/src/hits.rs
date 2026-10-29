@@ -76,6 +76,25 @@ pub enum Target {
     Window,
 }
 
+impl Target {
+    /// What lights up when the pointer is over this: the thing itself, the row a checkbox
+    /// belongs to, the place a tree arrow belongs to. Nothing for what only holds other
+    /// things (the list, a window, the preview) or answers a click anywhere (the address bar
+    /// outside its segments, a card outside its buttons).
+    pub fn lit(&self) -> Option<Target> {
+        match self {
+            Target::List
+            | Target::Preview
+            | Target::Address
+            | Target::Window
+            | Target::Notice(_, NoticeHit::Card) => None,
+            Target::Check(i) => Some(Target::Row(*i)),
+            Target::TreeToggle(p) => Some(Target::Place(p.clone())),
+            other => Some(other.clone()),
+        }
+    }
+}
+
 /// The parts of a notification card that can be clicked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoticeHit {
@@ -111,11 +130,16 @@ impl Hits {
 
     /// The topmost thing at a cell: later registrations are drawn over earlier ones.
     pub fn at(&self, x: u16, y: u16) -> Option<&Target> {
+        self.rect_at(x, y).map(|(_, t)| t)
+    }
+
+    /// [`at`](Self::at), with the rectangle it was registered with.
+    pub fn rect_at(&self, x: u16, y: u16) -> Option<(Rect, &Target)> {
         self.items
             .iter()
             .rev()
             .find(|(r, _)| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
-            .map(|(_, t)| t)
+            .map(|(r, t)| (*r, t))
     }
 
     pub fn len(&self) -> usize {

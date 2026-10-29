@@ -353,7 +353,7 @@ impl App {
             let path = self.nav_tag_path(first, len);
             return rada_core::tagsearch::view_name(&path);
         }
-        rada_core::tagsearch::view_name(self.side_nav.hover.as_ref()?)
+        rada_core::tagsearch::view_name(self.hovered_place()?)
     }
 
     /// Where the dot of the keyboard goes, among the `len` dots of a line from `first`.

@@ -178,14 +178,10 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
         let row = &rows[i];
         let is_current = current == Some(i);
         let is_focus = cursor == Some(i);
-        let hover =
-            !row.path.as_os_str().is_empty() && app.side_nav.hover.as_ref() == Some(&row.path);
         let bg = if is_focus {
             Style::default().bg(th.cursor)
         } else if is_current {
             Style::default().bg(th.selection)
-        } else if hover {
-            Style::default().bg(th.mark)
         } else {
             Style::default()
         };

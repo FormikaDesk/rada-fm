@@ -669,12 +669,16 @@ fn with_the_mouse_off_nothing_reacts() {
 }
 
 #[test]
-fn mouse_motion_never_triggers_a_redraw() {
+fn mouse_motion_within_one_thing_never_triggers_a_redraw() {
     let mut h = harness();
     let _ = h.screen();
     h.app.redraw.dirty = false;
-    // (In the list, not on a sidebar item: those redraw when the pointer enters them.)
+    // Coming onto a row lights it: that is one frame, and no more while the pointer stays on it.
     h.mouse(MouseEventKind::Moved, 60, 10, KeyModifiers::NONE);
+    assert!(h.app.redraw.dirty);
+    let _ = h.screen();
+    h.app.redraw.dirty = false;
+    h.mouse(MouseEventKind::Moved, 62, 10, KeyModifiers::NONE);
     h.mouse(
         MouseEventKind::Drag(MouseButton::Left),
         61,

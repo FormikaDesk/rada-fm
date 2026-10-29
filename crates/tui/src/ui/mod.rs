@@ -14,6 +14,7 @@ mod details;
 mod dialogs;
 mod frame;
 mod grid;
+mod hover;
 mod list;
 mod menu;
 mod modals;
@@ -463,6 +464,7 @@ fn finish(f: &mut Frame, app: &mut App, area: Rect, address_row: Option<Rect>) {
         }
         modals::draw_modal(f, app, area);
     }
+    hover::paint(f, app);
 }
 
 /// The places popups are drawn at, for what lies over cells and cannot be drawn under them (a

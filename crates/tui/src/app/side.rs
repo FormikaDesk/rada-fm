@@ -79,8 +79,6 @@ pub struct SideNav {
     /// The keyboard is in the sidebar, on item `side_cursor`, or in the NAV box.
     pub focus: bool,
     pub side_cursor: usize,
-    /// The sidebar item under the mouse.
-    pub hover: Option<PathBuf>,
     /// In the two columns, the left one shows ANTEPRIMA in the place of NAV.
     pub left_preview: bool,
     /// The folders of the NAV box of the panels view.
@@ -96,21 +94,11 @@ impl SideNav {
             wanted,
             focus: false,
             side_cursor: 0,
-            hover: None,
             left_preview: false,
             tree: Default::default(),
             nav_cursor: 0,
             nav_tag: 0,
         }
-    }
-
-    /// The mouse is over `over`; true when that is not what it was over.
-    pub(super) fn hover_over(&mut self, over: Option<PathBuf>) -> bool {
-        let changed = over != self.hover;
-        if changed {
-            self.hover = over;
-        }
-        changed
     }
 
     /// Up, Down, First and Last in the sidebar, which has items up to `last`; false for any
@@ -233,7 +221,7 @@ impl App {
         let item = if self.side_nav.focus {
             items.get(self.side_nav.side_cursor)
         } else {
-            let h = self.side_nav.hover.as_ref()?;
+            let h = self.hovered_place()?;
             items.iter().find(|i| &i.path == h)
         }?;
         if item.locked

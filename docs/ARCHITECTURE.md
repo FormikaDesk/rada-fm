@@ -48,7 +48,7 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 
 ## The state of `App`
 
-`App` (`crates/tui/src/app.rs`) has 19 fields. Each is a group that owns one kind of state, with its methods next to it; `app.rs` keeps the event loop entry points and what crosses groups.
+`App` (`crates/tui/src/app.rs`) has 20 fields. Each is a group that owns one kind of state, with its methods next to it; `app.rs` keeps the event loop entry points and what crosses groups.
 
 | Field | Holds | Where |
 |---|---|---|
@@ -70,6 +70,7 @@ The UI thread does no I/O. Every slow or blocking job runs on a worker thread of
 | `folder_info` | What is worked out about the folder shown: git status, folder sizes, date cache. | `app/panels.rs`, `app/sizes.rs` |
 | `updates` | The version, what the update worker last told, whether somebody waits for an answer. | `app/update.rs` |
 | `last_click` | The time and row of the last click, for the double click. | `app.rs` |
+| `hover` | Where the pointer is and what is lit under it; `ui/hover.rs` paints it last, from the map of clicks. | `app/hover.rs`, `ui/hover.rs` |
 
 A method sits next to the data it uses. One that reads only a group is a method of that group (`TabState::current`, `Redraw::after_launch`). One that reaches several groups, or the workers in `svc`, stays a method of `App` and sits in the file of its subject (`toast` in `app/windows.rs`). `app.rs` keeps what only the whole `App` can do: building it, the event loop's entry points and the sending of events to the groups.
 
