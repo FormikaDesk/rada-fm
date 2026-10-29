@@ -20,7 +20,7 @@ use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look, RowTone};
-use super::widgets::{Bar, SPIN, pad};
+use super::widgets::{Bar, SPIN, field_parts, pad};
 use crate::app::{App, BarItem, BarMode, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
@@ -252,11 +252,11 @@ fn field_bar(app: &App, look: Look, width: usize) -> Bar<'static> {
         let esc_w: usize = esc.iter().map(|s| s.content.width()).sum();
         body.push(Span::styled(format!(" {lead}"), th.dim().patch(field)));
         let room = inner.saturating_sub(1 + lead.width() + esc_w + 2).max(2);
-        let before: String = a.text.chars().take(a.cursor).collect();
-        let after_c: String = a.text.chars().skip(a.cursor).collect();
+        let (before, at, after) = field_parts(&a.text, a.cursor);
+        let after_c = format!("{at}{after}");
         if a.fresh {
             // Everything selected: the first key typed replaces it.
-            let shown = display::truncate(&a.text, room.saturating_sub(1));
+            let shown = display::truncate(&display::text(&a.text), room.saturating_sub(1));
             body.push(Span::styled(
                 shown,
                 th.base().patch(Style::default().bg(th.selection)),

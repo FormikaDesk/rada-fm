@@ -89,7 +89,8 @@ impl TabState {
         if self.recents_view() {
             return Some(Key::PlaceRecent.tr().to_string());
         }
-        self.tag_view().map(|tag| tf(Key::TagViewTitle, &[&tag]))
+        self.tag_view()
+            .map(|tag| tf(Key::TagViewTitle, &[&rada_core::display::text(&tag)]))
     }
 
     pub fn sort_label(&self) -> String {

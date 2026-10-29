@@ -13,7 +13,7 @@ use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use super::popup::{Ctx, Tone};
-use super::widgets::{SPIN, button, centered, hit_spans, pad, pad_left, tail};
+use super::widgets::{SPIN, button, centered, field_parts, hit_spans, pad, pad_left, tail};
 use crate::app::*;
 use crate::fmt;
 use crate::hits::{Hits, Target};
@@ -433,14 +433,8 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
     let iw = inner.width as usize;
 
     // Input line.
-    let before: String = p.query.chars().take(p.cursor).collect();
-    let at: String = p
-        .query
-        .chars()
-        .nth(p.cursor)
-        .map(String::from)
-        .unwrap_or_else(|| " ".into());
-    let after: String = p.query.chars().skip(p.cursor + 1).collect();
+    let (before, at, after) = field_parts(&p.query, p.cursor);
+    let at = if at.is_empty() { " ".into() } else { at };
     let mut input = vec![Span::styled(
         "⌕  ",
         th.accent_style().add_modifier(Modifier::BOLD),
@@ -632,14 +626,8 @@ fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
     let r = centered(area, 88, h);
     let inner = frame(f, th, r, th.accent);
     let w = inner.width as usize;
-    let before: String = iv.text.chars().take(iv.cursor).collect();
-    let at: String = iv
-        .text
-        .chars()
-        .nth(iv.cursor)
-        .map(String::from)
-        .unwrap_or_else(|| " ".to_string());
-    let after: String = iv.text.chars().skip(iv.cursor + 1).collect();
+    let (before, at, after) = field_parts(&iv.text, iv.cursor);
+    let at = if at.is_empty() { " ".into() } else { at };
     let mut lines = vec![
         Line::from(chip(ctx, title, Tone::Accent)),
         Line::raw(""),

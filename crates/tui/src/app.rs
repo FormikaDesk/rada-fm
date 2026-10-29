@@ -256,6 +256,7 @@ mod address;
 mod archives;
 mod bar;
 mod chooser;
+mod clean;
 mod columns;
 mod demo;
 mod eject;
@@ -473,7 +474,7 @@ impl App {
 
     pub fn on_core_event(&mut self, ev: CoreEvent) {
         self.redraw.dirty = true;
-        match ev {
+        match clean::clean(ev) {
             CoreEvent::Dir(d) => self.on_dir(d),
             CoreEvent::Watch(w) => self.on_watch(w),
             CoreEvent::Preview(p) => self.on_preview(p),

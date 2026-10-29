@@ -177,6 +177,15 @@ it loop. A filesystem root is never accepted as a source.
 Newlines, escape sequences, bidirectional controls and invalid UTF-8 in names are shown as
 visible escapes. Paths are never handled as text.
 
+The same goes for every other string that does not begin inside rada: the answer of a program
+(`gio`, `udisksctl`, `git`, `pdfinfo`...), the label of a disk or a phone, the notes of a
+release, the lines of the history, what a file says about itself (the title of a PDF, the
+interpreter of a program, the name of a tag). A worker's event is cleaned once, as it enters the
+interface (`display::text`: `\e`, `\n`, `\r`, `\u{202e}`), not in each window; a line being
+edited is cleaned as it is drawn and left untouched as it is typed. The tests of the interface
+check every frame they draw: no cell may hold a control character or a bidirectional mark.
+`hostile_text.rs` brings such text from each of those places.
+
 Where the filesystem ignores case (macOS, Windows), a rename that changes only the case of a
 name is a rename, not a conflict: the new name is taken by the file itself, which is checked
 (same folder, same file, and the folder lists only the old spelling) before the rename goes on,

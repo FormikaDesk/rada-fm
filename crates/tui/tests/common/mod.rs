@@ -429,6 +429,7 @@ impl H {
         watchdog::step("drawing a frame");
         self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
         let buf = self.term.backend().buffer().clone();
+        assert_no_control(&buf, self.draws_graphics());
         let mut out = String::new();
         for y in 0..buf.area.height {
             // A wide glyph (CJK, emoji) covers two cells; the second one is not text.
@@ -455,7 +456,17 @@ impl H {
     pub fn redrawn_buffer(&mut self) -> ratatui::buffer::Buffer {
         self.term.clear().unwrap();
         self.term.draw(|f| ui::draw(f, &mut self.app)).unwrap();
-        self.term.backend().buffer().clone()
+        let buf = self.term.backend().buffer().clone();
+        assert_no_control(&buf, self.draws_graphics());
+        buf
+    }
+
+    fn draws_graphics(&self) -> bool {
+        self.app
+            .preview
+            .image_ui
+            .as_ref()
+            .is_some_and(|u| u.is_graphics())
     }
 
     pub fn names(&self) -> Vec<String> {
@@ -468,6 +479,56 @@ impl H {
     pub fn modal_is_plan(&self) -> bool {
         matches!(self.app.windows.modal, Some(Modal::Plan(_)))
     }
+}
+
+/// Ratatui writes a cell's symbol as it is, so an escape that reaches the buffer reaches the
+/// terminal. Every frame a test draws must hold none of the characters `display` escapes; the
+/// one exception is the picture of a terminal that draws pictures, which the program itself
+/// puts in the cell as a Kitty graphics command (`ESC _ G`, base64, `ESC \`).
+pub fn assert_no_control(buf: &ratatui::buffer::Buffer, graphics: bool) {
+    for y in 0..buf.area.height {
+        for x in 0..buf.area.width {
+            let sym = buf[(x, y)].symbol();
+            let text = if graphics {
+                without_kitty(sym)
+            } else {
+                sym.to_string()
+            };
+            if let Some(c) = text.chars().find(|c| rada_core::display::is_dangerous(*c)) {
+                let row: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect();
+                panic!(
+                    "U+{:04X} in the cell ({x}, {y}) of the frame: {row:?}",
+                    c as u32
+                );
+            }
+        }
+    }
+}
+
+/// `sym` without its Kitty graphics commands: a command is only the characters of its
+/// parameters and of base64 between the opening and the closing, so text that merely starts
+/// with the same bytes stays in.
+fn without_kitty(sym: &str) -> String {
+    let mut out = String::new();
+    let mut rest = sym;
+    while let Some(at) = rest.find("\x1b_G") {
+        out.push_str(&rest[..at]);
+        let body = &rest[at + 3..];
+        let end = body.find("\x1b\\");
+        let plain = |s: &str| {
+            s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+/=,;_-".contains(c))
+        };
+        match end {
+            Some(e) if plain(&body[..e]) => rest = &body[e + 2..],
+            _ => {
+                out.push_str(&rest[at..]);
+                return out;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 pub fn sandbox_with_files() -> (Sandbox, PathBuf) {

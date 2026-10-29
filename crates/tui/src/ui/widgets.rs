@@ -1,5 +1,6 @@
 //! Small drawing helpers shared by every part of the interface.
 
+use rada_core::display;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -36,6 +37,27 @@ pub fn key_name(key: &str) -> &str {
         "Del" => Key::KeyDel.tr(),
         other => other,
     }
+}
+
+/// A line being edited, ready to draw: what is before the cursor, the character under it and
+/// what is after it. The text is what was typed or pasted, or the name of a file: anything can
+/// be in it, so each part is escaped here (the text itself is left as it is, so that what is
+/// done with it is what the person edited). `at` is empty when the cursor is at the end.
+pub fn field_parts(text: &str, cursor: usize) -> (String, String, String) {
+    let part = |from: usize, to: usize| -> String {
+        display::text(&text.chars().skip(from).take(to - from).collect::<String>())
+    };
+    let total = text.chars().count();
+    let at = if cursor < total {
+        part(cursor, cursor + 1)
+    } else {
+        String::new()
+    };
+    (
+        part(0, cursor.min(total)),
+        at,
+        part((cursor + 1).min(total), total),
+    )
 }
 
 pub fn pad(s: &str, width: usize) -> String {

@@ -68,13 +68,17 @@ fn escape_str(s: &str) -> String {
 }
 
 fn push_escaped(out: &mut String, s: &str) {
+    push_escaped_with(out, s, cfg!(unix));
+}
+
+fn push_escaped_with(out: &mut String, s: &str, double_backslash: bool) {
     for c in s.chars() {
         match c {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
             '\x1b' => out.push_str("\\e"),
-            '\\' if cfg!(unix) => out.push_str("\\\\"),
+            '\\' if double_backslash => out.push_str("\\\\"),
             c if is_dangerous(c) => {
                 let _ = write!(out, "\\u{{{:x}}}", c as u32);
             }
@@ -83,7 +87,18 @@ fn push_escaped(out: &mut String, s: &str) {
     }
 }
 
-fn is_dangerous(c: char) -> bool {
+/// Make a string that does not come from rada (the answer of a program, the label of a disk,
+/// a line of a file it reads) safe to show: the escapes of [`name`], but a backslash is left
+/// alone because this is a sentence, not an identifier. Safe to apply twice.
+pub fn text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    push_escaped_with(&mut out, s, false);
+    out
+}
+
+/// Whether `c` could act on a terminal or reorder the text around it: control characters
+/// (C0, DEL, C1) and the bidirectional and invisible formatting ones.
+pub fn is_dangerous(c: char) -> bool {
     c.is_control()
         || matches!(
             c as u32,
@@ -108,6 +123,16 @@ pub fn line(s: &str, tab: usize) -> String {
         }
     }
     out
+}
+
+/// Like [`text`] for a text of several lines (release notes): the line breaks stay, the rest
+/// is escaped.
+pub fn block(s: &str) -> String {
+    s.replace("\r\n", "\n")
+        .split('\n')
+        .map(text)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Terminal cell width of an (already escaped) string.
@@ -336,5 +361,21 @@ mod tests {
         assert_eq!(bytes(0), "0 B");
         assert_eq!(bytes(1536), "1.50 KB");
         assert_eq!(bytes(10 * 1024 * 1024), "10.0 MB");
+    }
+
+    #[test]
+    fn text_shows_what_would_act_on_a_terminal_and_is_safe_twice() {
+        let once = text("a\x1b[31m\x1b]8;;x\x07\nb\r\u{85}\u{7f}\u{202e}c\\d");
+        assert_eq!(
+            once,
+            "a\\e[31m\\e]8;;x\\u{7}\\nb\\r\\u{85}\\u{7f}\\u{202e}c\\d"
+        );
+        assert_eq!(text(&once), once);
+        assert!(!once.chars().any(is_dangerous));
+    }
+
+    #[test]
+    fn block_keeps_the_lines_and_escapes_the_rest() {
+        assert_eq!(block("one\r\ntwo\x1b\nthree"), "one\ntwo\\e\nthree");
     }
 }

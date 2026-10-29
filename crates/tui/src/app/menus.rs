@@ -531,8 +531,13 @@ fn own_tag_items(targets: &[&Entry]) -> Vec<MenuItem> {
         .enumerate()
         .map(|(i, t)| {
             let on = all_have(targets, &t.name);
-            MenuItem::choice(MenuCmd::Tag(TagCmd::Toggle(t.clone())), &t.name, on, i == 0)
-                .with_icon(MenuIcon::Dot(t.color))
+            MenuItem::choice(
+                MenuCmd::Tag(TagCmd::Toggle(t.clone())),
+                &rada_core::display::text(&t.name),
+                on,
+                i == 0,
+            )
+            .with_icon(MenuIcon::Dot(t.color))
         })
         .collect()
 }

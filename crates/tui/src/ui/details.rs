@@ -82,7 +82,7 @@ fn properties(app: &App) -> Vec<(Key, String)> {
             Key::PropTags,
             e.tags
                 .iter()
-                .map(|t| format!("● {}", t.name))
+                .map(|t| format!("● {}", display::text(&t.name)))
                 .collect::<Vec<_>>()
                 .join("  "),
         ));
@@ -377,7 +377,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
                         "●",
                         Style::default().fg(th.tag_color(t.color)),
                     ));
-                    let name = display::truncate(&t.name, left.saturating_sub(2));
+                    let name = display::truncate(&display::text(&t.name), left.saturating_sub(2));
                     left = left.saturating_sub(2 + name.width());
                     spans.push(Span::styled(format!(" {name}"), th.base()));
                 }

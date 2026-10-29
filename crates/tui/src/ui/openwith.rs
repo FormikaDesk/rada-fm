@@ -14,7 +14,7 @@ use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use super::popup::{self, Ctx, RowFill};
-use super::widgets::{key_name, pad};
+use super::widgets::{field_parts, key_name, pad};
 use crate::app::{OpenRow, OpenWithView};
 use crate::hits::{Hits, Target};
 use crate::icons::{self, Glyph};
@@ -149,8 +149,8 @@ pub fn draw(
     y += 1;
     // What is typed filters the list; the row is there only while something is typed.
     if g.filter_row {
-        let before: String = v.filter.chars().take(v.cursor).collect();
-        let after: String = v.filter.chars().skip(v.cursor).collect();
+        let (before, at, after) = field_parts(&v.filter, v.cursor);
+        let after = format!("{at}{after}");
         popup::put(
             buf,
             region(y),

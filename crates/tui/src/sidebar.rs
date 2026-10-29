@@ -331,11 +331,12 @@ pub fn items(app: &App, places_only: bool) -> Vec<Item> {
 /// The items of the TAGS section: the seven colours always, in the Finder's order and called
 /// what the system calls them; then the user's own tags seen in the folders opened so far.
 pub fn tag_items(app: &App) -> Vec<Item> {
+    // The path stands for the tag by its name as it is; what is shown is escaped.
     let tag = |name: String, color: Option<Hue>| Item {
         section: Section::Tags,
         origin: Origin::Tag(color),
         path: rada_core::tagsearch::view_path(&name),
-        name,
+        name: rada_core::display::text(&name),
         usage: None,
         locked: false,
     };

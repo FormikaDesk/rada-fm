@@ -289,7 +289,7 @@ impl App {
             return Key::PlaceRecent.tr().to_string();
         }
         if let Some(tag) = rada_core::tagsearch::view_name(p) {
-            return tf(Key::TagViewTitle, &[&tag]);
+            return tf(Key::TagViewTitle, &[&rada_core::display::text(&tag)]);
         }
         let on_disk = p
             .file_name()

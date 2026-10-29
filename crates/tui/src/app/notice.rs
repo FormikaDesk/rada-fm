@@ -14,6 +14,8 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use rada_core::display;
+
 /// How a notification looks and how long it lives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoticeKind {
@@ -63,7 +65,8 @@ impl Notice {
         Notice {
             id: 0,
             kind,
-            text: text.into(),
+            // Most of what is said is built here, but some of it is the answer of a program.
+            text: display::text(&text.into()),
             action: NoticeAction::None,
             show: None,
             select: None,
