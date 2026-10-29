@@ -110,31 +110,43 @@ const GIVEN_UP_ON: u8 = 2;
 
 /// The drawing ended: its answer is handed over unless nobody is waiting any more, and then
 /// it is no longer one of those that run on after being given up on.
-fn hand_over<T>(state: &AtomicU8, tx: &crossbeam_channel::Sender<T>, done: T) {
+fn hand_over<T>(
+    state: &AtomicU8,
+    given_up: &AtomicUsize,
+    tx: &crossbeam_channel::Sender<T>,
+    done: T,
+) {
     if state
         .compare_exchange(RUNNING, FINISHED, Ordering::AcqRel, Ordering::Acquire)
         .is_ok()
     {
         let _ = tx.send(done);
     } else {
-        GIVEN_UP.fetch_sub(1, Ordering::AcqRel);
+        given_up.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
 /// Stop waiting. `false` when the drawing ended in the meantime: its answer is there.
-fn give_up(state: &AtomicU8) -> bool {
+fn give_up(state: &AtomicU8, given_up: &AtomicUsize) -> bool {
     let gone = state
         .compare_exchange(RUNNING, GIVEN_UP_ON, Ordering::AcqRel, Ordering::Acquire)
         .is_ok();
     if gone {
-        GIVEN_UP.fetch_add(1, Ordering::AcqRel);
+        given_up.fetch_add(1, Ordering::AcqRel);
     }
     gone
 }
 
+/// Too many drawings that were given up on are still running for another to be started.
+fn crowded(given_up: &AtomicUsize) -> bool {
+    given_up.load(Ordering::Acquire) >= MAX_GIVEN_UP
+}
+
 /// Run `work` on a thread and wait for it up to `limit`, or until `abandon` says the answer is
-/// no longer wanted. `late` is the error when it was given up on.
+/// no longer wanted. `late` is the error when it was given up on, and `given_up` counts the
+/// drawings that are.
 fn with_deadline<T: Send + 'static>(
+    given_up: &'static AtomicUsize,
     limit: Duration,
     abandon: &dyn Fn() -> bool,
     late: String,
@@ -149,7 +161,7 @@ fn with_deadline<T: Send + 'static>(
             // A drawing that panics is an answer too, or the count of those given up on is wrong.
             let done = std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
                 .unwrap_or_else(|_| Err("the SVG could not be drawn".into()));
-            hand_over(&theirs, &tx, done);
+            hand_over(&theirs, given_up, &tx, done);
         });
     if let Err(e) = started {
         return Err(e.to_string());
@@ -161,7 +173,7 @@ fn with_deadline<T: Send + 'static>(
             Err(RecvTimeoutError::Disconnected) => return Err("the SVG could not be drawn".into()),
             Err(RecvTimeoutError::Timeout) => {}
         }
-        if (Instant::now() >= end || abandon()) && give_up(&state) {
+        if (Instant::now() >= end || abandon()) && give_up(&state, given_up) {
             return Err(late);
         }
     }
@@ -175,17 +187,28 @@ pub(super) fn load(
     abandon: &dyn Fn() -> bool,
 ) -> Result<DynamicImage, String> {
     let data = read(path)?;
-    if GIVEN_UP.load(Ordering::Acquire) >= MAX_GIVEN_UP {
+    if crowded(&GIVEN_UP) {
         return Err(too_complex(limits.svg_timeout));
     }
     // Vector art is rendered at a comfortable preview size, whatever its nominal size.
     let edge = limits.max_edge.min(1024) as f32;
     // Looking for the system's fonts is done once and is not the drawing's time.
     let fonts = fonts();
-    let late = too_complex(limits.svg_timeout);
-    let ((sw, sh), image) = with_deadline(limits.svg_timeout, abandon, late, move || {
+    draw(&GIVEN_UP, limits, info, abandon, move || {
         rasterize(&data, edge, fonts)
-    })?;
+    })
+}
+
+/// Run `work`, the drawing, within the time the limits allow, and fill in the size it declares.
+fn draw(
+    given_up: &'static AtomicUsize,
+    limits: &ImageLimits,
+    info: &mut ImageInfo,
+    abandon: &dyn Fn() -> bool,
+    work: impl FnOnce() -> Result<((f32, f32), RgbaImage), String> + Send + 'static,
+) -> Result<DynamicImage, String> {
+    let late = too_complex(limits.svg_timeout);
+    let ((sw, sh), image) = with_deadline(given_up, limits.svg_timeout, abandon, late, work)?;
     info.width = Some(sw.round().max(1.0) as u32);
     info.height = Some(sh.round().max(1.0) as u32);
     Ok(DynamicImage::ImageRgba8(image))
@@ -196,4 +219,144 @@ fn too_complex(limit: Duration) -> String {
         "the SVG is too complex to draw (given up after {} s)",
         limit.as_secs().max(1)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossbeam_channel::Sender;
+
+    /// A drawing that goes on until the test lets it end, whatever the speed of the machine.
+    fn endless<T: Send + 'static>(answer: T) -> (impl FnOnce() -> Result<T, String>, Sender<()>) {
+        let (release, wait) = bounded::<()>(1);
+        (
+            move || {
+                let _ = wait.recv();
+                Ok(answer)
+            },
+            release,
+        )
+    }
+
+    /// Wait until `count` is `to`: the thread of a drawing that ended has put it right.
+    fn settles_at(count: &AtomicUsize, to: usize) {
+        let end = Instant::now() + Duration::from_secs(60);
+        while count.load(Ordering::Acquire) != to {
+            assert!(
+                Instant::now() < end,
+                "stuck at {}",
+                count.load(Ordering::Acquire)
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    fn quick() -> Duration {
+        Duration::from_millis(20)
+    }
+
+    #[test]
+    fn a_drawing_that_does_not_end_is_given_up_on_and_counted_until_it_ends() {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let (work, release) = endless(1u8);
+        let r = with_deadline(&N, quick(), &|| false, "late".into(), work);
+        assert_eq!(r, Err("late".into()));
+        assert_eq!(N.load(Ordering::Acquire), 1);
+        release.send(()).unwrap();
+        settles_at(&N, 0);
+    }
+
+    #[test]
+    fn a_drawing_that_ends_in_time_is_handed_over_and_never_counted() {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let r = with_deadline(
+            &N,
+            Duration::from_secs(60),
+            &|| false,
+            "late".into(),
+            || Ok(7u8),
+        );
+        assert_eq!(r, Ok(7));
+        assert_eq!(N.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn a_drawing_nobody_waits_for_any_more_is_given_up_before_the_limit() {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let (work, release) = endless(1u8);
+        let r = with_deadline(&N, Duration::from_secs(600), &|| true, "late".into(), work);
+        assert_eq!(r, Err("late".into()));
+        release.send(()).unwrap();
+        settles_at(&N, 0);
+    }
+
+    #[test]
+    fn a_drawing_that_fails_or_panics_is_an_answer_and_not_counted() {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let wait = Duration::from_secs(60);
+        let r: Result<u8, String> =
+            with_deadline(
+                &N,
+                wait,
+                &|| false,
+                "late".into(),
+                || Err("bad file".into()),
+            );
+        assert_eq!(r, Err("bad file".into()));
+        let r: Result<u8, String> = with_deadline(&N, wait, &|| false, "late".into(), || {
+            panic!("in the renderer")
+        });
+        assert_eq!(r, Err("the SVG could not be drawn".into()));
+        assert_eq!(N.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn no_other_drawing_starts_while_enough_of_those_given_up_on_run() {
+        let n = AtomicUsize::new(MAX_GIVEN_UP - 1);
+        assert!(!crowded(&n));
+        n.fetch_add(1, Ordering::AcqRel);
+        assert!(crowded(&n));
+    }
+
+    fn info() -> ImageInfo {
+        ImageInfo {
+            format: "SVG".into(),
+            width: None,
+            height: None,
+            size: 0,
+            modified: None,
+            doc: None,
+            thumb: false,
+        }
+    }
+
+    #[test]
+    fn a_slow_svg_says_it_is_too_complex_and_the_next_one_is_drawn() {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let limits = ImageLimits {
+            svg_timeout: quick(),
+            ..Default::default()
+        };
+        let mut i = info();
+        let (work, release) = endless(((10.0, 10.0), RgbaImage::new(1, 1)));
+        let err = draw(&N, &limits, &mut i, &|| false, work).unwrap_err();
+        assert!(err.contains("too complex"), "{err}");
+        assert_eq!(
+            i.width, None,
+            "nothing is said of a file that was not drawn"
+        );
+        // The worker is free: a simple one right after is drawn, and its size is the declared one.
+        let long = ImageLimits {
+            svg_timeout: Duration::from_secs(60),
+            ..Default::default()
+        };
+        let image = draw(&N, &long, &mut i, &|| false, || {
+            Ok(((30.0, 20.0), RgbaImage::new(3, 2)))
+        })
+        .unwrap();
+        assert_eq!((image.width(), image.height()), (3, 2));
+        assert_eq!((i.width, i.height), (Some(30), Some(20)));
+        release.send(()).unwrap();
+        settles_at(&N, 0);
+    }
 }

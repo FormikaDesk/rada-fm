@@ -31,6 +31,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Renaming a file so that only the case changes (`Report.txt` to `report.txt`) works where the filesystem ignores case (macOS, Windows), and so does its undo.** The plan knew the new name was the same file, but the step that does the rename refused with "already exists", because the new name is taken by the file itself; the undo, and the undo of a bulk rename that goes through temporary names, judged the names against the files on the disk without ignoring case and left out steps. A name that is really another file is still a conflict.
 
 ### Internal
+- The tests of the time limit on SVG drawings no longer depend on the speed of the machine. The one that drew a slow file and waited 300 ms for it is gone: the drawing that does not end is now one that waits to be released, in unit tests of the deadline, of the count of those given up on and of the answer the preview gives. The slow file used to go on drawing, and to use a core, for as long as the other tests of the binary ran.
 - The zstd library crates are updated (`zstd` 0.14.3, `zstd-safe` 8.2.0, `zstd-sys` 2.1.2) for fixes of memory-safety flaws in parts of them that rada does not use (reused contexts, seekable archives, the writing decoder).
 
 ## [0.6.0-rc.17] - 2026-10-25
