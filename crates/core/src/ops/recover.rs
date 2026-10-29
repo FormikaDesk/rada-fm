@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use super::engine::Engine;
 use super::plan::Step;
 use crate::Result;
-use crate::fs::FsMeta;
+use crate::fs::{FsMeta, Stamp};
 use crate::journal::{Intent, Interrupted, Journal};
 
 /// What settling one interrupted operation did.
@@ -136,7 +136,7 @@ impl Engine {
     /// destination (`.rada-part-<pid>-*` for a record that has no tag).
     fn remove_temps(&self, intent: &Intent, pid: u32, rec: &mut Recovered) {
         let (dst, temp) = match intent {
-            Intent::Create { dst, temp } | Intent::Move { dst, temp, .. } => (dst, temp),
+            Intent::Create { dst, temp, .. } | Intent::Move { dst, temp, .. } => (dst, temp),
             Intent::Link { link, temp, .. } => (link, temp),
             _ => return,
         };
@@ -165,17 +165,30 @@ impl Engine {
         let fs = &self.fs;
         let exists = |p: &Path| fs.lstat(p).is_ok();
         let step = match intent {
-            Intent::Create { dst, .. } => {
+            Intent::Create {
+                dst, size, mtime, ..
+            } => {
                 let meta = fs.lstat(dst).ok()?;
+                if foreign(rec, dst, &meta, *size, *mtime) {
+                    return None;
+                }
                 Step::RemoveFile {
                     path: dst.clone(),
                     expect: Some(meta.fingerprint()),
                 }
             }
             Intent::Move {
-                src, dst, symlink, ..
+                src,
+                dst,
+                symlink,
+                size,
+                mtime,
+                ..
             } => {
                 let meta = fs.lstat(dst).ok()?;
+                if foreign(rec, dst, &meta, *size, *mtime) {
+                    return None;
+                }
                 if exists(src) {
                     // In two places: the copy counts as not made.
                     rec.notes.push(format!(
@@ -244,6 +257,32 @@ impl Engine {
         });
         Some(step)
     }
+}
+
+/// Whether the file at `dst` is not the one the interrupted step declared it would write (its
+/// size and, when the copy keeps times, its modification time): somebody else put it there,
+/// and neither adopting nor undoing may touch it. A record that declared nothing accepts
+/// whatever is there, as before.
+fn foreign(
+    rec: &mut Recovered,
+    dst: &Path,
+    meta: &FsMeta,
+    size: Option<u64>,
+    mtime: Option<Stamp>,
+) -> bool {
+    let size_differs = size.is_some_and(|s| !meta.is_file() || meta.size != s);
+    // Some filesystems keep times to two seconds, so a copy there comes out rounded.
+    let time_differs = mtime.is_some_and(|want| {
+        meta.mtime
+            .is_none_or(|got| Stamp::from(got).secs.abs_diff(want.secs) > 2)
+    });
+    if size_differs || time_differs {
+        rec.notes.push(format!(
+            "{} is there but is not what the interrupted operation was writing (its size or time differ); it is left alone and undo will not touch it",
+            dst.display()
+        ));
+    }
+    size_differs || time_differs
 }
 
 /// The step that moves a completed cross-device move back, from what the copy looks like now.

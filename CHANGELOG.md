@@ -11,6 +11,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - **Undo keeps the last name of a file it cannot read to check.** When a file with several names was made by an operation and its contents can no longer be read, the last name is kept and listed with the reason, instead of being removed as if nothing had changed.
 - **Settling a copy that was cut short removes only its own temporary files.** They were found by the process id, which another rada can have taken since, so a copy under way there could lose its half-written file. Each step now names its temporary file in the journal; records written before keep the old way.
+- **After a crash, rada no longer takes for its own a file that somebody else put where a copy was going.** A destination is adopted by the interrupted operation only if it has the size (and, when times are kept, the modification time) the step declared; otherwise it is left alone, mentioned, and an undo does not remove it. Records written before keep the old way.
 - **A download for an update never overwrites a file that is already there and never follows a link.** If the place it is saved to is taken, the download stops with an error and that file is left as it is; a download that fails or is stopped removes what it had written.
 - **A version with a sign or a leading zero in a number is no longer read as a version.** `1.+2.3`, `01.2.3` and `1.2.3-rc.01` are refused, as SemVer says; `0.6.0-rc.18`, `v1.0.0` and `1.2.3-rc.1+abc` are read as before.
 

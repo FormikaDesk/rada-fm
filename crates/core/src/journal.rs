@@ -30,6 +30,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+use crate::fs::Stamp;
 use crate::i18n::{t, tf};
 use crate::oplock::OpLock;
 use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
@@ -47,6 +48,12 @@ pub enum Intent {
         dst: PathBuf,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         temp: Option<String>,
+        /// What the file is expected to be once written, so that recovery does not take
+        /// for it a file somebody else put there.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mtime: Option<Stamp>,
     },
     /// A cross-device move of a file (`symlink: false`) or a link.
     Move {
@@ -57,6 +64,12 @@ pub enum Intent {
         symlink: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         temp: Option<String>,
+        /// What the file is expected to be once written, so that recovery does not take
+        /// for it a file somebody else put there.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mtime: Option<Stamp>,
     },
     Dir {
         #[serde(with = "pathcodec::path")]
@@ -100,21 +113,16 @@ impl Intent {
             Step::CopyFile {
                 src,
                 dst,
+                size,
+                mtime,
                 remove_source,
                 ..
             } => {
+                let expected = Some(*size);
                 if *remove_source {
-                    Intent::Move {
-                        src: src.clone(),
-                        dst: dst.clone(),
-                        symlink: false,
-                        temp: None,
-                    }
+                    Intent::moved(src, dst, false, expected, *mtime)
                 } else {
-                    Intent::Create {
-                        dst: dst.clone(),
-                        temp: None,
-                    }
+                    Intent::create(dst, expected, *mtime)
                 }
             }
             Step::CopySymlink {
@@ -124,17 +132,9 @@ impl Intent {
                 ..
             } => {
                 if *remove_source {
-                    Intent::Move {
-                        src: src.clone(),
-                        dst: dst.clone(),
-                        symlink: true,
-                        temp: None,
-                    }
+                    Intent::moved(src, dst, true, None, None)
                 } else {
-                    Intent::Create {
-                        dst: dst.clone(),
-                        temp: None,
-                    }
+                    Intent::create(dst, None, None)
                 }
             }
             Step::HardLink {
@@ -149,23 +149,46 @@ impl Intent {
                 src_existing: src_existing.clone(),
                 temp: None,
             },
-            Step::ExtractFile { dst, .. }
-            | Step::ExtractSymlink { dst, .. }
-            | Step::Compress { dst, .. } => Intent::Create {
-                dst: dst.clone(),
-                temp: None,
-            },
+            Step::ExtractFile {
+                dst, size, mtime, ..
+            } => Intent::create(dst, Some(*size), *mtime),
+            Step::ExtractSymlink { dst, .. } | Step::Compress { dst, .. } => {
+                Intent::create(dst, None, None)
+            }
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
-            Step::MakeFile { path, .. } => Intent::Create {
-                dst: path.clone(),
-                temp: None,
-            },
+            Step::MakeFile { path, .. } => Intent::create(path, Some(0), None),
             Step::Rename { from, to } => Intent::Rename {
                 from: from.clone(),
                 to: to.clone(),
             },
             _ => return None,
         })
+    }
+
+    fn create(dst: &Path, size: Option<u64>, mtime: Option<Stamp>) -> Intent {
+        Intent::Create {
+            dst: dst.to_path_buf(),
+            temp: None,
+            size,
+            mtime,
+        }
+    }
+
+    fn moved(
+        src: &Path,
+        dst: &Path,
+        symlink: bool,
+        size: Option<u64>,
+        mtime: Option<Stamp>,
+    ) -> Intent {
+        Intent::Move {
+            src: src.to_path_buf(),
+            dst: dst.to_path_buf(),
+            symlink,
+            temp: None,
+            size,
+            mtime,
+        }
     }
 }
 
