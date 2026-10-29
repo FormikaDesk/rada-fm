@@ -44,25 +44,45 @@ rada chooses the layout from the size of the window (`layout = "auto"`, the defa
 
 ## Install
 
-Prebuilt binaries (Linux x86_64 and aarch64, static; macOS Intel and Apple silicon; Windows x86_64) are on the [releases page](https://github.com/formikadesk/rada-fm/releases). Unpack the archive and put `rada` (`rada.exe`) on your `PATH`; commands for each system are in [docs/install.md](docs/install.md).
+Binaries are on the [releases page](https://github.com/formikadesk/rada-fm/releases); each system below downloads one and puts it in a folder of your own, with no administrator rights. [docs/install.md](docs/install.md) has everything else: which file is yours, checking the signature, the `PATH`, the font and the launcher, updating and uninstalling.
 
-With Rust 1.93 or newer ([rustup](https://rustup.rs)), from crates.io:
-
-```sh
-cargo install rada --locked --version 0.6.0-rc.19
-```
-
-Only pre-releases are published so far, and cargo does not pick a pre-release by itself, so the version has to be named. With 0.6.0 `cargo install rada --locked` will be enough. More in [docs/install.md](docs/install.md).
-
-Or from source:
+**Linux** (x86_64 and aarch64, static):
 
 ```sh
-git clone https://github.com/formikadesk/rada-fm rada
-cd rada
-cargo install --path crates/rada
+v=0.6.0-rc.19; n="rada-$v-$(uname -m)-unknown-linux-musl"
+curl -fLO "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.tar.gz"
+tar xzf "$n.tar.gz" && mkdir -p ~/.local/bin && install -m 755 "$n/rada" ~/.local/bin/rada
+rada --version      # not found? add ~/.local/bin to your PATH: docs/install.md#linux
 ```
 
-Arch Linux (AUR): coming soon. A [Nerd Font](https://www.nerdfonts.com/) is recommended for file-type icons (`rada setup font` installs one); without it rada uses Unicode markers.
+**macOS** (Apple silicon; for an Intel Mac, `x86_64-apple-darwin`):
+
+```sh
+v=0.6.0-rc.19; n="rada-$v-aarch64-apple-darwin"
+curl -fLO "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.tar.gz"
+tar xzf "$n.tar.gz" && mkdir -p ~/.local/bin && install -m 755 "$n/rada" ~/.local/bin/rada
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # then open a new terminal; rada --version
+```
+
+**Windows** (x86_64, PowerShell; [Windows Terminal](https://aka.ms/terminal) recommended):
+
+```powershell
+$v = "0.6.0-rc.19"; $n = "rada-$v-x86_64-pc-windows-msvc"; $d = "$env:LOCALAPPDATA\Programs\rada"
+Invoke-WebRequest "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.zip" -OutFile "$env:TEMP\$n.zip"
+Expand-Archive -Force "$env:TEMP\$n.zip" "$env:TEMP\rada-unpacked"; New-Item -ItemType Directory -Force $d | Out-Null; Copy-Item -Force "$env:TEMP\rada-unpacked\$n\rada.exe" $d
+[Environment]::SetEnvironmentVariable("Path", ([Environment]::GetEnvironmentVariable("Path", "User") + ";$d"), "User")   # then open a new terminal; rada --version
+```
+
+**Arch Linux:** AUR coming soon; until then use the binary or the `PKGBUILD` in the repository ([how](docs/install.md#arch-linux-aur)).
+
+**With cargo** (Rust 1.93 or newer, [rustup](https://rustup.rs)), from crates.io or from a checkout:
+
+```sh
+cargo install rada --locked --version 0.6.0-rc.19      # only pre-releases so far: the version has to be named
+cargo install --path crates/rada                        # from a clone of this repository
+```
+
+Check a download against its signature first: [docs/verify.md](docs/verify.md). A [Nerd Font](https://www.nerdfonts.com/) is recommended for file-type icons (`rada setup font` installs one); without it rada uses Unicode markers.
 
 ## Quick start
 
