@@ -27,6 +27,9 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
    the tests green. `scripts/set-version.sh x.y.z` moves the version everywhere it is written
    (`Cargo.toml`, `Cargo.lock`, and the download example and version numbers in `docs/`); the
    changelog is yours to write.
+   `scripts/set-version.sh --check` fails when `docs/install.md` or the Install section of the
+   README names another version than `Cargo.toml`, or a public key that `docs/verify.md` does
+   not have; CI runs it, and `scripts/test-set-version` tries the script on a copy.
 2. Tag it and push the tag. The tag must be `v` + the version in `Cargo.toml`; the workflow stops
    if they differ. Only tags that start with `v` and a digit start a release.
 

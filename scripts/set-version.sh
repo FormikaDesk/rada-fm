@@ -10,11 +10,50 @@
 # version in docs/platforms.md and docs/updates.md, the install line in the README of the rada
 # crate). The CHANGELOG is not touched: its sections are written
 # by hand. Run it from anywhere; it works on the repository the script lives in.
+#
+#   scripts/set-version.sh --check
+#
+# Changes nothing and fails if the commands a person copies are out of date: a version in
+# docs/install.md, or in the Install section of README.md, that is not the one of Cargo.toml
+# (the version without its suffix is let through: "with 0.6.0 ... will be enough"), or a public
+# key there that verify.md does not have. `scripts/test-set-version` tries both modes.
 set -euo pipefail
+
+if [[ "${1:-}" == "--check" ]]; then
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    current="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$root/Cargo.toml" | head -n 1)"
+    [[ -n "$current" ]] || { echo "no version found in $root/Cargo.toml" >&2; exit 1; }
+    base="${current%%-*}"
+    status=0
+    # install.md whole; of README.md only the section between "## Install" and "## Quick start".
+    check_text() {
+        local file="$1" text="$2" v key
+        while IFS= read -r v; do
+            [[ -z "$v" || "$v" == "$current" || "$v" == "$base" ]] && continue
+            echo "$file names $v, but the version is $current" >&2
+            status=1
+        done < <(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' <<<"$text" | sort -u || true)
+        if ! grep -qF "$current" <<<"$text"; then
+            echo "$file does not name $current at all" >&2
+            status=1
+        fi
+        while IFS= read -r key; do
+            [[ -z "$key" ]] && continue
+            grep -qF "$key" "$root/docs/verify.md" || {
+                echo "$file has a public key that docs/verify.md does not have: $key" >&2
+                status=1
+            }
+        done < <(grep -oE 'RW[A-Za-z0-9+/]{54}' <<<"$text" || true)
+    }
+    check_text docs/install.md "$(cat "$root/docs/install.md")"
+    check_text README.md "$(sed -n '/^## Install$/,/^## Quick start$/p' "$root/README.md")"
+    [[ $status -eq 0 ]] && echo "versions and keys in docs/install.md and README.md are current ($current)"
+    exit $status
+fi
 
 new="${1:-}"
 if [[ ! "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
-    echo "usage: $0 <version>   (for example 0.6.0-rc.11)" >&2
+    echo "usage: $0 <version> | --check   (for example 0.6.0-rc.11)" >&2
     exit 2
 fi
 

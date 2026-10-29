@@ -75,6 +75,8 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - name: The versions and keys in the install guide are current
+        run: scripts/set-version.sh --check && scripts/test-set-version
 
   # The declared minimum Rust version must keep building.
   msrv:

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Tries scripts/set-version.sh on a copy of the files it touches: nothing in the repository changes.
+#   scripts/test-set-version
+# The copy must pass --check; after a move to another version it must pass again, with the new
+# version where the old one was; and it must fail when a stale version or an unknown key is put
+# in docs/install.md or in the Install section of README.md.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+mkdir -p "$tmp/scripts" "$tmp/docs" "$tmp/crates/rada"
+cp "$root/scripts/set-version.sh" "$tmp/scripts/"
+cp "$root/Cargo.toml" "$root/Cargo.lock" "$root/README.md" "$tmp/"
+cp "$root/docs/install.md" "$root/docs/platforms.md" "$root/docs/updates.md" "$root/docs/verify.md" "$tmp/docs/"
+cp "$root/crates/rada/README.md" "$tmp/crates/rada/"
+set_version="$tmp/scripts/set-version.sh"
+
+fail() { echo "FAIL: $*" >&2; exit 1; }
+current="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$tmp/Cargo.toml" | head -n 1)"
+
+"$set_version" --check > /dev/null || fail "the files of the repository do not pass --check"
+
+# Same base version as now: the prose that names the release without a suffix stays right.
+new="${current%%-*}-rc.99"
+[[ "$new" != "$current" ]] || new="${current%%-*}-rc.98"
+"$set_version" "$new" > /dev/null || fail "set-version.sh $new"
+"$set_version" --check > /dev/null || fail "--check fails right after set-version.sh"
+grep -qF "$new" "$tmp/docs/install.md" || fail "install.md does not name $new"
+grep -qF "$new" "$tmp/README.md" || fail "README.md does not name $new"
+if grep -F "$current" "$tmp/docs/install.md" "$tmp/README.md" > /dev/null; then
+    fail "the old version $current is still in install.md or README.md"
+fi
+
+expect_failure() {
+    local what="$1"
+    if "$set_version" --check > /dev/null 2>&1; then fail "--check passes with $what"; fi
+}
+
+cp "$tmp/docs/install.md" "$tmp/install.good"
+sed -i "0,/$new/s//$current/" "$tmp/docs/install.md"
+expect_failure "a stale version in install.md"
+cp "$tmp/install.good" "$tmp/docs/install.md"
+
+cp "$tmp/README.md" "$tmp/README.good"
+sed -i "0,/$new/s//$current/" "$tmp/README.md"
+expect_failure "a stale version in the Install section of README.md"
+cp "$tmp/README.good" "$tmp/README.md"
+
+sed -i '0,/RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ/s//RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoX/' "$tmp/docs/install.md"
+expect_failure "a public key that verify.md does not have"
+
+echo "ok: scripts/set-version.sh keeps docs/install.md and README.md current"
