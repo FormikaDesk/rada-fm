@@ -35,6 +35,27 @@ pub struct Version {
     pre: Vec<Ident>,
 }
 
+/// A number as SemVer writes it: digits only, and no zero in front of another digit.
+fn number(text: &str) -> Option<u64> {
+    if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    if text.len() > 1 && text.starts_with('0') {
+        return None;
+    }
+    text.parse().ok()
+}
+
+fn identifier(id: &str) -> Option<Ident> {
+    if id.is_empty() || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        None
+    } else if id.bytes().all(|b| b.is_ascii_digit()) {
+        number(id).map(Ident::Num)
+    } else {
+        Some(Ident::Text(id.to_string()))
+    }
+}
+
 impl Version {
     /// `1.2.3`, `v1.2.3`, `1.2.3-rc.1`; build metadata (`+abc`) is ignored.
     pub fn parse(text: &str) -> Option<Version> {
@@ -45,32 +66,15 @@ impl Version {
             None => (t, None),
         };
         let mut nums = core.split('.');
-        let major = nums.next()?.parse().ok()?;
-        let minor = nums.next()?.parse().ok()?;
-        let patch = nums.next()?.parse().ok()?;
+        let major = number(nums.next()?)?;
+        let minor = number(nums.next()?)?;
+        let patch = number(nums.next()?)?;
         if nums.next().is_some() {
             return None;
         }
         let pre = match pre {
             None => Vec::new(),
-            Some(p) => {
-                if p.is_empty() {
-                    return None;
-                }
-                p.split('.')
-                    .map(|id| {
-                        if id.is_empty()
-                            || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-                        {
-                            None
-                        } else if id.chars().all(|c| c.is_ascii_digit()) {
-                            id.parse().ok().map(Ident::Num)
-                        } else {
-                            Some(Ident::Text(id.to_string()))
-                        }
-                    })
-                    .collect::<Option<Vec<_>>>()?
-            }
+            Some(p) => p.split('.').map(identifier).collect::<Option<_>>()?,
         };
         Some(Version {
             major,
@@ -167,6 +171,36 @@ mod tests {
             "nightly",
         ] {
             assert!(Version::parse(bad).is_none(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn numbers_are_digits_without_leading_zeros() {
+        for bad in [
+            "1.2.3-01",
+            "01.2.3",
+            "1.02.3",
+            "1.2.03",
+            "1.+2.3",
+            "+1.2.3",
+            "1.2.3-rc.01",
+            "1.2.3-rc.+1",
+            "1.2.3-0.00",
+            "1.2.3-99999999999999999999",
+        ] {
+            assert!(Version::parse(bad).is_none(), "{bad:?}");
+        }
+        for good in [
+            "0.6.0-rc.18",
+            "v1.0.0",
+            "1.2.3-rc.1+abc",
+            "0.0.0",
+            "1.2.3-0",
+            "1.2.3-rc.0",
+            "1.2.3-01a",
+            "1.2.3-0-x",
+        ] {
+            assert!(Version::parse(good).is_some(), "{good:?}");
         }
     }
 
