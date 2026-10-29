@@ -17,6 +17,7 @@ mod winfolder;
 mod winsetup;
 
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -238,21 +239,30 @@ fn early_language() {
 /// Set by the launchers of Rada.app: the window belongs to rada and closes with it.
 const FROM_APP: &str = "RADA_FROM_APP";
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
     let mut log_guard = None;
-    let result = run(&mut log_guard);
-    if let Err(e) = &result {
-        // The log is the only place left to look at when the window is gone.
-        log_fatal(e);
-        drop(log_guard);
-        if std::env::var_os(FROM_APP).is_some_and(|v| v == "1") {
-            // Started from Rada.app: the window closes with rada, and with it the message.
-            eprintln!("\nError: {e:?}\n\n{}", Key::MPressAnyKey.tr());
-            rada_tui::run::wait_for_key();
-            std::process::exit(1);
-        }
+    let Err(e) = run(&mut log_guard) else {
+        return ExitCode::SUCCESS;
+    };
+    // The log is the only place left to look at when the window is gone.
+    log_fatal(&e);
+    drop(log_guard);
+    let said = fatal_text(&e);
+    if std::env::var_os(FROM_APP).is_some_and(|v| v == "1") {
+        // Started from Rada.app: the window closes with rada, and with it the message.
+        eprintln!("\nError: {said}\n\n{}", Key::MPressAnyKey.tr());
+        rada_tui::run::wait_for_key();
+        std::process::exit(1);
     }
-    result
+    eprintln!("Error: {said}");
+    ExitCode::FAILURE
+}
+
+/// An error that ends rada, as it is shown: the message and its causes, as `{:?}` writes them.
+/// What the causes carry may come from outside (an answer from the network, the output of a
+/// program, a name on the disk), so nothing in it can act on the terminal.
+fn fatal_text(e: &anyhow::Error) -> String {
+    rada_core::display::block(&format!("{e:?}"))
 }
 
 /// An error that ends rada, in the log with every cause in the chain (`a: b: c`).
@@ -347,7 +357,7 @@ fn run_exiting_command(cli: &Cli) -> Result<bool> {
         let dirs = Dirs::from_env().context(Key::MNoDirs.tr())?;
         let platform = platform::current(dirs);
         for line in platform.volumes().diagnose() {
-            println!("{line}");
+            println!("{}", rada_core::display::text(&line));
         }
         return Ok(true);
     }
@@ -423,7 +433,7 @@ fn run_setup(what: &SetupWhat) -> Result<()> {
         )?,
     };
     for l in lines {
-        println!("{l}");
+        println!("{}", rada_core::display::block(&l));
     }
     Ok(())
 }
@@ -580,13 +590,19 @@ fn print_doctor(
 ) {
     let windows_terminal = caps.terminal == rada_tui::caps::TerminalKind::WindowsTerminal;
     for line in caps.describe() {
-        println!("{line}");
+        println!("{}", rada_core::display::text(&line));
     }
     // Why this set: the font the terminal is set to draw with, when it could be read.
     let chosen = !matches!(icons_name, None | Some("auto"));
     match fonts::terminal_nerd_font(&dirs.home, windows_terminal) {
         _ if chosen => println!("{}", tf(Key::DocIconsChosen, &[&icons.name()])),
-        Some(font) => println!("{}", tf(Key::DocIconsNerd, &[&icons.name(), &font.trim()])),
+        Some(font) => println!(
+            "{}",
+            tf(
+                Key::DocIconsNerd,
+                &[&icons.name(), &rada_core::display::text(font.trim())]
+            )
+        ),
         None => println!("{}", tf(Key::DocIconsNone, &[&icons.name()])),
     }
 }
@@ -1033,5 +1049,29 @@ mod tests {
             ),
             "{text}"
         );
+    }
+
+    #[test]
+    fn a_fatal_error_is_shown_with_its_causes_and_without_what_acts_on_the_terminal() {
+        let err = Err::<(), _>(std::io::Error::other(
+            "answer: \x1b]0;pwned\x07\x1b[2J and \u{202e}more\nsecond line",
+        ))
+        .context("cannot reach \x1b[31mhost")
+        .unwrap_err();
+        let said = fatal_text(&err);
+        assert!(
+            !said
+                .chars()
+                .any(|c| c != '\n' && rada_core::display::is_dangerous(c))
+        );
+        assert!(said.contains("cannot reach \\e[31mhost"), "{said}");
+        assert!(said.contains("Caused by"), "the chain stays: {said}");
+        assert!(
+            said.contains("\\e]0;pwned\\u{7}\\e[2J and \\u{202e}more\n    second line"),
+            "{said}"
+        );
+        // An ordinary message is what `{:?}` writes.
+        let plain = anyhow::anyhow!("plain").context("outer");
+        assert_eq!(fatal_text(&plain), format!("{plain:?}"));
     }
 }

@@ -104,6 +104,15 @@ impl World {
 
     /// List one release, with a program inside that says its version.
     fn publish(&self, version: &str, program: &[u8]) {
+        self.publish_with_notes(
+            version,
+            program,
+            r"Tags in Finder colours\n- Faster everything",
+        );
+    }
+
+    /// [`publish`](Self::publish), with release notes written as the inside of a JSON string.
+    fn publish_with_notes(&self, version: &str, program: &[u8], notes: &str) {
         let name = if cfg!(windows) {
             format!("rada-{version}-{}.zip", target())
         } else {
@@ -148,7 +157,7 @@ impl World {
             "/releases",
             200,
             format!(
-                r#"[{{"tag_name":"v{version}","prerelease":false,"draft":false,"body":"Tags in Finder colours\n- Faster everything","assets":[
+                r#"[{{"tag_name":"v{version}","prerelease":false,"draft":false,"body":"{notes}","assets":[
                 {{"name":"{name}","browser_download_url":"{}","size":1}},
                 {{"name":"SHA256SUMS","browser_download_url":"{}","size":1}},
                 {{"name":"SHA256SUMS.minisig","browser_download_url":"{}","size":1}}]}}]"#,
@@ -395,4 +404,61 @@ fn without_the_test_key_the_program_trusts_nobody() {
     // The keys built in are the author's: a release signed by anybody else does not pass.
     assert!(t.contains("signature of SHA256SUMS is not valid"), "{t}");
     assert_eq!(fs::read(&w.exe).unwrap(), before);
+}
+
+/// What the output of a command may hold: its own line breaks and nothing that acts on a
+/// terminal (no escape, no bell, no carriage return, no C1 control, no bidi override).
+fn assert_quiet(t: &str) {
+    for c in t.chars() {
+        assert!(
+            c == '\n' || !rada_core::display::is_dangerous(c),
+            "{c:?} in {t:?}"
+        );
+    }
+}
+
+#[test]
+fn release_notes_with_escape_sequences_are_shown_with_the_escapes_visible() {
+    let w = World::new();
+    w.publish_with_notes(
+        NEW,
+        b"whatever",
+        r"Fixes\n\u001b[31mred\u001b[0m\r\n\u001b]52;c;aGk=\u0007 copied\n\u202egnp.exe",
+    );
+    let out = w.run(&["update", "--check"]);
+    let t = text(&out);
+    assert!(out.status.success(), "{t}");
+    assert_quiet(&t);
+    assert!(t.contains("\\e[31mred"), "the escape is there to read: {t}");
+    assert!(t.contains("\\e]52;c;aGk=\\u{7} copied"), "{t}");
+    assert!(t.contains("\\u{202e}gnp.exe"), "{t}");
+}
+
+#[test]
+fn an_error_that_ends_the_program_is_shown_without_what_came_with_it() {
+    let w = World::new();
+    // The address of the server is part of what the error says, and it is whatever the
+    // environment gives.
+    let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!(
+        "http://{}/\u{1b}[31mreleases\u{1b}]52;c;aGk=\u{7}",
+        dead.local_addr().unwrap()
+    );
+    drop(dead);
+    let mut cmd = Command::new(&w.exe);
+    cmd.args(["update", "--check"])
+        .env("LC_ALL", "en_US.UTF-8")
+        .env("HOME", w.p("home"))
+        .env("USERPROFILE", w.p("home"))
+        .env("XDG_CONFIG_HOME", w.p("xdg/config"))
+        .env("XDG_STATE_HOME", w.p("xdg/state"))
+        .env("RADA_UPDATE_API", url);
+    let out = run_patiently(&mut cmd);
+    assert_eq!(out.status.code(), Some(1));
+    let t = text(&out);
+    assert_quiet(&t);
+    assert!(
+        t.contains("Error: "),
+        "the form of the message is the same: {t}"
+    );
 }
