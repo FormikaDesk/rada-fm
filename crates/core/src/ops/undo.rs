@@ -255,16 +255,22 @@ impl LastName<'_> {
         if self.digests.is_none() {
             self.digests = Some(self.journal.load_digests(self.id).unwrap_or_default());
         }
-        // Nothing recorded (made by an older rada) or unreadable: as before, no comparison.
+        // Nothing recorded (made by an older rada): as before, no comparison.
         let Some(want) = self.digests.as_ref().and_then(|d| d.get(path)) else {
             return Ok(());
         };
+        // A hash was recorded and cannot be taken now: removing the last name would be
+        // trusting what could not be looked at.
         match content_hash(path) {
-            Ok(have) if have != *want => Err(format!(
+            Ok(have) if have == *want => Ok(()),
+            Ok(_) => Err(format!(
                 "{} was modified after the operation (its contents differ)",
                 display::path(path)
             )),
-            _ => Ok(()),
+            Err(e) => Err(format!(
+                "{} cannot be read, so it cannot be told whether it was modified after the operation ({e})",
+                display::path(path)
+            )),
         }
     }
 }

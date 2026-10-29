@@ -87,3 +87,25 @@ fn a_changed_file_that_has_another_name_elsewhere_loses_only_its_names_here() {
     );
     assert_eq!(std::fs::read_to_string(&elsewhere).unwrap(), "9876543210");
 }
+
+#[test]
+fn the_last_name_of_a_file_that_cannot_be_read_is_not_removed() {
+    use std::os::unix::fs::PermissionsExt;
+    if is_root() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let (e, j) = (sb.engine(), sb.journal());
+    let (id, copy) = copied_group(&sb, &e, &j);
+    std::fs::set_permissions(copy.join("x"), std::fs::Permissions::from_mode(0o000)).unwrap();
+
+    let (up, _) = undo(&e, &j, &id);
+    assert_eq!(up.blocked.len(), 1, "{:?}", up.blocked);
+    assert!(
+        up.blocked[0].reason.contains("whether") && up.blocked[0].reason.contains("modified"),
+        "{:?}",
+        up.blocked
+    );
+    let left = ["x", "y"].iter().filter(|n| copy.join(n).exists()).count();
+    assert_eq!(left, 1, "one name goes, the last one stays");
+}
