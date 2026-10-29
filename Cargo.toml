@@ -5,7 +5,7 @@ members = ["crates/core", "crates/tui", "crates/rada"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.6.0-rc.17"
+version = "0.6.0-rc.18"
 edition = "2024"
 license = "MIT"
 authors = ["Alessandro Formica"]
@@ -17,8 +17,8 @@ homepage = "https://github.com/formikadesk/rada-fm"
 # exact because the three crates are released together and only fit each other;
 # scripts/set-version.sh moves it with the workspace version.
 [workspace.dependencies]
-rada-core = { path = "crates/core", version = "=0.6.0-rc.17" }
-rada-tui = { path = "crates/tui", version = "=0.6.0-rc.17" }
+rada-core = { path = "crates/core", version = "=0.6.0-rc.18" }
+rada-tui = { path = "crates/tui", version = "=0.6.0-rc.18" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
