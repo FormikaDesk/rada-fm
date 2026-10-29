@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.19] - 2026-10-29
+
+Fixes to archives on Windows, to undo, to the recovery after a crash and to downloads for updates. Still a **pre-release**.
+
 ### Security
 - **On Windows a name in a TAR archive written with backslashes (`..\..\x.txt`, `a\..\..\b`, `C:\x`, `\\server\share\x`) is read as the path it is** and refused, instead of being taken for one odd file name. Extracting also checks, whatever the archive format, that every member lands under the destination folder by plain names only.
 
