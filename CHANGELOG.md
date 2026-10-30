@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.21] - 2026-10-30
+
+Safer bulk rename, a recovery that trusts less what it finds, a clearer message when an update cannot be installed, command-line errors in your language, and install commands for fish. Still a **pre-release**.
+
+### Changed
+- **The mistakes you can make on the command line are said in the language of rada.** An argument or a command that does not exist (with or without a suggestion), a value that is missing and a value that is not one of those allowed (with the allowed ones) were always in English, even when the rest of the page was in Italian. The exit code is the same.
+- **`rada update` checks that it can write beside the program before it downloads anything**, and when it cannot (rada in `/usr/local/bin`, for example) it says what to do: move rada to a folder of yours (`~/.local/bin`, or `%LOCALAPPDATA%\Programs\rada` on Windows), as the install guide shows, run the update again, and run `rada setup desktop` again if you use the launcher.
+- **The installation guide has the commands for fish**, on Linux and on macOS. fish keeps the name `version` for its own version, so no block uses it as the name of a variable any more.
+- **`docs/SAFETY.md` describes the name of the temporary file as it is now** (it carries the operation and the step recorded in the history) and what the recovery after a crash needs to see before it takes a file as its own.
+
+### Fixed
+- **A width such as `{n:1000000000}` in the window of the multiple rename no longer freezes or closes rada.** The width of a counter is between 1 and 255, and anything else is refused with a message before a name is made.
+- **A counter that goes past the biggest number it can hold is an error for that item** instead of wrapping round to a small number. It applies to the start and the step of `--request` too.
+- **On Windows the preview of the multiple rename no longer shows a name such as `CON` as fine** and then has the plan refuse it. The preview uses the rules of the system rada runs on.
+- **After a crash, a rename that changed only the capitals of a name (`Report.txt` to `report.txt`) enters the history on macOS and Windows**, so it can be undone. The old name used to look as if it still existed.
+- **After a crash, rada no longer takes for its own a file or a link that somebody else put where a link was going.** A link is taken only if it points where the interrupted step was making it; a new archive found at its place is left alone, with a note in the summary of the recovery. The history written by earlier versions is read as before.
+
 ## [0.6.0-rc.20] - 2026-10-30
 
 Safer renames and journal, plans that say when they are incomplete, and a clearer tree. Still a **pre-release**.
