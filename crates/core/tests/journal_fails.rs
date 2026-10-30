@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use rada_core::journal::{Journal, JournalEntry};
+use rada_core::journal::{Journal, JournalEntry, RecordKind};
 use rada_core::ops::*;
 use rada_core::testutil::*;
 
@@ -30,7 +30,10 @@ impl ExecHandler for Answering {
 }
 
 fn four_files(sb: &Sandbox) -> (Engine, Journal, Plan) {
-    let e = sb.engine();
+    four_files_on(sb, sb.engine())
+}
+
+fn four_files_on(sb: &Sandbox, e: Engine) -> (Engine, Journal, Plan) {
     let srcs: Vec<PathBuf> = ["a", "b", "c", "d"]
         .iter()
         .map(|n| sb.write(format!("src/{n}"), n.as_bytes()))
@@ -55,13 +58,14 @@ fn entry(j: &Journal) -> JournalEntry {
     j.entries().unwrap().remove(0)
 }
 
-// The records of a run: the start, then the intent and the way back of each copy.
+// A record is made to fail by its kind and its number, not by how many records came before:
+// how many a step writes depends on the system (a digest only where files have an identity).
 
 #[test]
 fn when_the_intent_cannot_be_written_the_step_does_not_run() {
     let sb = Sandbox::new();
     let (e, j, plan) = four_files(&sb);
-    j.fail_write_after(3); // start, a (intent, way back); the intent of b fails
+    j.fail_record(RecordKind::Pending, 2); // the intent of b
     let mut h = Answering::new(None);
     let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
 
@@ -78,7 +82,7 @@ fn when_the_intent_cannot_be_written_the_step_does_not_run() {
 fn when_the_way_back_cannot_be_written_the_run_stops_before_the_next_step() {
     let sb = Sandbox::new();
     let (e, j, plan) = four_files(&sb);
-    j.fail_write_after(4); // ... the intent of b is written; its way back fails
+    j.fail_record(RecordKind::Undo, 2); // the way back of b
     let mut h = Answering::new(Some(JournalChoice::Stop));
     let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
 
@@ -91,10 +95,25 @@ fn when_the_way_back_cannot_be_written_the_run_stops_before_the_next_step() {
 }
 
 #[test]
+fn it_is_the_same_where_files_have_no_identity() {
+    let sb = Sandbox::new();
+    let ffs = FaultFs::new();
+    ffs.hide_identity();
+    let (e, j, plan) = four_files_on(&sb, sb.engine_with(ffs));
+    j.fail_record(RecordKind::Undo, 2);
+    let mut h = Answering::new(Some(JournalChoice::Stop));
+    let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
+    assert_eq!(copied(&sb), ["a", "b"]);
+    assert_eq!(h.asked.len(), 1);
+    assert_eq!(out.report.status(), RunStatus::Aborted);
+    assert_eq!(entry(&j).unrecorded_from, Some(1));
+}
+
+#[test]
 fn a_handler_with_nobody_to_ask_stops() {
     let sb = Sandbox::new();
     let (e, j, plan) = four_files(&sb);
-    j.fail_write_after(4);
+    j.fail_record(RecordKind::Undo, 2);
     let out = e
         .run_operation(&j, &plan, &mut SkipErrors, &Cancel::new())
         .unwrap();
@@ -106,7 +125,7 @@ fn a_handler_with_nobody_to_ask_stops() {
 fn going_on_marks_the_operation_as_not_undoable_from_that_step() {
     let sb = Sandbox::new();
     let (e, j, plan) = four_files(&sb);
-    j.fail_write_after(4);
+    j.fail_record(RecordKind::Undo, 2);
     let mut h = Answering::new(Some(JournalChoice::ContinueUnrecorded));
     let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
 
@@ -165,7 +184,7 @@ fn two_names_and_two_files(sb: &Sandbox) -> (Engine, Journal, Plan) {
 fn when_the_digest_cannot_be_written_the_run_stops_too() {
     let sb = Sandbox::new();
     let (e, j, plan) = two_names_and_two_files(&sb);
-    j.fail_write_after(3); // start, intent and way back of a; its digest fails
+    j.fail_record(RecordKind::Digest, 1); // the digest of a
     let mut h = Answering::new(None);
     let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
 
@@ -181,7 +200,7 @@ fn when_the_digest_cannot_be_written_the_run_stops_too() {
 fn going_on_without_the_digest_is_marked_like_any_other_record() {
     let sb = Sandbox::new();
     let (e, j, plan) = two_names_and_two_files(&sb);
-    j.fail_write_after(3);
+    j.fail_record(RecordKind::Digest, 1);
     let mut h = Answering::new(Some(JournalChoice::ContinueUnrecorded));
     let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
     assert_eq!(copied(&sb), ["a", "b", "c", "d"]);

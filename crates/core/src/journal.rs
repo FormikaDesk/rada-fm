@@ -346,9 +346,22 @@ pub struct Journal {
     counter: AtomicU64,
     /// The locks of the operations this process is running, by id.
     running: Mutex<HashMap<String, OpLock>>,
-    /// Records that may still be written before one write fails (tests).
+    /// The record that is to fail, and how many of its kind are still to be written before it
+    /// (tests).
     #[cfg(any(test, feature = "testutil"))]
-    writes_left: Mutex<Option<usize>>,
+    fault: Mutex<Option<(RecordKind, usize)>>,
+}
+
+/// The records an operation writes for each of its steps.
+#[cfg(any(test, feature = "testutil"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordKind {
+    /// The intent, before a step that creates something.
+    Pending,
+    /// The way back of a step that finished.
+    Undo,
+    /// The hash of a file that undo will check before it removes its last name.
+    Digest,
 }
 
 /// Closes a line that a crash cut short (see the module documentation).
@@ -432,34 +445,41 @@ impl Journal {
             counter: AtomicU64::new(0),
             running: Mutex::new(HashMap::new()),
             #[cfg(any(test, feature = "testutil"))]
-            writes_left: Mutex::new(None),
+            fault: Mutex::new(None),
         })
     }
 
-    /// After `records` more records the next write fails, once, as a disk that is full for a
-    /// moment would.
+    /// The `nth` (from 1) record of `kind` written from now on fails, once, as a disk that is
+    /// full for a moment would. Records of other kinds are written as they are, so the test
+    /// does not depend on how many records a step makes.
     #[cfg(any(test, feature = "testutil"))]
-    pub fn fail_write_after(&self, records: usize) {
-        *self.writes_left.lock().unwrap() = Some(records);
+    pub fn fail_record(&self, kind: RecordKind, nth: usize) {
+        *self.fault.lock().unwrap() = Some((kind, nth.max(1)));
     }
 
     #[cfg(any(test, feature = "testutil"))]
-    fn injected_fault(&self) -> Result<()> {
-        let mut left = self.writes_left.lock().unwrap();
-        match *left {
-            Some(0) => {
-                *left = None;
+    fn injected_fault(&self, rec: &Record) -> Result<()> {
+        let kind = match rec {
+            Record::Pending { .. } => RecordKind::Pending,
+            Record::Undo { .. } => RecordKind::Undo,
+            Record::Digest { .. } => RecordKind::Digest,
+            _ => return Ok(()),
+        };
+        let mut fault = self.fault.lock().unwrap();
+        match *fault {
+            Some((k, 1)) if k == kind => {
+                *fault = None;
                 Err(Error::io(
                     "write journal",
                     &self.path,
                     std::io::Error::other("no space left on device"),
                 ))
             }
-            Some(n) => {
-                *left = Some(n - 1);
+            Some((k, n)) if k == kind => {
+                *fault = Some((k, n - 1));
                 Ok(())
             }
-            None => Ok(()),
+            _ => Ok(()),
         }
     }
 
@@ -486,7 +506,7 @@ impl Journal {
     /// of concurrent instances never interleave); `force` also waits for the disk.
     fn append(&self, rec: &Record, force: bool) -> Result<()> {
         #[cfg(any(test, feature = "testutil"))]
-        self.injected_fault()?;
+        self.injected_fault(rec)?;
         let mut line = serde_json::to_vec(rec)?;
         line.push(b'\n');
         let mut w = self
