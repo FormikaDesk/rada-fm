@@ -23,6 +23,7 @@ Safer renames and journal, plans that say when they are incomplete, and a cleare
 - **When a hard link cannot be made and a separate copy takes its place, a failure to set its permissions is now in the summary** of what was not carried over, instead of being dropped.
 - **On Windows a copied or moved link to a folder stays a link to a folder** when its target does not exist. It used to become a link to a file.
 - **A folder that cannot be read has its own sign and reason in the tree of the panels view**, instead of looking empty with `(0)`.
+- **On Windows a copy no longer reads every file a second time after copying it.** The extra reading was for a check that only works where the system gives files a number, and Windows does not.
 
 ## [0.6.0-rc.19] - 2026-10-29
 
