@@ -85,16 +85,16 @@ impl Recording<'_> {
     ///
     /// Undo finds the file by its device and number, so where the system does not give them
     /// (Windows) a digest could never be used: nothing is hashed or written.
-    fn record_digest(&mut self, inverse: &Step) {
+    fn record_digest(&mut self, inverse: &Step) -> crate::Result<()> {
         let Step::RemoveFile {
             path,
             expect: Some(fp),
         } = inverse
         else {
-            return;
+            return Ok(());
         };
         if fp.ctime.is_some() || fp.kind != FileKind::File {
-            return;
+            return Ok(());
         }
         let Some(key) = self
             .fs
@@ -102,7 +102,7 @@ impl Recording<'_> {
             .ok()
             .and_then(|m| Some((m.dev?, m.ino?)))
         else {
-            return;
+            return Ok(());
         };
         let hash = match self.hashed.get(&key) {
             Some(h) => h.clone(),
@@ -110,15 +110,12 @@ impl Recording<'_> {
                 Ok(h) => h,
                 Err(e) => {
                     tracing::warn!("journal: cannot hash {}: {e}", path.display());
-                    return;
+                    return Ok(());
                 }
             },
         };
         self.hashed.insert(key, hash.clone());
-        if let Err(e) = self.journal.record_digest(self.id, path, &hash) {
-            tracing::error!("journal: {e}");
-            self.errors += 1;
-        }
+        self.journal.record_digest(self.id, path, &hash)
     }
 }
 
@@ -160,7 +157,13 @@ impl ExecHandler for Recording<'_> {
         if let Some(inv) = step.inverse(result) {
             if self.writing() {
                 match self.journal.record_undo(self.id, inv.clone()) {
-                    Ok(()) => self.record_digest(&inv),
+                    Ok(()) => {
+                        // Without its digest the last name of a hard link is checked less
+                        // well by undo: the same question as for any other record.
+                        if let Err(e) = self.record_digest(&inv) {
+                            self.journal_failed(index, step, &e, true);
+                        }
+                    }
                     Err(e) => self.journal_failed(index, step, &e, true),
                 }
             } else if self.reversible {

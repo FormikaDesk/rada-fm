@@ -137,3 +137,55 @@ fn a_journal_that_works_is_never_asked_about() {
     assert_eq!(copied(&sb), ["a", "b", "c", "d"]);
     assert_eq!(entry(&j).unrecorded_from, None);
 }
+
+/// `a` and `b` are one file with two names: a copy of the first is hashed for undo.
+#[cfg(unix)]
+fn two_names_and_two_files(sb: &Sandbox) -> (Engine, Journal, Plan) {
+    let e = sb.engine();
+    let a = sb.write("src/a", "a");
+    std::fs::hard_link(&a, sb.path("src/b")).unwrap();
+    let srcs: Vec<PathBuf> = [
+        a,
+        sb.path("src/b"),
+        sb.write("src/c", "c"),
+        sb.write("src/d", "d"),
+    ]
+    .into();
+    sb.mkdir("dest");
+    let plan = e.plan_transfer(
+        &scan(&e, &srcs),
+        &sb.path("dest"),
+        &TransferOptions::copy(ConflictPolicy::Skip),
+    );
+    (e, sb.journal(), plan)
+}
+
+#[cfg(unix)]
+#[test]
+fn when_the_digest_cannot_be_written_the_run_stops_too() {
+    let sb = Sandbox::new();
+    let (e, j, plan) = two_names_and_two_files(&sb);
+    j.fail_write_after(3); // start, intent and way back of a; its digest fails
+    let mut h = Answering::new(None);
+    let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
+
+    assert_eq!(copied(&sb), ["a"]);
+    assert_eq!(h.asked.len(), 1);
+    let gap = out.report.journal_gap.as_ref().unwrap();
+    assert!(gap.stopped && gap.path.ends_with("src/a"), "{gap:?}");
+    assert_eq!(entry(&j).unrecorded_from, Some(0));
+}
+
+#[cfg(unix)]
+#[test]
+fn going_on_without_the_digest_is_marked_like_any_other_record() {
+    let sb = Sandbox::new();
+    let (e, j, plan) = two_names_and_two_files(&sb);
+    j.fail_write_after(3);
+    let mut h = Answering::new(Some(JournalChoice::ContinueUnrecorded));
+    let out = e.run_operation(&j, &plan, &mut h, &Cancel::new()).unwrap();
+    assert_eq!(copied(&sb), ["a", "b", "c", "d"]);
+    assert_eq!(h.asked.len(), 1);
+    assert!(!out.report.journal_gap.as_ref().unwrap().stopped);
+    assert_eq!(entry(&j).unrecorded_from, Some(0));
+}
