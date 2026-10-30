@@ -149,7 +149,7 @@ impl Engine {
             return;
         };
         for item in listing.items {
-            if item.name.to_string_lossy().starts_with(&prefix) {
+            if is_temp_of(&item.name, &prefix) {
                 match self.fs.remove_file(&item.path) {
                     Ok(()) => rec.removed_temps.push(item.path),
                     Err(e) => rec
@@ -263,6 +263,14 @@ impl Engine {
 /// size and, when the copy keeps times, its modification time): somebody else put it there,
 /// and neither adopting nor undoing may touch it. A record that declared nothing accepts
 /// whatever is there, as before.
+/// `.rada-part-<tag>-<n>`: after the prefix only the counter, which is digits. A longer name
+/// is another file, or another step whose tag begins like this one.
+fn is_temp_of(name: &std::ffi::OsStr, prefix: &str) -> bool {
+    name.to_str()
+        .and_then(|n| n.strip_prefix(prefix))
+        .is_some_and(|counter| !counter.is_empty() && counter.bytes().all(|b| b.is_ascii_digit()))
+}
+
 fn foreign(
     rec: &mut Recovered,
     dst: &Path,

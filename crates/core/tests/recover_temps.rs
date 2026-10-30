@@ -124,3 +124,35 @@ fn an_operation_that_names_its_temporary_file_loses_that_one_only() {
     assert_eq!(rec[0].removed_temps, vec![mine.clone()]);
     assert!(!mine.exists() && other.exists());
 }
+
+#[test]
+fn only_the_counter_of_the_step_follows_its_name() {
+    let sb = Sandbox::new();
+    let dest = sb.mkdir("d");
+    let mine = dest.join(".rada-part-op7-3-1");
+    let kept = [
+        // More after the counter.
+        ".rada-part-op7-3-0-extra",
+        ".rada-part-op7-3-1.bak",
+        // No counter at all.
+        ".rada-part-op7-3-",
+        // A step whose tag goes on where this one's counter would be.
+        ".rada-part-op7-3-1-2",
+    ];
+    std::fs::write(&mine, b"half").unwrap();
+    for n in kept {
+        std::fs::write(dest.join(n), b"theirs").unwrap();
+    }
+    cut_short(
+        &sb.journal(),
+        &pid_id(0),
+        serde_json::json!({"k":"create","dst":dest.join("a.txt"),"temp":"op7-3"}),
+    );
+
+    let rec = sb.engine().recover_interrupted(&sb.journal()).unwrap();
+    assert_eq!(rec[0].removed_temps, vec![mine.clone()]);
+    assert!(!mine.exists());
+    for n in kept {
+        assert!(dest.join(n).exists(), "{n} is not this step's");
+    }
+}
