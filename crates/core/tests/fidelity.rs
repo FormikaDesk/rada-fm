@@ -405,6 +405,42 @@ fn linked_tree(sb: &Sandbox) {
 }
 
 #[test]
+fn a_link_made_a_copy_says_when_its_permissions_could_not_be_set() {
+    let sb = Sandbox::new();
+    linked_tree(&sb);
+    let dest = sb.mkdir("dest");
+    let ffs = FaultFs::new();
+    // The destination cannot make this link; the copy that takes its place then cannot be
+    // given the permissions of the original.
+    ffs.fail(Op::HardLink, "dest/a/y", libc::EPERM);
+    let later = ffs.clone();
+    ffs.hook(Op::HardLink, "dest/a/y", 1, move || {
+        later.fail_temps(Op::SetMode, libc::EPERM, 1);
+    });
+    let e = sb.engine_with(ffs);
+    let (_, rep) = copy_tree(&sb, &e, &sb.path("a"), &dest);
+
+    assert!(rep.failed.is_empty(), "{rep:?}");
+    assert_ne!(
+        ino(&dest.join("a/y")),
+        ino(&dest.join("a/x")),
+        "a separate file"
+    );
+    let lost: Vec<&str> = rep
+        .not_preserved
+        .iter()
+        .filter(|(p, _)| p.ends_with("a/y"))
+        .map(|(_, what)| what.as_str())
+        .collect();
+    assert_eq!(lost.len(), 2, "{:?}", rep.not_preserved);
+    assert!(lost.iter().any(|w| w.starts_with("hard link")), "{lost:?}");
+    assert!(
+        lost.iter().any(|w| w.starts_with("permissions")),
+        "{lost:?}"
+    );
+}
+
+#[test]
 fn files_sharing_an_inode_are_recreated_as_hard_links() {
     let sb = Sandbox::new();
     let e = sb.engine();

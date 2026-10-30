@@ -754,6 +754,8 @@ pub enum Op {
     SyncFile,
     /// Making the names of a folder reach the disk.
     SyncDir,
+    /// Setting the permissions of a file or folder.
+    SetMode,
 }
 
 /// What happens when a copy has moved `after` bytes of a matching file.
@@ -787,6 +789,8 @@ struct Rule {
     suffix: PathBuf,
     errno: i32,
     remaining: Option<usize>,
+    /// Matches only the temporary files a copy writes before it gives them their name.
+    temp_only: bool,
 }
 
 /// A [`LocalFs`] that fails on demand: unreadable files, `EXDEV`, `ENOSPC`...
@@ -855,6 +859,11 @@ impl io::Seek for FaultSink {
     }
 }
 
+fn is_temp(p: &Path) -> bool {
+    p.file_name()
+        .is_some_and(|n| n.to_string_lossy().starts_with(".rada-part-"))
+}
+
 impl FaultFs {
     pub fn new() -> Arc<FaultFs> {
         Arc::new(FaultFs {
@@ -875,6 +884,7 @@ impl FaultFs {
             suffix: suffix.into(),
             errno,
             remaining: None,
+            temp_only: false,
         });
     }
 
@@ -901,6 +911,18 @@ impl FaultFs {
             });
     }
 
+    /// Fail the next `times` calls of `op` on the temporary files of a copy (`.rada-part-*`),
+    /// and none on anything else.
+    pub fn fail_temps(&self, op: Op, errno: i32, times: usize) {
+        self.rules.lock().unwrap().push(Rule {
+            op,
+            suffix: PathBuf::new(),
+            errno,
+            remaining: Some(times),
+            temp_only: true,
+        });
+    }
+
     /// Fail only the next `times` matching calls (to test "retry").
     pub fn fail_times(&self, op: Op, suffix: impl Into<PathBuf>, errno: i32, times: usize) {
         self.rules.lock().unwrap().push(Rule {
@@ -908,6 +930,7 @@ impl FaultFs {
             suffix: suffix.into(),
             errno,
             remaining: Some(times),
+            temp_only: false,
         });
     }
 
@@ -988,7 +1011,10 @@ impl FaultFs {
         }
         let mut rules = self.rules.lock().unwrap();
         for r in rules.iter_mut() {
-            if (r.op == op || r.op == Op::Any) && p.ends_with(&r.suffix) {
+            if (r.op == op || r.op == Op::Any)
+                && p.ends_with(&r.suffix)
+                && (!r.temp_only || is_temp(p))
+            {
                 if let Some(n) = r.remaining.as_mut() {
                     if *n == 0 {
                         continue;
@@ -1098,6 +1124,7 @@ impl FsEngine for FaultFs {
         self.inner.remove_dir_all(p)
     }
     fn set_mode(&self, p: &Path, m: u32) -> io::Result<()> {
+        self.check(Op::SetMode, p)?;
         self.inner.set_mode(p, m)
     }
     fn hard_link(&self, existing: &Path, link: &Path) -> io::Result<()> {

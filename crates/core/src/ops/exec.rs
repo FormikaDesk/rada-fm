@@ -1032,11 +1032,11 @@ impl Engine {
             }
             // No hard links here: the name gets its own copy, and the report says so.
             Err(e) if crate::error::is_link_unsupported(&e) => {
-                self.copy_instead_of_link(ctl, existing, link)?;
                 not_preserved.push(
                     "hard link (the destination cannot make links: copied as a separate file)"
                         .to_string(),
                 );
+                not_preserved.extend(self.copy_instead_of_link(ctl, existing, link)?);
             }
             Err(e) => return Err(Error::io2("link", existing, link, e)),
         }
@@ -1054,7 +1054,13 @@ impl Engine {
         })
     }
 
-    fn copy_instead_of_link(&self, ctl: &mut Ctl<'_>, existing: &Path, link: &Path) -> Result<()> {
+    /// What the separate copy could not be given, for the report.
+    fn copy_instead_of_link(
+        &self,
+        ctl: &mut Ctl<'_>,
+        existing: &Path,
+        link: &Path,
+    ) -> Result<Vec<String>> {
         let fs = &*self.fs;
         let meta = fs
             .lstat(existing)
@@ -1072,14 +1078,17 @@ impl Engine {
         };
         fs.copy_file(&req, ctl)
             .map_err(|e| Error::io2("copy", existing, link, e))?;
-        if let Some(m) = meta.mode {
-            let _ = fs.set_mode(&tmp, m);
+        let mut not_preserved = Vec::new();
+        if let Some(m) = meta.mode
+            && let Err(e) = fs.set_mode(&tmp, m)
+        {
+            not_preserved.push(format!("permissions ({e})"));
         }
         if let Err(e) = fs.rename_noreplace(&tmp, link) {
             let _ = fs.remove_file(&tmp);
             return Err(Error::io2("finish copy", &tmp, link, e));
         }
-        Ok(())
+        Ok(not_preserved)
     }
 
     fn copy_symlink(
