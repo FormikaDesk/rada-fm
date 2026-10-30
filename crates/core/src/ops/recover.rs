@@ -25,6 +25,7 @@
 use std::path::{Path, PathBuf};
 
 use super::engine::Engine;
+use super::names;
 use super::plan::Step;
 use crate::Result;
 use crate::fs::{FsMeta, Stamp};
@@ -160,6 +161,20 @@ impl Engine {
         }
     }
 
+    /// Whether a rename of `from` to `to` was done. Where case does not matter, both names
+    /// find the entry whichever it is called now, so when the two are one entry the folder is
+    /// asked how it spells it.
+    fn rename_happened(&self, from: &Path, to: &Path) -> bool {
+        let fs = &*self.fs;
+        if names::is_case_alias(fs, from, to) {
+            return false; // the folder still lists `from`
+        }
+        if names::is_case_alias(fs, to, from) {
+            return true; // it lists `to` only
+        }
+        fs.lstat(from).is_err() && fs.lstat(to).is_ok()
+    }
+
     /// If the step in doubt turns out to have completed, the inverse the journal missed.
     fn adopt(&self, intent: &Intent, rec: &mut Recovered) -> Option<Step> {
         let fs = &self.fs;
@@ -218,7 +233,7 @@ impl Engine {
                 Step::RemoveDir { path: path.clone() }
             }
             Intent::Rename { from, to } => {
-                if exists(from) || !exists(to) {
+                if !self.rename_happened(from, to) {
                     return None;
                 }
                 Step::Rename {

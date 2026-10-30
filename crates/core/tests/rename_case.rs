@@ -208,3 +208,64 @@ fn on_the_real_filesystem() {
     assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
     assert_eq!(names_in(&sb, "d"), ["Report.txt"]);
 }
+
+/// An operation of a rada that is gone, cut short in a rename of `from` to `to`.
+fn cut_short_in_rename(j: &rada_core::journal::Journal, from: &Path, to: &Path) -> String {
+    use std::io::Write;
+    use std::time::UNIX_EPOCH;
+    let id = format!("1-{:x}-0", std::process::id());
+    let old = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        - 2 * 24 * 3600;
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(j.path())
+        .unwrap();
+    for line in [
+        serde_json::json!({"t":"begin","id":id,"time":old,"kind":"rename","title":"cut",
+            "reversible":true,"totals":{"items":1,"files":0,"dirs":0,"symlinks":0,"bytes":0}}),
+        serde_json::json!({"t":"pending","id":id,"intent":{"k":"rename","from":from,"to":to}}),
+    ] {
+        writeln!(f, "{line}").unwrap();
+    }
+    id
+}
+
+#[test]
+fn a_case_rename_cut_short_after_the_rename_is_adopted_and_undone() {
+    let sb = Sandbox::new();
+    let (e, j) = (folding_engine(&sb), sb.journal());
+    let from = sb.write("d/Report.txt", "contents");
+    let to = sb.path("d/report.txt");
+    let id = cut_short_in_rename(&j, &from, &to);
+    // The crash: the name changed on disk, the undo record never got written.
+    std::fs::rename(&from, &to).unwrap();
+    assert!(
+        e.fs.lstat(&from).is_ok(),
+        "the stand-in finds the old name too"
+    );
+
+    let rec = e.recover_interrupted(&j).unwrap();
+    assert_eq!(rec.len(), 1);
+    assert_eq!(rec[0].adopted.len(), 1, "{:?}", rec[0]);
+
+    let (up, rep) = undo(&e, &j, &id);
+    assert!(up.blocked.is_empty(), "{:?}", up.blocked);
+    assert_eq!(rep.status(), RunStatus::Completed, "{:?}", rep.failed);
+    assert_eq!(names_in(&sb, "d"), ["Report.txt"]);
+}
+
+#[test]
+fn a_case_rename_cut_short_before_the_rename_adopts_nothing() {
+    let sb = Sandbox::new();
+    let (e, j) = (folding_engine(&sb), sb.journal());
+    let from = sb.write("d/Report.txt", "contents");
+    cut_short_in_rename(&j, &from, &sb.path("d/report.txt"));
+
+    let rec = e.recover_interrupted(&j).unwrap();
+    assert_eq!(rec.len(), 1);
+    assert!(rec[0].adopted.is_empty(), "{:?}", rec[0]);
+    assert_eq!(names_in(&sb, "d"), ["Report.txt"]);
+}
