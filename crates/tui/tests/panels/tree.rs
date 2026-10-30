@@ -262,3 +262,38 @@ fn nav_click_opens_folder() {
     });
     assert!(h.screen().contains("fattura.pdf"));
 }
+
+/// A folder of Home that nobody may open.
+#[cfg(unix)]
+#[test]
+fn a_folder_that_cannot_be_read_has_a_sign_in_the_tree_and_the_others_do_not() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut h = tree_scene(160, 46, "rada", false);
+    let home = h.app.home().to_path_buf();
+    let locked = home.join("zz-locked");
+    std::fs::create_dir_all(locked.join("inside")).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let unlock = || std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755));
+    if std::fs::read_dir(&locked).is_ok() {
+        unlock().unwrap();
+        return; // running as root: nothing is locked
+    }
+    go_and_wait(&mut h, &home);
+    h.wait("the locked folder in the tree", |a| {
+        a.side_nav
+            .tree
+            .kids(a.home())
+            .is_some_and(|k| k.iter().any(|k| k.name == "zz-locked"))
+    });
+    h.settle();
+    let rows = h.app.nav_rows();
+    let s = h.screen();
+    unlock().unwrap();
+    let row = rows.iter().find(|r| r.path == locked).expect("its row");
+    assert_eq!(row.unreadable.as_deref(), Some("no permission"));
+    assert_eq!(rows.iter().filter(|r| r.unreadable.is_some()).count(), 1);
+
+    let line = s.lines().find(|l| l.contains("zz-locked")).expect("a line");
+    assert!(line.contains('\u{2298}'), "{line}");
+    assert!(!line.contains("(0)"), "{line}");
+}

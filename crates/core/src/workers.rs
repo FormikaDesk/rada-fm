@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crate::events::{CoreEvent, DirEvent, PreviewEvent};
-use crate::fs::{FileKind, FsEngine};
+use crate::fs::{DirItem, FileKind, FsEngine};
 use crate::model::{self, EntryUpdate};
 use crate::platform::{Platform, Unmounted, Volume};
 use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
@@ -54,6 +54,20 @@ pub struct TreeKid {
     pub name: String,
     pub items: usize,
     pub has_dirs: bool,
+    /// Why the folder cannot be listed, in a few words; `None` when it can. Without it an
+    /// unreadable folder would look empty.
+    pub unreadable: Option<String>,
+}
+
+/// A few words for why a folder cannot be listed.
+fn unreadable_reason(e: &std::io::Error) -> String {
+    use crate::i18n::{Key, t, tf};
+    if e.kind() == std::io::ErrorKind::PermissionDenied {
+        return t(Key::NavNoPermission).to_string();
+    }
+    let text = e.to_string();
+    let os = text.split(" (os error").next().unwrap_or(&text);
+    tf(Key::NavCannotRead, &[&os])
 }
 
 /// List the subfolders of `dir` with the number of items each holds, on a thread of its own, and
@@ -73,29 +87,35 @@ pub fn tree_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, hidden: bool, out: Sender<
                         .into_iter()
                         .filter(|it| shown(&it.name) && it.meta.as_ref().is_ok_and(|m| m.is_dir()))
                         .take(LIMIT)
-                        .map(|it| {
-                            let (items, has_dirs) = match fs.read_dir(&it.path) {
-                                Ok(inside) => (
-                                    inside.items.iter().filter(|i| shown(&i.name)).count(),
-                                    inside.items.iter().any(|i| {
-                                        shown(&i.name) && i.meta.as_ref().is_ok_and(|m| m.is_dir())
-                                    }),
-                                ),
-                                Err(_) => (0, false),
-                            };
-                            TreeKid {
-                                name: crate::display::name(&it.name),
-                                path: it.path,
-                                items,
-                                has_dirs,
-                            }
-                        })
+                        .map(|it| tree_kid(&*fs, it, &shown))
                         .collect()
                 })
                 .unwrap_or_default();
             kids.sort_by_key(|k| k.name.to_lowercase());
             let _ = out.send(CoreEvent::Tree { dir, hidden, kids });
         });
+}
+
+/// One subfolder of the tree: what it holds, or why it cannot be listed.
+fn tree_kid(fs: &dyn FsEngine, it: DirItem, shown: &dyn Fn(&std::ffi::OsStr) -> bool) -> TreeKid {
+    let (items, has_dirs, unreadable) = match fs.read_dir(&it.path) {
+        Ok(inside) => (
+            inside.items.iter().filter(|i| shown(&i.name)).count(),
+            inside
+                .items
+                .iter()
+                .any(|i| shown(&i.name) && i.meta.as_ref().is_ok_and(|m| m.is_dir())),
+            None,
+        ),
+        Err(e) => (0, false, Some(unreadable_reason(&e))),
+    };
+    TreeKid {
+        name: crate::display::name(&it.name),
+        path: it.path,
+        items,
+        has_dirs,
+        unreadable,
+    }
 }
 
 enum DirReq {

@@ -443,6 +443,8 @@ strings! {
     NJournalStopped => "Stopped because the journal could not be written ({0}). Undo covers what came before {1}.", "Fermata perché il registro non si è potuto scrivere ({0}). L'annullamento copre ciò che viene prima di {1}.";
     NJournalOff => "The journal could not be written ({0}). From {1} on this operation cannot be undone.", "Il registro non si è potuto scrivere ({0}). Da {1} in poi questa operazione non si può annullare.";
     HistPartlyUndoable => "undoable in part", "annullabile in parte";
+    NavNoPermission => "no permission", "senza permesso";
+    NavCannotRead => "cannot be read ({0})", "non leggibile ({0})";
     ChipDone => "Done", "Fatto";
     BtnUndoDone => "Undo what was done", "Annulla ciò che è stato fatto";
     ChipRunning => "Running", "In corso";

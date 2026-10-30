@@ -11,8 +11,16 @@ use rada_core::testutil::*;
 use rada_core::workers::{TreeKid, tree_dirs};
 
 fn kids_of(dir: &std::path::Path, hidden: bool) -> Vec<TreeKid> {
+    kids_through(Arc::new(LocalFs), dir, hidden)
+}
+
+fn kids_through(
+    fs: Arc<dyn rada_core::fs::FsEngine>,
+    dir: &std::path::Path,
+    hidden: bool,
+) -> Vec<TreeKid> {
     let (tx, rx) = unbounded();
-    tree_dirs(Arc::new(LocalFs), dir.to_path_buf(), hidden, tx);
+    tree_dirs(fs, dir.to_path_buf(), hidden, tx);
     loop {
         match rx.recv_timeout(Duration::from_secs(10)) {
             Ok(CoreEvent::Tree {
@@ -76,4 +84,28 @@ fn a_link_to_a_folder_is_a_leaf_and_never_followed() {
     let kids = kids_of(&sb.path("home"), false);
     let names: Vec<&str> = kids.iter().map(|k| k.name.as_str()).collect();
     assert_eq!(names, ["real"], "the link is not a folder of the tree");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_subfolder_that_cannot_be_read_says_so_instead_of_looking_empty() {
+    let sb = Sandbox::new();
+    sb.write("home/docs/a.txt", "a");
+    sb.write("home/locked/secret", "s");
+    sb.write("home/broken/x", "x");
+    let ffs = FaultFs::new();
+    ffs.fail(Op::ReadDir, "home/locked", libc::EACCES);
+    ffs.fail(Op::ReadDir, "home/broken", libc::EIO);
+
+    let kids = kids_through(ffs, &sb.path("home"), false);
+    let by = |n: &str| kids.iter().find(|k| k.name == n).unwrap();
+    assert_eq!(by("docs").unreadable, None);
+    assert_eq!(by("docs").items, 1);
+    assert_eq!(by("locked").unreadable.as_deref(), Some("no permission"));
+    assert_eq!(by("locked").items, 0);
+    let why = by("broken").unreadable.as_deref().unwrap();
+    assert!(
+        why.starts_with("cannot be read") && !why.contains("os error"),
+        "{why}"
+    );
 }

@@ -12,10 +12,11 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
+use crate::IconSet;
 use crate::app::App;
 use crate::hits::Target;
 use crate::icons::{self, Glyph, Mark};
-use crate::panels::{NavKind, TAG_TITLE};
+use crate::panels::{NavKind, NavRow, TAG_TITLE};
 use crate::sidebar::Origin;
 use crate::theme::Theme;
 use crate::ui::soft::{self, Look, RowTone};
@@ -303,18 +304,13 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             spans.push(Span::styled(format!("{glyph} "), icon_style.patch(bg)));
         }
         let head: usize = spans.iter().map(|s| s.content.width()).sum();
-        let mut count = row.count.map(|n| format!("({n})")).unwrap_or_default();
         let bookmark = match row.kind {
             NavKind::Favorite(n) => matches!(items[n].origin, Origin::Bookmark { .. }),
             _ => false,
         };
         let pin_w = if bookmark && !pin.is_empty() { 2 } else { 0 };
-        // In a narrow box the numbers go when the name does not fit with them.
-        if !count.is_empty()
-            && row.name.width() > w.saturating_sub(head + 2 + count.width() + pin_w)
-        {
-            count.clear();
-        }
+        let room_for_tail = w.saturating_sub(head + 2 + pin_w);
+        let count = tail_text(row, app.settings.icons, room_for_tail);
         let room = w.saturating_sub(head + 2 + count.width() + pin_w);
         let name = rada_core::display::truncate_name(&row.name, room.max(1));
         let name_style = if is_focus || is_current {
@@ -335,12 +331,17 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             spans.push(Span::styled(format!("{pin} "), quiet));
         }
         if !count.is_empty() {
+            let calm = if row.unreadable.is_some() {
+                Style::default().fg(th.warn)
+            } else {
+                th.dim()
+            };
             spans.push(Span::styled(
                 count,
                 if is_focus {
                     text_style.patch(bg)
                 } else {
-                    th.dim().patch(bg)
+                    calm.patch(bg)
                 },
             ));
         }
@@ -383,4 +384,26 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
             f.buffer_mut().set_string(x, area.y + y as u16, ch, style);
         }
     }
+}
+
+/// What ends a row of the tree: the number of items, or for a folder that cannot be read a
+/// sign and why. In a narrow box the reason goes first and then the whole tail, when the name
+/// does not fit with it.
+fn tail_text(row: &NavRow, set: IconSet, room: usize) -> String {
+    let fits = |tail: &str| row.name.width() <= room.saturating_sub(tail.width());
+    let tail = match (&row.unreadable, row.count) {
+        (Some(why), _) => {
+            let sign = icons::mark(set, Mark::Unreadable);
+            [format!("{sign} {why}"), sign.to_string()]
+                .into_iter()
+                .find(|t| fits(t))
+                .unwrap_or_default()
+        }
+        (None, Some(n)) => format!("({n})"),
+        (None, None) => String::new(),
+    };
+    if row.unreadable.is_none() && !fits(&tail) {
+        return String::new();
+    }
+    tail
 }

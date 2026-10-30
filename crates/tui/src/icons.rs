@@ -470,6 +470,8 @@ pub enum Mark {
     CardSide,
     DiskUsed,
     DiskFree,
+    /// A folder that cannot be read.
+    Unreadable,
 }
 
 /// A mark of the panels view in the icon set in use: the same Unicode mark in every set but
@@ -485,6 +487,7 @@ pub fn mark(set: IconSet, m: Mark) -> &'static str {
         Mark::CardSide => ("┃", "│"),
         Mark::DiskUsed => ("■", "■"),
         Mark::DiskFree => ("□", "░"),
+        Mark::Unreadable => ("⊘", "×"),
     };
     if set == IconSet::UnicodeStd { std } else { uni }
 }

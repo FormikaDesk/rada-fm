@@ -278,6 +278,8 @@ pub struct NavRow {
     pub name: String,
     /// The number of items in a folder of the tree, once known.
     pub count: Option<usize>,
+    /// Why the folder cannot be read, when it cannot: its row has a sign instead of a count.
+    pub unreadable: Option<String>,
 }
 
 /// The width of the title (" TAGS ") before the first dot of a line, and of a dot with the

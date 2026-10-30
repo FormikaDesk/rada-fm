@@ -23,6 +23,7 @@ fn plain_row(kind: NavKind, name: String, path: PathBuf) -> NavRow {
         path,
         name,
         count: None,
+        unreadable: None,
     }
 }
 
@@ -200,6 +201,7 @@ impl App {
             path: home.clone(),
             name: home_name,
             count: None,
+            unreadable: None,
         });
         if open {
             self.tree_rows(&mut rows, &home, 1);
@@ -350,6 +352,7 @@ impl App {
             path: dir.to_path_buf(),
             name: self.places.shown_name(dir, on_disk),
             count: here.then(|| self.tab.listing.all().len()),
+            unreadable: None,
         }
     }
 
@@ -364,6 +367,7 @@ impl App {
                 path: k.path.clone(),
                 name: self.places.shown_name(&k.path, k.name.clone()),
                 count: Some(k.items),
+                unreadable: k.unreadable.clone(),
             })
             .collect()
     }
@@ -400,6 +404,7 @@ impl App {
                 path: k.path.clone(),
                 name: self.places.shown_name(&k.path, k.name.clone()),
                 count: Some(k.items),
+                unreadable: k.unreadable.clone(),
             });
             if open == Some(true) {
                 self.tree_rows(rows, &k.path, depth + 1);
