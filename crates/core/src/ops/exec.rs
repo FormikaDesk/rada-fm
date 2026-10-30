@@ -764,7 +764,7 @@ impl Engine {
                 };
                 self.extract_file(st, ctl, member, dst, *mode, *mtime)
             }
-            Step::ExtractSymlink { dst, target, .. } => self.make_symlink(dst, target),
+            Step::ExtractSymlink { dst, target, .. } => self.make_symlink(dst, target, None),
             Step::Compress {
                 dst, format, items, ..
             } => self.compress(ctl, dst, *format, items),
@@ -1098,7 +1098,7 @@ impl Engine {
         target: &Path,
         remove_source: bool,
     ) -> Result<StepResult> {
-        let made = self.make_symlink(dst, target)?;
+        let made = self.make_symlink(dst, target, Some(src))?;
         if remove_source
             && let Err(e) = self.fs.remove_file(src)
             && e.kind() != io::ErrorKind::NotFound
@@ -1109,9 +1109,9 @@ impl Engine {
         Ok(made)
     }
 
-    fn make_symlink(&self, dst: &Path, target: &Path) -> Result<StepResult> {
+    fn make_symlink(&self, dst: &Path, target: &Path, like: Option<&Path>) -> Result<StepResult> {
         self.require_free(dst)?;
-        self.fs.create_symlink(target, dst).map_err(|e| {
+        self.fs.create_symlink(target, dst, like).map_err(|e| {
             if e.kind() == io::ErrorKind::AlreadyExists {
                 Error::AlreadyExists(dst.to_path_buf())
             } else {

@@ -55,8 +55,8 @@ impl FsEngine for FoldFs {
     fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()> {
         self.0.create_dir(p, mode)
     }
-    fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
-        self.0.create_symlink(t, l)
+    fn create_symlink(&self, t: &Path, l: &Path, like: Option<&Path>) -> io::Result<()> {
+        self.0.create_symlink(t, l, like)
     }
     fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn FileSink>> {
         self.0.create_file(p, mode)

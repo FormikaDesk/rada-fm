@@ -36,8 +36,8 @@ impl FsEngine for SlowFs {
     fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()> {
         self.inner.create_dir(p, mode)
     }
-    fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
-        self.inner.create_symlink(t, l)
+    fn create_symlink(&self, t: &Path, l: &Path, like: Option<&Path>) -> io::Result<()> {
+        self.inner.create_symlink(t, l, like)
     }
     fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn rada_core::fs::FileSink>> {
         self.inner.create_file(p, mode)

@@ -48,7 +48,7 @@ pub fn copy_tree(fs: &dyn FsEngine, src: &Path, dst: &Path, verify: bool) -> Res
             let target = fs
                 .read_link(src)
                 .map_err(|e| Error::io("read link", src, e))?;
-            fs.create_symlink(&target, dst)
+            fs.create_symlink(&target, dst, Some(src))
                 .map_err(|e| Error::io("create link", dst, e))
         }
         FileKind::File => {

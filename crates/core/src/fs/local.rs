@@ -111,6 +111,25 @@ fn windows_identity(p: &Path, follow: bool) -> Option<(u64, u64, u64)> {
     ))
 }
 
+/// Is the new link a link to a folder? The kind of the link it copies, when that is known;
+/// otherwise what the target is, which for a target that does not exist is a file.
+#[cfg(windows)]
+fn windows_link_is_dir(target: &Path, link: &Path, like: Option<&Path>) -> bool {
+    use std::os::windows::fs::FileTypeExt;
+    let origin = like
+        .and_then(|l| fs::symlink_metadata(l).ok())
+        .map(|m| m.file_type())
+        .filter(|t| t.is_symlink());
+    if let Some(t) = origin {
+        return t.is_symlink_dir();
+    }
+    let resolved = link
+        .parent()
+        .map(|d| d.join(target))
+        .unwrap_or_else(|| target.to_path_buf());
+    fs::metadata(&resolved).map(|m| m.is_dir()).unwrap_or(false)
+}
+
 impl FsEngine for LocalFs {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta> {
         fs::symlink_metadata(p).map(|m| with_identity(FsMeta::from_std(&m), p, false))
@@ -163,18 +182,15 @@ impl FsEngine for LocalFs {
         }
     }
 
-    fn create_symlink(&self, target: &Path, link: &Path) -> io::Result<()> {
+    fn create_symlink(&self, target: &Path, link: &Path, like: Option<&Path>) -> io::Result<()> {
         #[cfg(unix)]
         {
+            let _ = like;
             std::os::unix::fs::symlink(target, link)
         }
         #[cfg(windows)]
         {
-            let resolved = link
-                .parent()
-                .map(|d| d.join(target))
-                .unwrap_or_else(|| target.to_path_buf());
-            if fs::metadata(&resolved).map(|m| m.is_dir()).unwrap_or(false) {
+            if windows_link_is_dir(target, link, like) {
                 std::os::windows::fs::symlink_dir(target, link)
             } else {
                 std::os::windows::fs::symlink_file(target, link)

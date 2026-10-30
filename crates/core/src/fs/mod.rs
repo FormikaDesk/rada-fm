@@ -446,7 +446,11 @@ pub trait FsEngine: Send + Sync {
     fn read_link(&self, p: &Path) -> io::Result<PathBuf>;
 
     fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()>;
-    fn create_symlink(&self, target: &Path, link: &Path) -> io::Result<()>;
+    /// A new symbolic link at `link` pointing to `target`. `like` is the link this one is a
+    /// copy of, when there is one: Windows has links to files and links to folders, and a link
+    /// whose target does not exist can be given its kind only by the link it comes from.
+    /// Without it, or elsewhere, the kind is guessed from the target.
+    fn create_symlink(&self, target: &Path, link: &Path, like: Option<&Path>) -> io::Result<()>;
     /// A new, empty file opened for writing; fails with `AlreadyExists` if the name is taken.
     /// `mode` is the permission bits it is created with (the process's umask still applies).
     fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn FileSink>>;

@@ -1064,9 +1064,9 @@ impl FsEngine for FaultFs {
         self.check(Op::CreateDir, p)?;
         self.inner.create_dir(p, mode)
     }
-    fn create_symlink(&self, t: &Path, l: &Path) -> io::Result<()> {
+    fn create_symlink(&self, t: &Path, l: &Path, like: Option<&Path>) -> io::Result<()> {
         self.check(Op::CreateSymlink, l)?;
-        self.inner.create_symlink(t, l)
+        self.inner.create_symlink(t, l, like)
     }
     fn create_file(&self, p: &Path, mode: u32) -> io::Result<Box<dyn crate::fs::FileSink>> {
         let dir = p.parent().unwrap_or(p);
