@@ -49,11 +49,20 @@ fn cells(r: Rect) -> impl Iterator<Item = (u16, u16)> {
     (r.y..r.bottom()).flat_map(move |y| (r.x..r.right()).map(move |x| (x, y)))
 }
 
-/// How many cells of `r` have the hover tone as their background.
+/// The tones the pointer gives the grounds it can light.
+fn tones(h: &H) -> Vec<ratatui::style::Color> {
+    let th = &h.app.settings.th;
+    th.hoverable_grounds()
+        .iter()
+        .map(|g| th.hover_over(*g))
+        .collect()
+}
+
+/// How many cells of `r` have a hover tone as their background.
 fn lit(h: &mut H, r: Rect) -> usize {
-    let mark = h.app.settings.th.mark;
+    let tones = tones(h);
     let b = buffer(h);
-    cells(r).filter(|p| b[*p].bg == mark).count()
+    cells(r).filter(|p| tones.contains(&b[*p].bg)).count()
 }
 
 fn underlined(h: &mut H, r: Rect) -> usize {
@@ -147,10 +156,10 @@ fn a_window_over_the_list_takes_the_pointer_only_for_its_own_buttons() {
     assert!(all_lit(&mut h, cancel));
     // A row of the list under the window is out of reach, and so is the window's own body.
     move_to(&mut h, 31, 12);
-    let mark = h.app.settings.th.mark;
+    let tones = tones(&h);
     let after = buffer(&mut h);
     assert!(
-        cells(Rect::new(30, 12, 74, 1)).all(|p| after[p].bg != mark),
+        cells(Rect::new(30, 12, 74, 1)).all(|p| !tones.contains(&after[p].bg)),
         "the list is behind the window"
     );
 }

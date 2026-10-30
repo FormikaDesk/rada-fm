@@ -1288,6 +1288,29 @@ impl Theme {
         }
     }
 
+    /// The tone a plain ground or a button takes under the pointer: the accent over that very
+    /// ground, so that it shows by as much on the canvas, on a box, on a window and on a
+    /// button, on a dark theme and on a light one (a fixed colour was a shade of one ground
+    /// and nearly the same as the others). It is weaker than the row of the cursor.
+    pub fn hover_over(&self, ground: Color) -> Color {
+        self.tint_share(ground, self.accent, if self.light { 0.14 } else { 0.16 })
+    }
+
+    /// The grounds the pointer can light: those of a zone, a menu or a window, and buttons.
+    pub fn hoverable_grounds(&self) -> [Color; 9] {
+        [
+            Color::Reset,
+            self.canvas,
+            self.cmdbar,
+            self.panel,
+            self.inner,
+            self.popup,
+            self.modal_surface(),
+            self.button,
+            self.key_bg,
+        ]
+    }
+
     /// What a window is filled with: the screen behind it is dimmed (see
     /// [`dimmed`](Self::dimmed)) and the window is that tone a little lighter, so that its
     /// border and its inside are one colour. On a light theme that is the paper itself. Only

@@ -58,7 +58,8 @@ fn is_current(app: &App, target: &Target) -> bool {
             .is_some_and(|e| app.tab.sel.marked.contains(&e.name))
 }
 
-/// Light `area`: what lies on a plain ground or on a button goes to the hover tone; a field
+/// Light `area`: what lies on a plain ground or on a button goes to the hover tone of that
+/// ground (`Theme::hover_over`); a field
 /// (which is that tone already) and the main button (whose text would not read on it) are
 /// underlined instead; what is filled with a stronger tone (the cursor, a selection, the tab
 /// in front) is left alone. With 16 colours there are no tones to tell apart, so everything is
@@ -72,29 +73,17 @@ fn shade(buf: &mut Buffer, area: Rect, th: &Theme) {
         return;
     }
     let base = dominant_bg(buf, area);
-    if plain(th).contains(&base) || [th.button, th.key_bg].contains(&base) {
+    if th.hoverable_grounds().contains(&base) {
+        let tone = th.hover_over(base);
         for p in cells(area) {
             if buf[p].bg == base {
-                buf[p].set_bg(th.mark);
+                buf[p].set_bg(tone);
             }
         }
-        recolour_caps(buf, area, base, th.mark);
+        recolour_caps(buf, area, base, tone);
     } else if [th.field, th.accent].contains(&base) {
         underline(buf, area);
     }
-}
-
-/// The backgrounds that are the ground of a zone, a menu or a window.
-fn plain(th: &Theme) -> [Color; 7] {
-    [
-        Color::Reset,
-        th.canvas,
-        th.cmdbar,
-        th.panel,
-        th.inner,
-        th.popup,
-        th.modal_surface(),
-    ]
 }
 
 /// The half circles at the ends of a pill are drawn in its colour: they follow it.
