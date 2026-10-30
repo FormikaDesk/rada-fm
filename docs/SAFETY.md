@@ -20,7 +20,9 @@ records, that you see and confirm.
 ### A file never appears half-written
 
 A file is copied to a hidden temporary name next to its destination
-(`.rada-part-<pid>-<n>`) and renamed to its final name only when complete, with a rename that
+(`.rada-part-<operation>-<step>-<n>`: the id of the operation and the number of the step, which
+the *pending* record in the journal holds, then a counter) and renamed to its final name only
+when complete, with a rename that
 refuses to replace anything: `renameat2` with `RENAME_NOREPLACE` on Linux, `renamex_np` with
 `RENAME_EXCL` on macOS, `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` on Windows. Where a
 Linux filesystem does not know `renameat2`, a regular file is moved with `link` followed by
@@ -108,12 +110,18 @@ a *pending* record before each step that creates something. If the process is ki
 (`SIGKILL`, the terminal closing, an out-of-memory kill) at any moment, the next start looks
 at the one step that was in doubt and settles it:
 
-- the half-written temporary file is deleted;
+- the half-written temporary file is deleted: the one the *pending* record names, and no other
+  (a record written by an earlier version names none, and its file was `.rada-part-<pid>-<n>`,
+  with the process id of the rada that wrote it);
 - a copy that had finished but was not yet recorded is added to the journal, so undo still
   covers it, but only if what is at the destination is what the step declared: when the
-  pending record holds a size and a modification time, both must match. Otherwise the file is
-  left where it is, it does not enter the history (undo never removes it), and the summary of
-  the recovery says so;
+  pending record holds a size and a modification time, both must match; for a link, it must
+  point where the step was making it. A new archive declares nothing to check, so one found
+  at its destination is never taken. Otherwise the file is left where it is, it does not enter
+  the history (undo never removes it), and the summary of the recovery says so. Records
+  written by earlier versions, which hold none of this, are taken as before. A rename that
+  changed only the case of a name is told apart on a filesystem that ignores case by the
+  spelling the folder lists;
 - a move killed between the copy and the removal of the source keeps **both**; undo then
   removes the copy;
 - the operation is marked *interrupted* in the history, and you are told once.
@@ -246,7 +254,7 @@ and on the executor, and each has a test (`archives.rs`, `archives_write.rs`,
   list, a member is never allowed to write more bytes than the archive declared for it, so a
   lying header cannot get round the check.
 - **A file never appears half-written, and a killed extraction is cleaned up.** Members are
-  written under the same hidden temporary name and renamed into place as every copy is; each
+  written under a hidden temporary name of the same kind and renamed into place as every copy is; each
   one is recorded in the journal as it completes. After a `SIGKILL` the next start removes
   the temporary file and undo removes exactly what was extracted (a member you edited since
   is left alone and reported).
