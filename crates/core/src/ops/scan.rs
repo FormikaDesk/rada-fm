@@ -8,7 +8,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use super::engine::Engine;
-use crate::fs::{FileKind, FsMeta};
+use super::plan::{Severity, WarningKind, WarningSet};
+use crate::fs::{FileKind, FsMeta, Listing};
 use crate::platform::SourceAttrs;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,8 +28,12 @@ pub struct ScanNode {
     pub link_target: Option<PathBuf>,
     pub link_state: Option<LinkState>,
     pub children: Vec<ScanNode>,
-    /// The directory could not be listed (message already contains the full path).
-    pub unreadable: Option<String>,
+    /// What in this folder could not be read, each with the reason: the folder itself, or an
+    /// entry the system listed but would not describe.
+    pub unreadable: Vec<(PathBuf, String)>,
+    /// The system failed in the middle of listing the folder, so entries may be missing.
+    /// One reason for each failure.
+    pub incomplete: Vec<String>,
     /// A directory that is its own ancestor (mount cycle): not descended into.
     pub loop_skipped: bool,
     /// Extended attributes and ACLs of a file or folder (what a copy would carry over).
@@ -45,6 +50,27 @@ pub struct Stats {
 }
 
 impl ScanNode {
+    /// A warning for everything in this folder that could not be read, and one for a listing
+    /// that broke in the middle.
+    pub(super) fn warn_unreadable(&self, ws: &mut WarningSet) {
+        for (path, reason) in &self.unreadable {
+            ws.add_with(
+                WarningKind::Unreadable,
+                Severity::Warning,
+                Some(path),
+                Some(reason.clone()),
+            );
+        }
+        if let Some(reason) = self.incomplete.first() {
+            ws.add_with(
+                WarningKind::IncompleteList,
+                Severity::Warning,
+                Some(&self.path),
+                Some(reason.clone()),
+            );
+        }
+    }
+
     pub fn stats(&self) -> Stats {
         let mut s = Stats::default();
         self.accumulate(&mut s);
@@ -185,7 +211,8 @@ impl Walker<'_, '_> {
             link_target: None,
             link_state: None,
             children: Vec::new(),
-            unreadable: None,
+            unreadable: Vec::new(),
+            incomplete: Vec::new(),
             loop_skipped: false,
             attrs: SourceAttrs::default(),
         };
@@ -221,29 +248,8 @@ impl Walker<'_, '_> {
                     ancestors.push(id);
                 }
                 match self.engine.fs.read_dir(path) {
-                    Ok(mut items) => {
-                        items.sort_by(|a, b| a.name.cmp(&b.name));
-                        for item in items {
-                            if self.cancelled {
-                                break;
-                            }
-                            match item.meta {
-                                Ok(m) => {
-                                    let child = self.node(&item.path, item.name, m, ancestors);
-                                    node.children.push(child);
-                                }
-                                Err(e) => {
-                                    // Keep the entry visible instead of silently dropping it.
-                                    node.unreadable =
-                                        Some(crate::Error::io("read", &item.path, e).to_string());
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        node.unreadable =
-                            Some(crate::Error::io("read folder", path, e).to_string());
-                    }
+                    Ok(listing) => self.children(&mut node, listing, ancestors),
+                    Err(e) => node.unreadable.push((path.to_path_buf(), e.to_string())),
                 }
                 if id.is_some() {
                     ancestors.pop();
@@ -252,5 +258,25 @@ impl Walker<'_, '_> {
             FileKind::Other => {}
         }
         node
+    }
+
+    fn children(&mut self, node: &mut ScanNode, listing: Listing, ancestors: &mut Vec<(u64, u64)>) {
+        node.incomplete
+            .extend(listing.broken.iter().map(|e| e.to_string()));
+        let mut items = listing.items;
+        items.sort_by(|a, b| a.name.cmp(&b.name));
+        for item in items {
+            if self.cancelled {
+                break;
+            }
+            match item.meta {
+                Ok(m) => {
+                    let child = self.node(&item.path, item.name, m, ancestors);
+                    node.children.push(child);
+                }
+                // Keep the entry visible instead of silently dropping it.
+                Err(e) => node.unreadable.push((item.path, e.to_string())),
+            }
+        }
     }
 }

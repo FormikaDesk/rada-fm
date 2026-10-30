@@ -25,10 +25,14 @@ pub fn copy_tree(fs: &dyn FsEngine, src: &Path, dst: &Path, verify: bool) -> Res
         FileKind::Dir => {
             fs.create_dir(dst, Some(0o700))
                 .map_err(|e| Error::io("create folder", dst, e))?;
-            let items = fs
+            let listing = fs
                 .read_dir(src)
                 .map_err(|e| Error::io("read folder", src, e))?;
-            for item in items {
+            // A move ends by removing the source: what the list lacks would be lost with it.
+            if let Some(e) = listing.broken.into_iter().next() {
+                return Err(Error::io("read folder", src, e));
+            }
+            for item in listing.items {
                 copy_tree(fs, &item.path, &dst.join(&item.name), verify)?;
             }
             if let Some(m) = meta.mode {

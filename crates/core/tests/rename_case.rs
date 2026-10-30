@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use rada_core::fs::{
-    CopyControl, CopyOutcome, CopyRequest, DirItem, FileSink, FsEngine, FsMeta, LocalFs,
+    CopyControl, CopyOutcome, CopyRequest, FileSink, FsEngine, FsMeta, Listing, LocalFs,
 };
 use rada_core::ops::*;
 use rada_core::testplatform::WithPathRules;
@@ -46,7 +46,7 @@ impl FsEngine for FoldFs {
     fn stat(&self, p: &Path) -> io::Result<FsMeta> {
         self.0.stat(&self.folded(p))
     }
-    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {
+    fn read_dir(&self, p: &Path) -> io::Result<Listing> {
         self.0.read_dir(p)
     }
     fn read_link(&self, p: &Path) -> io::Result<PathBuf> {

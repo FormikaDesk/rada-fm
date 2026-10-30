@@ -9,7 +9,7 @@ use xxhash_rust::xxh3::Xxh3;
 
 use super::{
     CopyControl, CopyMethod, CopyOutcome, CopyRequest, DirItem, Fingerprint, FsEngine, FsMeta,
-    Removed,
+    Listing, Removed,
 };
 
 /// Failures of [`FsEngine::copy_file`] that are not plain OS errors. They are carried
@@ -120,19 +120,20 @@ impl FsEngine for LocalFs {
         fs::metadata(p).map(|m| with_identity(FsMeta::from_std(&m), p, true))
     }
 
-    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {
-        let mut out = Vec::new();
+    fn read_dir(&self, p: &Path) -> io::Result<Listing> {
+        let mut out = Listing::default();
         for entry in fs::read_dir(p)? {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
                     tracing::warn!("reading {}: {e}", p.display());
+                    out.broken.push(e);
                     continue;
                 }
             };
             let path = entry.path();
             let meta = fs::symlink_metadata(&path).map(|m| FsMeta::from_std(&m));
-            out.push(DirItem {
+            out.items.push(DirItem {
                 name: entry.file_name(),
                 path,
                 meta,

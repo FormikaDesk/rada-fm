@@ -354,6 +354,28 @@ pub struct DirItem {
     pub meta: io::Result<FsMeta>,
 }
 
+/// What a folder holds, and what the system failed to say about it.
+#[derive(Default)]
+pub struct Listing {
+    pub items: Vec<DirItem>,
+    /// Errors the system gave while the folder was being listed. They belong to no entry:
+    /// whatever they stood for is missing from `items`, so the list is incomplete.
+    pub broken: Vec<io::Error>,
+}
+
+impl Listing {
+    pub fn complete(items: Vec<DirItem>) -> Self {
+        Listing {
+            items,
+            broken: Vec::new(),
+        }
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.broken.is_empty()
+    }
+}
+
 /// Progress/cancellation hook for byte-oriented work.
 pub trait CopyControl {
     /// Called with the number of bytes just transferred. Return `false` to cancel.
@@ -420,7 +442,7 @@ pub enum Removed {
 pub trait FsEngine: Send + Sync {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta>;
     fn stat(&self, p: &Path) -> io::Result<FsMeta>;
-    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>>;
+    fn read_dir(&self, p: &Path) -> io::Result<Listing>;
     fn read_link(&self, p: &Path) -> io::Result<PathBuf>;
 
     fn create_dir(&self, p: &Path, mode: Option<u32>) -> io::Result<()>;

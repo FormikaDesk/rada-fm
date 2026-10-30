@@ -1710,6 +1710,11 @@
           ]
         },
         {
+          "description": "The system failed in the middle of listing a folder: the plan may not have all of it.",
+          "type": "string",
+          "const": "IncompleteList"
+        },
+        {
           "description": "Files with hard links outside the selection: their copies are independent.",
           "type": "string",
           "const": "HardLinks"

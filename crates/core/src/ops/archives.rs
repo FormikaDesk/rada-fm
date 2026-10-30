@@ -1032,14 +1032,7 @@ fn walk_compress(
                 ws.add(WarningKind::MountLoop, Severity::Warning, Some(&n.path));
                 return;
             }
-            if let Some(msg) = &n.unreadable {
-                ws.add_with(
-                    WarningKind::Unreadable,
-                    Severity::Warning,
-                    Some(&n.path),
-                    Some(msg.clone()),
-                );
-            }
+            n.warn_unreadable(ws);
             totals.dirs += 1;
             items.push(CompressItem {
                 src: n.path.clone(),

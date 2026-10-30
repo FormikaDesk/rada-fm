@@ -174,7 +174,7 @@ pub fn measure(
         return Some(SizeOutcome::Skipped);
     }
     let root_dev = fs.lstat(root).ok().and_then(|m| m.dev);
-    let Ok(first) = fs.read_dir(root) else {
+    let Ok(first) = fs.read_dir(root).map(|l| l.items) else {
         return Some(SizeOutcome::Unreadable);
     };
     let items = first.len() as u64;
@@ -225,7 +225,7 @@ pub fn measure(
                         continue;
                     }
                     if let Ok(more) = fs.read_dir(&item.path) {
-                        pending.push(more);
+                        pending.push(more.items);
                     }
                 }
                 // Links are not followed; sockets and devices have no size worth adding.

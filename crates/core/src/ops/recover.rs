@@ -145,10 +145,10 @@ impl Engine {
         // may have taken since) only for a record written without it.
         let owner = temp.clone().unwrap_or_else(|| pid.to_string());
         let prefix = format!(".rada-part-{owner}-");
-        let Ok(items) = self.fs.read_dir(dir) else {
+        let Ok(listing) = self.fs.read_dir(dir) else {
             return;
         };
-        for item in items {
+        for item in listing.items {
             if item.name.to_string_lossy().starts_with(&prefix) {
                 match self.fs.remove_file(&item.path) {
                     Ok(()) => rec.removed_temps.push(item.path),

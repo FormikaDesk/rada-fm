@@ -207,10 +207,11 @@ pub fn read_entries(
     platform: &dyn Platform,
     dir: &Path,
 ) -> crate::Result<Vec<Entry>> {
-    let items = fs
+    let listing = fs
         .read_dir(dir)
         .map_err(|e| crate::Error::io("read folder", dir, e))?;
-    Ok(items
+    Ok(listing
+        .items
         .into_iter()
         .map(|it| match it.meta {
             Ok(m) => Entry::from_meta(fs, platform, it.path, it.name, &m),

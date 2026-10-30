@@ -26,8 +26,9 @@ pub fn complete_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, out: Sender<CoreEvent>
             const LIMIT: usize = 5000;
             let mut names: Vec<String> = fs
                 .read_dir(&dir)
-                .map(|items| {
-                    items
+                .map(|listing| {
+                    listing
+                        .items
                         .into_iter()
                         .filter(|it| {
                             it.meta.as_ref().is_ok_and(|m| m.is_dir())
@@ -66,16 +67,17 @@ pub fn tree_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, hidden: bool, out: Sender<
             let shown = |n: &std::ffi::OsStr| hidden || !n.to_string_lossy().starts_with('.');
             let mut kids: Vec<TreeKid> = fs
                 .read_dir(&dir)
-                .map(|items| {
-                    items
+                .map(|listing| {
+                    listing
+                        .items
                         .into_iter()
                         .filter(|it| shown(&it.name) && it.meta.as_ref().is_ok_and(|m| m.is_dir()))
                         .take(LIMIT)
                         .map(|it| {
                             let (items, has_dirs) = match fs.read_dir(&it.path) {
                                 Ok(inside) => (
-                                    inside.iter().filter(|i| shown(&i.name)).count(),
-                                    inside.iter().any(|i| {
+                                    inside.items.iter().filter(|i| shown(&i.name)).count(),
+                                    inside.items.iter().any(|i| {
                                         shown(&i.name) && i.meta.as_ref().is_ok_and(|m| m.is_dir())
                                     }),
                                 ),

@@ -545,6 +545,8 @@ pub enum WarningKind {
     Conflict,
     Overwrite,
     Unreadable,
+    /// The system failed in the middle of listing a folder: the plan may not have all of it.
+    IncompleteList,
     SpecialFile,
     BrokenSymlink,
     Symlink,
@@ -703,6 +705,7 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::Conflict => pl(n, WConflictOne, WConflictMany, x),
         WarningKind::Overwrite => pl(n, WOverwriteOne, WOverwriteMany, x),
         WarningKind::Unreadable => pl(n, WUnreadableOne, WUnreadableMany, x),
+        WarningKind::IncompleteList => pl(n, WIncompleteListOne, WIncompleteListMany, x),
         WarningKind::SpecialFile => pl(n, WSpecialFileOne, WSpecialFileMany, x),
         WarningKind::BrokenSymlink => pl(n, WBrokenSymlinkOne, WBrokenSymlinkMany, x),
         WarningKind::Symlink => pl(n, WSymlinkOne, WSymlinkMany, x),

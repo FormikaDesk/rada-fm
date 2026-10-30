@@ -297,14 +297,7 @@ impl Engine {
                         ws.add(WarningKind::MountLoop, Severity::Warning, Some(&n.path));
                         return;
                     }
-                    if let Some(msg) = &n.unreadable {
-                        ws.add_with(
-                            WarningKind::Unreadable,
-                            Severity::Warning,
-                            Some(&n.path),
-                            Some(msg.clone()),
-                        );
-                    }
+                    n.warn_unreadable(ws);
                     for c in &n.children {
                         walk(c, steps, ws);
                     }
@@ -476,7 +469,7 @@ impl Engine {
     fn can_replace(&self, src: &FsMeta, existing: &FsMeta, to: &Path) -> bool {
         match (src.is_dir(), existing.is_dir()) {
             (false, false) => true,
-            (true, true) => self.fs.read_dir(to).is_ok_and(|items| items.is_empty()),
+            (true, true) => self.fs.read_dir(to).is_ok_and(|l| l.items.is_empty()),
             _ => false,
         }
     }
@@ -786,14 +779,7 @@ impl Transfer<'_> {
     }
 
     fn note_unreadable_dir(&mut self, node: &ScanNode) {
-        if let Some(msg) = &node.unreadable {
-            self.ws.add_with(
-                WarningKind::Unreadable,
-                Severity::Warning,
-                Some(&node.path),
-                Some(msg.clone()),
-            );
-        }
+        node.warn_unreadable(&mut self.ws);
     }
 
     /// `dst` is known to be free.

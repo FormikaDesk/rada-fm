@@ -5,7 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use rada_core::fs::{CopyControl, CopyOutcome, CopyRequest, DirItem, FsEngine, FsMeta, LocalFs};
+use rada_core::fs::{CopyControl, CopyOutcome, CopyRequest, FsEngine, FsMeta, Listing, LocalFs};
 
 pub struct SlowFs {
     inner: LocalFs,
@@ -27,7 +27,7 @@ impl FsEngine for SlowFs {
     fn stat(&self, p: &Path) -> io::Result<FsMeta> {
         self.inner.stat(p)
     }
-    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {
+    fn read_dir(&self, p: &Path) -> io::Result<Listing> {
         self.inner.read_dir(p)
     }
     fn read_link(&self, p: &Path) -> io::Result<PathBuf> {

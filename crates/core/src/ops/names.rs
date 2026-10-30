@@ -85,7 +85,7 @@ pub fn is_case_alias(fs: &dyn FsEngine, from: &Path, to: &Path) -> bool {
     one_file
         && fs
             .read_dir(dir)
-            .is_ok_and(|items| items.iter().all(|i| i.name != b))
+            .is_ok_and(|l| l.items.iter().all(|i| i.name != b))
 }
 
 /// Split a *file name* into stem and extension (with its dot). `.tar.gz` stays together

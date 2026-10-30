@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::SystemTime;
 
 use crate::fs::{
-    CopyControl, CopyOutcome, CopyRequest, DirItem, Fingerprint, FsEngine, FsMeta, LocalFs, Removed,
+    CopyControl, CopyOutcome, CopyRequest, Fingerprint, FsEngine, FsMeta, Listing, LocalFs, Removed,
 };
 use crate::journal::Journal;
 use crate::ops::{
@@ -796,7 +796,16 @@ pub struct FaultFs {
     byte_rules: Mutex<Vec<ByteRule>>,
     hooks: Mutex<Vec<Hook>>,
     write_rules: Mutex<Vec<WriteRule>>,
+    listing_rules: Mutex<Vec<ListingRule>>,
     pub hits: Mutex<Vec<(Op, PathBuf)>>,
+}
+
+/// What a listing does wrong: breaks in the middle, or shows an entry that cannot be read.
+enum ListingRule {
+    /// The system fails after the entries before the last one: that one is missing.
+    Breaks { folder: PathBuf, errno: i32 },
+    /// The entry is listed, but looking at it fails.
+    Unreadable { entry: PathBuf, errno: i32 },
 }
 
 struct WriteRule {
@@ -854,6 +863,7 @@ impl FaultFs {
             byte_rules: Mutex::new(Vec::new()),
             hooks: Mutex::new(Vec::new()),
             write_rules: Mutex::new(Vec::new()),
+            listing_rules: Mutex::new(Vec::new()),
             hits: Mutex::new(Vec::new()),
         })
     }
@@ -866,6 +876,29 @@ impl FaultFs {
             errno,
             remaining: None,
         });
+    }
+
+    /// Listing a folder whose path ends with `folder` fails in the middle: the last entry is
+    /// missing and the system's error comes with the list.
+    pub fn break_listing(&self, folder: impl Into<PathBuf>, errno: i32) {
+        self.listing_rules
+            .lock()
+            .unwrap()
+            .push(ListingRule::Breaks {
+                folder: folder.into(),
+                errno,
+            });
+    }
+
+    /// The entry whose path ends with `entry` is listed, but cannot be looked at.
+    pub fn fail_entry(&self, entry: impl Into<PathBuf>, errno: i32) {
+        self.listing_rules
+            .lock()
+            .unwrap()
+            .push(ListingRule::Unreadable {
+                entry: entry.into(),
+                errno,
+            });
     }
 
     /// Fail only the next `times` matching calls (to test "retry").
@@ -978,9 +1011,25 @@ impl FsEngine for FaultFs {
     fn stat(&self, p: &Path) -> io::Result<FsMeta> {
         self.inner.stat(p)
     }
-    fn read_dir(&self, p: &Path) -> io::Result<Vec<DirItem>> {
+    fn read_dir(&self, p: &Path) -> io::Result<Listing> {
         self.check(Op::ReadDir, p)?;
-        self.inner.read_dir(p)
+        let mut listing = self.inner.read_dir(p)?;
+        for rule in self.listing_rules.lock().unwrap().iter() {
+            match rule {
+                ListingRule::Breaks { folder, errno } if p.ends_with(folder) => {
+                    listing.items.sort_by(|a, b| a.name.cmp(&b.name));
+                    listing.items.pop();
+                    listing.broken.push(io::Error::from_raw_os_error(*errno));
+                }
+                ListingRule::Unreadable { entry, errno } => {
+                    for item in listing.items.iter_mut().filter(|i| i.path.ends_with(entry)) {
+                        item.meta = Err(io::Error::from_raw_os_error(*errno));
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(listing)
     }
     fn read_link(&self, p: &Path) -> io::Result<PathBuf> {
         self.inner.read_link(p)

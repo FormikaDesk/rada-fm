@@ -40,6 +40,11 @@ Errors are handled per step. You choose to skip, skip all, retry or abort; the m
 names the full path. A source that shrinks, changes or disappears while it is being copied is
 reported for that file and the others carry on.
 
+The plan does not look complete when it is not. Every item the scan could not read is counted
+in the plan's warnings, with its path and the reason, and a folder that the system listed only
+in part (it failed in the middle of the list) gets its own warning, because items may be
+missing from the plan. *Tests:* `listing_errors.rs`.
+
 ### Moves across filesystems cannot lose data
 
 A move across filesystems is copy, **verify** (a checksum of what was written, read back),
