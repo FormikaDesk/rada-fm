@@ -1293,7 +1293,7 @@ impl Theme {
     /// button, on a dark theme and on a light one (a fixed colour was a shade of one ground
     /// and nearly the same as the others). It is weaker than the row of the cursor.
     pub fn hover_over(&self, ground: Color) -> Color {
-        self.tint_share(ground, self.accent, if self.light { 0.14 } else { 0.16 })
+        self.tint_share(ground, self.accent, if self.light { 0.16 } else { 0.18 })
     }
 
     /// The grounds the pointer can light: those of a zone, a menu or a window, and buttons.
