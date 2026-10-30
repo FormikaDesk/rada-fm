@@ -134,6 +134,83 @@ fn an_error_in_a_choice_is_said_in_the_language() {
 }
 
 #[test]
+fn a_mistake_in_the_command_line_is_said_in_the_language_with_the_same_exit_code() {
+    let w = World::new();
+    let cases: [(&[&str], &[&str]); 5] = [
+        (
+            &["--v"],
+            &[
+                "errore: argomento '--v' non riconosciuto",
+                "suggerimento: esiste un argomento simile: '--version'",
+                "Uso: rada [OPZIONI]",
+                "Per maggiori informazioni, prova '--help'.",
+            ],
+        ),
+        (
+            &["--zzzz"],
+            &[
+                "argomento '--zzzz' non riconosciuto",
+                "per passare '--zzzz' come valore, usa '-- --zzzz'",
+            ],
+        ),
+        (
+            &["--profile"],
+            &["errore: serve un valore per '--profile <NAME>', ma non è stato dato"],
+        ),
+        (
+            &["--schema", "reqest"],
+            &[
+                "valore 'reqest' non valido per '--schema <WHAT>'",
+                "[valori possibili: request, plan]",
+                "esiste un valore simile: 'request'",
+            ],
+        ),
+        (
+            &["setup", "deskto"],
+            &[
+                "comando 'deskto' non riconosciuto",
+                "esiste un comando simile: 'desktop'",
+                "Uso: rada setup <COMANDO>",
+            ],
+        ),
+    ];
+    for (args, want) in cases {
+        let (it, en) = (w.rada(IT, args), w.rada(EN, args));
+        let said = text(&it);
+        for word in want {
+            assert!(said.contains(word), "{args:?}: {word:?} missing:\n{said}");
+        }
+        for english in [
+            "error:",
+            "tip:",
+            "unexpected",
+            "For more information",
+            "Usage:",
+        ] {
+            assert!(
+                !said.contains(english),
+                "{args:?}: {english:?} left in:\n{said}"
+            );
+        }
+        assert!(text(&en).starts_with("error: "), "{args:?}: {}", text(&en));
+        assert_eq!(it.status.code(), Some(2), "{args:?}");
+        assert_eq!(it.status.code(), en.status.code(), "{args:?}");
+    }
+}
+
+#[test]
+fn the_mistakes_of_the_command_line_that_are_not_translated_stay_as_clap_says_them() {
+    let w = World::new();
+    let out = w.rada(IT, &["--hidden=3"]);
+    assert!(
+        text(&out).starts_with("error: unexpected value '3'"),
+        "{}",
+        text(&out)
+    );
+    assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
 fn rada_doctor_speaks_the_language() {
     let w = World::new();
     let it = text(&w.rada(IT, &["doctor"]));

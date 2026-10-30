@@ -21,6 +21,8 @@ rada-core = { workspace = true }
 rada-tui = { workspace = true }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+# What clap itself prints with: colours only where the terminal takes them.
+anstream = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"

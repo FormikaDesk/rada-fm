@@ -1,5 +1,6 @@
 //! rada: a terminal file manager you can trust.
 
+mod cli_error;
 mod cli_text;
 mod config;
 mod demo;
@@ -290,7 +291,11 @@ fn run(log_guard: &mut Option<tracing_appender::non_blocking::WorkerGuard>) -> R
     if cfg!(windows) && put_name_back_after_cut_update() {
         return Ok(());
     }
-    let matches = cli_text::command::<Cli>().get_matches();
+    let command = cli_text::command::<Cli>();
+    let matches = command
+        .clone()
+        .try_get_matches()
+        .unwrap_or_else(|e| cli_error::exit(&command, e));
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
     if run_exiting_command(&cli)? {
         return Ok(());

@@ -3,7 +3,7 @@
 //! clap builds the help from the doc comments of `main.rs`, which are English. After it has
 //! built the command, this puts the texts of the table in their place: the description of the
 //! program and of every command and option, the headings of the sections and the template of
-//! the page itself. What clap says on its own when the line typed is wrong stays English.
+//! the page itself. What clap says when the line typed is wrong is in `cli_error`.
 
 use clap::{Arg, Command};
 use rada_core::i18n::Key;
