@@ -161,6 +161,9 @@ fn report_of(mut r: ExecReport) -> ExecReport {
     for (_, why) in r.kept.iter_mut().chain(r.not_preserved.iter_mut()) {
         *why = text(why);
     }
+    if let Some(gap) = r.journal_gap.as_mut() {
+        gap.error = text(&gap.error);
+    }
     r.failed = r
         .failed
         .into_iter()
@@ -278,6 +281,7 @@ mod tests {
                 message: NASTY.into(),
                 path: PathBuf::from("x"),
                 attempt: 1,
+                journal: false,
             },
             reply,
         }) else {

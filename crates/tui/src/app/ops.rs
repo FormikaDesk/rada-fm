@@ -476,12 +476,24 @@ impl App {
         reply: Sender<ErrorChoice>,
         key: KeyEvent,
     ) {
-        let choice = match key.code {
-            KeyCode::Char('s') | KeyCode::Enter => Some(ErrorChoice::Skip),
-            KeyCode::Char('S') => Some(ErrorChoice::SkipAll),
-            KeyCode::Char('r') => Some(ErrorChoice::Retry),
-            KeyCode::Char('a') | KeyCode::Esc | KeyCode::Char('q') => Some(ErrorChoice::Abort),
-            _ => None,
+        let abort = matches!(
+            key.code,
+            KeyCode::Char('a') | KeyCode::Esc | KeyCode::Char('q')
+        );
+        let choice = if info.journal {
+            // Stopping is what Enter does here: going on without a way back is a decision.
+            match key.code {
+                KeyCode::Char('c') => Some(ErrorChoice::Skip),
+                KeyCode::Enter => Some(ErrorChoice::Abort),
+                _ => abort.then_some(ErrorChoice::Abort),
+            }
+        } else {
+            match key.code {
+                KeyCode::Char('s') | KeyCode::Enter => Some(ErrorChoice::Skip),
+                KeyCode::Char('S') => Some(ErrorChoice::SkipAll),
+                KeyCode::Char('r') => Some(ErrorChoice::Retry),
+                _ => abort.then_some(ErrorChoice::Abort),
+            }
         };
         match choice {
             Some(c) => {

@@ -434,6 +434,12 @@ strings! {
     BtnRetry => "Retry", "Riprova";
     BtnAbort => "Abort", "Interrompi";
     AbortKeeps => "Abort keeps what is already done; u undoes it.", "Interrompi conserva ciò che è già fatto; u lo annulla.";
+    JournalFailTitle => "The journal cannot be written", "Il registro non si può scrivere";
+    JournalFailNote => "The next steps could not be undone. Stopping keeps what is already done, and u undoes it.", "I passaggi successivi non si potrebbero annullare. Interrompendo si conserva ciò che è già fatto, e u lo annulla.";
+    BtnContinueNoUndo => "Continue without being able to undo the rest", "Continua senza poter annullare il resto";
+    NJournalStopped => "Stopped because the journal could not be written ({0}). Undo covers what came before {1}.", "Fermata perché il registro non si è potuto scrivere ({0}). L'annullamento copre ciò che viene prima di {1}.";
+    NJournalOff => "The journal could not be written ({0}). From {1} on this operation cannot be undone.", "Il registro non si è potuto scrivere ({0}). Da {1} in poi questa operazione non si può annullare.";
+    HistPartlyUndoable => "undoable in part", "annullabile in parte";
     ChipDone => "Done", "Fatto";
     BtnUndoDone => "Undo what was done", "Annulla ciò che è stato fatto";
     ChipRunning => "Running", "In corso";

@@ -77,6 +77,15 @@ pub struct Failure<'a> {
     pub attempt: u32,
 }
 
+/// What to do when the journal cannot be written during an operation that can be undone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JournalChoice {
+    /// Stop before the next step; what is done so far stays recorded.
+    Stop,
+    /// Go on: from here the operation cannot be undone.
+    ContinueUnrecorded,
+}
+
 pub trait ExecHandler {
     fn progress(&mut self, _p: &Progress) {}
     /// Decide what to do about a failed step. The default is to skip it.
@@ -92,6 +101,15 @@ pub trait ExecHandler {
     /// one the name carries the process id.
     fn temp_tag(&self) -> Option<String> {
         None
+    }
+    /// The journal could not be written while recording `f.step`. The default is to stop:
+    /// a handler with nobody to ask does not go on without a way back.
+    fn on_journal_failure(&mut self, _f: &Failure<'_>) -> JournalChoice {
+        JournalChoice::Stop
+    }
+    /// Asked before every step: `true` ends the run there, as an abort.
+    fn halted(&self) -> bool {
+        false
     }
 }
 
@@ -131,6 +149,18 @@ pub struct ExecReport {
     /// What could not be carried over to a copy (owner, extended attributes, ACLs, a hard
     /// link the destination cannot make), with the item it concerns.
     pub not_preserved: Vec<(PathBuf, String)>,
+    /// Set when the journal could not be written during the run.
+    pub journal_gap: Option<JournalGap>,
+}
+
+/// Where the journal stopped being written, and why.
+#[derive(Clone, Debug)]
+pub struct JournalGap {
+    /// The step being recorded when the write failed.
+    pub path: PathBuf,
+    pub error: String,
+    /// The run was stopped there; otherwise it went on, and cannot be undone from `path`.
+    pub stopped: bool,
 }
 
 impl ExecReport {
@@ -297,6 +327,13 @@ impl<'a> Running<'a> {
         }
     }
 
+    /// The handler wants the run to end here; that is an abort.
+    fn halted(&mut self) -> bool {
+        let halted = self.handler.halted();
+        self.report.aborted |= halted;
+        halted
+    }
+
     fn start_step(&mut self, index: usize, step: &Step) {
         self.prog.current = step.path().to_path_buf();
         self.prog.current_done = 0;
@@ -402,11 +439,17 @@ impl Engine {
                 run.report.cancelled = true;
                 break;
             }
+            if run.halted() {
+                break;
+            }
             if st.blocked_by(step) {
                 run.skip_blocked(&mut st, step);
                 continue;
             }
             run.start_step(index, step);
+            if run.halted() {
+                break;
+            }
             if !self.run_with_retries(index, step, &mut st, &mut run) {
                 break;
             }

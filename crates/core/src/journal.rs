@@ -232,6 +232,10 @@ enum Record {
         done: u64,
         failed: u64,
         bytes: u64,
+        /// The first step that ran without its way back being written, when the journal
+        /// could not be written during the run: undo covers what comes before.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        unrecorded_from: Option<usize>,
     },
     Undone {
         id: String,
@@ -283,6 +287,9 @@ pub struct JournalEntry {
     pub bytes: u64,
     pub undo_steps: usize,
     pub undo_state: UndoState,
+    /// The first step that ran without its way back being written (the journal could not be
+    /// written, and the person chose to go on): undo covers only what comes before.
+    pub unrecorded_from: Option<usize>,
     pub request: Option<OpRequest>,
     /// Fully undone, and nothing but other undos happened since: `Ctrl+Y` can redo it.
     pub redoable: bool,
@@ -339,6 +346,9 @@ pub struct Journal {
     counter: AtomicU64,
     /// The locks of the operations this process is running, by id.
     running: Mutex<HashMap<String, OpLock>>,
+    /// Records that may still be written before one write fails (tests).
+    #[cfg(any(test, feature = "testutil"))]
+    writes_left: Mutex<Option<usize>>,
 }
 
 /// Closes a line that a crash cut short (see the module documentation).
@@ -421,7 +431,36 @@ impl Journal {
             writer: Mutex::new(Writer { file }),
             counter: AtomicU64::new(0),
             running: Mutex::new(HashMap::new()),
+            #[cfg(any(test, feature = "testutil"))]
+            writes_left: Mutex::new(None),
         })
+    }
+
+    /// After `records` more records the next write fails, once, as a disk that is full for a
+    /// moment would.
+    #[cfg(any(test, feature = "testutil"))]
+    pub fn fail_write_after(&self, records: usize) {
+        *self.writes_left.lock().unwrap() = Some(records);
+    }
+
+    #[cfg(any(test, feature = "testutil"))]
+    fn injected_fault(&self) -> Result<()> {
+        let mut left = self.writes_left.lock().unwrap();
+        match *left {
+            Some(0) => {
+                *left = None;
+                Err(Error::io(
+                    "write journal",
+                    &self.path,
+                    std::io::Error::other("no space left on device"),
+                ))
+            }
+            Some(n) => {
+                *left = Some(n - 1);
+                Ok(())
+            }
+            None => Ok(()),
+        }
     }
 
     pub fn path(&self) -> &Path {
@@ -446,6 +485,8 @@ impl Journal {
     /// Write one record. It goes to the operating system at once, in one `write` call (lines
     /// of concurrent instances never interleave); `force` also waits for the disk.
     fn append(&self, rec: &Record, force: bool) -> Result<()> {
+        #[cfg(any(test, feature = "testutil"))]
+        self.injected_fault()?;
         let mut line = serde_json::to_vec(rec)?;
         line.push(b'\n');
         let mut w = self
@@ -563,6 +604,20 @@ impl Journal {
         failed: u64,
         bytes: u64,
     ) -> Result<()> {
+        self.end_unrecorded(id, status, done, failed, bytes, None)
+    }
+
+    /// [`Journal::end`] for a run in which the steps from `unrecorded_from` on were not
+    /// recorded: the entry says so, and undo covers only what comes before.
+    pub fn end_unrecorded(
+        &self,
+        id: &str,
+        status: RunStatus,
+        done: u64,
+        failed: u64,
+        bytes: u64,
+        unrecorded_from: Option<usize>,
+    ) -> Result<()> {
         self.append(
             &Record::End {
                 id: id.to_string(),
@@ -570,6 +625,7 @@ impl Journal {
                 done,
                 failed,
                 bytes,
+                unrecorded_from,
             },
             true,
         )?;
@@ -765,6 +821,7 @@ impl Journal {
                         bytes: 0,
                         undo_steps: 0,
                         undo_state: UndoState::NotUndone,
+                        unrecorded_from: None,
                         request,
                         redoable: false,
                         damaged: None,
@@ -783,9 +840,11 @@ impl Journal {
                 done,
                 failed,
                 bytes,
+                unrecorded_from,
             } => {
                 ended.insert(id.clone(), n);
                 if let Some(e) = map.get_mut(&id) {
+                    e.unrecorded_from = unrecorded_from;
                     e.status = EntryStatus::Finished(status);
                     e.done = done;
                     e.failed = failed;

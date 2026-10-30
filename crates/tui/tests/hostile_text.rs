@@ -190,6 +190,7 @@ fn what_the_journal_says_of_an_operation_is_shown_escaped() {
         bytes: 0,
         undo_steps: 0,
         undo_state: UndoState::NotUndone,
+        unrecorded_from: None,
         request: None,
         redoable: false,
         damaged: None,

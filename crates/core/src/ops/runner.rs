@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 
 use super::engine::Engine;
-use super::exec::{Cancel, ErrorChoice, ExecHandler, ExecReport, Failure, Progress};
+use super::exec::{
+    Cancel, ErrorChoice, ExecHandler, ExecReport, Failure, JournalChoice, JournalGap, Progress,
+};
 use super::plan::*;
 use crate::Result;
 use crate::fs::local::content_hash;
@@ -17,12 +19,25 @@ pub struct RunOutcome {
     pub journal_errors: u64,
 }
 
+/// Whether the journal is being written, and if not, why.
+enum JournalState {
+    Writing,
+    /// The person (or the lack of one) chose to stop at the first write that failed.
+    Stopped,
+    /// The person chose to go on; nothing more is recorded.
+    Off,
+}
+
 struct Recording<'a> {
     inner: &'a mut dyn ExecHandler,
     journal: &'a Journal,
     id: &'a str,
     reversible: bool,
     errors: u64,
+    state: JournalState,
+    /// The first step that ran without its way back written.
+    unrecorded_from: Option<usize>,
+    gap: Option<JournalGap>,
     /// Contents already hashed in this run, by (device, file): the names of one file.
     hashed: HashMap<(u64, u64), String>,
     /// The name the running step gives its temporary file, as its pending record says.
@@ -30,6 +45,38 @@ struct Recording<'a> {
 }
 
 impl Recording<'_> {
+    fn writing(&self) -> bool {
+        self.reversible && matches!(self.state, JournalState::Writing)
+    }
+
+    /// The first journal write that fails ends the recording: the handler is asked whether to
+    /// stop before the next step or to go on without a way back. `ran` tells that the step
+    /// the record was for has already happened, so it is the first one not recorded.
+    fn journal_failed(&mut self, index: usize, step: &Step, e: &crate::Error, ran: bool) {
+        tracing::error!("journal: {e}");
+        self.errors += 1;
+        let choice = self.inner.on_journal_failure(&Failure {
+            index,
+            step,
+            error: e,
+            attempt: 1,
+        });
+        let stopped = choice == JournalChoice::Stop;
+        self.state = if stopped {
+            JournalState::Stopped
+        } else {
+            JournalState::Off
+        };
+        if ran || !stopped {
+            self.unrecorded_from = Some(index);
+        }
+        self.gap = Some(JournalGap {
+            path: step.path().to_path_buf(),
+            error: e.to_string(),
+            stopped,
+        });
+    }
+
     /// A file made with several names has a fingerprint without a status-change time, which
     /// cannot see contents rewritten with the same size and modification time: its contents
     /// are hashed now, so that undo can tell before it removes the last name.
@@ -81,7 +128,7 @@ impl ExecHandler for Recording<'_> {
         // Written before the step runs: if the process dies in it, the next start can see
         // from the disk whether it happened.
         self.tag = None;
-        if self.reversible
+        if self.writing()
             && let Some(intent) = crate::journal::Intent::of(step)
         {
             let tag = format!("{}-{index}", self.id);
@@ -90,13 +137,12 @@ impl ExecHandler for Recording<'_> {
                 .pending(self.id, intent.with_temp(Some(tag.clone())))
             {
                 Ok(()) => self.tag = Some(tag),
-                Err(e) => {
-                    tracing::error!("journal: {e}");
-                    self.errors += 1;
-                }
+                Err(e) => self.journal_failed(index, step, &e, false),
             }
         }
-        self.inner.step_starting(index, step);
+        if !self.halted() {
+            self.inner.step_starting(index, step);
+        }
     }
 
     fn temp_tag(&self) -> Option<String> {
@@ -104,16 +150,25 @@ impl ExecHandler for Recording<'_> {
     }
 
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
-        if self.reversible
-            && let Some(inv) = step.inverse(result)
-        {
-            if let Err(e) = self.journal.record_undo(self.id, inv.clone()) {
-                tracing::error!("journal: {e}");
-                self.errors += 1;
+        if let Some(inv) = step.inverse(result) {
+            if self.writing() {
+                match self.journal.record_undo(self.id, inv.clone()) {
+                    Ok(()) => self.record_digest(&inv),
+                    Err(e) => self.journal_failed(index, step, &e, true),
+                }
+            } else if self.reversible {
+                self.unrecorded_from.get_or_insert(index);
             }
-            self.record_digest(&inv);
         }
         self.inner.step_finished(index, step, result);
+    }
+
+    fn on_journal_failure(&mut self, f: &Failure<'_>) -> JournalChoice {
+        self.inner.on_journal_failure(f)
+    }
+
+    fn halted(&self) -> bool {
+        matches!(self.state, JournalState::Stopped) || self.inner.halted()
     }
 }
 
@@ -142,17 +197,22 @@ impl Engine {
             id: &id,
             reversible: plan.reversible,
             errors: 0,
+            state: JournalState::Writing,
+            unrecorded_from: None,
+            gap: None,
             hashed: HashMap::new(),
             tag: None,
         };
-        let report = self.execute(plan, &mut rec, cancel);
+        let mut report = self.execute(plan, &mut rec, cancel);
         let mut errors = rec.errors;
-        if let Err(e) = journal.end(
+        report.journal_gap = rec.gap.take();
+        if let Err(e) = journal.end_unrecorded(
             &id,
             report.status(),
             report.done,
             report.failed.len() as u64,
             report.bytes,
+            rec.unrecorded_from,
         ) {
             tracing::error!("journal: {e}");
             errors += 1;

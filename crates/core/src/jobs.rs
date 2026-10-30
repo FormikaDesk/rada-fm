@@ -11,8 +11,8 @@ use crossbeam_channel::Sender;
 use crate::events::{CoreEvent, FailureInfo, JobEvent, JobId};
 use crate::journal::Journal;
 use crate::ops::{
-    Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, Failure, OpRequest, Plan, Progress,
-    Scan, ScanControl, TransferOptions, UndoPlan,
+    Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, Failure, JournalChoice, OpRequest,
+    Plan, Progress, Scan, ScanControl, TransferOptions, UndoPlan,
 };
 
 #[derive(Clone)]
@@ -364,6 +364,20 @@ impl ExecHandler for Forward {
     }
 
     fn on_failure(&mut self, f: &Failure<'_>) -> ErrorChoice {
+        self.ask(f, false)
+    }
+
+    fn on_journal_failure(&mut self, f: &Failure<'_>) -> JournalChoice {
+        match self.ask(f, true) {
+            ErrorChoice::Skip | ErrorChoice::SkipAll => JournalChoice::ContinueUnrecorded,
+            _ => JournalChoice::Stop,
+        }
+    }
+}
+
+impl Forward {
+    /// Blocks this worker until the window is answered; closed without an answer means abort.
+    fn ask(&mut self, f: &Failure<'_>, journal: bool) -> ErrorChoice {
         let (tx, rx) = crossbeam_channel::bounded(1);
         let info = FailureInfo {
             index: f.index,
@@ -371,6 +385,7 @@ impl ExecHandler for Forward {
             message: f.error.to_string(),
             path: f.step.path().to_path_buf(),
             attempt: f.attempt,
+            journal,
         };
         if self
             .out

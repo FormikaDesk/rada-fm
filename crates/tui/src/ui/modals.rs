@@ -265,51 +265,7 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
                 &mut app.frame.hits,
             );
         }
-        Modal::Failure { info, .. } => {
-            let w = 88.min(area.width.saturating_sub(4));
-            let msg = fmt::wrap(&info.message, (w as usize).saturating_sub(6));
-            let h = (msg.len() as u16 + 9).min(area.height.saturating_sub(2));
-            let r = centered(area, w, h);
-            let inner = frame(f, &th, r, th.error);
-            let mut lines = vec![
-                titled(&ctx, Key::ChipError.tr(), Tone::Danger, Key::WentWrong.tr()),
-                Line::raw(""),
-            ];
-            for l in msg {
-                lines.push(Line::from(Span::styled(l, th.fg(th.error))));
-            }
-            if info.attempt > 1 {
-                lines.push(Line::from(Span::styled(
-                    tf(Key::AttemptN, &[&info.attempt]),
-                    th.dim(),
-                )));
-            }
-            lines.push(Line::raw(""));
-            let btns = vec![
-                button(&th, "s", Key::BtnSkip.tr(), Some(th.accent), true),
-                Span::raw("  "),
-                button(&th, "S", Key::BtnSkipAll.tr(), None, true),
-                Span::raw("  "),
-                button(&th, "r", Key::BtnRetry.tr(), None, true),
-                Span::raw("  "),
-                button(&th, "a", Key::BtnAbort.tr(), None, true),
-            ];
-            hit_spans(
-                &mut app.frame.hits,
-                inner.x,
-                inner.y + lines.len() as u16,
-                &btns,
-                &[
-                    (0, Target::Key(KeyCode::Char('s'))),
-                    (2, Target::Key(KeyCode::Char('S'))),
-                    (4, Target::Key(KeyCode::Char('r'))),
-                    (6, Target::Key(KeyCode::Char('a'))),
-                ],
-            );
-            lines.push(Line::from(btns));
-            lines.push(Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint())));
-            f.render_widget(Paragraph::new(lines), inner);
-        }
+        Modal::Failure { info, .. } => draw_failure(f, &ctx, info, area, &mut app.frame.hits),
         Modal::Input(iv) => draw_input(f, &ctx, iv, area),
         Modal::History(h) => draw_history(f, &ctx, h, area, spinner, &mut app.frame.hits),
         Modal::Result(r) => {
@@ -570,6 +526,99 @@ fn draw_palette(f: &mut Frame, th: &Theme, p: &PaletteView, area: Rect, hits: &m
 
 // -------------------------------------------------------------------------------- others
 
+/// The window of a step that failed (skip, skip all, retry, abort) or of a journal that
+/// cannot be written (abort, which is the default, or go on without a way back).
+fn draw_failure(
+    f: &mut Frame,
+    ctx: &Ctx,
+    info: &rada_core::events::FailureInfo,
+    area: Rect,
+    hits: &mut Hits,
+) {
+    let th = ctx.th;
+    let w = 88.min(area.width.saturating_sub(4));
+    let msg = fmt::wrap(&info.message, (w as usize).saturating_sub(6));
+    let note = if info.journal {
+        fmt::wrap(Key::JournalFailNote.tr(), (w as usize).saturating_sub(6))
+    } else {
+        Vec::new()
+    };
+    let h = ((msg.len() + note.len()) as u16 + 9).min(area.height.saturating_sub(2));
+    let inner = frame(f, th, centered(area, w, h), th.error);
+    let mut lines = failure_text(ctx, info, msg, note);
+    let (btns, targets) = failure_buttons(th, info.journal);
+    hit_spans(hits, inner.x, inner.y + lines.len() as u16, &btns, &targets);
+    lines.push(Line::from(btns));
+    if !info.journal {
+        lines.push(Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint())));
+    }
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
+fn failure_text(
+    ctx: &Ctx,
+    info: &rada_core::events::FailureInfo,
+    msg: Vec<String>,
+    note: Vec<String>,
+) -> Vec<Line<'static>> {
+    let th = ctx.th;
+    let headline = if info.journal {
+        Key::JournalFailTitle.tr()
+    } else {
+        Key::WentWrong.tr()
+    };
+    let mut lines = vec![
+        titled(ctx, Key::ChipError.tr(), Tone::Danger, headline),
+        Line::raw(""),
+    ];
+    for l in msg {
+        lines.push(Line::from(Span::styled(l, th.fg(th.error))));
+    }
+    for l in note {
+        lines.push(Line::from(Span::styled(l, th.dim())));
+    }
+    if info.attempt > 1 {
+        lines.push(Line::from(Span::styled(
+            tf(Key::AttemptN, &[&info.attempt]),
+            th.dim(),
+        )));
+    }
+    lines.push(Line::raw(""));
+    lines
+}
+
+fn failure_buttons(th: &Theme, journal: bool) -> (Vec<Span<'static>>, Vec<(usize, Target)>) {
+    let keys: Vec<(char, Key, bool)> = if journal {
+        vec![
+            ('a', Key::BtnAbort, true),
+            ('c', Key::BtnContinueNoUndo, false),
+        ]
+    } else {
+        vec![
+            ('s', Key::BtnSkip, true),
+            ('S', Key::BtnSkipAll, false),
+            ('r', Key::BtnRetry, false),
+            ('a', Key::BtnAbort, false),
+        ]
+    };
+    let mut spans = Vec::new();
+    let mut targets = Vec::new();
+    for (i, (c, label, main)) in keys.into_iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw("  "));
+        }
+        targets.push((spans.len(), Target::Key(KeyCode::Char(c))));
+        spans.push(button(
+            th,
+            &c.to_string(),
+            label.tr(),
+            main.then_some(th.accent),
+            true,
+        ));
+    }
+    (spans, targets)
+}
+
 fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
     let th = ctx.th;
     let (title, hint): (&str, String) = match &iv.kind {
@@ -716,6 +765,9 @@ fn draw_history(
         let (tag, tag_color) = match (&e.undo_state, e.reversible) {
             (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
             (UndoState::Partial { remaining }, _) => (tf(Key::HistPartly, &[remaining]), th.muted),
+            _ if e.reversible && e.unrecorded_from.is_some() => {
+                (Key::HistPartlyUndoable.tr().to_string(), th.warn)
+            }
             (_, false) => (Key::HistPermanent.tr().to_string(), th.error),
             _ if e.undo_steps == 0 => (Key::HistNothing.tr().to_string(), th.muted),
             _ => (Key::HistCanUndo.tr().to_string(), th.accent),

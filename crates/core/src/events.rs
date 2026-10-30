@@ -21,6 +21,9 @@ pub struct FailureInfo {
     pub message: String,
     pub path: PathBuf,
     pub attempt: u32,
+    /// Not a step that failed: the journal could not be written. The answer is `Abort` to
+    /// stop, `Skip` to go on without a way back.
+    pub journal: bool,
 }
 
 pub enum JobEvent {

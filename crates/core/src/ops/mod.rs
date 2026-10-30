@@ -17,8 +17,8 @@ pub mod undo;
 pub use archives::ExtractInto;
 pub use engine::Engine;
 pub use exec::{
-    Cancel, ErrorChoice, ExecHandler, ExecReport, FailedStep, Failure, Progress, RunStatus,
-    SkipErrors,
+    Cancel, ErrorChoice, ExecHandler, ExecReport, FailedStep, Failure, JournalChoice, JournalGap,
+    Progress, RunStatus, SkipErrors,
 };
 pub use plan::*;
 pub use planner::{TransferMode, TransferOptions};

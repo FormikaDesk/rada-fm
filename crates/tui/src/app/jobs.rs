@@ -201,7 +201,9 @@ impl App {
             lines.push((ToastKind::Warn, note.clone()));
         }
         lines.extend(self.not_preserved_lines(report));
-        if journal_errors > 0 {
+        if let Some(gap) = &report.journal_gap {
+            lines.push((ToastKind::Warn, journal_gap_line(gap, self.home())));
+        } else if journal_errors > 0 {
             lines.push((
                 ToastKind::Warn,
                 if journal_errors == 1 {
@@ -328,5 +330,49 @@ fn headline(report: &ExecReport, title: &str) -> (ToastKind, String) {
         Aborted => (ToastKind::Warn, tf(Key::NStopped, &[&title])),
         Cancelled => (ToastKind::Warn, tf(Key::NCancelled, &[&title])),
         Interrupted => (ToastKind::Warn, tf(Key::NInterrupted, &[&title])),
+    }
+}
+
+/// Where the journal stopped being written, and what that means for undo.
+fn journal_gap_line(gap: &rada_core::ops::JournalGap, home: &Path) -> String {
+    let at = fmt::short_path(&gap.path, home);
+    let key = if gap.stopped {
+        Key::NJournalStopped
+    } else {
+        Key::NJournalOff
+    };
+    tf(key, &[&gap.error, &at])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rada_core::ops::JournalGap;
+
+    fn gap(stopped: bool) -> JournalGap {
+        JournalGap {
+            path: "/home/me/docs/b.txt".into(),
+            error: "no space left on device".into(),
+            stopped,
+        }
+    }
+
+    #[test]
+    fn a_stopped_run_says_what_undo_still_covers() {
+        let line = journal_gap_line(&gap(true), Path::new("/home/me"));
+        assert_eq!(
+            line,
+            "Stopped because the journal could not be written (no space left on device). \
+             Undo covers what came before ~/docs/b.txt."
+        );
+    }
+
+    #[test]
+    fn a_run_that_went_on_says_from_where_it_cannot_be_undone() {
+        let line = journal_gap_line(&gap(false), Path::new("/home/me"));
+        assert!(
+            line.ends_with("From ~/docs/b.txt on this operation cannot be undone."),
+            "{line}"
+        );
     }
 }

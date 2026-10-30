@@ -88,6 +88,14 @@ move → undo, on one filesystem and across two, give back exactly the starting 
 a copy is the same tree as its original. They are run with a few dozen cases by default and
 `PROPTEST_CASES=1000 cargo test -p rada-core --test properties --release` runs a long hunt.
 
+If the journal cannot be written in the middle of an operation (a full disk, a lost folder),
+rada does not carry on quietly. The operation stops before the next step and asks you:
+*Abort*, which is the default, or *Continue without being able to undo the rest*. Where there
+is nobody to ask it aborts. If you go on, the summary and the history say that the operation
+can be undone only up to that point, and undo covers just the steps that were recorded.
+
+*Tests:* `journal_fails.rs`.
+
 ### A killed process leaves a coherent state
 
 rada writes each journal record to the operating system as soon as it is produced, and writes
