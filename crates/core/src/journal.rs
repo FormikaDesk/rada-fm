@@ -54,6 +54,18 @@ pub enum Intent {
         size: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mtime: Option<Stamp>,
+        /// For a link: where it was to point, so that recovery does not take for it a link
+        /// (or a file) somebody else put there.
+        #[serde(
+            with = "pathcodec::opt_path",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        target: Option<PathBuf>,
+        /// The step declares nothing to check what it wrote against (a new archive), so
+        /// recovery leaves whatever it finds. Absent in records written before this existed.
+        #[serde(default, skip_serializing_if = "is_false")]
+        unverifiable: bool,
     },
     /// A cross-device move of a file (`symlink: false`) or a link.
     Move {
@@ -70,6 +82,13 @@ pub enum Intent {
         size: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         mtime: Option<Stamp>,
+        /// For a link: where it was to point (see `Create`).
+        #[serde(
+            with = "pathcodec::opt_path",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        target: Option<PathBuf>,
     },
     Dir {
         #[serde(with = "pathcodec::path")]
@@ -95,7 +114,27 @@ pub enum Intent {
     },
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 impl Intent {
+    /// The link target a symlink step was to give its destination.
+    fn pointing_to(mut self, to: &Path) -> Intent {
+        if let Intent::Create { target, .. } | Intent::Move { target, .. } = &mut self {
+            *target = Some(to.to_path_buf());
+        }
+        self
+    }
+
+    /// Marks a step whose result nothing can be checked against.
+    fn unverifiable(mut self) -> Intent {
+        if let Intent::Create { unverifiable, .. } = &mut self {
+            *unverifiable = true;
+        }
+        self
+    }
+
     /// The name the step gives its temporary file (see `ExecHandler::temp_tag`), so that
     /// settling the step removes that file and no other.
     pub fn with_temp(mut self, tag: Option<String>) -> Intent {
@@ -128,14 +167,15 @@ impl Intent {
             Step::CopySymlink {
                 src,
                 dst,
+                target,
                 remove_source,
-                ..
             } => {
-                if *remove_source {
+                let intent = if *remove_source {
                     Intent::moved(src, dst, true, None, None)
                 } else {
                     Intent::create(dst, None, None)
-                }
+                };
+                intent.pointing_to(target)
             }
             Step::HardLink {
                 existing,
@@ -152,9 +192,10 @@ impl Intent {
             Step::ExtractFile {
                 dst, size, mtime, ..
             } => Intent::create(dst, Some(*size), *mtime),
-            Step::ExtractSymlink { dst, .. } | Step::Compress { dst, .. } => {
-                Intent::create(dst, None, None)
+            Step::ExtractSymlink { dst, target, .. } => {
+                Intent::create(dst, None, None).pointing_to(target)
             }
+            Step::Compress { dst, .. } => Intent::create(dst, None, None).unverifiable(),
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
             Step::MakeFile { path, .. } => Intent::create(path, Some(0), None),
             Step::Rename { from, to } => Intent::Rename {
@@ -171,6 +212,8 @@ impl Intent {
             temp: None,
             size,
             mtime,
+            target: None,
+            unverifiable: false,
         }
     }
 
@@ -188,6 +231,7 @@ impl Intent {
             temp: None,
             size,
             mtime,
+            target: None,
         }
     }
 }

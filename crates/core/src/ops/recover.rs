@@ -10,7 +10,10 @@
 //!   destination that is renamed into place only when complete) is removed;
 //! * a destination that is there but has no `undo` record is a completed step the journal
 //!   missed: its undo is recorded, so that undoing the operation still brings everything
-//!   back;
+//!   back. It is taken only when it is what the step was writing: its size and time, or for a
+//!   link where it points. A new archive declares nothing to check, so it is left where it
+//!   is, with a note. Records written before these fields existed are taken as they always
+//!   were;
 //! * a move that was cut between "copy in place" and "remove the source" has the file in two
 //!   places: the copy is treated as not made (undo removes it), the source is untouched.
 //!
@@ -161,6 +164,20 @@ impl Engine {
         }
     }
 
+    /// Whether `dst` is not the link the step was making: it was to point at `target` (a
+    /// record that names none accepts whatever is there, as before).
+    fn wrong_link(&self, rec: &mut Recovered, dst: &Path, target: &Option<PathBuf>) -> bool {
+        let Some(want) = target else { return false };
+        if self.fs.read_link(dst).is_ok_and(|got| got == *want) {
+            return false;
+        }
+        rec.notes.push(format!(
+            "{} is there but is not the link the interrupted operation was making; it is left alone and undo will not touch it",
+            dst.display()
+        ));
+        true
+    }
+
     /// Whether a rename of `from` to `to` was done. Where case does not matter, both names
     /// find the entry whichever it is called now, so when the two are one entry the folder is
     /// asked how it spells it.
@@ -181,10 +198,22 @@ impl Engine {
         let exists = |p: &Path| fs.lstat(p).is_ok();
         let step = match intent {
             Intent::Create {
-                dst, size, mtime, ..
+                dst,
+                size,
+                mtime,
+                target,
+                unverifiable,
+                ..
             } => {
                 let meta = fs.lstat(dst).ok()?;
-                if foreign(rec, dst, &meta, *size, *mtime) {
+                if *unverifiable {
+                    rec.notes.push(format!(
+                        "{} is there, but nothing says it is what the interrupted operation was writing; it is left alone and undo will not touch it",
+                        dst.display()
+                    ));
+                    return None;
+                }
+                if foreign(rec, dst, &meta, *size, *mtime) || self.wrong_link(rec, dst, target) {
                     return None;
                 }
                 Step::RemoveFile {
@@ -198,10 +227,11 @@ impl Engine {
                 symlink,
                 size,
                 mtime,
+                target,
                 ..
             } => {
                 let meta = fs.lstat(dst).ok()?;
-                if foreign(rec, dst, &meta, *size, *mtime) {
+                if foreign(rec, dst, &meta, *size, *mtime) || self.wrong_link(rec, dst, target) {
                     return None;
                 }
                 if exists(src) {
