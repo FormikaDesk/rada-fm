@@ -102,6 +102,9 @@ pub struct Scan {
     pub missing: Vec<PathBuf>,
     /// Sources that could not even be inspected, with the reason.
     pub errors: Vec<(PathBuf, String)>,
+    /// The walk was stopped before the end: `roots` hold only part of what was selected, and
+    /// no plan may be made from it.
+    pub cancelled: bool,
 }
 
 impl Scan {
@@ -180,6 +183,7 @@ impl Engine {
             }
         }
         (w.ctl.progress)(&w.prog);
+        scan.cancelled = w.cancelled;
         scan
     }
 }

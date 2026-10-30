@@ -545,6 +545,8 @@ pub enum WarningKind {
     Conflict,
     Overwrite,
     Unreadable,
+    /// The scan of the selection was stopped before the end, so there is nothing to plan from.
+    ScanCancelled,
     /// The system failed in the middle of listing a folder: the plan may not have all of it.
     IncompleteList,
     SpecialFile,
@@ -704,6 +706,7 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::LowSpace => tf(WLowSpace, &[&x]),
         WarningKind::Conflict => pl(n, WConflictOne, WConflictMany, x),
         WarningKind::Overwrite => pl(n, WOverwriteOne, WOverwriteMany, x),
+        WarningKind::ScanCancelled => t(WScanCancelled).to_string(),
         WarningKind::Unreadable => pl(n, WUnreadableOne, WUnreadableMany, x),
         WarningKind::IncompleteList => pl(n, WIncompleteListOne, WIncompleteListMany, x),
         WarningKind::SpecialFile => pl(n, WSpecialFileOne, WSpecialFileMany, x),
@@ -923,6 +926,16 @@ impl Plan {
             undoes: None,
             estimated_bytes: None,
         }
+    }
+
+    /// What a scan that was cancelled gets instead of a plan: no steps, and a warning that
+    /// blocks it.
+    pub fn from_cancelled_scan(kind: OpKind, title: impl Into<String>) -> Plan {
+        let mut plan = Plan::empty(kind, title);
+        let mut ws = WarningSet::default();
+        ws.add(WarningKind::ScanCancelled, Severity::Blocking, None);
+        plan.warnings = ws.finish();
+        plan
     }
 
     /// How many of the selected items the plan leaves alone (a name that is taken and a policy

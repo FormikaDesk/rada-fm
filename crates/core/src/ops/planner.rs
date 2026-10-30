@@ -103,6 +103,9 @@ impl Engine {
                 &display::path(dest_dir),
             ],
         );
+        if scan.cancelled {
+            return Plan::from_cancelled_scan(kind, title);
+        }
         let mut plan = Plan::empty(kind, title);
         plan.destination = Some(dest_dir.to_path_buf());
         plan.policy = opts.policy;
@@ -236,10 +239,11 @@ impl Engine {
     // ------------------------------------------------------------------ trash / delete
 
     pub fn plan_trash(&self, scan: &Scan) -> Plan {
-        let mut plan = Plan::empty(
-            OpKind::Trash,
-            tf(Key::TitleTrash, &[&items_label(scan.roots.len() as u64)]),
-        );
+        let title = tf(Key::TitleTrash, &[&items_label(scan.roots.len() as u64)]);
+        if scan.cancelled {
+            return Plan::from_cancelled_scan(OpKind::Trash, title);
+        }
+        let mut plan = Plan::empty(OpKind::Trash, title);
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
         let st = scan.stats();
@@ -274,10 +278,11 @@ impl Engine {
     }
 
     pub fn plan_delete(&self, scan: &Scan) -> Plan {
-        let mut plan = Plan::empty(
-            OpKind::Delete,
-            tf(Key::TitleDelete, &[&items_label(scan.roots.len() as u64)]),
-        );
+        let title = tf(Key::TitleDelete, &[&items_label(scan.roots.len() as u64)]);
+        if scan.cancelled {
+            return Plan::from_cancelled_scan(OpKind::Delete, title);
+        }
+        let mut plan = Plan::empty(OpKind::Delete, title);
         plan.reversible = false;
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);

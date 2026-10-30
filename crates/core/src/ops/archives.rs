@@ -751,16 +751,17 @@ impl Engine {
     ) -> Plan {
         let name = archive.file_name().unwrap_or_default().to_os_string();
         let dir = archive.parent().unwrap_or(Path::new("."));
-        let mut plan = Plan::empty(
-            OpKind::Compress,
-            tf(
-                Key::TitleCompress,
-                &[
-                    &i18n::count(scan.roots.len() as u64, Key::ItemOne, Key::ItemMany),
-                    &display::name(&name),
-                ],
-            ),
+        let title = tf(
+            Key::TitleCompress,
+            &[
+                &i18n::count(scan.roots.len() as u64, Key::ItemOne, Key::ItemMany),
+                &display::name(&name),
+            ],
         );
+        if scan.cancelled {
+            return Plan::from_cancelled_scan(OpKind::Compress, title);
+        }
+        let mut plan = Plan::empty(OpKind::Compress, title);
         plan.policy = policy;
         let mut ws = WarningSet::default();
         for p in &scan.missing {

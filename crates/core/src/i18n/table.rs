@@ -166,6 +166,7 @@ strings! {
     WOverwriteOne => "{0} item will be replaced (the old version goes to the trash, so undo restores it)", "{0} elemento verrà sostituito (la versione vecchia va nel cestino, quindi annullando torna com'era)";
     WOverwriteMany => "{0} items will be replaced (the old versions go to the trash, so undo restores them)", "{0} elementi verranno sostituiti (le versioni vecchie vanno nel cestino, quindi annullando tornano com'erano)";
     WUnreadableOne => "{0} item cannot be read and will probably fail{1}", "{0} elemento non si può leggere e probabilmente fallirà{1}";
+    WScanCancelled => "The scan was cancelled before it finished, so nothing can be planned from it", "La scansione è stata annullata prima di finire, quindi non si può pianificare nulla da essa";
     WIncompleteListOne => "{0} folder could not be listed completely, so the plan may be missing items{1}", "{0} cartella non si è potuta elencare per intero, quindi il piano potrebbe non avere tutti gli elementi{1}";
     WIncompleteListMany => "{0} folders could not be listed completely, so the plan may be missing items{1}", "{0} cartelle non si sono potute elencare per intero, quindi il piano potrebbe non avere tutti gli elementi{1}";
     WUnreadableMany => "{0} items cannot be read and will probably fail{1}", "{0} elementi non si possono leggere e probabilmente falliranno{1}";

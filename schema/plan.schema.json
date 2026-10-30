@@ -1710,6 +1710,11 @@
           ]
         },
         {
+          "description": "The scan of the selection was stopped before the end, so there is nothing to plan from.",
+          "type": "string",
+          "const": "ScanCancelled"
+        },
+        {
           "description": "The system failed in the middle of listing a folder: the plan may not have all of it.",
           "type": "string",
           "const": "IncompleteList"
