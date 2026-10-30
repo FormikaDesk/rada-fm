@@ -107,6 +107,9 @@ strings! {
     TitleTrash => "Move {0} to the trash", "Sposta {0} nel cestino";
     TitleDelete => "Permanently delete {0}", "Elimina definitivamente {0}";
     TitleRename => "Rename {0} to {1}", "Rinomina {0} in {1}";
+    RenBadWidth => "bad width {0}", "larghezza non valida {0}";
+    RenWidthRange => "the width in {n:W} must be between 1 and {0} (got {1})", "la larghezza in {n:W} deve essere tra 1 e {0} (trovato {1})";
+    RenCounterTooLarge => "the counter is too large for this item: it would pass the biggest number it can hold", "il contatore è troppo grande per questo elemento: supererebbe il numero più alto che può contenere";
     TitleBulkRename => "Rename {0}", "Rinomina {0}";
     TitleUndo => "Undo: {0}", "Annulla: {0}";
     TitleMkdir => "Create folder {0}", "Crea la cartella {0}";

@@ -17,6 +17,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::engine::Engine;
 use super::names;
 use super::plan::*;
+use crate::i18n::{Key, tf};
+use crate::platform::PathRules;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Part {
@@ -53,25 +55,44 @@ pub struct Preview {
     pub to: Result<OsString, String>,
 }
 
+/// The widest zero-padded counter: a name never needs more, and the preview is recomputed on
+/// every key, so a huge width must be refused before anything is formatted with it.
+const MAX_WIDTH: usize = 255;
+
+fn parse_token(tok: &str) -> Result<Part, String> {
+    let (head, arg) = match tok.split_once(':') {
+        Some((h, a)) => (h, Some(a)),
+        None => (tok, None),
+    };
+    Ok(match (head, arg) {
+        ("name", None) => Part::Name(CaseMode::Keep),
+        ("name", Some("lower")) => Part::Name(CaseMode::Lower),
+        ("name", Some("upper")) => Part::Name(CaseMode::Upper),
+        ("ext", None) => Part::Ext,
+        ("parent", None) => Part::Parent,
+        ("n", None) => Part::Counter { width: 1 },
+        ("n", Some(w)) => Part::Counter {
+            width: parse_width(w)?,
+        },
+        _ => return Err(format!("unknown token {{{tok}}}")),
+    })
+}
+
+fn parse_width(w: &str) -> Result<usize, String> {
+    if w.is_empty() || !w.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(tf(Key::RenBadWidth, &[&format!("{w:?}")]));
+    }
+    // Digits that do not even fit a number are out of range too.
+    match w.parse::<usize>() {
+        Ok(n) if (1..=MAX_WIDTH).contains(&n) => Ok(n),
+        _ => Err(tf(Key::RenWidthRange, &[&MAX_WIDTH, &w])),
+    }
+}
+
 impl Pattern {
     pub fn parse(src: &str) -> Result<Pattern, String> {
         if let Some(rest) = src.strip_prefix("s/") {
-            let mut it = rest.splitn(3, '/');
-            let (find, with) = (
-                it.next().unwrap_or(""),
-                it.next().ok_or("use s/find/replace/")?,
-            );
-            if find.is_empty() {
-                return Err("nothing to search for".into());
-            }
-            return Ok(Pattern {
-                kind: Kind::Replace {
-                    find: find.into(),
-                    with: with.into(),
-                },
-                start: 1,
-                step: 1,
-            });
+            return Self::parse_replace(rest);
         }
         let mut parts = Vec::new();
         let mut lit = String::new();
@@ -98,22 +119,7 @@ impl Pattern {
                     if !lit.is_empty() {
                         parts.push(Part::Lit(std::mem::take(&mut lit)));
                     }
-                    let (head, arg) = match tok.split_once(':') {
-                        Some((h, a)) => (h, Some(a)),
-                        None => (tok.as_str(), None),
-                    };
-                    parts.push(match (head, arg) {
-                        ("name", None) => Part::Name(CaseMode::Keep),
-                        ("name", Some("lower")) => Part::Name(CaseMode::Lower),
-                        ("name", Some("upper")) => Part::Name(CaseMode::Upper),
-                        ("ext", None) => Part::Ext,
-                        ("parent", None) => Part::Parent,
-                        ("n", None) => Part::Counter { width: 1 },
-                        ("n", Some(w)) => Part::Counter {
-                            width: w.parse().map_err(|_| format!("bad width {w:?}"))?,
-                        },
-                        _ => return Err(format!("unknown token {{{tok}}}")),
-                    });
+                    parts.push(parse_token(&tok)?);
                 }
                 '}' => return Err("unmatched '}'".into()),
                 c => lit.push(c),
@@ -132,10 +138,37 @@ impl Pattern {
         })
     }
 
+    fn parse_replace(rest: &str) -> Result<Pattern, String> {
+        let mut it = rest.splitn(3, '/');
+        let (find, with) = (
+            it.next().unwrap_or(""),
+            it.next().ok_or("use s/find/replace/")?,
+        );
+        if find.is_empty() {
+            return Err("nothing to search for".into());
+        }
+        Ok(Pattern {
+            kind: Kind::Replace {
+                find: find.into(),
+                with: with.into(),
+            },
+            start: 1,
+            step: 1,
+        })
+    }
+
     pub fn with_counter(mut self, start: u64, step: u64) -> Self {
         self.start = start;
         self.step = step.max(1);
         self
+    }
+
+    /// `start + step * index`, or an error if that is more than a counter can hold.
+    fn counter_at(&self, index: usize) -> Result<u64, String> {
+        (index as u64)
+            .checked_mul(self.step)
+            .and_then(|d| self.start.checked_add(d))
+            .ok_or_else(|| Key::RenCounterTooLarge.tr().to_string())
     }
 
     /// The new name for the `index`-th item.
@@ -168,7 +201,7 @@ impl Pattern {
                         },
                         Part::Ext => out.push(ext),
                         Part::Counter { width } => {
-                            let n = self.start + self.step * index as u64;
+                            let n = self.counter_at(index)?;
                             out.push(format!("{n:0width$}", width = *width));
                         }
                         Part::Parent => {
@@ -186,15 +219,15 @@ impl Pattern {
     }
 
     /// Pure preview (no I/O): safe to call on every keystroke.
-    pub fn preview(&self, items: &[PathBuf]) -> Vec<Preview> {
-        let rules = crate::platform::PathRules::POSIX;
+    /// `rules` are the platform's, the ones the plan will check the names against.
+    pub fn preview(&self, items: &[PathBuf], rules: &PathRules) -> Vec<Preview> {
         items
             .iter()
             .enumerate()
             .map(|(i, p)| {
                 let to = self
                     .render(i, p)
-                    .and_then(|n| names::validate(&rules, &n).map(|_| n));
+                    .and_then(|n| names::validate(rules, &n).map(|_| n));
                 Preview {
                     from: p.clone(),
                     to,
@@ -376,5 +409,36 @@ mod tests {
         assert!(Pattern::parse("a}").is_err());
         assert!(Pattern::parse("").is_err());
         assert!(Pattern::parse("s/x").is_err());
+    }
+
+    #[test]
+    fn a_counter_width_is_limited_before_anything_is_formatted() {
+        for w in ["0", "256", "1000000000", "99999999999999999999999"] {
+            let e = Pattern::parse(&format!("{{n:{w}}}")).unwrap_err();
+            assert!(e.contains("between 1 and 255"), "{w}: {e}");
+        }
+        assert!(Pattern::parse("{n:1}").is_ok() && Pattern::parse("{n:255}").is_ok());
+        let it = crate::i18n::with_lang(crate::i18n::Lang::It, || {
+            Pattern::parse("{n:1000000000}").unwrap_err()
+        });
+        assert!(it.contains("tra 1 e 255"), "{it}");
+    }
+
+    #[test]
+    fn a_counter_that_passes_u64_is_an_error_for_that_item() {
+        let p = Pattern::parse("{n}").unwrap().with_counter(u64::MAX - 1, 1);
+        assert_eq!(
+            p.render(1, Path::new("/x/a")).unwrap(),
+            "18446744073709551615"
+        );
+        let e = p.render(2, Path::new("/x/a")).unwrap_err();
+        assert!(e.contains("too large"), "{e}");
+        // The multiplication alone can pass the limit.
+        let p = Pattern::parse("{n}").unwrap().with_counter(1, u64::MAX);
+        assert!(p.render(2, Path::new("/x/a")).is_err());
+        let it = crate::i18n::with_lang(crate::i18n::Lang::It, || {
+            p.render(2, Path::new("/x/a")).unwrap_err()
+        });
+        assert!(it.contains("troppo grande"), "{it}");
     }
 }

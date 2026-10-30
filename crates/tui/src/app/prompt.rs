@@ -8,6 +8,7 @@ use rada_core::archive::ArchiveKind;
 use rada_core::events::CoreEvent;
 use rada_core::i18n::Key;
 use rada_core::ops::{ConflictPolicy, ExtractInto, OpRequest, Pattern};
+use rada_core::platform::PathRules;
 
 use super::{App, Modal};
 
@@ -20,6 +21,8 @@ pub enum InputKind {
     SaveAs,
     BulkRename {
         items: Vec<PathBuf>,
+        /// The platform's rules, so the preview refuses what the plan will refuse.
+        rules: PathRules,
     },
     /// The folder to extract an archive into, named after the archive unless changed.
     ExtractTo {
@@ -149,8 +152,9 @@ impl App {
         if items.is_empty() {
             return;
         }
+        let rules = self.svc.platform.path_rules();
         self.windows.modal = Some(Modal::Input(InputView::new(
-            InputKind::BulkRename { items },
+            InputKind::BulkRename { items, rules },
             "{name}_{n:2}.{ext}".to_string(),
         )));
     }
@@ -200,7 +204,7 @@ impl App {
                     self.open_with_program(path, program);
                 }
             }
-            InputKind::BulkRename { items } => {
+            InputKind::BulkRename { items, .. } => {
                 if let Err(e) = self.submit_bulk_rename(items, &iv.text) {
                     self.reject_input(iv, e);
                 }

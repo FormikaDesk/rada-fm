@@ -105,6 +105,18 @@ fn a_new_folder_or_file_with_a_device_name_is_refused_in_every_form() {
 }
 
 #[test]
+fn the_preview_of_a_bulk_rename_agrees_with_the_plan_on_device_names() {
+    let sb = Sandbox::new();
+    let e = windows_engine(&sb);
+    let a = sb.write("d/a.txt", "x");
+    let pat = Pattern::parse("CON").unwrap();
+    let rules = e.platform.path_rules();
+    let shown = pat.preview(std::slice::from_ref(&a), &rules);
+    assert!(shown[0].to.is_err(), "the preview accepted CON");
+    assert!(refused(&e.plan_bulk_rename(&[a], &pat)));
+}
+
+#[test]
 fn members_of_an_archive_with_a_device_name_are_not_extracted_in_any_form() {
     for zip in [false, true] {
         for name in RESERVED {

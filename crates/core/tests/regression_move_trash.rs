@@ -262,7 +262,7 @@ fn bulk_rename_previews_and_applies_a_numbered_pattern() {
         .collect();
     let e = sb.engine();
     let pat = Pattern::parse("holiday_{n:3}.{ext}").unwrap();
-    let preview = pat.preview(&files);
+    let preview = pat.preview(&files, &e.platform.path_rules());
     assert_eq!(
         preview[0].to.as_ref().unwrap().to_str().unwrap(),
         "holiday_001.jpg"
@@ -271,6 +271,24 @@ fn bulk_rename_previews_and_applies_a_numbered_pattern() {
     assert!(plan.is_executable(), "{:?}", plan.warnings);
     assert_eq!(run(&e, &plan).status(), RunStatus::Completed);
     assert!(sb.path("p.v2/holiday_001.jpg").exists() && sb.path("p.v2/holiday_003.JPG").exists());
+}
+
+#[test]
+fn bulk_rename_with_a_counter_past_u64_blocks_only_that_plan() {
+    let sb = Sandbox::new();
+    let a = sb.write("d/a", "a");
+    let b = sb.write("d/b", "b");
+    let e = sb.engine();
+    let pat = Pattern::parse("{n}").unwrap().with_counter(u64::MAX, 1);
+    let plan = e.plan_bulk_rename(&[a.clone(), b], &pat);
+    assert!(!plan.is_executable());
+    let bad = plan
+        .warnings
+        .iter()
+        .find(|w| w.kind == WarningKind::InvalidName)
+        .expect("an invalid-name warning");
+    assert_eq!(bad.count, 1, "{:?}", plan.warnings);
+    assert!(bad.message.contains("too large"), "{}", bad.message);
 }
 
 #[test]

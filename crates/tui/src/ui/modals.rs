@@ -653,9 +653,9 @@ fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
         InputKind::BulkRename { .. } => (Key::VerbBulkRename.tr(), Key::InBulkHint.tr().into()),
     };
     let preview: Vec<(String, String)> = match &iv.kind {
-        InputKind::BulkRename { items } => match rada_core::ops::Pattern::parse(&iv.text) {
+        InputKind::BulkRename { items, rules } => match rada_core::ops::Pattern::parse(&iv.text) {
             Ok(p) => p
-                .preview(items)
+                .preview(items, rules)
                 .into_iter()
                 .take(12)
                 .map(|pv| {
