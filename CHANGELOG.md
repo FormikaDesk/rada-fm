@@ -5,8 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0-rc.20] - 2026-10-30
+
+Safer renames and journal, plans that say when they are incomplete, and a clearer tree. Still a **pre-release**.
+
 ### Changed
 - **The installation guide is complete for every system.** `docs/install.md` now says which file is yours, and gives commands to copy for Linux, Arch, macOS and Windows (download, check, install, `PATH`, what to do when macOS or SmartScreen stops the program), then the font, the shell and the launcher, updating and uninstalling. The README keeps a few lines per system and points to it.
+- **The page of rada on crates.io shows the same pictures and the same Install section as the project page**, with links that work from there.
+- **The parts of rada that read archives, names and the history file are tried with random input every week**, five minutes for each, and a crash is kept so that it can become a test.
+
+### Fixed
+- **A file or folder is never replaced by a move or a copy that finishes after another program made the same name.** On macOS and Windows the system itself now refuses the name that is taken, and on a Linux filesystem that cannot do that rada links the file and then removes the old name. Only on FAT and exFAT (a USB stick, an SD card), on some network shares and for a folder on a Linux filesystem without the feature is there a few microseconds in which a name made at that moment can be replaced; [SAFETY.md](docs/SAFETY.md) lists them.
+- **If the history cannot be written in the middle of an operation, rada stops and asks.** It used to carry on and only count the failures. Now the operation stops before the next step and asks you to *Abort* (the default) or to *Continue without being able to undo the rest*. If you go on, the summary and the history say that it can be undone only up to that point. Where there is nobody to ask, it stops.
+- **A folder that the system lists only in part no longer looks complete.** The plan warns that items may be missing, and every item that could not be read is counted with its path and the reason, not only the last one.
+- **A scan that you cancelled can no longer be turned into a plan** of a copy, move, trash, delete or archive.
+- **After a crash, only the temporary files of the step that was cut short are removed.** A file whose name merely begins like one of ours stays.
+- **When a hard link cannot be made and a separate copy takes its place, a failure to set its permissions is now in the summary** of what was not carried over, instead of being dropped.
+- **On Windows a copied or moved link to a folder stays a link to a folder** when its target does not exist. It used to become a link to a file.
+- **A folder that cannot be read has its own sign and reason in the tree of the panels view**, instead of looking empty with `(0)`.
 
 ## [0.6.0-rc.19] - 2026-10-29
 
