@@ -24,6 +24,8 @@ Tests never touch your real folders: each one runs in a temporary sandbox with `
 
 CI (GitHub Actions) checks formatting and lints and builds with the minimum Rust version on Linux, and runs the whole suite — core, interface and program — on Linux, Windows and macOS; all of it must pass. A test that cannot run on a system (POSIX permissions on Windows, a second filesystem to move across, the freedesktop trash layout, names that are not valid UTF-8 on macOS) is marked `#[ignore = "<reason>"]`, so the reason shows in the output. The tests on Windows and macOS run on GitHub's machines, with the trash kept in a folder of the sandbox: they say that the code works there, not that people have lived with it.
 
+The fuzz targets in `fuzz/` (names of archive members, the journal, ZIP and tar archives) run for five minutes each in a weekly workflow, `.github/workflows/fuzz.yml`, and by hand from the Actions tab; a crash is kept as an artifact. They do not run on a push or a pull request. See [fuzz/README.md](../fuzz/README.md).
+
 ## Contributing code
 
 Bug reports and ideas are welcome as issues; the templates ask for what helps most (version, terminal, steps). If rada ever loses or damages a file, say so first: that is the one kind of bug that matters most, and the journal (`U`) may still be able to undo it. The best thing you can do for the project is to read the operations engine and try to break it: see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to build, test and where help is needed.

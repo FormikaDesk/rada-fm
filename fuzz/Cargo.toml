@@ -1,5 +1,5 @@
 # Fuzz targets (cargo-fuzz, rust nightly). Not part of the workspace, not published, and not run
-# by the CI: see fuzz/README.md.
+# on a push (a weekly workflow does): see fuzz/README.md.
 [package]
 name = "rada-fuzz"
 version = "0.0.0"

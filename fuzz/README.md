@@ -1,7 +1,8 @@
 # Fuzzing
 
 Targets for `cargo-fuzz` (needs a nightly Rust). Not part of the workspace, not published, and
-not run by the CI.
+not run on a push or a pull request: a weekly workflow (`.github/workflows/fuzz.yml`, also
+started by hand) runs each one for five minutes and keeps the input of a crash as an artifact.
 
 | Target | What it feeds |
 |---|---|
