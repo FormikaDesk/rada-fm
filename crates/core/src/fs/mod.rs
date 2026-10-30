@@ -6,6 +6,7 @@
 //! be added later without touching the engine.
 
 pub mod local;
+mod noreplace;
 mod remove;
 pub mod tree;
 

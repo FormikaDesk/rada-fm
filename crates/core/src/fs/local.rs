@@ -201,42 +201,7 @@ impl FsEngine for LocalFs {
     }
 
     fn rename_noreplace(&self, from: &Path, to: &Path) -> io::Result<()> {
-        #[cfg(target_os = "linux")]
-        {
-            use std::ffi::CString;
-            use std::os::unix::ffi::OsStrExt;
-            let a = CString::new(from.as_os_str().as_bytes())
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
-            let b = CString::new(to.as_os_str().as_bytes())
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
-            const RENAME_NOREPLACE: libc::c_uint = 1;
-            // SAFETY: both pointers are valid NUL-terminated strings for the duration of the call.
-            let r = unsafe {
-                libc::syscall(
-                    libc::SYS_renameat2,
-                    libc::AT_FDCWD,
-                    a.as_ptr(),
-                    libc::AT_FDCWD,
-                    b.as_ptr(),
-                    RENAME_NOREPLACE,
-                )
-            };
-            if r == 0 {
-                return Ok(());
-            }
-            let err = io::Error::last_os_error();
-            match err.raw_os_error() {
-                // The filesystem (or kernel) does not know the flag: fall back below.
-                Some(libc::ENOSYS) | Some(libc::EINVAL) | Some(libc::EOPNOTSUPP) => {}
-                _ => return Err(err),
-            }
-        }
-        // Best effort where an atomic no-replace rename is not available.
-        match fs::symlink_metadata(to) {
-            Ok(_) => Err(io::Error::from(io::ErrorKind::AlreadyExists)),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => fs::rename(from, to),
-            Err(e) => Err(e),
-        }
+        super::noreplace::rename_noreplace(from, to)
     }
 
     fn remove_file(&self, p: &Path) -> io::Result<()> {

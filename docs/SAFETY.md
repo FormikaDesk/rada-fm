@@ -21,8 +21,11 @@ records, that you see and confirm.
 
 A file is copied to a hidden temporary name next to its destination
 (`.rada-part-<pid>-<n>`) and renamed to its final name only when complete, with a rename that
-refuses to replace anything (`renameat2` with `RENAME_NOREPLACE`). A name that appeared in the
-meantime is never overwritten; the step fails with "already exists".
+refuses to replace anything: `renameat2` with `RENAME_NOREPLACE` on Linux, `renamex_np` with
+`RENAME_EXCL` on macOS, `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` on Windows. Where a
+Linux filesystem does not know `renameat2`, a regular file is moved with `link` followed by
+`unlink`, which also refuses an existing name. A name that appeared in the meantime is never
+overwritten; the step fails with "already exists". The one exception is in the limits below.
 
 *Tests:* `faults.rs` (full disk in the middle of a file, rights revoked, destination unplugged,
 file created meanwhile), `crash.rs`.
@@ -264,6 +267,12 @@ These are real, and we would rather you read them here than discover them.
   journal can lack its last few steps. The temporary-name-and-rename rule means a *partial*
   file does not carry a final name on filesystems that order rename after data (ext4 and
   btrfs do in practice), but rada cannot promise it for every filesystem.
+- **A rename that cannot refuse a name that appeared meanwhile.** On a filesystem with no
+  atomic no-replace rename and no hard links (FAT and exFAT, typically a USB stick or an SD
+  card, and some network shares), and for a folder on a Linux filesystem without `renameat2`,
+  rada looks at the destination and then renames. A file created at that exact name in the
+  few microseconds between the two is replaced. On macOS the same happens on a volume that
+  does not support `RENAME_EXCL`.
 - **Extended attributes on tmpfs.** Before Linux 6.6, `tmpfs` refuses `user.*` attributes.
   The plan says so before you confirm and the result window lists the files that lost them.
 - **Owner and group** are kept only when the system allows changing them (normally root).
