@@ -16,7 +16,9 @@
 # Changes nothing and fails if the commands a person copies are out of date: a version in
 # docs/install.md, or in the Install section of README.md, that is not the one of Cargo.toml
 # (the version without its suffix is let through: "with 0.6.0 ... will be enough"), or a public
-# key there that verify.md does not have. `scripts/test-set-version` tries both modes.
+# key there that verify.md does not have, or `version` used as the name of a variable (fish keeps
+# that name for its own version: the commands call it `rv`). `scripts/test-set-version` tries both
+# modes.
 set -euo pipefail
 
 if [[ "${1:-}" == "--check" ]]; then
@@ -35,6 +37,10 @@ if [[ "${1:-}" == "--check" ]]; then
         done < <(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' <<<"$text" | sort -u || true)
         if ! grep -qF "$current" <<<"$text"; then
             echo "$file does not name $current at all" >&2
+            status=1
+        fi
+        if grep -qE '(^|[[:space:];])(version=|set +version([[:space:]]|$))|[$]version\b' <<<"$text"; then
+            echo "$file uses version as the name of a variable (fish keeps it for itself): use rv" >&2
             status=1
         fi
         while IFS= read -r key; do

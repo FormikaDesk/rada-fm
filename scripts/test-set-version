@@ -49,5 +49,13 @@ cp "$tmp/README.good" "$tmp/README.md"
 
 sed -i '0,/RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ/s//RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoX/' "$tmp/docs/install.md"
 expect_failure "a public key that verify.md does not have"
+cp "$tmp/install.good" "$tmp/docs/install.md"
+
+sed -i '0,/^rv=/s//version=/' "$tmp/docs/install.md"
+expect_failure "version as the name of a variable in install.md"
+cp "$tmp/install.good" "$tmp/docs/install.md"
+sed -i '0,/^set rv /s//set version /' "$tmp/docs/install.md"
+expect_failure "version as the name of a variable in a fish block"
+cp "$tmp/install.good" "$tmp/docs/install.md"
 
 echo "ok: scripts/set-version.sh keeps docs/install.md and README.md current"

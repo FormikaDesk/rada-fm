@@ -28,13 +28,13 @@ The Linux builds are static (musl): they run on every distribution, with nothing
 
 ## Linux
 
-The same commands serve both processors: `uname -m` gives the first half of the file name.
+The same commands serve both processors: `uname -m` gives the first half of the file name. They are for bash and zsh; for fish, which writes variables differently, see [Using fish](#using-fish-linux).
 
 ```sh
-version=0.6.0-rc.20
+rv=0.6.0-rc.20
 target="$(uname -m)-unknown-linux-musl"
-name="rada-$version-$target"
-base="https://github.com/formikadesk/rada-fm/releases/download/v$version"
+name="rada-$rv-$target"
+base="https://github.com/formikadesk/rada-fm/releases/download/v$rv"
 
 cd "$(mktemp -d)"
 curl -fLO "$base/$name.tar.gz"
@@ -78,6 +78,31 @@ rada --version      # rada 0.6.0-rc.20
 
 If it says `command not found`, the folder is not on the `PATH` of this terminal yet: open a new one, or run `~/.local/bin/rada --version` to see that the file itself works. Once it is installed, rada can [update itself](updates.md).
 
+### Using fish (Linux)
+
+fish sets variables with `set`, not `name=value`, and keeps the name `version` for its own version, so these commands call the variable `rv`. The commands to check the download above (`minisign`, `sha256sum`) are the same in fish.
+
+```fish
+set rv 0.6.0-rc.20
+set target (uname -m)-unknown-linux-musl
+set name rada-$rv-$target
+set base https://github.com/formikadesk/rada-fm/releases/download/v$rv
+
+cd (mktemp -d)
+curl -fLO $base/$name.tar.gz
+curl -fLO $base/SHA256SUMS
+curl -fLO $base/SHA256SUMS.minisig
+```
+
+Then, after checking the download, unpack and install into `~/.local/bin` and put that folder on the `PATH` (once; fish remembers it):
+
+```fish
+tar xzf $name.tar.gz
+mkdir -p ~/.local/bin
+install -m 755 $name/rada ~/.local/bin/rada
+fish_add_path ~/.local/bin
+```
+
 ## Arch Linux (AUR)
 
 Not published yet: the AUR package is coming soon. Until it is, use the [binary above](#linux) or build the package from the `PKGBUILD` in the repository, which makes a normal pacman package (`rada` can then be removed with `pacman -R rada`):
@@ -94,13 +119,13 @@ makepkg -si
 
 ## macOS
 
-Apple silicon and Intel, with the Terminal. No Homebrew is needed. Take the file for your Mac from [the table](#which-file-do-i-need): the first line of the commands below is the only one that changes.
+Apple silicon and Intel, with the Terminal. No Homebrew is needed. Take the file for your Mac from [the table](#which-file-do-i-need): the first line of the commands below is the only one that changes. They are for zsh and bash; for fish, see [Using fish](#using-fish-macos).
 
 ```sh
 target=aarch64-apple-darwin          # Apple silicon; for an Intel Mac: x86_64-apple-darwin
-version=0.6.0-rc.20
-name="rada-$version-$target"
-base="https://github.com/formikadesk/rada-fm/releases/download/v$version"
+rv=0.6.0-rc.20
+name="rada-$rv-$target"
+base="https://github.com/formikadesk/rada-fm/releases/download/v$rv"
 
 cd "$(mktemp -d)"
 curl -fLO "$base/$name.tar.gz"
@@ -147,6 +172,31 @@ xattr -d com.apple.quarantine ~/.local/bin/rada
 
 `xattr ~/.local/bin/rada` lists the flags a file carries; if `com.apple.quarantine` is not among them, the flag was not the problem. Instead of the command you can also open *System Settings → Privacy & Security*, scroll to the message about `rada` and choose *Open Anyway*. Once rada is installed, [it updates itself](updates.md).
 
+### Using fish (macOS)
+
+fish sets variables with `set`, not `name=value`, and keeps the name `version` for its own version, so these commands call the variable `rv`. The commands to check the download above (`minisign`, `shasum`) are the same in fish.
+
+```fish
+set target aarch64-apple-darwin          # Apple silicon; for an Intel Mac: x86_64-apple-darwin
+set rv 0.6.0-rc.20
+set name rada-$rv-$target
+set base https://github.com/formikadesk/rada-fm/releases/download/v$rv
+
+cd (mktemp -d)
+curl -fLO $base/$name.tar.gz
+curl -fLO $base/SHA256SUMS
+curl -fLO $base/SHA256SUMS.minisig
+```
+
+Then, after checking the download, unpack and install into `~/.local/bin` and put that folder on the `PATH` (once; fish remembers it):
+
+```fish
+tar xzf $name.tar.gz
+mkdir -p ~/.local/bin
+install -m 755 $name/rada ~/.local/bin/rada
+fish_add_path ~/.local/bin
+```
+
 ### On a Mac
 
 - **Use [Ghostty](https://ghostty.org)** if you can: rada draws pictures with the kitty graphics protocol, the icons work with no font to install (Ghostty ships a Nerd Font symbols fallback, which rada detects), and Ghostty passes the Cmd key on (see [macOS](platforms.md#macos)). iTerm2, WezTerm, kitty and Terminal also work, with less.
@@ -161,9 +211,9 @@ Windows 10 or 11, 64-bit Intel or AMD, with PowerShell (the one that comes with 
 
 ```powershell
 $ProgressPreference = "SilentlyContinue"     # makes Invoke-WebRequest much faster
-$version = "0.6.0-rc.20"
-$name = "rada-$version-x86_64-pc-windows-msvc"
-$base = "https://github.com/formikadesk/rada-fm/releases/download/v$version"
+$rv = "0.6.0-rc.20"
+$name = "rada-$rv-x86_64-pc-windows-msvc"
+$base = "https://github.com/formikadesk/rada-fm/releases/download/v$rv"
 
 Set-Location $env:TEMP
 Invoke-WebRequest "$base/$name.zip" -OutFile "$name.zip"

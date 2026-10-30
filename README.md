@@ -64,6 +64,8 @@ tar xzf "$n.tar.gz" && mkdir -p ~/.local/bin && install -m 755 "$n/rada" ~/.loca
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # then open a new terminal; rada --version
 ```
 
+Using fish? See [docs/install.md#using-fish-linux](docs/install.md#using-fish-linux) (Linux) or [docs/install.md#using-fish-macos](docs/install.md#using-fish-macos) (macOS): the blocks above are for bash and zsh.
+
 **Windows** (x86_64, PowerShell; [Windows Terminal](https://aka.ms/terminal) recommended):
 
 ```powershell
