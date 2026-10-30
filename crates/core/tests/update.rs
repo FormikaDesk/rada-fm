@@ -566,6 +566,66 @@ fn a_folder_that_cannot_be_written_is_explained() {
     assert!(!err.is_empty());
 }
 
+/// Whether this process may write anywhere: as root a folder with no write bit is writable.
+#[cfg(unix)]
+fn is_root() -> bool {
+    // SAFETY: no arguments, no pointers.
+    unsafe { libc::geteuid() == 0 }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_the_program_cannot_be_replaced_in_is_said_before_anything_is_downloaded() {
+    use std::os::unix::fs::PermissionsExt;
+    if is_root() {
+        return;
+    }
+    let w = world("0.6.0-rc.1", Settings::default());
+    w.publish("v0.7.0", false, &program(NEW));
+    w.list(&[("v0.7.0", false)]);
+    let release = w.newest();
+    let before = w.server.requests().len();
+    let dir = w.exe.parent().unwrap().to_path_buf();
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let en = update::apply(&w.ctx, &release, &mut quiet).unwrap_err();
+    let it = rada_core::i18n::with_lang(rada_core::i18n::Lang::It, || {
+        update::apply(&w.ctx, &release, &mut quiet).unwrap_err()
+    });
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+
+    assert_eq!(
+        w.server.requests().len(),
+        before,
+        "something was downloaded"
+    );
+    assert_eq!(fs::read(&w.exe).unwrap(), b"the old program");
+    for (text, words) in [
+        (
+            &en,
+            [
+                "cannot write",
+                "~/.local/bin",
+                "docs/install.md",
+                "rada setup desktop",
+            ],
+        ),
+        (
+            &it,
+            [
+                "non può scrivere",
+                "~/.local/bin",
+                "docs/install.md",
+                "rada setup desktop",
+            ],
+        ),
+    ] {
+        for word in words {
+            assert!(text.contains(word), "{word:?} missing from: {text}");
+        }
+    }
+}
+
 #[test]
 fn going_back_restores_the_program_that_was_replaced() {
     let w = world("0.6.0-rc.1", Settings::default());

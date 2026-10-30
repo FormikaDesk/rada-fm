@@ -1180,7 +1180,7 @@ strings! {
     UpChecking => "checking the download", "controllo il file scaricato";
     UpChecksumBad => "the downloaded file does not match its checksum (expected {0}, got {1}); nothing was installed", "il file scaricato non corrisponde alla sua somma di controllo (attesa {0}, trovata {1}); non è stato installato nulla";
     UpUnpacking => "unpacking", "estraggo";
-    UpCannotWriteDir => "rada cannot write in {0}: {1}", "rada non può scrivere in {0}: {1}";
+    UpCannotWriteDir => "rada cannot write in {0}: {1}\nMove rada to a folder of yours, as the install guide shows ({2}), and run `rada update` again. If you use the launcher, run `rada setup desktop` again afterwards.\nGuide: {3}", "rada non può scrivere in {0}: {1}\nSposta rada in una cartella tua, come nella guida all'installazione ({2}), e rilancia `rada update`. Se usi il lanciatore, rilancia anche `rada setup desktop`.\nGuida: {3}";
     UpCheckingNew => "checking the new program", "controllo il programma nuovo";
     UpNewSays => "the new program says \"{0}\", not rada {1}; nothing was installed", "il programma nuovo dice \"{0}\", non rada {1}; non è stato installato nulla";
     UpInstalling => "installing", "installo";

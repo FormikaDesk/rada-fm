@@ -421,12 +421,32 @@ pub fn apply(
     result
 }
 
+/// Where the install guide is.
+const INSTALL_GUIDE: &str = "https://github.com/formikadesk/rada-fm/blob/main/docs/install.md";
+
+/// What to tell when the folder of the program cannot be written: where a folder of the
+/// person's own is, and the guide that shows how to put rada there.
+fn cannot_write_dir(exe: &Path, why: &dyn std::fmt::Display) -> String {
+    let dir = exe.parent().map(|d| d.display().to_string());
+    let own = if cfg!(windows) {
+        "%LOCALAPPDATA%\\Programs\\rada"
+    } else {
+        "~/.local/bin"
+    };
+    tf(
+        Key::UpCannotWriteDir,
+        &[&dir.unwrap_or_default(), why, &own, &INSTALL_GUIDE],
+    )
+}
+
 fn apply_binary(
     ctx: &Ctx,
     release: &Release,
     log: &mut source::Log,
     report: &mut dyn FnMut(String),
 ) -> Result<Applied, String> {
+    // Before the first byte is downloaded: a folder that cannot be written fails later anyway.
+    install::check_dir_writable(&ctx.exe).map_err(|e| cannot_write_dir(&ctx.exe, &e))?;
     let target = ctx
         .target
         .as_deref()
@@ -514,16 +534,7 @@ fn apply_binary(
         let inner = release::inner_path(&release.version, target);
         install::extract_binary(&file, &inner, &stage).map_err(|e| {
             if e.contains("Permission denied") || e.contains("denied") {
-                tf(
-                    Key::UpCannotWriteDir,
-                    &[
-                        &ctx.exe
-                            .parent()
-                            .map(|d| d.display().to_string())
-                            .unwrap_or_default(),
-                        &e,
-                    ],
-                )
+                cannot_write_dir(&ctx.exe, &e)
             } else {
                 e
             }

@@ -52,6 +52,14 @@ pub fn stage_path(exe: &Path) -> PathBuf {
     sibling(exe, "update")
 }
 
+/// Whether a file can be made beside `exe`, which is what an update does first: the error if
+/// not. Asked before anything is downloaded.
+pub fn check_dir_writable(exe: &Path) -> io::Result<()> {
+    let probe = sibling(exe, "probe");
+    create_new_file(&probe)?;
+    fs::remove_file(&probe)
+}
+
 /// Create `path` as a new, empty file to write: it must not exist, and a link in its place is
 /// never followed (so it cannot send the write to another file).
 pub(crate) fn create_new_file(path: &Path) -> io::Result<fs::File> {
