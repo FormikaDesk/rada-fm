@@ -801,6 +801,8 @@ pub struct FaultFs {
     hooks: Mutex<Vec<Hook>>,
     write_rules: Mutex<Vec<WriteRule>>,
     listing_rules: Mutex<Vec<ListingRule>>,
+    /// Answer as Windows does: no device, file number, link count or status-change time.
+    anonymous: std::sync::atomic::AtomicBool,
     pub hits: Mutex<Vec<(Op, PathBuf)>>,
 }
 
@@ -873,8 +875,23 @@ impl FaultFs {
             hooks: Mutex::new(Vec::new()),
             write_rules: Mutex::new(Vec::new()),
             listing_rules: Mutex::new(Vec::new()),
+            anonymous: Default::default(),
             hits: Mutex::new(Vec::new()),
         })
+    }
+
+    /// From now on the metadata has no device, file number, link count or status-change time,
+    /// as on Windows.
+    pub fn hide_identity(&self) {
+        self.anonymous
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn anonymise(&self, mut m: FsMeta) -> FsMeta {
+        if self.anonymous.load(std::sync::atomic::Ordering::Relaxed) {
+            (m.dev, m.ino, m.nlink, m.ctime) = (None, None, None, None);
+        }
+        m
     }
 
     /// Fail `op` on paths ending with `suffix`, forever.
@@ -1032,14 +1049,18 @@ impl FaultFs {
 impl FsEngine for FaultFs {
     fn lstat(&self, p: &Path) -> io::Result<FsMeta> {
         self.check(Op::Lstat, p)?;
-        self.inner.lstat(p)
+        self.inner.lstat(p).map(|m| self.anonymise(m))
     }
     fn stat(&self, p: &Path) -> io::Result<FsMeta> {
-        self.inner.stat(p)
+        self.inner.stat(p).map(|m| self.anonymise(m))
     }
     fn read_dir(&self, p: &Path) -> io::Result<Listing> {
         self.check(Op::ReadDir, p)?;
         let mut listing = self.inner.read_dir(p)?;
+        for item in listing.items.iter_mut() {
+            item.meta = std::mem::replace(&mut item.meta, Err(io::ErrorKind::Other.into()))
+                .map(|m| self.anonymise(m));
+        }
         for rule in self.listing_rules.lock().unwrap().iter() {
             match rule {
                 ListingRule::Breaks { folder, errno } if p.ends_with(folder) => {

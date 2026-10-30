@@ -9,7 +9,7 @@ use super::exec::{
 use super::plan::*;
 use crate::Result;
 use crate::fs::local::content_hash;
-use crate::fs::{FileKind, FsEngine, LocalFs};
+use crate::fs::{FileKind, FsEngine};
 use crate::journal::Journal;
 
 pub struct RunOutcome {
@@ -31,6 +31,8 @@ enum JournalState {
 struct Recording<'a> {
     inner: &'a mut dyn ExecHandler,
     journal: &'a Journal,
+    /// Where the identity of a file is looked up (the engine's, not the real disk's).
+    fs: &'a dyn FsEngine,
     id: &'a str,
     reversible: bool,
     errors: u64,
@@ -80,6 +82,9 @@ impl Recording<'_> {
     /// A file made with several names has a fingerprint without a status-change time, which
     /// cannot see contents rewritten with the same size and modification time: its contents
     /// are hashed now, so that undo can tell before it removes the last name.
+    ///
+    /// Undo finds the file by its device and number, so where the system does not give them
+    /// (Windows) a digest could never be used: nothing is hashed or written.
     fn record_digest(&mut self, inverse: &Step) {
         let Step::RemoveFile {
             path,
@@ -91,11 +96,15 @@ impl Recording<'_> {
         if fp.ctime.is_some() || fp.kind != FileKind::File {
             return;
         }
-        let key = LocalFs
+        let Some(key) = self
+            .fs
             .lstat(path)
             .ok()
-            .and_then(|m| Some((m.dev?, m.ino?)));
-        let hash = match key.and_then(|k| self.hashed.get(&k)) {
+            .and_then(|m| Some((m.dev?, m.ino?)))
+        else {
+            return;
+        };
+        let hash = match self.hashed.get(&key) {
             Some(h) => h.clone(),
             None => match content_hash(path) {
                 Ok(h) => h,
@@ -105,9 +114,7 @@ impl Recording<'_> {
                 }
             },
         };
-        if let Some(k) = key {
-            self.hashed.insert(k, hash.clone());
-        }
+        self.hashed.insert(key, hash.clone());
         if let Err(e) = self.journal.record_digest(self.id, path, &hash) {
             tracing::error!("journal: {e}");
             self.errors += 1;
@@ -194,6 +201,7 @@ impl Engine {
         let mut rec = Recording {
             inner: handler,
             journal,
+            fs: &*self.fs,
             id: &id,
             reversible: plan.reversible,
             errors: 0,
