@@ -1,5 +1,24 @@
 # What rada guarantees, and what it does not
 
+## Guarantees at a glance
+
+Every cell restates a sentence further down this page, where the details and the tests are.
+"After a crash" is for a process that is killed.
+
+| Operation | Plan before | Undo | After a crash | Main notes |
+|---|---|---|---|---|
+| **Copy** | Yes | Removes exactly what the copy created; a file modified since is left alone and reported | The half-written temporary file is deleted; a copy that had finished but was not recorded is added to the history if it is what the step declared | Written under a temporary name and renamed only when complete; what could not be kept is listed in the plan and in the result |
+| **Move** | Yes | Moves back, with the same contents, permissions, times, hard links and holes | A move killed between the copy and the removal of the source keeps both; undo then removes the copy | Across filesystems: copy, verify, then remove the source, file by file |
+| **Rename** | Yes | Yes, from the journal; undo compares names without regard to case where the filesystem ignores it | The step that was in doubt is settled at the next start | Never replaces a name that appeared meanwhile, except on the filesystems named in the limits |
+| **Trash** | Yes | Restores from the trash | If rada is stopped between the move and its record, the item is in the system's trash but the history does not bring it back | Restore it from the trash itself in that case |
+| **Permanent deletion** | Yes | **No**: it cannot be undone | The operation is marked *interrupted* and you are told once | The file is compared with its fingerprint at the last moment; the plan says it is permanent and asks you to type `yes` |
+| **Extract an archive** | Yes | Removes exactly what was extracted; a member you edited since is left alone and reported | The temporary file is removed at the next start | A member that would land outside the destination is not extracted; setuid, setgid and sticky bits are dropped; a bomb asks for a typed `yes` |
+| **Create an archive** | Yes | Removes the finished archive (kept if you changed it) | The half-written temporary file is deleted; a finished archive found at its destination is never taken as rada's own | Written under a temporary name and renamed into place; cancelling removes it |
+
+Not in the table, and in the [limits](#limits-known-and-by-design): a **power cut** or a
+kernel crash is not the same as a killed process; on a **phone or a camera** undo is not
+guaranteed; **Windows and macOS** are a pre-release.
+
 rada moves your files around, so this page says plainly what you can rely on, how that is
 checked, and where the promises stop. Every statement here is backed by a test in
 `crates/core/tests/` unless it is listed under [Limits](#limits-known-and-by-design).
@@ -310,6 +329,9 @@ These are real, and we would rather you read them here than discover them.
   extended-attribute interface carries.
 - **Undo is bounded by what is still true.** If you changed or removed a file after the
   operation, or the destination is gone, undo does what is safe and tells you what it left.
+- **Permanent deletion cannot be undone.** The plan says so and asks you to type `yes`, and
+  undo answers that the operation is permanent. Moving to the trash is the way to keep a way
+  back.
 - **Moving to the trash has no *pending* record.** The move into the trash is recorded once it
   has happened. If rada is stopped between the move and that record, the item is in the
   system's trash but rada's history does not bring it back: restore it from the trash itself.
