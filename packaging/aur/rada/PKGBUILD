@@ -67,7 +67,7 @@ package() {
   install -Dm644 packaging/linux/rada.desktop "$pkgdir/usr/share/applications/rada.desktop"
   install -Dm644 packaging/linux/rada.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/rada.svg"
   local size
-  for size in 48 64 128 256 512; do
+  for size in 48 128 256; do
     install -Dm644 "packaging/linux/rada-$size.png" \
       "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/rada.png"
   done
