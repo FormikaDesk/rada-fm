@@ -1,6 +1,12 @@
+<p align="center"><img src="docs/media/logo-256.png" alt="The rada logo: a small boat sheltered in a bay" width="128" height="128"></p>
+
 # rada
 
-**A terminal file manager for Linux, macOS and Windows where every file operation shows a plan first and can be undone.**
+**Know what will happen to your files.**
+
+Plan it. Preview it. Run it. Undo it.
+
+A terminal file manager for Linux, macOS and Windows where every file operation shows a plan first and can be undone.
 
 [![CI](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml/badge.svg)](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/formikadesk/rada-fm?include_prereleases)](https://github.com/formikadesk/rada-fm/releases)

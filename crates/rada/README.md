@@ -1,4 +1,10 @@
+<p align="center"><img src="https://raw.githubusercontent.com/formikadesk/rada-fm/main/docs/media/logo-256.png" alt="The rada logo: a small boat sheltered in a bay" width="128" height="128"></p>
+
 # rada
+
+**Know what will happen to your files.**
+
+Plan it. Preview it. Run it. Undo it.
 
 A safe harbor for your files: a terminal file manager where every operation shows its plan
 before it runs, every change is written to a journal that can take it back, and copying
