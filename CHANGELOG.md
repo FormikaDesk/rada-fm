@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- **A new icon.** rada has a new logo, still the boat in its bay. The launcher entry on Linux, the application on macOS and the program file on Windows use it, and the README opens with it. On Linux the icon is installed in more sizes (48, 64, 128, 256 and 512 pixels) next to the flat SVG, and `rada setup desktop --remove` takes them all away; the small sizes (16, 24 and 32 pixels) keep the flat drawing, which is sharper there. Nothing in how rada works changes.
+- **`docs/SAFETY.md` opens with a table of the guarantees at a glance**: for copy, move, rename, trash, permanent deletion and the extraction and creation of archives, whether there is a plan before, what undo does, what happens after a crash, and the main notes. It says only what the page already says below, and the limits now state in one line that a permanent deletion cannot be undone.
+
 ## [0.6.0-rc.21] - 2026-10-30
 
 Safer bulk rename, a recovery that trusts less what it finds, a clearer message when an update cannot be installed, command-line errors in your language, and install commands for fish. Still a **pre-release**.
