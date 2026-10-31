@@ -127,11 +127,13 @@ fn wait_for_file(p: &Path) -> String {
     panic!("{} never appeared", p.display());
 }
 
-const ICONS: [&str; 4] = [
+const ICONS: [&str; 6] = [
     "icons/hicolor/scalable/apps/rada.svg",
     "icons/hicolor/48x48/apps/rada.png",
+    "icons/hicolor/64x64/apps/rada.png",
     "icons/hicolor/128x128/apps/rada.png",
     "icons/hicolor/256x256/apps/rada.png",
+    "icons/hicolor/512x512/apps/rada.png",
 ];
 
 #[test]

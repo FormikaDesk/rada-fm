@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 const DESKTOP_ENTRY: &str = include_str!("../assets/linux/rada.desktop");
 const ICON_SVG: &[u8] = include_bytes!("../assets/linux/rada.svg");
 const ICON_48: &[u8] = include_bytes!("../assets/linux/rada-48.png");
+const ICON_64: &[u8] = include_bytes!("../assets/linux/rada-64.png");
 const ICON_128: &[u8] = include_bytes!("../assets/linux/rada-128.png");
 const ICON_256: &[u8] = include_bytes!("../assets/linux/rada-256.png");
+const ICON_512: &[u8] = include_bytes!("../assets/linux/rada-512.png");
 
 const DESKTOP_FILE: &str = "rada.desktop";
 const DIR_MIME: &str = "inode/directory";
@@ -64,8 +66,10 @@ impl Setup {
         vec![
             (hicolor.join("scalable/apps/rada.svg"), ICON_SVG),
             (hicolor.join("48x48/apps/rada.png"), ICON_48),
+            (hicolor.join("64x64/apps/rada.png"), ICON_64),
             (hicolor.join("128x128/apps/rada.png"), ICON_128),
             (hicolor.join("256x256/apps/rada.png"), ICON_256),
+            (hicolor.join("512x512/apps/rada.png"), ICON_512),
         ]
     }
 
@@ -650,8 +654,10 @@ mod asset_tests {
             "rada.desktop",
             "rada.svg",
             "rada-48.png",
+            "rada-64.png",
             "rada-128.png",
             "rada-256.png",
+            "rada-512.png",
         ] {
             let a = std::fs::read(here.join("assets/linux").join(name)).unwrap();
             let b = std::fs::read(here.join("../../packaging/linux").join(name)).unwrap();
@@ -660,5 +666,18 @@ mod asset_tests {
                 "{name} differs between crates/rada/assets/linux and packaging/linux"
             );
         }
+    }
+
+    /// The names say the size; the logo they come from keeps its transparent corners.
+    #[test]
+    fn the_icon_pictures_have_the_size_in_their_name() {
+        let here = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        for size in [48, 64, 128, 256, 512] {
+            let img = image::open(here.join(format!("linux/rada-{size}.png"))).unwrap();
+            assert_eq!((img.width(), img.height()), (size, size));
+        }
+        let logo = image::open(here.join("logo.png")).unwrap().to_rgba8();
+        assert_eq!(logo.dimensions(), (1024, 1024));
+        assert_eq!(logo.get_pixel(0, 0)[3], 0, "the corner is not transparent");
     }
 }
