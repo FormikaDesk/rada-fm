@@ -266,10 +266,10 @@ An antivirus that quarantines the file is a different matter: the [signature](ve
 This builds rada from crates.io (it needs a Rust toolchain of version 1.93 or newer, [rustup](https://rustup.rs)) and puts it in `~/.cargo/bin` (`%USERPROFILE%\.cargo\bin` on Windows, which rustup adds to the `PATH`):
 
 ```sh
-cargo install rada --locked --version 0.6.0
+cargo install rada --locked
 ```
 
-`--locked` builds with the exact versions of the dependencies rada was tested with. While only pre-releases have been published, cargo does not pick one by itself, so the version has to be named; with 0.6.0 `cargo install rada --locked` will be enough. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it (while the newer version is a pre-release, the command it gives names it: `cargo install rada --locked --version 0.6.0`). This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
+`--locked` builds with the exact versions of the dependencies rada was tested with. A copy installed this way is not updated by `rada update` (it does not replace a file cargo looks after): it says to run `cargo install rada --locked` again, which is also how you update it. This is not signed by the author's key like the binaries; cargo checks the download against the checksum of the crates.io index.
 
 ## From source
 
@@ -339,7 +339,7 @@ rada update --rollback  # go back to the version that was running before
 
 For a copy downloaded from the releases, `rada update` fetches the archive for your system, checks the signature and installs it in place of the running program; the old one is kept for `--rollback`. rada also looks for a new version once a day and shows it in the tab bar (`Alt+U` updates). Details, and what happens with the other ways to install, in [Updates](updates.md).
 
-A copy installed with cargo is updated with cargo: `cargo install rada --locked` (while the newer version is a pre-release, with `--version <the new version>` added: `rada update` prints the exact command). On Arch, build the package again (`makepkg -si`) with the new `PKGBUILD`.
+A copy installed with cargo is updated with cargo: `cargo install rada --locked` (cargo does not pick a pre-release by itself: if the newer version is one, `rada update` prints the command with `--version <the new version>` added). On Arch, build the package again (`makepkg -si`) with the new `PKGBUILD`.
 
 ## Uninstalling
 

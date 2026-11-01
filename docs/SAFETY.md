@@ -17,7 +17,7 @@ Every cell restates a sentence further down this page, where the details and the
 
 Not in the table, and in the [limits](#limits-known-and-by-design): a **power cut** or a
 kernel crash is not the same as a killed process; on a **phone or a camera** undo is not
-guaranteed; **Windows and macOS** are a pre-release.
+guaranteed; **Windows and macOS** are newer and have the limits listed below.
 
 rada moves your files around, so this page says plainly what you can rely on, how that is
 checked, and where the promises stop. Every statement here is backed by a test in
@@ -364,7 +364,7 @@ These are real, and we would rather you read them here than discover them.
   that what is on it is as rada left it. Undo of a copy *from* a phone removes the copy, here,
   and is as sure as any. This was written from the documented behaviour of gvfs and tested
   against folders standing in for devices, not against a real phone.
-- **Windows and macOS** are a pre-release. The engine, the journal and undo are the same
+- **Windows and macOS** are supported and newer than Linux. The engine, the journal and undo are the same
   code and the same tests as on Linux, run in CI on both; the Recycle Bin (Windows) and
   `~/.Trash` (macOS) are real. What is not done: preservation of attributes (ACLs and
   alternate data streams on Windows, extended attributes and resource forks on macOS) is a

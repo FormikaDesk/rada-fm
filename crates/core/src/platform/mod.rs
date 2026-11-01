@@ -1,7 +1,7 @@
 //! Everything that depends on the operating system lives behind [`Platform`].
 //!
 //! The rest of the core never branches on the OS: it asks the platform. Linux is
-//! complete. Windows and macOS are a pre-release: trash, volumes, standard folders and
+//! complete. Windows and macOS are supported and newer: trash, volumes, standard folders and
 //! opening files are implemented and run in CI; carrying attributes over (ACLs, alternate
 //! data streams, resource forks) is not done, and the plan says so.
 

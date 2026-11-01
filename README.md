@@ -9,8 +9,8 @@ Plan it. Preview it. Run it. Undo it.
 A terminal file manager for Linux, macOS and Windows where every file operation shows a plan first and can be undone.
 
 [![CI](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml/badge.svg)](https://github.com/formikadesk/rada-fm/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/formikadesk/rada-fm?include_prereleases)](https://github.com/formikadesk/rada-fm/releases)
-[![crates.io](https://img.shields.io/crates/v/rada?include_prereleases)](https://crates.io/crates/rada)
+[![Release](https://img.shields.io/github/v/release/formikadesk/rada-fm)](https://github.com/formikadesk/rada-fm/releases)
+[![crates.io](https://img.shields.io/crates/v/rada)](https://crates.io/crates/rada)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![rada in the panels view on the Neon theme: look around, select three items, copy them with a plan first, settle the name conflict with Keep both, see the card, take it back with Ctrl+Z](docs/media/demo-panels.gif)
@@ -27,7 +27,7 @@ rada is written in Rust and driven by keyboard or mouse. Vim keys and the usual 
 - **Signed updates.** `rada update` checks a [minisign](https://jedisct1.github.io/minisign/) signature made with an offline key before it installs anything, and can roll back. Signed releases start with 0.6.0-rc.9.
 - **Phones and USB sticks.** On Linux, phones, cameras and unmounted sticks appear in the sidebar; you can mount, copy to and eject them, and the plan says what a phone cannot keep.
 - **Fits the window.** Three boxes, two, or the classic layout, chosen from the size of the window.
-- **Linux, macOS, Windows.** Linux is supported; macOS and Windows are a pre-release (Trash and Recycle Bin, Finder tags, Quick Look, drive ejection) and still have rough edges.
+- **Linux, macOS, Windows.** Linux is the main platform; macOS and Windows are supported and newer (Trash and Recycle Bin, Finder tags, Quick Look, drive ejection), with the limits listed in [docs/platforms.md](docs/platforms.md).
 
 | ![The plan window](docs/screenshots/piano.png) | ![The window of an undo](docs/screenshots/annulla.png) |
 |---|---|
@@ -86,8 +86,8 @@ Expand-Archive -Force "$env:TEMP\$n.zip" "$env:TEMP\rada-unpacked"; New-Item -It
 **With cargo** (Rust 1.93 or newer, [rustup](https://rustup.rs)), from crates.io or from a checkout:
 
 ```sh
-cargo install rada --locked --version 0.6.0      # only pre-releases so far: the version has to be named
-cargo install --path crates/rada                        # from a clone of this repository
+cargo install rada --locked                     # from crates.io
+cargo install --path crates/rada                # from a clone of this repository
 ```
 
 Check a download against its signature first: [docs/verify.md](docs/verify.md). A [Nerd Font](https://www.nerdfonts.com/) is recommended for file-type icons (`rada setup font` installs one); without it rada uses Unicode markers.

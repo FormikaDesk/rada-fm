@@ -54,8 +54,8 @@ Expand-Archive -Force "$env:TEMP\$n.zip" "$env:TEMP\rada-unpacked"; New-Item -It
 **With cargo** (Rust 1.93 or newer, [rustup](https://rustup.rs)), from crates.io or from a checkout:
 
 ```sh
-cargo install rada --locked --version 0.6.0      # only pre-releases so far: the version has to be named
-cargo install --path crates/rada                        # from a clone of this repository
+cargo install rada --locked                     # from crates.io
+cargo install --path crates/rada                # from a clone of this repository
 ```
 
 Check a download against its signature first: [docs/verify.md](https://github.com/formikadesk/rada-fm/blob/main/docs/verify.md). A [Nerd Font](https://www.nerdfonts.com/) is recommended for file-type icons (`rada setup font` installs one); without it rada uses Unicode markers.
