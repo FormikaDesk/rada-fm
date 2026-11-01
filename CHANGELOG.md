@@ -5,9 +5,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-01
+
+The first stable version after the release candidates. If you come from 0.5.x, this is what is new in the 0.6.0 series:
+
+- **A plan before every operation, and an undo that outlasts the session.** The plan says what it could not read and what a phone or another system cannot keep; the history is written as it goes, so undo works after a restart.
+- **Recovery after a crash.** If rada is killed in the middle of a copy or a move, the next start tidies the half-written files, keeps what is still needed and tells you.
+- **macOS and Windows**, with ready-made binaries, the Trash and the Recycle Bin, Finder tags, Quick Look and ejecting drives.
+- **Signed updates.** `rada update` checks a minisign signature before it installs anything, and can go back.
+- **Archives.** Zip, tar (gz, bz2, xz, zst), 7z and RAR open like folders, and files can be extracted and archived through the same plan.
+- **Previews** of source code in colour, of pictures and of SVG, drawn with whatever your terminal can show.
+- **Italian.** The interface, the messages and the command line follow your language.
+- **A new look.** The panels view in wide windows, new themes and a new icon.
+
 ### Changed
 - **A new icon.** rada has a new logo, still the boat in its bay. The launcher entry on Linux, the application on macOS and the program file on Windows use it, and the README opens with it. On Linux the icon is installed in more sizes (48, 64, 128, 256 and 512 pixels) next to the flat SVG, and `rada setup desktop --remove` takes them all away; the small sizes (16, 24 and 32 pixels) keep the flat drawing, which is sharper there. Nothing in how rada works changes.
 - **`docs/SAFETY.md` opens with a table of the guarantees at a glance**: for copy, move, rename, trash, permanent deletion and the extraction and creation of archives, whether there is a plan before, what undo does, what happens after a crash, and the main notes. It says only what the page already says below, and the limits now state in one line that a permanent deletion cannot be undone.
+- **Installing from crates.io is now `cargo install rada --locked`**, with no version to name. The documents describe macOS and Windows as supported and newer than Linux, with the limits that stay listed in `docs/platforms.md` and `docs/SAFETY.md`.
+
+### Fixed
+- **The SPAZIO box of the panels view is no longer lit by the mouse, and nothing in the panels is lit in pieces.** Over the ring, the percentage or the text of the main disk the pointer used to light three separate rectangles. The box still answers a click as before; it just has no highlight. Everything else the pointer lights is lit whole.
 
 ## [0.6.0-rc.21] - 2026-10-30
 
@@ -604,6 +621,7 @@ First release.
 ### Platforms
 - Linux is supported. Windows and macOS are in development: the code compiles for them, but they are not supported yet.
 
-[Unreleased]: https://github.com/formikadesk/rada-fm/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/formikadesk/rada-fm/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/formikadesk/rada-fm/releases/tag/v0.6.0
 [0.2.0]: https://github.com/formikadesk/rada-fm/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/formikadesk/rada-fm/releases/tag/v0.1.0
