@@ -147,3 +147,74 @@ fn a_cell_the_system_does_not_report_leaves_the_ring_as_it_is() {
     assert!(!h.app.redraw.take_full_redraw());
     assert_eq!(h.app.preview.image_ui.as_ref().unwrap().cell_px(), (10, 20));
 }
+
+/// Every cell of the screen: its background, its foreground and its modifiers.
+fn look(
+    h: &mut H,
+) -> Vec<(
+    ratatui::style::Color,
+    ratatui::style::Color,
+    ratatui::style::Modifier,
+)> {
+    let _ = h.screen();
+    let b = h.term.backend().buffer();
+    b.content()
+        .iter()
+        .map(|c| (c.bg, c.fg, c.modifier))
+        .collect()
+}
+
+fn point_at(h: &mut H, x: u16, y: u16) {
+    h.mouse(
+        crossterm::event::MouseEventKind::Moved,
+        x,
+        y,
+        crossterm::event::KeyModifiers::NONE,
+    );
+}
+
+#[test]
+fn the_space_box_has_no_hover_over_the_ring_the_percentage_or_the_text() {
+    use rada_tui::hits::Target;
+    for ring in [true, false] {
+        let mut h = ring_scene("neon");
+        if !ring {
+            h.app.preview.image_ui = None;
+        }
+        h.app.settings.mouse = true;
+        let main = h.app.devices.volumes[0].mount_point.clone();
+        let before = look(&mut h);
+        let r = h
+            .app
+            .frame
+            .hits
+            .find(&Target::Place(main.clone()))
+            .filter(|r| r.x > 0 && r.y > 0)
+            .expect("the main disk of the box");
+        let text: String = (r.y..r.bottom())
+            .flat_map(|y| (r.x..r.right()).map(move |x| (x, y)))
+            .map(|p| h.term.backend().buffer()[p].symbol().to_string())
+            .collect();
+        assert!(
+            text.contains("62%"),
+            "the rectangle is the box of the disk: {text:?}"
+        );
+        // Every cell of the box: the ring, the percentage in the hole, the figures at its right,
+        // the strip at its left.
+        for y in r.y..r.bottom() {
+            for x in r.x..r.right() {
+                point_at(&mut h, x, y);
+                let now = look(&mut h);
+                let changed: Vec<usize> = (0..before.len())
+                    .filter(|i| before[*i] != now[*i])
+                    .collect();
+                assert!(
+                    changed.is_empty(),
+                    "pointer at ({x}, {y}), ring: {ring}: {} cells changed, the first at {:?}",
+                    changed.len(),
+                    changed.first().map(|i| (i % 160, i / 160))
+                );
+            }
+        }
+    }
+}

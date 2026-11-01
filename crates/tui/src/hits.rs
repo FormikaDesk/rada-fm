@@ -115,17 +115,47 @@ pub enum NoticeHit {
 #[derive(Default, Clone)]
 pub struct Hits {
     items: Vec<(Rect, Target)>,
+    /// The registrations the pointer does not light.
+    quiet: Vec<(Rect, Target)>,
 }
 
 impl Hits {
     pub fn clear(&mut self) {
         self.items.clear();
+        self.quiet.clear();
     }
 
     pub fn add(&mut self, area: Rect, target: Target) {
         if area.width > 0 && area.height > 0 {
             self.items.push((area, target));
         }
+    }
+
+    /// [`add`](Self::add) for a box that answers a click but is never lit by the pointer: it is
+    /// made of a picture, text and strips of other grounds, and lighting only the cells of one
+    /// of them would show it in pieces.
+    pub fn add_quiet(&mut self, area: Rect, target: Target) {
+        if area.width > 0 && area.height > 0 {
+            self.quiet.push((area, target.clone()));
+        }
+        self.add(area, target);
+    }
+
+    /// What the pointer lights at a cell, and where: the thing under it ([`Target::lit`]) and
+    /// its rectangle, unless it was added with [`add_quiet`](Self::add_quiet). A checkbox
+    /// lights its row and a tree arrow its place.
+    pub fn lit_at(&self, x: u16, y: u16) -> Option<(Rect, Target)> {
+        let (rect, under) = self.rect_at(x, y)?;
+        if self.quiet.iter().any(|(r, t)| *r == rect && t == under) {
+            return None;
+        }
+        let target = under.lit()?;
+        let area = if &target == under {
+            rect
+        } else {
+            self.find(&target).unwrap_or(rect)
+        };
+        Some((area, target))
     }
 
     /// The topmost thing at a cell: later registrations are drawn over earlier ones.

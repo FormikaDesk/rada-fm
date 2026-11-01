@@ -75,7 +75,7 @@ impl App {
     }
 
     fn hover(&mut self, column: u16, row: u16) {
-        let under = self.frame.hits.at(column, row).and_then(Target::lit);
+        let under = self.frame.hits.lit_at(column, row).map(|(_, t)| t);
         if self.hover.moved(column, row, under) {
             self.redraw.dirty = true;
         }

@@ -11,6 +11,7 @@ mod colours;
 mod common;
 mod focus;
 mod git;
+mod hover;
 mod layout;
 mod pills;
 mod places;

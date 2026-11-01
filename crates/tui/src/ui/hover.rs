@@ -32,18 +32,10 @@ pub fn paint(f: &mut Frame, app: &mut App) {
     }
 }
 
-/// What is lit, and where: the target under the pointer in the frame just drawn. A checkbox
-/// lights its row and a tree arrow its place.
+/// What is lit, and where: what the map of clicks has under the pointer in the frame just drawn.
 fn under_pointer(app: &App) -> Option<(Rect, Target)> {
     let (x, y) = app.hover.at.filter(|_| app.settings.mouse)?;
-    let (rect, under) = app.frame.hits.rect_at(x, y)?;
-    let target = under.lit()?;
-    let area = if &target == under {
-        rect
-    } else {
-        app.frame.hits.find(&target).unwrap_or(rect)
-    };
-    Some((area, target))
+    app.frame.hits.lit_at(x, y)
 }
 
 /// The row of the list is already marked out: the cursor is on it or it is selected.

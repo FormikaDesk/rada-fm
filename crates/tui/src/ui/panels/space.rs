@@ -200,7 +200,7 @@ fn draw_ring(f: &mut Frame, app: &mut App, area: Rect, main: &Volume, name: &str
             );
         }
     }
-    app.frame.hits.add(
+    app.frame.hits.add_quiet(
         Rect::new(area.x, area.y, area.width, ROWS.min(area.height)),
         Target::Place(main.mount_point.clone()),
     );
@@ -322,7 +322,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(Paragraph::new(lines), below);
     // A click on the box goes to the disk the row is about.
     if !ring {
-        app.frame.hits.add(
+        app.frame.hits.add_quiet(
             Rect { height: 1, ..area },
             Target::Place(main.mount_point.clone()),
         );
@@ -337,7 +337,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     for (n, v) in others.iter().enumerate() {
         let y = top_others + n;
         if y < shown {
-            app.frame.hits.add(
+            app.frame.hits.add_quiet(
                 Rect {
                     y: area.y + y as u16,
                     height: 1,
