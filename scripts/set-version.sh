@@ -27,6 +27,7 @@ if [[ "${1:-}" == "--check" ]]; then
     [[ -n "$current" ]] || { echo "no version found in $root/Cargo.toml" >&2; exit 1; }
     base="${current%%-*}"
     status=0
+    # A suffix is a pre-release one (-rc.2): the "-x86_64" of a file name is not part of the version.
     # install.md whole; of README.md only the section between "## Install" and "## Quick start".
     check_text() {
         local file="$1" text="$2" v key
@@ -34,7 +35,7 @@ if [[ "${1:-}" == "--check" ]]; then
             [[ -z "$v" || "$v" == "$current" || "$v" == "$base" ]] && continue
             echo "$file names $v, but the version is $current" >&2
             status=1
-        done < <(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' <<<"$text" | sort -u || true)
+        done < <(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc|pre)[0-9A-Za-z.]*)?' <<<"$text" | sort -u || true)
         if ! grep -qF "$current" <<<"$text"; then
             echo "$file does not name $current at all" >&2
             status=1
@@ -80,6 +81,8 @@ for f in Cargo.toml Cargo.lock README.md docs/install.md docs/platforms.md docs/
     sed -i "s/$esc/$new/g" "$root/$f"
 done
 echo "$old -> $new"
+# Going from 0.6.0 to 0.6.0-rc.1 leaves "0.6.0" in the new version: nothing to look for then.
+[[ "$new" == "$old"* ]] && exit 0
 grep -rnF "$old" "$root/Cargo.toml" "$root/Cargo.lock" "$root/README.md" "$root/docs/install.md" \
     "$root/docs/platforms.md" "$root/docs/updates.md" "$root/crates/rada/README.md" && exit 1
 exit 0

@@ -235,6 +235,25 @@ mod tests {
     }
 
     #[test]
+    fn the_stable_release_is_offered_to_a_copy_on_a_release_candidate_on_either_channel() {
+        let all = [
+            release("v0.6.0-rc.20", true),
+            release("v0.6.0-rc.21", true),
+            release("v0.6.0", false),
+        ];
+        for channel in [Channel::Auto, Channel::Stable, Channel::Prerelease] {
+            for running in ["0.6.0-rc.1", "0.6.0-rc.21"] {
+                assert_eq!(
+                    newest(&all, &v(running), channel).unwrap().tag,
+                    "v0.6.0",
+                    "{running} on {channel:?}"
+                );
+            }
+            assert!(newest(&all, &v("0.6.0"), channel).is_none());
+        }
+    }
+
+    #[test]
     fn each_system_gets_the_file_built_for_it() {
         let t = |os, arch, tr| target_for(os, arch, tr);
         assert_eq!(

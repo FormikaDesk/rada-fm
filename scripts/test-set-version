@@ -28,9 +28,13 @@ new="${current%%-*}-rc.99"
 "$set_version" --check > /dev/null || fail "--check fails right after set-version.sh"
 grep -qF "$new" "$tmp/docs/install.md" || fail "install.md does not name $new"
 grep -qF "$new" "$tmp/README.md" || fail "README.md does not name $new"
-if grep -F "$current" "$tmp/docs/install.md" "$tmp/README.md" > /dev/null; then
+# (From 0.6.0 to 0.6.0-rc.99 the old version is inside the new one: nothing to look for.)
+if [[ "$new" != "$current"* ]] && grep -F "$current" "$tmp/docs/install.md" "$tmp/README.md" > /dev/null; then
     fail "the old version $current is still in install.md or README.md"
 fi
+
+# A version that is not the current one, nor its base (which the check lets through).
+stale=0.5.9
 
 expect_failure() {
     local what="$1"
@@ -38,12 +42,12 @@ expect_failure() {
 }
 
 cp "$tmp/docs/install.md" "$tmp/install.good"
-sed -i "0,/$new/s//$current/" "$tmp/docs/install.md"
+sed -i "0,/$new/s//$stale/" "$tmp/docs/install.md"
 expect_failure "a stale version in install.md"
 cp "$tmp/install.good" "$tmp/docs/install.md"
 
 cp "$tmp/README.md" "$tmp/README.good"
-sed -i "0,/$new/s//$current/" "$tmp/README.md"
+sed -i "0,/v=$new;/s//v=$stale;/" "$tmp/README.md"
 expect_failure "a stale version in the Install section of README.md"
 cp "$tmp/README.good" "$tmp/README.md"
 
@@ -57,5 +61,12 @@ cp "$tmp/install.good" "$tmp/docs/install.md"
 sed -i '0,/^set rv /s//set version /' "$tmp/docs/install.md"
 expect_failure "version as the name of a variable in a fish block"
 cp "$tmp/install.good" "$tmp/docs/install.md"
+
+# The stable version itself (no suffix): the file names in install.md go on after it
+# ("rada-0.6.0-x86_64-…") and must not be taken for another version.
+stable="${current%%-*}"
+"$set_version" "$stable" > /dev/null || fail "set-version.sh $stable"
+"$set_version" --check > /dev/null || fail "--check fails on the stable version $stable"
+grep -qF "rada-$stable-x86_64-unknown-linux-musl" "$tmp/docs/install.md" || fail "install.md does not name the file of $stable"
 
 echo "ok: scripts/set-version.sh keeps docs/install.md and README.md current"
