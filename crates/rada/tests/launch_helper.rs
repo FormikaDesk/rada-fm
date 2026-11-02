@@ -80,5 +80,9 @@ fn what_is_not_a_helper_task_is_an_ordinary_command_line() {
     let out = rada().args(["--launch-helper"]).output().unwrap();
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("unexpected argument"), "{err}");
+    assert!(
+        err.contains("unexpected argument")
+            || err.contains("argomento '--launch-helper' non riconosciuto"),
+        "{err}"
+    );
 }
