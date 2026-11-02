@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- **`rada update` shows the release notes as plain text**, without markdown marks.
+
 ## [0.6.0] - 2026-11-01
 
 The first stable version after the release candidates. If you come from 0.5.x, this is what is new in the 0.6.0 series:
