@@ -52,7 +52,7 @@ impl World {
         // The sandbox lies inside rada's own checkout: say that this copy is a downloaded one.
         fs::write(
             root.path().join("xdg/config/rada/config.toml"),
-            "[update]\nmethod = \"binary\"\n",
+            "language = \"en\"\n\n[update]\nmethod = \"binary\"\n",
         )
         .unwrap();
         World {

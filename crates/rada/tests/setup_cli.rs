@@ -17,11 +17,21 @@ impl Sandbox {
             .tempdir_in(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"))
             .unwrap();
         for d in [
-            "home", "data", "config", "state", "cache", "appdata", "local",
+            "home",
+            "data",
+            "config/rada",
+            "state",
+            "cache",
+            "appdata",
+            "local",
         ] {
             fs::create_dir_all(root.path().join(d)).unwrap();
         }
-        Sandbox { root }
+        let sandbox = Sandbox { root };
+        if !cfg!(target_os = "linux") {
+            fs::write(sandbox.p("config/rada/config.toml"), "language = \"en\"\n").unwrap();
+        }
+        sandbox
     }
 
     fn p(&self, rel: &str) -> PathBuf {

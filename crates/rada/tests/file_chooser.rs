@@ -17,14 +17,34 @@ impl World {
             .prefix("rada-chooser-")
             .tempdir_in(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"))
             .unwrap();
-        for d in ["home", "config", "data", "state", "cache", "share", "bin"] {
+        for d in [
+            "home",
+            "config/rada",
+            "data",
+            "state",
+            "cache",
+            "share",
+            "bin",
+        ] {
             fs::create_dir_all(root.path().join(d)).unwrap();
         }
-        World { root }
+        let world = World { root };
+        if !cfg!(target_os = "linux") {
+            world.set_language("en");
+        }
+        world
     }
 
     fn p(&self, rel: &str) -> PathBuf {
         self.root.path().join(rel)
+    }
+
+    fn set_language(&self, language: &str) {
+        fs::write(
+            self.p("config/rada/config.toml"),
+            format!("language = \"{language}\"\n"),
+        )
+        .unwrap();
     }
 
     fn rada_cmd(&self, args: &[&str]) -> Command {
@@ -130,6 +150,9 @@ fn the_help_describes_the_chooser_in_both_languages() {
         assert!(en.contains(want), "{want}: {en}");
     }
     let mut c = w.rada_cmd(&["--help"]);
+    if !cfg!(target_os = "linux") {
+        w.set_language("it");
+    }
     c.env("LC_ALL", "it_IT.UTF-8").env("LANG", "it_IT.UTF-8");
     let it = String::from_utf8_lossy(&c.output().unwrap().stdout).into_owned();
     if cfg!(target_os = "linux") {
