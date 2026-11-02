@@ -11,6 +11,7 @@ use rada_core::update::{self, Check, Ctx, Mode};
 /// by somebody else: what could act on the terminal is made visible.
 fn notes_lines(notes: &str) -> Vec<String> {
     let notes = display::block(notes);
+    let notes = clean_markdown(&notes);
     let notes = notes.trim();
     if notes.is_empty() {
         return vec![format!("  {}", Key::UNoNotes.tr())];
@@ -21,6 +22,127 @@ fn notes_lines(notes: &str) -> Vec<String> {
         out.push("  …".into());
     }
     out
+}
+
+fn clean_markdown(notes: &str) -> String {
+    let mut out = Vec::new();
+    let mut blank = false;
+    for line in notes.lines() {
+        let heading = line.trim().starts_with("### ") || line.trim().starts_with("## ");
+        if heading && !out.is_empty() && !blank {
+            out.push(String::new());
+        }
+        let line = clean_markdown_line(line.trim());
+        if line.is_empty() {
+            if !blank {
+                out.push(String::new());
+            }
+            blank = true;
+        } else {
+            out.push(line);
+            blank = false;
+        }
+    }
+    out.join("\n")
+}
+
+fn clean_markdown_line(line: &str) -> String {
+    let heading = line
+        .strip_prefix("### ")
+        .or_else(|| line.strip_prefix("## "));
+    if let Some(title) = heading {
+        return format!("{title}:");
+    }
+    let bullet = line.strip_prefix("- ").or_else(|| line.strip_prefix("* "));
+    let (prefix, body) = bullet.map_or(("", line), |body| ("• ", body));
+    format!("{prefix}{}", clean_inline(body))
+}
+
+fn clean_inline(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '*'
+            && chars.get(i + 1) == Some(&'*')
+            && copy_double_emphasis(&chars, &mut i, &mut out)
+        {
+            continue;
+        }
+        if chars[i] == '`' && copy_delimited(&chars, &mut i, '`', &mut out) {
+            continue;
+        }
+        if chars[i] == '*' && copy_delimited(&chars, &mut i, '*', &mut out) {
+            continue;
+        }
+        if chars[i] == '[' && copy_link(&chars, &mut i, &mut out) {
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn copy_double_emphasis(chars: &[char], i: &mut usize, out: &mut String) -> bool {
+    let Some(end) = chars[*i + 2..]
+        .windows(2)
+        .position(|pair| pair == ['*', '*'])
+        .map(|n| n + *i + 2)
+    else {
+        return false;
+    };
+    if end == *i + 2 {
+        return false;
+    }
+    out.extend(&chars[*i + 2..end]);
+    *i = end + 2;
+    true
+}
+
+fn copy_delimited(chars: &[char], i: &mut usize, delimiter: char, out: &mut String) -> bool {
+    let Some(end) = chars[*i + 1..]
+        .iter()
+        .position(|c| *c == delimiter)
+        .map(|n| n + *i + 1)
+    else {
+        return false;
+    };
+    if end == *i + 1 {
+        return false;
+    }
+    out.extend(&chars[*i + 1..end]);
+    *i = end + 1;
+    true
+}
+
+fn copy_link(chars: &[char], i: &mut usize, out: &mut String) -> bool {
+    let Some(close) = chars[*i + 1..]
+        .iter()
+        .position(|c| *c == ']')
+        .map(|n| n + *i + 1)
+    else {
+        return false;
+    };
+    if chars.get(close + 1) != Some(&'(') {
+        return false;
+    }
+    let Some(end) = chars[close + 2..]
+        .iter()
+        .position(|c| *c == ')')
+        .map(|n| n + close + 2)
+    else {
+        return false;
+    };
+    if close == *i + 1 {
+        return false;
+    }
+    out.extend(&chars[*i + 1..close]);
+    out.push_str(" (");
+    out.extend(&chars[close + 2..end]);
+    out.push(')');
+    *i = end + 1;
+    true
 }
 
 fn what_will_happen(how: &Result<Mode, String>) -> String {
@@ -179,6 +301,36 @@ mod tests {
         assert_eq!(lines[60], "  …");
         assert_eq!(notes_lines("  \n ").len(), 1);
         assert!(notes_lines("").concat().contains(Key::UNoNotes.tr()));
+    }
+
+    #[test]
+    fn markdown_notes_are_plain_text() {
+        let lines = notes_lines(
+            "Intro\n### Changed\n- *A new icon.* use `rada update` [guide](https://example.test)\n* second\n\n\n## Fixed\n* last",
+        );
+        let text = lines.join("\n");
+        assert!(text.contains("  Intro\n  \n  Changed:\n  • A new icon. use rada update guide (https://example.test)\n  • second\n  \n  Fixed:\n  • last"), "{text}");
+        assert!(!text.contains('*'));
+        assert!(!text.contains('`'));
+    }
+
+    #[test]
+    fn release_060_notes_are_readable() {
+        let notes = "### Changed\n- **A new icon.** rada has a new logo, still the boat in its bay. The launcher entry on Linux, the application on macOS and the program file on Windows use it, and the README opens with it. On Linux the icon is installed in more sizes (48, 64, 128, 256 and 512 pixels) next to the flat SVG, and `rada setup desktop --remove` takes them all away; the small sizes (16, 24 and 32 pixels) keep the flat drawing, which is sharper there. Nothing in how rada works changes.";
+        let text = notes_lines(notes).join("\n");
+        assert!(
+            text.starts_with("  Changed:\n  • A new icon. rada has a new logo"),
+            "{text}"
+        );
+        assert!(
+            text.contains("rada setup desktop --remove takes them all away"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn isolated_markdown_punctuation_is_preserved() {
+        assert_eq!(notes_lines("*\n`"), ["  *", "  `"]);
     }
 
     #[test]
