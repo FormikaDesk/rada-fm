@@ -85,14 +85,18 @@ fn clean_inline(text: &str) -> String {
 }
 
 fn copy_double_emphasis(chars: &[char], i: &mut usize, out: &mut String) -> bool {
+    if chars.get(*i + 2).is_none_or(|c| c.is_whitespace()) {
+        return false;
+    }
     let Some(end) = chars[*i + 2..]
         .windows(2)
-        .position(|pair| pair == ['*', '*'])
-        .map(|n| n + *i + 2)
+        .enumerate()
+        .find(|(offset, pair)| *pair == ['*', '*'] && !chars[*i + 1 + offset].is_whitespace())
+        .map(|(offset, _)| offset + *i + 2)
     else {
         return false;
     };
-    if end == *i + 2 {
+    if end == *i + 2 || chars[end - 1].is_whitespace() {
         return false;
     }
     out.extend(&chars[*i + 2..end]);
@@ -101,9 +105,16 @@ fn copy_double_emphasis(chars: &[char], i: &mut usize, out: &mut String) -> bool
 }
 
 fn copy_delimited(chars: &[char], i: &mut usize, delimiter: char, out: &mut String) -> bool {
+    if delimiter == '*' && chars.get(*i + 1).is_none_or(|c| c.is_whitespace()) {
+        return false;
+    }
     let Some(end) = chars[*i + 1..]
         .iter()
-        .position(|c| *c == delimiter)
+        .enumerate()
+        .find(|(offset, c)| {
+            **c == delimiter && (delimiter != '*' || !chars[*i + *offset].is_whitespace())
+        })
+        .map(|(offset, _)| offset)
         .map(|n| n + *i + 1)
     else {
         return false;
@@ -331,6 +342,14 @@ mod tests {
     #[test]
     fn isolated_markdown_punctuation_is_preserved() {
         assert_eq!(notes_lines("*\n`"), ["  *", "  `"]);
+    }
+
+    #[test]
+    fn literal_asterisks_are_preserved() {
+        assert_eq!(
+            notes_lines("2 * 3 * 4\ncopia *.pdf e *.png"),
+            ["  2 * 3 * 4", "  copia *.pdf e *.png"]
+        );
     }
 
     #[test]
