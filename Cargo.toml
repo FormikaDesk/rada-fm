@@ -26,6 +26,17 @@ unsafe_op_in_unsafe_fn = "deny"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
+# Debug builds keep the file and line of every frame (backtraces, panics) but not the types and
+# locals, and none of the code from the registry: with a test binary per integration test,
+# full debug information made the target folder three times as big (20 GB against 6 GB for the
+# interface and program tests) and the builds slower. Use `debug = true` here to step through
+# a debugger.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
