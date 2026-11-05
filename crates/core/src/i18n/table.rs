@@ -388,6 +388,7 @@ strings! {
     PropInArchive => "an archive (read-only)", "un archivio (sola lettura)";
     FlagExecutable => "executable", "eseguibile";
     TagViewTitle => "Tag: {0}", "Tag: {0}";
+    SearchViewTitle => "Search: {0}", "Cerca: {0}";
     PropsSelectedOne => "1 selected", "1 selezionato";
     PropsSelectedMany => "{0} selected", "{0} selezionati";
 
@@ -668,6 +669,8 @@ strings! {
     BarPlaceholder => "Search files or type a command…", "Cerca file o digita un comando…";
     BarCommand => "command", "comando";
     BarGoTo => "go to", "vai a";
+    BarSearch => "search", "ricerca";
+    BarSearchBelow => "Search \"{0}\" in subfolders", "Cerca \"{0}\" nelle sottocartelle";
     HomeLabel => "Home", "Home";
 
     // ---- the command bar
@@ -846,6 +849,9 @@ strings! {
     // ---- notices
     TJournalDown => "journal unavailable: operations cannot be undone this session", "registro non disponibile: in questa sessione le operazioni non si possono annullare";
     TTagViewRefuse => "this list is the items tagged \"{0}\", not a folder — cannot {1} here", "questo elenco contiene gli elementi con il tag \"{0}\", non è una cartella — qui non si può {1}";
+    TSearchUnavailable => "cannot search here: the folder's name is not plain text", "qui non si può cercare: il nome della cartella non è testo semplice";
+    TSearchRefuse => "this list is the result of a search, not a folder — cannot {0} here", "questo elenco è il risultato di una ricerca, non una cartella — qui non si può {0}";
+    TSearchTruncated => "the search stopped at its limit ({0} matches or too many items looked at): there may be more", "la ricerca si è fermata al limite ({0} risultati o troppi elementi esaminati): potrebbero essercene altri";
     TRecentRefuse => "this list is the files used lately, not a folder — cannot {0} here", "questo elenco contiene i file usati di recente, non è una cartella — qui non si può {0}";
     TShowInFolderHere => "this is already a folder: nothing to show", "questa è già una cartella: non c'è altro da mostrare";
     TAtTop => "already at the top", "sei già in cima";

@@ -73,6 +73,7 @@ One pill holds the path and the search. At rest it shows the path as clickable c
 
 - a **path** (`~/Documenti`, `/etc`, `../x`): `~` is your home, relative paths start at the current folder, `Tab` completes with the subfolders (listed by a background worker, never while you type), `Enter` goes. `Ctrl+L` selects the old path, so typing replaces it;
 - **words**: the files of this folder are filtered as you type (`tag:red` finds by tag), and under the bar the **commands** that match (*Copia*, *Nuova cartella*, *Vista a colonne*…) and the places (folders, recents, pinned, disks) are offered. `↑` `↓` choose, `Enter` runs the one chosen; with none chosen it keeps the filter if files match, otherwise it runs the best command;
+- when **no file of this folder matches**, the last suggestion is *Search "words" in subfolders*. It lists what has all the words in its name in this folder and the ones under it, as a read-only list like a tag's (pick it with `↓` or `Tab`, or click it; `Enter` alone never starts it) (the title says *Search: words*; nothing can be made in it, and `↑` or back leaves it the way you came). The search never follows a link, never leaves the filesystem it started on, skips what it cannot read, and stops at 2000 matches or 300000 items looked at, saying so;
 - `Esc` goes back to the path and clears the filter; `Backspace` on an empty bar closes it.
 
 ### Command bar

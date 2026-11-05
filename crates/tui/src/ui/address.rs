@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use crate::fmt;
 use rada_core::display;
-use rada_core::i18n::Key;
+use rada_core::i18n::{Key, tf};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -549,6 +549,12 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
                 fmt::short_path(path, app.home()),
                 Key::BarZoxide.tr().to_string(),
                 h.label_pos.clone(),
+            ),
+            BarItem::Search(words) => (
+                tf(Key::BarSearchBelow, &[&display::text(words)]),
+                String::new(),
+                Key::BarSearch.tr().to_string(),
+                Vec::new(),
             ),
             BarItem::Place(item) => (
                 item.label.clone(),

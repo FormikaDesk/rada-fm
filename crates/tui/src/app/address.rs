@@ -44,6 +44,8 @@ pub enum BarItem {
     Place(PaletteItem),
     /// Go to a folder zoxide knows.
     Zoxide(PathBuf),
+    /// List what has these words in its name, in this folder and the ones under it.
+    Search(String),
 }
 
 #[derive(Clone, Debug)]

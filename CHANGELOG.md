@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- **Search by name in the folders under this one.** When the words typed in the bar match nothing in the folder, the last suggestion is *Search "words" in subfolders*: it lists what matches as a read-only list, like the items of a tag. It does not follow links or leave the filesystem, skips what it cannot read, and says when it stopped at its limit (2000 matches).
+
 ### Fixed
 - **Moving to the trash and renaming no longer touch a file that changed after the plan was shown.** The item is compared with what the plan saw at the last moment, as a permanent deletion already is; one that changed is left where it is and reported.
 

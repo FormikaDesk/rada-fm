@@ -4,9 +4,9 @@
 //! path from a real one, so a window, a menu or a worker asks "what is this list?" instead of
 //! knowing how the paths are spelled.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::{recents, tagsearch};
+use crate::{recents, search, tagsearch};
 
 /// What a path stands for when it is not a folder.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,6 +15,8 @@ pub enum ViewKind {
     Tag(String),
     /// The files used lately.
     Recent,
+    /// What has the words in its name, in a folder and the ones under it.
+    Search { root: PathBuf, query: String },
 }
 
 impl ViewKind {
@@ -23,14 +25,16 @@ impl ViewKind {
         if recents::is_view(path) {
             return Some(ViewKind::Recent);
         }
-        tagsearch::view_name(path).map(ViewKind::Tag)
+        if let Some(name) = tagsearch::view_name(path) {
+            return Some(ViewKind::Tag(name));
+        }
+        search::parse(path).map(|(query, root)| ViewKind::Search { root, query })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn a_path_off_the_disk_says_what_list_it_is() {
@@ -39,6 +43,18 @@ mod tests {
             Some(ViewKind::Tag("Blu".into()))
         );
         assert_eq!(ViewKind::of(&recents::view_path()), Some(ViewKind::Recent));
+    }
+
+    #[test]
+    fn a_search_path_says_where_and_for_what() {
+        let p = search::view_path(Path::new("/home/u/src"), "main rs").unwrap();
+        assert_eq!(
+            ViewKind::of(&p),
+            Some(ViewKind::Search {
+                root: PathBuf::from("/home/u/src"),
+                query: "main rs".into()
+            })
+        );
     }
 
     #[test]

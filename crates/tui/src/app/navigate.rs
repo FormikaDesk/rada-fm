@@ -189,6 +189,10 @@ impl App {
                 self.toast(ToastKind::Warn, tf(Key::TTagViewRefuse, &[&tag, &what]), 5);
                 true
             }
+            Some(ViewKind::Search { .. }) => {
+                self.toast(ToastKind::Warn, tf(Key::TSearchRefuse, &[&what]), 5);
+                true
+            }
             None => false,
         }
     }

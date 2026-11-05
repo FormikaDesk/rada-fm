@@ -6,11 +6,12 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::address::{MAX_COMMANDS, MAX_PLACES, SEP, expand, is_separator, offered};
-use super::{AddressEdit, App, BarHit, BarItem, BarMode, FilterState};
+use super::{AddressEdit, App, BarHit, BarItem, BarMode, FilterState, ToastKind};
 use crate::chooser::Chooser;
 use crate::keymap::Action;
 use crate::palette::{PaletteKind, PaletteView};
 use crate::{fmt, fuzzy};
+use rada_core::i18n::Key;
 
 impl App {
     /// Turn the address bar into a text field holding the current path.
@@ -140,6 +141,11 @@ impl App {
             a.zoxide.clear();
             a.zoxide_asked.clear();
         }
+        // Last, and only when nothing in this folder matches: the arrows keep moving through
+        // the files that do, and Enter keeps running the best command.
+        if let Some(hit) = search_hit(&q_text, chooser.is_none(), &self.tab) {
+            hits.push(hit);
+        }
         a.hit_selected = a.hit_selected.filter(|i| *i < hits.len());
         a.hits = hits;
     }
@@ -172,6 +178,15 @@ impl App {
             BarItem::Command(action) => self.dispatch(action),
             BarItem::Place(item) => self.open_dir(item.path),
             BarItem::Zoxide(path) => self.open_dir(path),
+            BarItem::Search(words) => self.search_below(&words),
+        }
+    }
+
+    /// List what has `words` in its name in this folder and the ones under it.
+    fn search_below(&mut self, words: &str) {
+        match rada_core::search::view_path(&self.tab.cwd, words) {
+            Some(path) => self.open_dir(path),
+            None => self.toast(ToastKind::Warn, Key::TSearchUnavailable.tr(), 4),
         }
     }
 
@@ -192,7 +207,11 @@ impl App {
             self.windows.address = None;
             return;
         }
-        if !a.hits.is_empty() {
+        // The search below is never the "best" suggestion: it takes a choice of its own.
+        if a.hits
+            .first()
+            .is_some_and(|h| !matches!(h.item, BarItem::Search(_)))
+        {
             return self.run_bar_hit(0);
         }
         self.cancel_address_edit();
@@ -306,6 +325,18 @@ impl App {
             self.open_dir(target);
         }
     }
+}
+
+/// The suggestion to search under this folder, when nothing here matches and there is a folder
+/// to search in: not in a list that is not one, not inside an archive, not while choosing a
+/// file.
+fn search_hit(words: &str, free: bool, tab: &super::TabState) -> Option<BarHit> {
+    let usable =
+        free && tab.visible.is_empty() && tab.archive.is_none() && tab.virtual_view().is_none();
+    (usable && rada_core::search::view_path(&tab.cwd, words).is_some()).then(|| BarHit {
+        item: BarItem::Search(words.to_string()),
+        label_pos: Vec::new(),
+    })
 }
 
 /// The commands whose names match what is typed (in this language or in English), best first.

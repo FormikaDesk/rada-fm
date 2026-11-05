@@ -105,6 +105,9 @@ pub(super) fn view_title(kind: &ViewKind) -> String {
     match kind {
         ViewKind::Recent => Key::PlaceRecent.tr().to_string(),
         ViewKind::Tag(tag) => tf(Key::TagViewTitle, &[&rada_core::display::text(tag)]),
+        ViewKind::Search { query, .. } => {
+            tf(Key::SearchViewTitle, &[&rada_core::display::text(query)])
+        }
     }
 }
 

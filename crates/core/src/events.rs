@@ -103,6 +103,8 @@ pub enum DirEvent {
         /// Set when the folder could not be opened because the system is waiting for the
         /// person to allow it (macOS asks per terminal and per folder).
         denied: Option<Box<crate::platform::AccessDenied>>,
+        /// A search stopped at its bounds: the list may be missing matches.
+        truncated: bool,
     },
     Patched {
         generation: u64,

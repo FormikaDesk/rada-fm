@@ -213,6 +213,7 @@ fn dir_loop(
                     .name("rada-tag-view".into())
                     .spawn(move || {
                         let stale = || latest.load(Ordering::SeqCst) != generation;
+                        let mut truncated = false;
                         let result = match kind {
                             ViewKind::Recent => {
                                 crate::recents::entries(fs.as_ref(), platform.as_ref(), &stale)
@@ -226,6 +227,17 @@ fn dir_loop(
                                     &stale,
                                 )
                             }
+                            ViewKind::Search { root, query } => crate::search::entries(
+                                fs.as_ref(),
+                                platform.as_ref(),
+                                &root,
+                                &query,
+                                &stale,
+                            )
+                            .map(|found| {
+                                truncated = found.truncated;
+                                found.entries
+                            }),
                         };
                         if stale() {
                             return;
@@ -236,6 +248,7 @@ fn dir_loop(
                             result,
                             archive: None,
                             denied: None,
+                            truncated,
                         }));
                     });
                 continue;
@@ -271,6 +284,7 @@ fn dir_loop(
                     result,
                     archive,
                     denied,
+                    truncated: false,
                 }))
                 .is_err()
             {

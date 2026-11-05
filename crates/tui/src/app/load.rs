@@ -41,6 +41,7 @@ impl App {
                 result,
                 archive,
                 denied,
+                truncated,
             } => {
                 if generation & columns::PARENT_GEN != 0 {
                     return self.on_parent_loaded(generation, path, result);
@@ -49,7 +50,13 @@ impl App {
                     return; // an answer to a request that has been superseded
                 }
                 match result {
-                    Ok(entries) => self.show_listing(path, entries, archive),
+                    Ok(entries) => {
+                        self.show_listing(path, entries, archive);
+                        if truncated {
+                            let n = rada_core::search::MAX_MATCHES.to_string();
+                            self.toast(ToastKind::Warn, tf(Key::TSearchTruncated, &[&n]), 6);
+                        }
+                    }
                     Err(msg) => self.on_load_failed(msg, denied),
                 }
             }
