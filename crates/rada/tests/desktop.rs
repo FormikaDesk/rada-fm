@@ -127,14 +127,20 @@ fn wait_for_file(p: &Path) -> String {
     panic!("{} never appeared", p.display());
 }
 
-const ICONS: [&str; 6] = [
-    "icons/hicolor/scalable/apps/rada.svg",
+const ICONS: [&str; 8] = [
+    "icons/hicolor/16x16/apps/rada.png",
+    "icons/hicolor/24x24/apps/rada.png",
+    "icons/hicolor/32x32/apps/rada.png",
     "icons/hicolor/48x48/apps/rada.png",
     "icons/hicolor/64x64/apps/rada.png",
     "icons/hicolor/128x128/apps/rada.png",
     "icons/hicolor/256x256/apps/rada.png",
     "icons/hicolor/512x512/apps/rada.png",
 ];
+
+/// Where earlier versions put their scalable icon, and what they put there.
+const OLD_SCALABLE: &str = "icons/hicolor/scalable/apps/rada.svg";
+const OLD_SVG: &[u8] = include_bytes!("../assets/linux/rada.svg");
 
 #[test]
 fn setup_installs_the_entry_and_icons_for_the_user_and_says_so() {
@@ -436,4 +442,69 @@ fn repo_entry_file_is_a_valid_desktop_file() {
         out.status.success() && !msg.contains("error:") && !msg.contains("warning:"),
         "{msg}"
     );
+}
+
+fn put_scalable(sb: &Sandbox, bytes: &[u8]) -> PathBuf {
+    let path = sb.p("data").join(OLD_SCALABLE);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, bytes).unwrap();
+    path
+}
+
+#[test]
+fn a_new_installation_has_no_scalable_icon() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    assert!(sb.rada(&["setup", "desktop"]).status.success());
+    assert!(!sb.p("data").join(OLD_SCALABLE).exists());
+    assert!(!sb.p("data/icons/hicolor/scalable").exists());
+}
+
+#[test]
+fn the_scalable_icon_an_older_version_installed_is_taken_away() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    let old = put_scalable(&sb, OLD_SVG);
+    let o = sb.rada(&["setup", "desktop"]);
+    assert!(o.status.success(), "{}", text(&o));
+    assert!(!old.exists(), "the old logo is still there");
+    assert!(text(&o).contains("removed"), "{}", text(&o));
+    for i in ICONS {
+        assert!(sb.p("data").join(i).is_file(), "{i} missing");
+    }
+}
+
+#[test]
+fn a_scalable_icon_that_is_not_ours_is_left_and_said() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    let mine = put_scalable(&sb, b"<svg>the user's own drawing</svg>");
+    let o = sb.rada(&["setup", "desktop"]);
+    assert!(o.status.success(), "{}", text(&o));
+    assert_eq!(read(&mine), "<svg>the user's own drawing</svg>");
+    let out = text(&o);
+    assert!(
+        out.contains("rada.svg") && out.contains("not the icon rada installed"),
+        "{out}"
+    );
+}
+
+#[test]
+fn removing_never_takes_a_scalable_icon_that_is_not_ours_even_if_the_record_lists_it() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    let mine = put_scalable(&sb, b"<svg>the user's own drawing</svg>");
+    // The record an older version wrote: it listed the scalable icon among its files.
+    fs::create_dir_all(sb.p("state/rada")).unwrap();
+    fs::write(
+        sb.p("state/rada/desktop-install.json"),
+        format!(
+            r#"{{"files":["{}"],"previous_default":null}}"#,
+            mine.display()
+        ),
+    )
+    .unwrap();
+    let o = sb.rada(&["setup", "desktop", "--remove"]);
+    assert!(o.status.success(), "{}", text(&o));
+    assert_eq!(read(&mine), "<svg>the user's own drawing</svg>");
 }

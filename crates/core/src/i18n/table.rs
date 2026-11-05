@@ -1091,6 +1091,7 @@ strings! {
     SayInstalled => "installed {0}", "installato {0}";
     SayRemoved => "removed {0}", "tolto {0}";
     SayCouldNotRemove => "could not remove {0}: {1}", "impossibile togliere {0}: {1}";
+    SayOldIconKept => "left {0} alone: it is not the icon rada installed", "lasciato {0}: non è l'icona installata da rada";
     SayMade => "made {0}", "creato {0}";
     SayNothingToRemove => "nothing to remove", "non c'è nulla da togliere";
     SayDbUpdated => "updated the desktop database", "aggiornato l'archivio delle voci del desktop";

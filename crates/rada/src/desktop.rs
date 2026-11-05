@@ -11,7 +11,14 @@ use rada_core::platform::Dirs;
 use serde::{Deserialize, Serialize};
 
 const DESKTOP_ENTRY: &str = include_str!("../assets/linux/rada.desktop");
-const ICON_SVG: &[u8] = include_bytes!("../assets/linux/rada.svg");
+/// The flat logo that earlier versions installed as the scalable icon. It is no longer
+/// installed (the icon theme would pick it at every size it has no picture for): it is kept to
+/// recognise that copy and take it away.
+const OLD_ICON_SVG: &[u8] = include_bytes!("../assets/linux/rada.svg");
+const OLD_SCALABLE: &str = "icons/hicolor/scalable/apps/rada.svg";
+const ICON_16: &[u8] = include_bytes!("../assets/linux/rada-16.png");
+const ICON_24: &[u8] = include_bytes!("../assets/linux/rada-24.png");
+const ICON_32: &[u8] = include_bytes!("../assets/linux/rada-32.png");
 const ICON_48: &[u8] = include_bytes!("../assets/linux/rada-48.png");
 const ICON_64: &[u8] = include_bytes!("../assets/linux/rada-64.png");
 const ICON_128: &[u8] = include_bytes!("../assets/linux/rada-128.png");
@@ -64,7 +71,9 @@ impl Setup {
     fn icon_files(&self) -> Vec<(PathBuf, &'static [u8])> {
         let hicolor = self.data_home.join("icons/hicolor");
         vec![
-            (hicolor.join("scalable/apps/rada.svg"), ICON_SVG),
+            (hicolor.join("16x16/apps/rada.png"), ICON_16),
+            (hicolor.join("24x24/apps/rada.png"), ICON_24),
+            (hicolor.join("32x32/apps/rada.png"), ICON_32),
             (hicolor.join("48x48/apps/rada.png"), ICON_48),
             (hicolor.join("64x64/apps/rada.png"), ICON_64),
             (hicolor.join("128x128/apps/rada.png"), ICON_128),
@@ -95,6 +104,7 @@ impl Setup {
             say.push(tf(Key::SayInstalled, &[&path.display()]));
             written.push(path);
         }
+        self.drop_old_scalable(&mut manifest, &mut say);
         for f in written {
             if !manifest.files.contains(&f) {
                 manifest.files.push(f);
@@ -139,10 +149,30 @@ impl Setup {
         Ok(say)
     }
 
+    /// The scalable icon that earlier versions installed is taken away only when it is, byte
+    /// for byte, the one they installed; anything else at that name is the user's, and is left
+    /// (and said). Either way it is no longer in the record, so `--remove` never touches it.
+    fn drop_old_scalable(&self, manifest: &mut Manifest, say: &mut Vec<String>) {
+        let path = self.data_home.join(OLD_SCALABLE);
+        manifest.files.retain(|f| f != &path);
+        let Ok(found) = std::fs::read(&path) else {
+            return;
+        };
+        if found != OLD_ICON_SVG {
+            say.push(tf(Key::SayOldIconKept, &[&path.display()]));
+        } else {
+            match std::fs::remove_file(&path) {
+                Ok(()) => say.push(tf(Key::SayRemoved, &[&path.display()])),
+                Err(e) => say.push(tf(Key::SayCouldNotRemove, &[&path.display(), &e])),
+            }
+        }
+    }
+
     /// Remove exactly what `install` wrote and restore the previous default handler.
     pub fn remove(&self) -> Result<Vec<String>> {
         let mut say = Vec::new();
-        let manifest = self.read_manifest();
+        let mut manifest = self.read_manifest();
+        self.drop_old_scalable(&mut manifest, &mut say);
         // Without a record (deleted state folder), fall back to the known locations.
         let mut files = manifest.files.clone();
         for known in std::iter::once(self.desktop_path())
@@ -653,6 +683,9 @@ mod asset_tests {
         for name in [
             "rada.desktop",
             "rada.svg",
+            "rada-16.png",
+            "rada-24.png",
+            "rada-32.png",
             "rada-48.png",
             "rada-64.png",
             "rada-128.png",
@@ -672,7 +705,7 @@ mod asset_tests {
     #[test]
     fn the_icon_pictures_have_the_size_in_their_name() {
         let here = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
-        for size in [48, 64, 128, 256, 512] {
+        for size in [16, 24, 32, 48, 64, 128, 256, 512] {
             let img = image::open(here.join(format!("linux/rada-{size}.png"))).unwrap();
             assert_eq!((img.width(), img.height()), (size, size));
         }

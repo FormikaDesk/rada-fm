@@ -17,7 +17,7 @@ mod icons;
 /// Below this the flat logo is drawn; from here up, the picture.
 const FIRST_PICTURE_SIZE: u32 = 48;
 /// The sizes of the Linux icon theme that are written as files.
-const LINUX_SIZES: &[u32] = &[48, 64, 128, 256, 512];
+const LINUX_SIZES: &[u32] = &[16, 24, 32, 48, 64, 128, 256, 512];
 /// The size of the logo in the README.
 const README_SIZE: u32 = 256;
 
