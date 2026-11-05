@@ -221,6 +221,10 @@ impl FsEngine for LocalFs {
         super::noreplace::rename_noreplace(from, to)
     }
 
+    fn rename_noreplace_strict(&self, from: &Path, to: &Path) -> io::Result<()> {
+        super::noreplace::rename_noreplace_strict(from, to)
+    }
+
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         fs::remove_file(p)
     }

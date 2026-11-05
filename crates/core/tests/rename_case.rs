@@ -70,6 +70,12 @@ impl FsEngine for FoldFs {
         }
         self.0.rename_noreplace(&self.folded(from), to)
     }
+    fn rename_noreplace_strict(&self, from: &Path, to: &Path) -> io::Result<()> {
+        if self.folded(to).exists() {
+            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+        }
+        self.0.rename_noreplace_strict(&self.folded(from), to)
+    }
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         self.0.remove_file(&self.folded(p))
     }

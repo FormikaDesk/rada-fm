@@ -745,6 +745,8 @@ pub enum Op {
     /// name, so a rule matches the folder it is created in.
     CreateFile,
     Rename,
+    /// The rename that never looks first and renames after (publishing a finished file).
+    RenameStrict,
     RemoveFile,
     RemoveDir,
     CreateDir,
@@ -1127,6 +1129,12 @@ impl FsEngine for FaultFs {
     fn rename_noreplace(&self, a: &Path, b: &Path) -> io::Result<()> {
         self.check(Op::Rename, a)?;
         self.inner.rename_noreplace(a, b)
+    }
+    fn rename_noreplace_strict(&self, a: &Path, b: &Path) -> io::Result<()> {
+        // A rule on `Rename` reaches every kind of rename; `RenameStrict` only this one.
+        self.check(Op::Rename, a)?;
+        self.check(Op::RenameStrict, a)?;
+        self.inner.rename_noreplace_strict(a, b)
     }
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         self.check(Op::RemoveFile, p)?;

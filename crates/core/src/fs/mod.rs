@@ -457,6 +457,12 @@ pub trait FsEngine: Send + Sync {
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
     /// Rename that fails with `AlreadyExists` instead of replacing the destination.
     fn rename_noreplace(&self, from: &Path, to: &Path) -> io::Result<()>;
+    /// Rename that never replaces the destination and never settles for looking first:
+    /// `AlreadyExists` if the name is taken, `Unsupported` where the system has no atomic way
+    /// to ask for that (for a folder on a filesystem without `RENAME_NOREPLACE`, for a file
+    /// where there are no hard links either). [`FsEngine::rename_noreplace`] stays the one for
+    /// operations that accept the look-then-rename.
+    fn rename_noreplace_strict(&self, from: &Path, to: &Path) -> io::Result<()>;
     fn remove_file(&self, p: &Path) -> io::Result<()>;
     /// Remove the file at `p` unless it no longer looks like `expect`. The look is taken as
     /// close to the removal as the system allows, and on the same folder the name is removed

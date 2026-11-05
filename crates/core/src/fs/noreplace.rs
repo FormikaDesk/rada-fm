@@ -1,7 +1,8 @@
 //! A rename that never replaces what is already at the destination.
 //!
 //! Each system has its own atomic way to ask for it; where the filesystem cannot, the last
-//! resort looks first and renames after, which leaves a window (see docs/SAFETY.md).
+//! resort looks first and renames after, which leaves a window (see docs/SAFETY.md). The
+//! strict form never takes that last resort: where only it is left, it says `Unsupported`.
 
 use std::io;
 use std::path::Path;
@@ -9,22 +10,57 @@ use std::path::Path;
 #[cfg(not(windows))]
 use std::fs;
 
+/// What a rename does where the system has no way to refuse an existing name atomically.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(windows, allow(dead_code))]
+enum Fallback {
+    /// Look, then rename: a name created in between is replaced.
+    LookThenRename,
+    /// Do not rename at all.
+    Refuse,
+}
+
+impl Fallback {
+    #[cfg(not(windows))]
+    fn rename(self, from: &Path, to: &Path) -> io::Result<()> {
+        match self {
+            Fallback::LookThenRename => check_then_rename(from, to),
+            Fallback::Refuse => Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "this filesystem cannot refuse an existing name atomically",
+            )),
+        }
+    }
+}
+
 pub(super) fn rename_noreplace(from: &Path, to: &Path) -> io::Result<()> {
+    rename_with(from, to, Fallback::LookThenRename)
+}
+
+/// Like [`rename_noreplace`], but never looks-then-renames: `Unsupported` where the system
+/// has nothing atomic to offer for this item.
+pub(super) fn rename_noreplace_strict(from: &Path, to: &Path) -> io::Result<()> {
+    rename_with(from, to, Fallback::Refuse)
+}
+
+fn rename_with(from: &Path, to: &Path, fallback: Fallback) -> io::Result<()> {
     #[cfg(target_os = "linux")]
     {
-        linux::rename(from, to, false)
+        linux::rename(from, to, false, fallback)
     }
     #[cfg(target_os = "macos")]
     {
-        macos::rename(from, to)
+        macos::rename(from, to, fallback)
     }
     #[cfg(windows)]
     {
+        // `MoveFileExW` refuses an existing name by itself: there is no fallback to choose.
+        let _ = fallback;
         windows::rename(from, to)
     }
     #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
     {
-        check_then_rename(from, to)
+        fallback.rename(from, to)
     }
 }
 
@@ -51,14 +87,21 @@ mod linux {
 
     /// `skip_kernel` goes straight to the fallback, which tests cannot otherwise reach on a
     /// filesystem that has `renameat2`.
-    pub(super) fn rename(from: &Path, to: &Path, skip_kernel: bool) -> io::Result<()> {
+    pub(super) fn rename(
+        from: &Path,
+        to: &Path,
+        skip_kernel: bool,
+        fallback: Fallback,
+    ) -> io::Result<()> {
         if !skip_kernel {
             match renameat2_noreplace(from, to) {
                 Err(e) if lacks_the_flag(&e) => {}
                 done => return done,
             }
         }
-        link_then_unlink(from, to)
+        // A closure: the function item does not fit "for any lifetime" of the parameter.
+        #[allow(clippy::redundant_closure)]
+        link_then_unlink(from, to, fallback, |a, b| fs::hard_link(a, b))
     }
 
     fn renameat2_noreplace(from: &Path, to: &Path) -> io::Result<()> {
@@ -99,14 +142,19 @@ mod linux {
 
     /// `link` fails if the name exists and never replaces it, so for a regular file it is
     /// the atomic check the rename lacks. FAT and exFAT have no links, and a folder cannot
-    /// be linked: those two keep the look-then-rename.
-    fn link_then_unlink(from: &Path, to: &Path) -> io::Result<()> {
+    /// be linked: those two take the fallback.
+    fn link_then_unlink(
+        from: &Path,
+        to: &Path,
+        fallback: Fallback,
+        link: impl Fn(&Path, &Path) -> io::Result<()>,
+    ) -> io::Result<()> {
         if !fs::symlink_metadata(from)?.is_file() {
-            return check_then_rename(from, to);
+            return fallback.rename(from, to);
         }
-        match fs::hard_link(from, to) {
+        match link(from, to) {
             Ok(()) => {}
-            Err(e) if no_hard_links(&e) => return check_then_rename(from, to),
+            Err(e) if no_hard_links(&e) => return fallback.rename(from, to),
             Err(e) => return Err(e),
         }
         fs::remove_file(from).inspect_err(|_| {
@@ -116,7 +164,30 @@ mod linux {
 
     #[cfg(test)]
     pub(super) fn rename_by_link(from: &Path, to: &Path) -> io::Result<()> {
-        rename(from, to, true)
+        rename(from, to, true, Fallback::LookThenRename)
+    }
+
+    #[cfg(test)]
+    pub(super) fn rename_by_link_strict(from: &Path, to: &Path) -> io::Result<()> {
+        rename(from, to, true, Fallback::Refuse)
+    }
+
+    /// The same, on a filesystem whose `link` fails with `errno`.
+    #[cfg(test)]
+    pub(super) fn rename_by_failing_link(
+        from: &Path,
+        to: &Path,
+        errno: i32,
+        strict: bool,
+    ) -> io::Result<()> {
+        let fallback = if strict {
+            Fallback::Refuse
+        } else {
+            Fallback::LookThenRename
+        };
+        link_then_unlink(from, to, fallback, |_, _| {
+            Err(io::Error::from_raw_os_error(errno))
+        })
     }
 }
 
@@ -124,7 +195,7 @@ mod linux {
 mod macos {
     use super::*;
 
-    pub(super) fn rename(from: &Path, to: &Path) -> io::Result<()> {
+    pub(super) fn rename(from: &Path, to: &Path, fallback: Fallback) -> io::Result<()> {
         let (a, b) = (c_path(from)?, c_path(to)?);
         // SAFETY: both pointers are valid NUL-terminated strings for the duration of the call.
         let r = unsafe { libc::renamex_np(a.as_ptr(), b.as_ptr(), libc::RENAME_EXCL) };
@@ -135,7 +206,7 @@ mod macos {
         match err.raw_os_error() {
             Some(libc::EEXIST) => Err(io::Error::from(io::ErrorKind::AlreadyExists)),
             // A volume that does not support the flag (some network and FAT volumes).
-            Some(libc::ENOTSUP | libc::EINVAL) => check_then_rename(from, to),
+            Some(libc::ENOTSUP | libc::EINVAL) => fallback.rename(from, to),
             _ => Err(err),
         }
     }
@@ -229,6 +300,98 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let e = rename_noreplace(&tmp.path().join("a"), &tmp.path().join("b")).unwrap_err();
         assert_eq!(e.kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn the_strict_form_takes_a_free_name_and_never_replaces() {
+        let (_tmp, from, to) = two_files();
+        rename_noreplace_strict(&from, &to).unwrap();
+        assert_eq!(fs::read_to_string(&to).unwrap(), "new");
+        assert!(!from.exists());
+
+        fs::write(&from, "again").unwrap();
+        let e = rename_noreplace_strict(&from, &to).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read_to_string(&to).unwrap(), "new");
+        assert_eq!(fs::read_to_string(&from).unwrap(), "again");
+    }
+
+    #[test]
+    fn the_strict_form_moves_a_folder_where_the_system_can_refuse_a_taken_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (from, to) = (tmp.path().join("from"), tmp.path().join("to"));
+        fs::create_dir(&from).unwrap();
+        // Whatever the system is, the answer is never "replaced": either it moved, or it says
+        // it cannot.
+        match rename_noreplace_strict(&from, &to) {
+            Ok(()) => {
+                fs::create_dir(&from).unwrap();
+                let e = rename_noreplace_strict(&from, &to).unwrap_err();
+                assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+            }
+            Err(e) => assert_eq!(e.kind(), io::ErrorKind::Unsupported),
+        }
+        assert!(from.exists() || to.exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    mod strict_by_link {
+        use super::*;
+
+        #[test]
+        fn a_file_still_moves_by_link_and_is_never_replaced() {
+            let (_tmp, from, to) = two_files();
+            linux::rename_by_link_strict(&from, &to).unwrap();
+            assert_eq!(fs::read_to_string(&to).unwrap(), "new");
+            assert!(!from.exists());
+
+            fs::write(&from, "again").unwrap();
+            let e = linux::rename_by_link_strict(&from, &to).unwrap_err();
+            assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+            assert_eq!(fs::read_to_string(&to).unwrap(), "new");
+        }
+
+        #[test]
+        fn a_folder_is_unsupported_and_stays_where_it_is() {
+            let tmp = tempfile::tempdir().unwrap();
+            let (from, to) = (tmp.path().join("from"), tmp.path().join("to"));
+            fs::create_dir(&from).unwrap();
+            let e = linux::rename_by_link_strict(&from, &to).unwrap_err();
+            assert_eq!(e.kind(), io::ErrorKind::Unsupported);
+            assert!(from.is_dir() && !to.exists());
+        }
+
+        #[test]
+        fn a_link_to_something_is_unsupported_too() {
+            let (_tmp, from, to) = two_files();
+            let link = from.with_file_name("link");
+            std::os::unix::fs::symlink(&from, &link).unwrap();
+            let e = linux::rename_by_link_strict(&link, &to).unwrap_err();
+            assert_eq!(e.kind(), io::ErrorKind::Unsupported);
+            assert!(fs::symlink_metadata(&link).is_ok() && !to.exists());
+        }
+
+        /// What FAT does when asked for a hard link (`EPERM`), standing in for the filesystem.
+        #[test]
+        fn a_file_where_links_are_refused_is_unsupported_in_the_strict_form_only() {
+            for errno in [libc::EPERM, libc::EOPNOTSUPP, libc::ENOSYS, libc::EMLINK] {
+                let (_tmp, from, to) = two_files();
+                let e = linux::rename_by_failing_link(&from, &to, errno, true).unwrap_err();
+                assert_eq!(e.kind(), io::ErrorKind::Unsupported, "errno {errno}");
+                assert!(from.exists() && !to.exists(), "errno {errno}");
+            }
+            let (_tmp, from, to) = two_files();
+            linux::rename_by_failing_link(&from, &to, libc::EPERM, false).unwrap();
+            assert_eq!(fs::read_to_string(&to).unwrap(), "new");
+        }
+
+        #[test]
+        fn any_other_failure_of_the_link_is_passed_on_not_turned_into_unsupported() {
+            let (_tmp, from, to) = two_files();
+            let e = linux::rename_by_failing_link(&from, &to, libc::EACCES, true).unwrap_err();
+            assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+            assert!(from.exists() && !to.exists());
+        }
     }
 
     #[cfg(target_os = "linux")]

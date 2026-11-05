@@ -48,6 +48,9 @@ impl FsEngine for SlowFs {
     fn rename_noreplace(&self, a: &Path, b: &Path) -> io::Result<()> {
         self.inner.rename_noreplace(a, b)
     }
+    fn rename_noreplace_strict(&self, a: &Path, b: &Path) -> io::Result<()> {
+        self.inner.rename_noreplace_strict(a, b)
+    }
     fn remove_file(&self, p: &Path) -> io::Result<()> {
         self.inner.remove_file(p)
     }
