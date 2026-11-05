@@ -83,7 +83,8 @@ impl Tools {
         limit: Duration,
     ) -> std::result::Result<Output, ToolError> {
         let exe = self.find(name).ok_or(ToolError::Missing)?;
-        let child = Command::new(exe)
+        let mut command = Command::new(exe);
+        command
             .args(args)
             // Their words are read here: the same words whatever the language of the person.
             .env("LC_ALL", "C")
@@ -91,8 +92,9 @@ impl Tools {
             .env_remove("LANGUAGE")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stderr(Stdio::piped());
+        // A program written a moment ago may still be "busy" while another process starts.
+        let child = crate::platform::spawn::spawn_retrying_busy(&mut command)
             .map_err(|e| ToolError::Io(e.to_string()))?;
         let pid = child.id();
         let (tx, rx) = crossbeam_channel::bounded(1);
@@ -1437,6 +1439,30 @@ Volume(0): motorola edge 40
                 .unwrap_err(),
             ToolError::Missing
         );
+    }
+
+    #[test]
+    fn a_program_that_is_still_open_for_writing_is_started_when_it_is_closed() {
+        let sb = Sandbox::new();
+        let bin = Bin::new(&sb);
+        bin.tool("late", "echo hello");
+        // Another process that was started at that very moment holds the file open for
+        // writing, and the system refuses to run it ("Text file busy") until it lets go.
+        let held = std::fs::OpenOptions::new()
+            .append(true)
+            .open(bin.dir.join("late"))
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(150));
+            drop(held);
+        });
+        let out = bin
+            .tools()
+            .run("late", &[], Duration::from_secs(5))
+            .expect("started once the file was closed");
+        release.join().unwrap();
+        assert!(out.ok, "{out:?}");
+        assert_eq!(out.stdout.trim(), "hello");
     }
 
     #[test]
