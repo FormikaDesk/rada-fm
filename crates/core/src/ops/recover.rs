@@ -269,6 +269,7 @@ impl Engine {
                 Step::Rename {
                     from: to.clone(),
                     to: from.clone(),
+                    expect_from: None,
                 }
             }
             Intent::Link {

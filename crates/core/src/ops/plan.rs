@@ -206,11 +206,19 @@ pub enum Step {
         #[serde(with = "pathcodec::path")]
         #[schemars(with = "String")]
         to: PathBuf,
+        /// What `from` looked like when the plan was made. With it, a file that changed since
+        /// is not renamed. Absent in plans written before it existed.
+        #[serde(default)]
+        expect_from: Option<Fingerprint>,
     },
     TrashItem {
         #[serde(with = "pathcodec::path")]
         #[schemars(with = "String")]
         path: PathBuf,
+        /// What `path` looked like when the plan was made. With it, a file that changed since
+        /// is not moved to the trash. Absent in plans written before it existed.
+        #[serde(default)]
+        expect: Option<Fingerprint>,
     },
     /// Permanent removal of a file or symlink. With `expect`, refuses to remove a
     /// file that changed since it was recorded (used by undo).
@@ -260,7 +268,7 @@ impl Step {
             Step::MakeDir { path, .. }
             | Step::MakeFile { path, .. }
             | Step::FinishDir { path, .. }
-            | Step::TrashItem { path }
+            | Step::TrashItem { path, .. }
             | Step::RemoveFile { path, .. }
             | Step::SetTags { path, .. }
             | Step::RemoveDir { path } => path,
@@ -334,8 +342,8 @@ impl Step {
             Step::ExtractSymlink { src, dst, .. } => tf(StepExtractLink, &[&p(src), &p(dst)]),
             Step::Compress { dst, items, .. } => tf(StepCompress, &[&items.len(), &p(dst)]),
             Step::HardLink { existing, link, .. } => tf(StepHardLink, &[&p(existing), &p(link)]),
-            Step::Rename { from, to } => tf(StepRename, &[&p(from), &p(to)]),
-            Step::TrashItem { path } => tf(StepTrash, &[&p(path)]),
+            Step::Rename { from, to, .. } => tf(StepRename, &[&p(from), &p(to)]),
+            Step::TrashItem { path, .. } => tf(StepTrash, &[&p(path)]),
             Step::RemoveFile { path, .. } => tf(StepRemoveFile, &[&p(path)]),
             Step::RemoveDir { path } => tf(StepRemoveDir, &[&p(path)]),
             Step::Restore { item } => tf(StepRestore, &[&p(&item.original)]),
@@ -442,9 +450,12 @@ impl Step {
                 path: dst.clone(),
                 expect: result.after.clone(),
             }),
-            Step::Rename { from, to } => Some(Step::Rename {
+            // The state after a rename is not recorded, and a file edited since is still the
+            // one to put back: undo never replaces a name, so it carries no fingerprint.
+            Step::Rename { from, to, .. } => Some(Step::Rename {
                 from: to.clone(),
                 to: from.clone(),
+                expect_from: None,
             }),
             Step::TrashItem { .. } => result.trashed.clone().map(|item| Step::Restore { item }),
             Step::RemoveDir { path } => {

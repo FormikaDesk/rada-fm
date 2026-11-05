@@ -414,8 +414,16 @@ impl<'a> Running<'a> {
             ErrorChoice::Abort => self.report.aborted = true,
             _ => {
                 st.skip_all |= choice == ErrorChoice::SkipAll;
-                if let Step::MakeDir { path, .. } | Step::TrashItem { path } = step {
-                    st.blocked.insert(path.clone());
+                match step {
+                    Step::MakeDir { path, .. } | Step::TrashItem { path, .. } => {
+                        st.blocked.insert(path.clone());
+                    }
+                    // The name was not made: a step that goes on from it has nothing to act on
+                    // (the second phase of a bulk rename).
+                    Step::Rename { to, .. } => {
+                        st.blocked.insert(to.clone());
+                    }
+                    _ => {}
                 }
             }
         }
@@ -768,8 +776,12 @@ impl Engine {
             Step::Compress {
                 dst, format, items, ..
             } => self.compress(ctl, dst, *format, items),
-            Step::Rename { from, to } => self.rename(from, to),
-            Step::TrashItem { path } => self.trash_item(path),
+            Step::Rename {
+                from,
+                to,
+                expect_from,
+            } => self.rename(from, to, expect_from.as_ref()),
+            Step::TrashItem { path, expect } => self.trash_item(path, expect.as_ref()),
             Step::Restore { item } => self.restore_item(item),
             Step::RemoveFile { path, expect } => self.remove_file(st, path, expect.as_ref()),
             Step::RemoveDir { path } => self.remove_dir(st, path),
@@ -781,7 +793,27 @@ impl Engine {
         }
     }
 
-    fn trash_item(&self, path: &Path) -> Result<StepResult> {
+    /// Refuses a file that is no longer what the plan saw. A name that is gone is left to the
+    /// operation, which says so in its own words.
+    fn unchanged_since_plan(&self, path: &Path, expect: Option<&Fingerprint>) -> Result<()> {
+        let Some(exp) = expect else {
+            return Ok(());
+        };
+        match self.fs.lstat(path) {
+            Ok(now) => match exp.diff(&now.fingerprint()) {
+                Some(reason) => Err(Error::Modified {
+                    path: path.to_path_buf(),
+                    reason,
+                }),
+                None => Ok(()),
+            },
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(Error::io("inspect", path, e)),
+        }
+    }
+
+    fn trash_item(&self, path: &Path, expect: Option<&Fingerprint>) -> Result<StepResult> {
+        self.unchanged_since_plan(path, expect)?;
         let item = self.platform.trash().trash(path)?;
         Ok(StepResult {
             trashed: Some(item),
@@ -1144,7 +1176,13 @@ impl Engine {
         })
     }
 
-    fn rename(&self, from: &Path, to: &Path) -> Result<StepResult> {
+    fn rename(
+        &self,
+        from: &Path,
+        to: &Path,
+        expect_from: Option<&Fingerprint>,
+    ) -> Result<StepResult> {
+        self.unchanged_since_plan(from, expect_from)?;
         match self.fs.rename_noreplace(from, to) {
             Ok(()) => Ok(StepResult::done()),
             // Only the case changes, on a volume that ignores it: the name is taken by this

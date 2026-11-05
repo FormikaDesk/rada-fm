@@ -1267,6 +1267,18 @@
         {
           "type": "object",
           "properties": {
+            "expect_from": {
+              "description": "What `from` looked like when the plan was made. With it, a file that changed since\nis not renamed. Absent in plans written before it existed.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Fingerprint"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "from": {
               "type": "string"
             },
@@ -1287,6 +1299,18 @@
         {
           "type": "object",
           "properties": {
+            "expect": {
+              "description": "What `path` looked like when the plan was made. With it, a file that changed since\nis not moved to the trash. Absent in plans written before it existed.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Fingerprint"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "path": {
               "type": "string"
             },

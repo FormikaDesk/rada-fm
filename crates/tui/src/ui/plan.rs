@@ -929,13 +929,15 @@ fn step_label(step: &Step, b: &Bases) -> Option<String> {
             b.rel_dst(dst),
             fmt::count(items.len() as u64, Key::ItemOne, Key::ItemMany)
         ),
-        Step::Rename { from, to } => format!(
+        Step::Rename { from, to, .. } => format!(
             "{}{} → {}",
             step_word(Key::StepWRename),
             b.rel_src(from),
             b.rel(to)
         ),
-        Step::TrashItem { path } => format!("{}{}", step_word(Key::StepWTrash), b.rel_src(path)),
+        Step::TrashItem { path, .. } => {
+            format!("{}{}", step_word(Key::StepWTrash), b.rel_src(path))
+        }
         Step::RemoveFile { path, .. } => {
             format!("{}{}", step_word(Key::StepWDelete), b.rel_src(path))
         }

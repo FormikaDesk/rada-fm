@@ -68,10 +68,12 @@ impl Sim<'_> {
             Step::MakeDir { path, .. } | Step::MakeFile { path, .. } => {
                 self.set(path, true);
             }
-            Step::RemoveFile { path, .. } | Step::RemoveDir { path } | Step::TrashItem { path } => {
+            Step::RemoveFile { path, .. }
+            | Step::RemoveDir { path }
+            | Step::TrashItem { path, .. } => {
                 self.set(path, false);
             }
-            Step::Rename { from, to } => {
+            Step::Rename { from, to, .. } => {
                 self.set(from, false);
                 self.set(to, true);
             }
@@ -138,7 +140,7 @@ impl Sim<'_> {
                     Err(format!("the parent of {} is gone", display::path(path)))
                 }
             }
-            Step::Rename { from, to } => {
+            Step::Rename { from, to, .. } => {
                 if !self.exists(from) {
                     Err(format!("{} is no longer there", display::path(from)))
                 } else if self.exists(to) && !names::is_case_alias(&*self.engine.fs, from, to) {
@@ -533,7 +535,7 @@ fn undo_items(steps: &[Step]) -> Vec<ItemSummary> {
                 None,
             ),
             Step::RemoveDir { path } => (path.clone(), ItemAction::Delete, FileKind::Dir, 0, None),
-            Step::Rename { from, to } => (
+            Step::Rename { from, to, .. } => (
                 from.clone(),
                 ItemAction::Move,
                 FileKind::File,

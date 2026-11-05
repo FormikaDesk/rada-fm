@@ -269,3 +269,19 @@ fn a_case_rename_cut_short_before_the_rename_adopts_nothing() {
     assert!(rec[0].adopted.is_empty(), "{:?}", rec[0]);
     assert_eq!(names_in(&sb, "d"), ["Report.txt"]);
 }
+
+/// The case-only branch renames the file onto itself: it is checked like any other rename.
+#[test]
+fn a_case_only_rename_of_a_file_that_changed_after_the_plan_is_refused() {
+    let sb = Sandbox::new();
+    let e = folding_engine(&sb);
+    let f = sb.write("d/Report.txt", "as the plan saw it");
+    let plan = e.plan_rename(&f, "report.txt".as_ref(), ConflictPolicy::Skip);
+
+    std::fs::write(&f, "written after the plan, and longer").unwrap();
+    let rep = run(&e, &plan);
+
+    assert_eq!(names_in(&sb, "d"), [OsString::from("Report.txt")]);
+    assert_eq!(rep.failed.len(), 1, "{:?}", rep.failed);
+    assert!(rep.failed[0].error.contains("changed"), "{:?}", rep.failed);
+}

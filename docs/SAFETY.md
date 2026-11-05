@@ -9,8 +9,8 @@ Every cell restates a sentence further down this page, where the details and the
 |---|---|---|---|---|
 | **Copy** | Yes | Removes exactly what the copy created; a file modified since is left alone and reported | The half-written temporary file is deleted; a copy that had finished but was not recorded is added to the history if it is what the step declared | Written under a temporary name and renamed only when complete; what could not be kept is listed in the plan and in the result |
 | **Move** | Yes | Moves back, with the same contents, permissions, times, hard links and holes | A move killed between the copy and the removal of the source keeps both; undo then removes the copy | Across filesystems: copy, verify, then remove the source, file by file; a source that was replaced meanwhile is not removed |
-| **Rename** | Yes | Yes, from the journal; undo compares names without regard to case where the filesystem ignores it | The step that was in doubt is settled at the next start | Never replaces a name that appeared meanwhile, except on the filesystems named in the limits |
-| **Trash** | Yes | Restores from the trash | If rada is stopped between the move and its record, the item is in the system's trash but the history does not bring it back | Restore it from the trash itself in that case |
+| **Rename** | Yes | Yes, from the journal; undo compares names without regard to case where the filesystem ignores it | The step that was in doubt is settled at the next start | Never replaces a name that appeared meanwhile, except on the filesystems named in the limits; an item that changed since the plan is not renamed |
+| **Trash** | Yes | Restores from the trash | If rada is stopped between the move and its record, the item is in the system's trash but the history does not bring it back | Restore it from the trash itself in that case; an item that changed since the plan is not moved to the trash |
 | **Permanent deletion** | Yes | **No**: it cannot be undone | The operation is marked *interrupted* and you are told once | Each file, also inside a folder, is compared with the fingerprint the plan saw at the last moment, and one that changed is kept and reported; the plan says it is permanent and asks you to type `yes` |
 | **Extract an archive** | Yes | Removes exactly what was extracted; a member you edited since is left alone and reported | The temporary file is removed at the next start | A member that would land outside the destination is not extracted; setuid, setgid and sticky bits are dropped; a bomb asks for a typed `yes` |
 | **Create an archive** | Yes | Removes the finished archive (kept if you changed it) | The half-written temporary file is deleted; a finished archive found at its destination is never taken as rada's own | Written under a temporary name and renamed into place; cancelling removes it |
@@ -353,6 +353,18 @@ These are real, and we would rather you read them here than discover them.
   fingerprint check on either side of it is what makes it unlikely to matter. A file that is
   open for writing in another program cannot be deleted on Windows (the system refuses; rada
   says so and nothing is lost).
+- **Moving to the trash and renaming are checked, not guaranteed.** Just before it moves an
+  item to the trash or renames it, rada looks at the item again (`lstat`, never following a
+  link) and compares it with the fingerprint the plan saw; one that changed is left where it
+  is and reported, in a bulk rename also each file before its first move to a temporary name.
+  An item that is gone is left to the operation itself, which says so. Between that look and
+  the call that does the work there is a short window, because both go by path: on Linux and
+  macOS the work is a rename into the trash (a copy across filesystems), on Windows it is the
+  system's call to the Recycle Bin, which rada cannot hold open. A program that replaces the
+  item inside that window has the replacement moved. What is guaranteed is that an item which
+  had already changed when the step began is never touched, not that nobody can change it in
+  the next instant. Undo carries no fingerprint of this kind: it only puts a name back, and
+  never over a name that is taken.
 - **Phones and cameras** (MTP and PTP, through the desktop's virtual filesystem) are not a
   filesystem rada can make promises about. A copy there is the same plan with a progress bar,
   a cancel and a journal entry, and the plan says what is different before anything is done:

@@ -17,6 +17,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::engine::Engine;
 use super::names;
 use super::plan::*;
+use super::planner::seen_by_plan;
+use crate::fs::Fingerprint;
 use crate::i18n::{Key, tf};
 use crate::platform::PathRules;
 
@@ -268,11 +270,13 @@ impl Engine {
         };
 
         let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
+        let mut looked: HashMap<PathBuf, Option<Fingerprint>> = HashMap::new();
         for (i, from) in items.iter().enumerate() {
-            if self.fs.lstat(from).is_err() {
+            let Ok(meta) = self.fs.lstat(from) else {
                 ws.add(WarningKind::Missing, Severity::Blocking, Some(from));
                 continue;
-            }
+            };
+            looked.insert(from.clone(), seen_by_plan(from, &meta, items));
             match pattern
                 .render(i, from)
                 .and_then(|n| names::validate(&rules, &n).map(|_| n))
@@ -334,9 +338,12 @@ impl Engine {
                     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
                     let tmp =
                         from.with_file_name(format!(".rada-rename-{}-{n}", std::process::id()));
+                    // Only the first phase looks at the item: after it the temporary name
+                    // holds a file that was moved by this plan itself.
                     plan.steps.push(Step::Rename {
                         from: from.clone(),
                         to: tmp.clone(),
+                        expect_from: looked.get(from).cloned().flatten(),
                     });
                     temps.push(tmp);
                 }
@@ -344,6 +351,7 @@ impl Engine {
                     plan.steps.push(Step::Rename {
                         from: tmp,
                         to: to.clone(),
+                        expect_from: None,
                     });
                 }
             } else {
@@ -351,6 +359,7 @@ impl Engine {
                     plan.steps.push(Step::Rename {
                         from: from.clone(),
                         to: to.clone(),
+                        expect_from: looked.get(from).cloned().flatten(),
                     });
                 }
             }

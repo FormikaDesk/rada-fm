@@ -62,11 +62,23 @@ fn items_label(n: u64) -> String {
     i18n::count(n, Key::ItemOne, Key::ItemMany)
 }
 
-fn rename_step(from: &Path, to: &Path) -> Step {
+fn rename_step(from: &Path, to: &Path, seen: &FsMeta) -> Step {
     Step::Rename {
         from: from.to_path_buf(),
         to: to.to_path_buf(),
+        expect_from: Some(seen.fingerprint()),
     }
+}
+
+/// What the plan saw of an item, for the last look before the run changes it. A folder with
+/// another selected item inside is left out: moving that item changes the folder itself.
+pub(super) fn seen_by_plan(
+    path: &Path,
+    meta: &FsMeta,
+    selected: &[PathBuf],
+) -> Option<crate::fs::Fingerprint> {
+    let holds_another = meta.is_dir() && selected.iter().any(|s| s != path && s.starts_with(path));
+    (!holds_another).then(|| meta.fingerprint())
 }
 
 fn not_found(e: &io::Error) -> bool {
@@ -130,6 +142,7 @@ impl Engine {
             support: self.platform.fidelity().destination_support(dest_dir),
             links: BTreeMap::new(),
             preserved: Preserved::default(),
+            selected: scan.roots.iter().map(|r| r.path.clone()).collect(),
         };
         scan_problems(scan, &mut t.ws);
         if !self.platform.fidelity().implemented() {
@@ -254,6 +267,7 @@ impl Engine {
             symlinks: st.symlinks,
             bytes: st.bytes,
         };
+        let selected: Vec<PathBuf> = scan.roots.iter().map(|r| r.path.clone()).collect();
         for r in &scan.roots {
             if r.path.parent().is_none() {
                 ws.add_with(
@@ -266,6 +280,7 @@ impl Engine {
             }
             plan.steps.push(Step::TrashItem {
                 path: r.path.clone(),
+                expect: seen_by_plan(&r.path, &r.meta, &selected),
             });
             plan.items.push(summary_of(r, ItemAction::Trash));
             if self.platform.on_device(&r.path) {
@@ -393,12 +408,14 @@ impl Engine {
             return (Vec::new(), to);
         }
         match self.fs.lstat(&to) {
-            Ok(existing) if self.is_same_file(src, &existing) => (vec![rename_step(from, &to)], to),
+            Ok(existing) if self.is_same_file(src, &existing) => {
+                (vec![rename_step(from, &to, src)], to)
+            }
             Ok(existing) => self.rename_onto(from, src, &existing, to, policy, ws),
             Err(e) if not_found(&e) => {
                 let parent = to.parent().unwrap_or(Path::new("."));
                 if self.fs.can_write(parent) {
-                    return (vec![rename_step(from, &to)], to);
+                    return (vec![rename_step(from, &to, src)], to);
                 }
                 ws.add(WarningKind::NotWritable, Severity::Blocking, Some(parent));
                 (Vec::new(), to)
@@ -450,13 +467,16 @@ impl Engine {
                 let parent = to.parent().unwrap_or(Path::new("."));
                 let name = to.file_name().unwrap_or_default();
                 let free = names::first_free(parent, name, |p| self.fs.lstat(p).is_ok());
-                (vec![rename_step(from, &free)], free)
+                (vec![rename_step(from, &free, src)], free)
             }
             ConflictPolicy::Overwrite if self.can_replace(src, existing, &to) => {
                 ws.add(WarningKind::Conflict, Severity::Warning, Some(&to));
                 ws.add(WarningKind::Overwrite, Severity::Warning, Some(&to));
-                let steps = vec![Step::TrashItem { path: to.clone() }, rename_step(from, &to)];
-                (steps, to)
+                let trash = Step::TrashItem {
+                    path: to.clone(),
+                    expect: Some(existing.fingerprint()),
+                };
+                (vec![trash, rename_step(from, &to, src)], to)
             }
             ConflictPolicy::Overwrite => {
                 let why = i18n::t(Key::RenameCannotReplace).to_string();
@@ -586,6 +606,8 @@ struct Transfer<'a> {
     /// become hard links of that copy.
     links: BTreeMap<(u64, u64), LinkGroup>,
     preserved: Preserved,
+    /// The paths of the items selected, to tell a folder that holds another of them.
+    selected: Vec<PathBuf>,
 }
 
 /// The permissions a copy is given: the source's, except that a device keeps none (nothing is
@@ -773,7 +795,7 @@ impl Transfer<'_> {
             ConflictPolicy::Overwrite if exists_on_disk => {
                 self.ws
                     .add(WarningKind::Overwrite, Severity::Warning, Some(&dst));
-                self.steps.push(Step::TrashItem { path: dst.clone() });
+                self.trash_in_the_way(&dst);
                 self.proceed(node, dst);
             }
             ConflictPolicy::Overwrite => {
@@ -782,6 +804,19 @@ impl Transfer<'_> {
                 self.proceed(node, new);
             }
         }
+    }
+
+    /// Trash what is at `dst` so that the item can take its place. A name this plan already
+    /// wrote to has changed on purpose: there is no earlier look to compare with.
+    fn trash_in_the_way(&mut self, dst: &Path) {
+        let touched = self.taken.contains(&self.key(dst));
+        let expect = (!touched)
+            .then(|| self.engine.fs.lstat(dst).ok().map(|m| m.fingerprint()))
+            .flatten();
+        self.steps.push(Step::TrashItem {
+            path: dst.to_path_buf(),
+            expect,
+        });
     }
 
     fn note_unreadable_dir(&mut self, node: &ScanNode) {
@@ -816,6 +851,7 @@ impl Transfer<'_> {
                     self.steps.push(Step::Rename {
                         from: node.path.clone(),
                         to: dst,
+                        expect_from: seen_by_plan(&node.path, &node.meta, &self.selected),
                     });
                 } else {
                     self.cross_device = true;

@@ -117,12 +117,13 @@ impl Ex<'_> {
                 self.existing.insert(dir.to_path_buf());
                 Ok(())
             }
-            Ok(_) => {
+            Ok(old) => {
                 if self.policy == ConflictPolicy::Overwrite {
                     self.ws
                         .add(WarningKind::Overwrite, Severity::Warning, Some(dir));
                     self.steps.push(Step::TrashItem {
                         path: dir.to_path_buf(),
+                        expect: Some(old.fingerprint()),
                     });
                     self.make(dir, mode)
                 } else {
@@ -206,6 +207,7 @@ impl Ex<'_> {
                     .add(WarningKind::Overwrite, Severity::Warning, Some(dst));
                 self.steps.push(Step::TrashItem {
                     path: dst.to_path_buf(),
+                    expect: self.engine.fs.lstat(dst).ok().map(|m| m.fingerprint()),
                 });
                 self.taken.insert(self.key(dst));
                 Some(dst.to_path_buf())
@@ -807,8 +809,8 @@ impl Engine {
             ),
         }
         let mut dst = archive.to_path_buf();
-        let mut trash_old = false;
-        if self.fs.lstat(archive).is_ok() {
+        let mut trash_old = None;
+        if let Ok(old) = self.fs.lstat(archive) {
             ws.add(WarningKind::Conflict, Severity::Warning, Some(archive));
             match policy {
                 ConflictPolicy::Skip => {
@@ -825,7 +827,7 @@ impl Engine {
                 }
                 ConflictPolicy::Overwrite => {
                     ws.add(WarningKind::Overwrite, Severity::Warning, Some(archive));
-                    trash_old = true;
+                    trash_old = Some(old.fingerprint());
                 }
             }
         }
@@ -917,9 +919,10 @@ impl Engine {
                 )),
             );
         }
-        if trash_old {
+        if let Some(seen) = trash_old {
             plan.steps.push(Step::TrashItem {
                 path: archive.to_path_buf(),
+                expect: Some(seen),
             });
         }
         if items.is_empty() {

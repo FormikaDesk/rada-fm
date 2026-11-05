@@ -198,7 +198,7 @@ impl Intent {
             Step::Compress { dst, .. } => Intent::create(dst, None, None).unverifiable(),
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
             Step::MakeFile { path, .. } => Intent::create(path, Some(0), None),
-            Step::Rename { from, to } => Intent::Rename {
+            Step::Rename { from, to, .. } => Intent::Rename {
                 from: from.clone(),
                 to: to.clone(),
             },
