@@ -5,8 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-05
+
+Fixes only.
+
 ### Changed
 - **`rada update` shows the release notes as plain text**, without markdown marks.
+
+### Fixed
+- **A permanent deletion no longer removes a file that changed after the plan was shown.** Each file, also inside a folder, is compared with what the plan saw at the last moment, as undo already did; one that changed is kept and reported, and the folder that still holds it stays.
+- **A move across filesystems no longer removes a source that was replaced while it was being copied.** The item is not left in two places: the copy is taken away and the step reports that the file changed.
+- **The plan window no longer crashes on a terminal shorter than 14 rows.**
+- **The buttons of every window are drawn, and only what is drawn answers a click.** "Quit anyway", the properties, the prompts to rename or to name a new folder or file, the update notes and the window of a failed step were cut short and their buttons were missing, while the click for them stayed on an empty row. A window now takes its height from its content, within the screen; on a short terminal the buttons keep their place first, and on a narrow one they go one under the other.
+- **Notifications that do not fit are no longer all left out.** When the pile was taller than the list nothing was drawn and the list had already given up its rows. Now the cards that fit are shown, errors first, the list keeps its titles and a row, and "+N" says how many were left out.
+- **Keys typed in a window no longer close the notifications behind it**, which were not on screen.
+- **On Linux the dock and the launchers no longer show the old logo.** `rada setup desktop` stopped installing the scalable SVG, which the icon theme used at every size without a picture of its own, and installs PNGs at 16, 24, 32, 48, 64, 128, 256 and 512 pixels. The SVG that an earlier version installed is taken away when it is exactly the one that version wrote; any other file at that name is left, and the command says so.
+- **The helper programs that list phones and disks are started again when the system says the file is busy**, instead of reporting an empty list.
 
 ## [0.6.0] - 2026-11-01
 
@@ -624,7 +638,8 @@ First release.
 ### Platforms
 - Linux is supported. Windows and macOS are in development: the code compiles for them, but they are not supported yet.
 
-[Unreleased]: https://github.com/formikadesk/rada-fm/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/formikadesk/rada-fm/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/formikadesk/rada-fm/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/formikadesk/rada-fm/releases/tag/v0.6.0
 [0.2.0]: https://github.com/formikadesk/rada-fm/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/formikadesk/rada-fm/releases/tag/v0.1.0

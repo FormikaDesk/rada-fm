@@ -10,11 +10,11 @@ Every release on the [releases page](https://github.com/formikadesk/rada-fm/rele
 
 | System | Processor | The file |
 |---|---|---|
-| Linux | Intel or AMD (`x86_64`) | `rada-0.6.0-x86_64-unknown-linux-musl.tar.gz` |
-| Linux | ARM (`aarch64`) | `rada-0.6.0-aarch64-unknown-linux-musl.tar.gz` |
-| macOS | Apple silicon (M1 and later) | `rada-0.6.0-aarch64-apple-darwin.tar.gz` |
-| macOS | Intel | `rada-0.6.0-x86_64-apple-darwin.tar.gz` |
-| Windows | 64-bit Intel or AMD (`x86_64`) | `rada-0.6.0-x86_64-pc-windows-msvc.zip` |
+| Linux | Intel or AMD (`x86_64`) | `rada-0.6.1-x86_64-unknown-linux-musl.tar.gz` |
+| Linux | ARM (`aarch64`) | `rada-0.6.1-aarch64-unknown-linux-musl.tar.gz` |
+| macOS | Apple silicon (M1 and later) | `rada-0.6.1-aarch64-apple-darwin.tar.gz` |
+| macOS | Intel | `rada-0.6.1-x86_64-apple-darwin.tar.gz` |
+| Windows | 64-bit Intel or AMD (`x86_64`) | `rada-0.6.1-x86_64-pc-windows-msvc.zip` |
 
 Which processor do you have? On Linux and on a Mac, ask the terminal:
 
@@ -31,7 +31,7 @@ The Linux builds are static (musl): they run on every distribution, with nothing
 The same commands serve both processors: `uname -m` gives the first half of the file name. They are for bash and zsh; for fish, which writes variables differently, see [Using fish](#using-fish-linux).
 
 ```sh
-rv=0.6.0
+rv=0.6.1
 target="$(uname -m)-unknown-linux-musl"
 name="rada-$rv-$target"
 base="https://github.com/formikadesk/rada-fm/releases/download/v$rv"
@@ -49,7 +49,7 @@ minisign -Vm SHA256SUMS -P RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-The first command must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.0`; the second must say `OK` for your archive. If either fails, stop and read [what to do](verify.md#if-a-signature-does-not-verify).
+The first command must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.1`; the second must say `OK` for your archive. If either fails, stop and read [what to do](verify.md#if-a-signature-does-not-verify).
 
 **Unpack and install** into `~/.local/bin`, a folder that belongs to you:
 
@@ -73,7 +73,7 @@ fish_add_path ~/.local/bin
 **Check:**
 
 ```sh
-rada --version      # rada 0.6.0
+rada --version      # rada 0.6.1
 ```
 
 If it says `command not found`, the folder is not on the `PATH` of this terminal yet: open a new one, or run `~/.local/bin/rada --version` to see that the file itself works. Once it is installed, rada can [update itself](updates.md).
@@ -83,7 +83,7 @@ If it says `command not found`, the folder is not on the `PATH` of this terminal
 fish sets variables with `set`, not `name=value`, and keeps the name `version` for its own version, so these commands call the variable `rv`. The commands to check the download above (`minisign`, `sha256sum`) are the same in fish.
 
 ```fish
-set rv 0.6.0
+set rv 0.6.1
 set target (uname -m)-unknown-linux-musl
 set name rada-$rv-$target
 set base https://github.com/formikadesk/rada-fm/releases/download/v$rv
@@ -123,7 +123,7 @@ Apple silicon and Intel, with the Terminal. No Homebrew is needed. Take the file
 
 ```sh
 target=aarch64-apple-darwin          # Apple silicon; for an Intel Mac: x86_64-apple-darwin
-rv=0.6.0
+rv=0.6.1
 name="rada-$rv-$target"
 base="https://github.com/formikadesk/rada-fm/releases/download/v$rv"
 
@@ -140,7 +140,7 @@ minisign -Vm SHA256SUMS -P RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0
 shasum -a 256 --check --ignore-missing SHA256SUMS
 ```
 
-The first command must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.0`; the second must say `OK` for your archive.
+The first command must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.1`; the second must say `OK` for your archive.
 
 **Unpack and install** into `~/.local/bin`:
 
@@ -161,7 +161,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 **Check:**
 
 ```sh
-rada --version      # rada 0.6.0
+rada --version      # rada 0.6.1
 ```
 
 **If macOS refuses to open it.** A file that `curl` downloaded is not marked and opens at once. A file that a **browser** downloaded (or an archive you opened with a double click in the Finder) carries macOS's quarantine flag, `com.apple.quarantine`, and the first run may end in *"rada" cannot be opened because the developer cannot be verified* (the binaries are not notarized by Apple). Take the flag off the program, which is what rada itself does to the files it writes when it updates:
@@ -178,7 +178,7 @@ fish sets variables with `set`, not `name=value`, and keeps the name `version` f
 
 ```fish
 set target aarch64-apple-darwin          # Apple silicon; for an Intel Mac: x86_64-apple-darwin
-set rv 0.6.0
+set rv 0.6.1
 set name rada-$rv-$target
 set base https://github.com/formikadesk/rada-fm/releases/download/v$rv
 
@@ -211,7 +211,7 @@ Windows 10 or 11, 64-bit Intel or AMD, with PowerShell (the one that comes with 
 
 ```powershell
 $ProgressPreference = "SilentlyContinue"     # makes Invoke-WebRequest much faster
-$rv = "0.6.0"
+$rv = "0.6.1"
 $name = "rada-$rv-x86_64-pc-windows-msvc"
 $base = "https://github.com/formikadesk/rada-fm/releases/download/v$rv"
 
@@ -221,7 +221,7 @@ Invoke-WebRequest "$base/SHA256SUMS" -OutFile SHA256SUMS
 Invoke-WebRequest "$base/SHA256SUMS.minisig" -OutFile SHA256SUMS.minisig
 ```
 
-**Check the download.** With `minisign` installed, the commands of [verify.md](verify.md) work in PowerShell too: `minisign -Vm SHA256SUMS -P RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ` must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.0`. Without it, you can at least see that the file is not damaged: the two lines below must show the same hash (this does not prove who made the file).
+**Check the download.** With `minisign` installed, the commands of [verify.md](verify.md) work in PowerShell too: `minisign -Vm SHA256SUMS -P RWTqJn1Q6BACL1Uum9OJEEM2ZyPMK3StBCnXcQXli1oYz0lZ19+S0OoQ` must print `Signature and comment signature verified` and `Trusted comment: rada v0.6.1`. Without it, you can at least see that the file is not damaged: the two lines below must show the same hash (this does not prove who made the file).
 
 ```powershell
 (Get-FileHash "$name.zip" -Algorithm SHA256).Hash.ToLower()
@@ -250,7 +250,7 @@ if ($parts -notcontains $dest) {
 **Close the terminal and open a new one** (a terminal reads the `PATH` when it starts), then:
 
 ```powershell
-rada --version      # rada 0.6.0
+rada --version      # rada 0.6.1
 ```
 
 **SmartScreen.** rada.exe is not signed with a certificate from Microsoft's list, so Windows may say *"Windows protected your PC"* the first time you run a file that came from a browser. Click *More info*, then *Run anyway*; or take the mark of the download off before the first run (the file `Invoke-WebRequest` saved has none, so with the commands above this is not needed):
