@@ -13,7 +13,8 @@ use ratatui::widgets::{Block, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use super::popup::{Ctx, Tone};
-use super::widgets::{SPIN, button, centered, field_parts, hit_spans, pad, pad_left, tail};
+use super::sheet::{self, Sheet};
+use super::widgets::{SPIN, button, centered, field_parts, pad, pad_left, tail};
 use crate::app::*;
 use crate::fmt;
 use crate::hits::{Hits, Target};
@@ -33,6 +34,18 @@ pub(super) fn frame(f: &mut Frame, th: &Theme, r: Rect, _tone: Color) -> Rect {
         width: inner.width.saturating_sub(4),
         height: inner.height.saturating_sub(2),
     }
+}
+
+/// Lines of one style, each text wrapped to `width`, as the body of a [`Sheet`].
+fn plain(
+    texts: impl Iterator<Item = String>,
+    width: usize,
+    style: Style,
+) -> Vec<(Line<'static>, Option<Target>)> {
+    texts
+        .flat_map(|t| fmt::wrap(&t, width))
+        .map(|l| (Line::from(Span::styled(l, style)), None))
+        .collect()
 }
 
 /// The label at the head of a window: a pill in the tint of its tone (see [`super::popup`]),
@@ -105,51 +118,35 @@ fn draw_full_preview(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_properties(f: &mut Frame, ctx: &Ctx, p: &PropsView, area: Rect, hits: &mut Hits) {
     let th = ctx.th;
+    let tw = sheet::text_width(area, 80);
     let key_w = p.rows.iter().map(|(k, _)| k.width()).max().unwrap_or(8) + 2;
-    let w = 80.min(area.width.saturating_sub(4));
-    let value_w = (w as usize).saturating_sub(6 + key_w).max(10);
-    let mut lines: Vec<Line> = Vec::new();
+    let value_w = tw.saturating_sub(key_w).max(10);
+    let mut body = Vec::new();
     for (k, v) in &p.rows {
         for (i, part) in fmt::wrap(v, value_w).into_iter().enumerate() {
-            lines.push(Line::from(vec![
+            let line = Line::from(vec![
                 Span::styled(pad(if i == 0 { k } else { "" }, key_w), th.dim()),
                 Span::styled(part, th.base()),
-            ]));
+            ]);
+            body.push((line, None));
         }
     }
-    let h = (lines.len() as u16 + 6).min(area.height.saturating_sub(2));
-    let r = centered(area, w, h);
-    let inner = frame(f, th, r, th.accent);
-    let rows = inner.height.saturating_sub(3) as usize;
-    let scroll = p.scroll.min(lines.len().saturating_sub(rows));
-    let mut out = vec![
-        titled(
+    let sheet = Sheet {
+        title: titled(
             ctx,
             Key::ChipProperties.tr(),
             Tone::Accent,
-            &display::truncate(&p.title, inner.width as usize / 2),
+            &display::truncate(&p.title, tw / 2),
         ),
-        Line::raw(""),
-    ];
-    out.extend(lines.into_iter().skip(scroll).take(rows));
-    out.push(Line::raw(""));
-    out.push(Line::from(vec![button(
-        th,
-        "Esc",
-        Key::BtnClose.tr(),
-        None,
-        true,
-    )]));
-    f.render_widget(Paragraph::new(out), inner);
-    hits.add(
-        Rect {
-            y: inner.y + inner.height.saturating_sub(1),
-            height: 1,
-            width: 14.min(inner.width),
-            ..inner
-        },
-        Target::Key(KeyCode::Esc),
-    );
+        body,
+        scroll: p.scroll,
+        buttons: vec![(
+            button(th, "Esc", Key::BtnClose.tr(), None, true),
+            Target::Key(KeyCode::Esc),
+        )],
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 80, sheet, hits);
 }
 
 /// Whether the window in front dims what is behind it: a menu does not, nor the list of
@@ -174,6 +171,127 @@ pub(super) fn popup_room(app: &App, area: Rect) -> Rect {
         height: area.height.saturating_sub(2 + hints),
         ..area
     }
+}
+
+/// The window that lists what went wrong in an operation that finished.
+fn draw_result(f: &mut Frame, ctx: &Ctx, r: &ResultView, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
+    let tw = sheet::text_width(area, 90);
+    let mut body = Vec::new();
+    for (k, t) in &r.lines {
+        let c = if *k == ToastKind::Error {
+            th.error
+        } else {
+            th.warn
+        };
+        for (i, l) in fmt::wrap(t, tw.saturating_sub(2)).into_iter().enumerate() {
+            let bullet = if i == 0 { "• " } else { "  " };
+            body.push((
+                Line::from(vec![
+                    Span::styled(bullet, th.fg(c)),
+                    Span::styled(l, th.fg(c)),
+                ]),
+                None,
+            ));
+        }
+    }
+    let title = display::truncate(&r.title, tw.saturating_sub(10));
+    let sheet = Sheet {
+        title: titled(ctx, Key::ChipDone.tr(), Tone::Warn, &title),
+        body,
+        scroll: r.scroll,
+        buttons: vec![
+            (
+                button(th, "u", Key::BtnUndoDone.tr(), Some(th.accent), true),
+                Target::Key(KeyCode::Char('u')),
+            ),
+            (
+                button(th, "Esc", Key::BtnClose.tr(), None, true),
+                Target::Key(KeyCode::Esc),
+            ),
+        ],
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 90, sheet, hits);
+}
+
+/// The question asked when quitting while an operation runs.
+fn draw_confirm_quit(f: &mut Frame, ctx: &Ctx, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
+    let tw = sheet::text_width(area, 66);
+    let warn = [Key::QuitWarn1.tr(), Key::QuitWarn2.tr()];
+    let sheet = Sheet {
+        title: titled(
+            ctx,
+            Key::ChipRunning.tr(),
+            Tone::Warn,
+            Key::OpInProgress.tr(),
+        ),
+        body: plain(warn.iter().map(|w| w.to_string()), tw, th.dim()),
+        buttons: vec![
+            (
+                button(th, "y", Key::BtnQuitAnyway.tr(), Some(th.warn), true),
+                Target::Key(KeyCode::Char('y')),
+            ),
+            (
+                button(th, "Esc", Key::BtnStay.tr(), None, true),
+                Target::Key(KeyCode::Esc),
+            ),
+        ],
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 66, sheet, hits);
+}
+
+/// What the window of a scan shows.
+struct ScanLine<'a> {
+    what: &'a str,
+    spinner: &'a str,
+    current: &'a std::path::Path,
+    files: u64,
+    dirs: u64,
+    bytes: u64,
+}
+
+/// The window of a scan or a plan being made: what for, how far, and which path it is on.
+fn draw_scanning(f: &mut Frame, ctx: &Ctx, area: Rect, scan: &ScanLine, hits: &mut Hits) {
+    let th = ctx.th;
+    let ScanLine {
+        what,
+        spinner,
+        current,
+        files,
+        dirs,
+        bytes,
+    } = *scan;
+    let tw = sheet::text_width(area, 66);
+    let totals = tf(
+        Key::ScanTotals,
+        &[
+            &fmt::count(files, Key::FileOne, Key::FileMany),
+            &fmt::count(dirs, Key::FolderOne, Key::FolderMany),
+            &fmt::size(bytes),
+        ],
+    );
+    let sheet = Sheet {
+        title: Line::from(vec![
+            Span::styled(format!("{spinner} "), th.accent_style()),
+            Span::styled(what.to_string(), th.base().add_modifier(Modifier::BOLD)),
+        ]),
+        body: vec![
+            (Line::from(Span::styled(totals, th.base())), None),
+            (
+                Line::from(Span::styled(tail(&display::path(current), tw), th.dim())),
+                None,
+            ),
+        ],
+        after: vec![Line::from(vec![
+            Span::styled("Esc", th.key()),
+            Span::styled(format!(" {}", Key::HintCancel.tr()), th.dim()),
+        ])],
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 66, sheet, hits);
 }
 
 pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
@@ -207,36 +325,15 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             current,
             ..
         } => {
-            let r = centered(area, 66, 9);
-            let inner = frame(f, &th, r, th.accent);
-            let lines = vec![
-                Line::from(vec![
-                    Span::styled(format!("{spinner} "), th.accent_style()),
-                    Span::styled(what.clone(), th.base().add_modifier(Modifier::BOLD)),
-                ]),
-                Line::raw(""),
-                Line::from(Span::styled(
-                    tf(
-                        Key::ScanTotals,
-                        &[
-                            &fmt::count(*files, Key::FileOne, Key::FileMany),
-                            &fmt::count(*dirs, Key::FolderOne, Key::FolderMany),
-                            &fmt::size(*bytes),
-                        ],
-                    ),
-                    th.base(),
-                )),
-                Line::from(Span::styled(
-                    tail(&display::path(current), inner.width as usize),
-                    th.dim(),
-                )),
-                Line::raw(""),
-                Line::from(vec![
-                    Span::styled("Esc", th.key()),
-                    Span::styled(format!(" {}", Key::HintCancel.tr()), th.dim()),
-                ]),
-            ];
-            f.render_widget(Paragraph::new(lines), inner);
+            let scan = ScanLine {
+                what,
+                spinner,
+                current,
+                files: *files,
+                dirs: *dirs,
+                bytes: *bytes,
+            };
+            draw_scanning(f, &ctx, area, &scan, &mut app.frame.hits);
         }
         Modal::Plan(pv) => super::plan::draw(
             f,
@@ -266,96 +363,10 @@ pub fn draw_modal(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         Modal::Failure { info, .. } => draw_failure(f, &ctx, info, area, &mut app.frame.hits),
-        Modal::Input(iv) => draw_input(f, &ctx, iv, area),
+        Modal::Input(iv) => draw_input(f, &ctx, iv, area, &mut app.frame.hits),
         Modal::History(h) => draw_history(f, &ctx, h, area, spinner, &mut app.frame.hits),
-        Modal::Result(r) => {
-            let w = 90.min(area.width.saturating_sub(4));
-            let wrapped: Vec<(ToastKind, String, bool)> = r
-                .lines
-                .iter()
-                .flat_map(|(k, t)| {
-                    fmt::wrap(t, (w as usize).saturating_sub(8))
-                        .into_iter()
-                        .enumerate()
-                        .map(move |(i, l)| (*k, l, i == 0))
-                })
-                .collect();
-            let h = (wrapped.len() as u16 + 8).min(area.height.saturating_sub(2));
-            let rect = centered(area, w, h);
-            let inner = frame(f, &th, rect, th.warn);
-            let title = display::truncate(&r.title, (w as usize).saturating_sub(10));
-            let mut lines = vec![
-                titled(&ctx, Key::ChipDone.tr(), Tone::Warn, &title),
-                Line::raw(""),
-            ];
-            let rows = inner.height.saturating_sub(5) as usize;
-            for (k, t, first) in wrapped.iter().skip(r.scroll).take(rows) {
-                let c = if *k == ToastKind::Error {
-                    th.error
-                } else {
-                    th.warn
-                };
-                lines.push(Line::from(vec![
-                    Span::styled(if *first { "• " } else { "  " }, th.fg(c)),
-                    Span::styled(t.clone(), th.fg(c)),
-                ]));
-            }
-            lines.push(Line::raw(""));
-            let btns = vec![
-                button(&th, "u", Key::BtnUndoDone.tr(), Some(th.accent), true),
-                Span::raw("  "),
-                button(&th, "Esc", Key::BtnClose.tr(), None, true),
-            ];
-            hit_spans(
-                &mut app.frame.hits,
-                inner.x,
-                inner.y + lines.len() as u16,
-                &btns,
-                &[
-                    (0, Target::Key(KeyCode::Char('u'))),
-                    (2, Target::Key(KeyCode::Esc)),
-                ],
-            );
-            lines.push(Line::from(btns));
-            f.render_widget(Paragraph::new(lines), inner);
-        }
-        Modal::ConfirmQuit => {
-            let r = centered(area, 66, 9);
-            let inner = frame(f, &th, r, th.warn);
-            let lines = vec![
-                titled(
-                    &ctx,
-                    Key::ChipRunning.tr(),
-                    Tone::Warn,
-                    Key::OpInProgress.tr(),
-                ),
-                Line::raw(""),
-                Line::from(Span::styled(Key::QuitWarn1.tr(), th.dim())),
-                Line::from(Span::styled(Key::QuitWarn2.tr(), th.dim())),
-                Line::raw(""),
-                Line::from(vec![
-                    button(&th, "y", Key::BtnQuitAnyway.tr(), Some(th.warn), true),
-                    Span::raw("  "),
-                    button(&th, "Esc", Key::BtnStay.tr(), None, true),
-                ]),
-            ];
-            let btns = vec![
-                button(&th, "y", Key::BtnQuitAnyway.tr(), Some(th.warn), true),
-                Span::raw("  "),
-                button(&th, "Esc", Key::BtnStay.tr(), None, true),
-            ];
-            hit_spans(
-                &mut app.frame.hits,
-                inner.x,
-                inner.y + 5,
-                &btns,
-                &[
-                    (0, Target::Key(KeyCode::Char('y'))),
-                    (2, Target::Key(KeyCode::Esc)),
-                ],
-            );
-            f.render_widget(Paragraph::new(lines), inner);
-        }
+        Modal::Result(r) => draw_result(f, &ctx, r, area, &mut app.frame.hits),
+        Modal::ConfirmQuit => draw_confirm_quit(f, &ctx, area, &mut app.frame.hits),
         Modal::Help => draw_help(
             f,
             &ctx,
@@ -536,58 +547,40 @@ fn draw_failure(
     hits: &mut Hits,
 ) {
     let th = ctx.th;
-    let w = 88.min(area.width.saturating_sub(4));
-    let msg = fmt::wrap(&info.message, (w as usize).saturating_sub(6));
-    let note = if info.journal {
-        fmt::wrap(Key::JournalFailNote.tr(), (w as usize).saturating_sub(6))
-    } else {
-        Vec::new()
-    };
-    let h = ((msg.len() + note.len()) as u16 + 9).min(area.height.saturating_sub(2));
-    let inner = frame(f, th, centered(area, w, h), th.error);
-    let mut lines = failure_text(ctx, info, msg, note);
-    let (btns, targets) = failure_buttons(th, info.journal);
-    hit_spans(hits, inner.x, inner.y + lines.len() as u16, &btns, &targets);
-    lines.push(Line::from(btns));
-    if !info.journal {
-        lines.push(Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint())));
-    }
-    f.render_widget(Paragraph::new(lines), inner);
-}
-
-fn failure_text(
-    ctx: &Ctx,
-    info: &rada_core::events::FailureInfo,
-    msg: Vec<String>,
-    note: Vec<String>,
-) -> Vec<Line<'static>> {
-    let th = ctx.th;
+    let tw = sheet::text_width(area, 88);
     let headline = if info.journal {
         Key::JournalFailTitle.tr()
     } else {
         Key::WentWrong.tr()
     };
-    let mut lines = vec![
-        titled(ctx, Key::ChipError.tr(), Tone::Danger, headline),
-        Line::raw(""),
-    ];
-    for l in msg {
-        lines.push(Line::from(Span::styled(l, th.fg(th.error))));
-    }
-    for l in note {
-        lines.push(Line::from(Span::styled(l, th.dim())));
+    let mut body = plain(std::iter::once(info.message.clone()), tw, th.fg(th.error));
+    if info.journal {
+        body.extend(plain(
+            std::iter::once(Key::JournalFailNote.tr().to_string()),
+            tw,
+            th.dim(),
+        ));
     }
     if info.attempt > 1 {
-        lines.push(Line::from(Span::styled(
-            tf(Key::AttemptN, &[&info.attempt]),
-            th.dim(),
-        )));
+        let attempt = tf(Key::AttemptN, &[&info.attempt]);
+        body.extend(plain(std::iter::once(attempt), tw, th.dim()));
     }
-    lines.push(Line::raw(""));
-    lines
+    let after = if info.journal {
+        Vec::new()
+    } else {
+        vec![Line::from(Span::styled(Key::AbortKeeps.tr(), th.faint()))]
+    };
+    let sheet = Sheet {
+        title: titled(ctx, Key::ChipError.tr(), Tone::Danger, headline),
+        body,
+        buttons: failure_buttons(th, info.journal),
+        after,
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 88, sheet, hits);
 }
 
-fn failure_buttons(th: &Theme, journal: bool) -> (Vec<Span<'static>>, Vec<(usize, Target)>) {
+fn failure_buttons(th: &Theme, journal: bool) -> Vec<(Span<'static>, Target)> {
     let keys: Vec<(char, Key, bool)> = if journal {
         vec![
             ('a', Key::BtnAbort, true),
@@ -601,27 +594,23 @@ fn failure_buttons(th: &Theme, journal: bool) -> (Vec<Span<'static>>, Vec<(usize
             ('a', Key::BtnAbort, false),
         ]
     };
-    let mut spans = Vec::new();
-    let mut targets = Vec::new();
-    for (i, (c, label, main)) in keys.into_iter().enumerate() {
-        if i > 0 {
-            spans.push(Span::raw("  "));
-        }
-        targets.push((spans.len(), Target::Key(KeyCode::Char(c))));
-        spans.push(button(
-            th,
-            &c.to_string(),
-            label.tr(),
-            main.then_some(th.accent),
-            true,
-        ));
-    }
-    (spans, targets)
+    keys.into_iter()
+        .map(|(c, label, main)| {
+            let span = button(
+                th,
+                &c.to_string(),
+                label.tr(),
+                main.then_some(th.accent),
+                true,
+            );
+            (span, Target::Key(KeyCode::Char(c)))
+        })
+        .collect()
 }
 
-fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
-    let th = ctx.th;
-    let (title, hint): (&str, String) = match &iv.kind {
+/// The title of the window and the hint under it, by what is being asked.
+fn input_texts(kind: &InputKind) -> (&'static str, String) {
+    match kind {
         InputKind::Rename { .. } => (Key::VRename.tr(), Key::InNewName.tr().into()),
         InputKind::NewDir => (Key::VNewFolder.tr(), Key::InName.tr().into()),
         InputKind::SaveAs => (Key::ChooseTitleSave.tr(), Key::ChooseSaveName.tr().into()),
@@ -651,8 +640,12 @@ fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
             (Key::VCompress.tr(), tf(Key::InArchiveHint, &[&formats]))
         }
         InputKind::BulkRename { .. } => (Key::VerbBulkRename.tr(), Key::InBulkHint.tr().into()),
-    };
-    let preview: Vec<(String, String)> = match &iv.kind {
+    }
+}
+
+/// What a bulk rename would do to the first names: from, and to (or the problem).
+fn input_preview(iv: &InputView) -> Vec<(String, String)> {
+    match &iv.kind {
         InputKind::BulkRename { items, rules } => match rada_core::ops::Pattern::parse(&iv.text) {
             Ok(p) => p
                 .preview(items, rules)
@@ -670,58 +663,101 @@ fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect) {
             Err(_) => Vec::new(),
         },
         _ => Vec::new(),
-    };
-    let h = 10 + preview.len() as u16;
-    let r = centered(area, 88, h);
-    let inner = frame(f, th, r, th.accent);
-    let w = inner.width as usize;
+    }
+}
+
+/// The lines under the title: the hint, the field with its cursor, and what is wrong.
+fn input_lead(th: &Theme, iv: &InputView, hint: &str, w: usize) -> Vec<Line<'static>> {
     let (before, at, after) = field_parts(&iv.text, iv.cursor);
     let at = if at.is_empty() { " ".into() } else { at };
-    let mut lines = vec![
-        Line::from(chip(ctx, title, Tone::Accent)),
-        Line::raw(""),
-        Line::from(Span::styled(display::truncate(&hint, w), th.dim())),
+    let problem = match &iv.error {
+        Some(e) => Some(e.to_string()),
+        None if matches!(iv.kind, InputKind::BulkRename { .. }) => {
+            rada_core::ops::Pattern::parse(&iv.text)
+                .err()
+                .map(|e| e.to_string())
+        }
+        None => None,
+    };
+    vec![
+        Line::from(Span::styled(display::truncate(hint, w), th.dim())),
         Line::from(vec![
             Span::styled("› ", th.accent_style().add_modifier(Modifier::BOLD)),
             Span::styled(before, th.base()),
             Span::styled(at, Style::default().add_modifier(Modifier::REVERSED)),
             Span::styled(after, th.base()),
         ]),
-    ];
-    match &iv.error {
-        Some(e) => lines.push(Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error)))),
-        None => {
-            if let InputKind::BulkRename { .. } = &iv.kind {
-                if let Err(e) = rada_core::ops::Pattern::parse(&iv.text) {
-                    lines.push(Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error))));
-                } else {
-                    lines.push(Line::raw(""));
-                }
-            } else {
-                lines.push(Line::raw(""));
-            }
-        }
-    }
-    for (a, b) in preview {
-        let half = w.saturating_sub(5) / 2;
-        lines.push(Line::from(vec![
-            Span::styled(display::truncate(&a, half), th.dim()),
-            Span::styled("  →  ", th.accent_style()),
-            Span::styled(display::truncate(&b, half), th.base()),
-        ]));
-    }
-    lines.push(Line::raw(""));
+        match problem {
+            Some(e) => Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error))),
+            None => Line::raw(""),
+        },
+    ]
+}
+
+fn draw_input(f: &mut Frame, ctx: &Ctx, iv: &InputView, area: Rect, hits: &mut Hits) {
+    let th = ctx.th;
+    let (title, hint) = input_texts(&iv.kind);
+    let w = sheet::text_width(area, 88);
+    let half = w.saturating_sub(5) / 2;
+    let body = input_preview(iv)
+        .into_iter()
+        .map(|(a, b)| {
+            let line = Line::from(vec![
+                Span::styled(display::truncate(&a, half), th.dim()),
+                Span::styled("  →  ", th.accent_style()),
+                Span::styled(display::truncate(&b, half), th.base()),
+            ]);
+            (line, None)
+        })
+        .collect();
     let go = if matches!(iv.kind, InputKind::OpenWith { .. }) {
         Key::BtnOpen.tr()
     } else {
         Key::BtnPlan.tr()
     };
-    lines.push(Line::from(vec![
-        button(th, "Enter", go, Some(th.accent), true),
-        Span::raw("  "),
-        button(th, "Esc", Key::BtnCancel.tr(), None, true),
-    ]));
-    f.render_widget(Paragraph::new(lines), inner);
+    let sheet = Sheet {
+        title: Line::from(chip(ctx, title, Tone::Accent)),
+        lead: input_lead(th, iv, &hint, w),
+        body,
+        buttons: vec![
+            (
+                button(th, "Enter", go, Some(th.accent), true),
+                Target::Key(KeyCode::Enter),
+            ),
+            (
+                button(th, "Esc", Key::BtnCancel.tr(), None, true),
+                Target::Key(KeyCode::Esc),
+            ),
+        ],
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 88, sheet, hits);
+}
+
+/// The rows of the history, and the row where its entries begin (a line may come first).
+fn history_body(
+    th: &Theme,
+    h: &HistoryView,
+    spinner: &str,
+    w: usize,
+) -> (Vec<(Line<'static>, Option<Target>)>, usize) {
+    let mut body: Vec<(Line<'static>, Option<Target>)> = Vec::new();
+    if h.loading {
+        let reading = tf(Key::ReadingJournal, &[&spinner]);
+        body.push((Line::from(Span::styled(reading, th.dim())), None));
+    } else if h.entries.is_empty() {
+        body.push((Line::from(Span::styled(Key::NoOpsYet.tr(), th.dim())), None));
+    }
+    let first_entry = body.len();
+    for (i, e) in h.entries.iter().enumerate() {
+        let row = history_row(th, e, i == h.selected, w);
+        body.push((row, Some(Target::HistoryRow(i))));
+    }
+    // A list never shrinks to nothing: three rows at least.
+    while body.len() < 3 {
+        body.push((Line::raw(""), None));
+    }
+    (body, first_entry)
 }
 
 fn draw_history(
@@ -733,99 +769,84 @@ fn draw_history(
     hits: &mut Hits,
 ) {
     let th = ctx.th;
-    let rows = h.entries.len().clamp(3, 16) as u16;
-    let r = centered(area, 104, rows + 9);
-    let inner = frame(f, th, r, th.accent);
-    let w = inner.width as usize;
-    let mut lines: Vec<Line> = vec![
-        Line::from(chip(ctx, Key::ChipHistory.tr(), Tone::Accent)),
-        Line::raw(""),
-    ];
-    if h.loading {
-        lines.push(Line::from(Span::styled(
-            tf(Key::ReadingJournal, &[&spinner]),
-            th.dim(),
-        )));
-    } else if h.entries.is_empty() {
-        lines.push(Line::from(Span::styled(Key::NoOpsYet.tr(), th.dim())));
-    }
-    let visible = inner.height.saturating_sub(5) as usize;
-    let start = h.selected.saturating_sub(visible.saturating_sub(1));
-    for (i, e) in h.entries.iter().enumerate().skip(start).take(visible) {
-        let sel = i == h.selected;
-        let row = if sel { th.selected() } else { Style::default() };
-        let (g, gc) = match e.status {
-            EntryStatus::Finished(RunStatus::Completed) => ("✔", th.success),
-            EntryStatus::Finished(RunStatus::CompletedWithProblems) => ("▲", th.warn),
-            EntryStatus::Finished(RunStatus::Aborted)
-            | EntryStatus::Finished(RunStatus::Cancelled) => ("■", th.warn),
-            EntryStatus::Finished(RunStatus::Interrupted) => ("?", th.warn),
-            EntryStatus::Interrupted => ("?", th.error),
-        };
-        let (tag, tag_color) = match (&e.undo_state, e.reversible) {
-            (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
-            (UndoState::Partial { remaining }, _) => (tf(Key::HistPartly, &[remaining]), th.muted),
-            _ if e.reversible && e.unrecorded_from.is_some() => {
-                (Key::HistPartlyUndoable.tr().to_string(), th.warn)
-            }
-            (_, false) => (Key::HistPermanent.tr().to_string(), th.error),
-            _ if e.undo_steps == 0 => (Key::HistNothing.tr().to_string(), th.muted),
-            _ => (Key::HistCanUndo.tr().to_string(), th.accent),
-        };
-        let when = fmt::clock(e.time);
-        let right = format!(" {tag}");
-        let title_w = w.saturating_sub(4 + 13 + right.width());
-        let mut spans = vec![
-            Span::styled(if sel { "▎" } else { " " }, th.accent_style().patch(row)),
-            Span::styled(format!("{g} "), Style::default().fg(gc).patch(row)),
-            Span::styled(pad(&when, 13), th.dim().patch(row)),
-            Span::styled(
-                pad(&display::truncate(&e.title, title_w), title_w),
-                th.base().patch(row),
+    let w = sheet::text_width(area, 104);
+    let (body, first_entry) = history_body(th, h, spinner, w);
+    let sheet = Sheet {
+        title: Line::from(chip(ctx, Key::ChipHistory.tr(), Tone::Accent)),
+        body,
+        body_max: Some(16),
+        keep: Some(first_entry + h.selected),
+        buttons: vec![
+            (
+                button(
+                    th,
+                    "Enter",
+                    Key::BtnUndoSelected.tr(),
+                    Some(th.accent),
+                    true,
+                ),
+                Target::Key(KeyCode::Enter),
             ),
-            Span::styled(right, Style::default().fg(tag_color).patch(row)),
-        ];
-        let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
-        if drawn < w {
-            spans.push(Span::styled(" ".repeat(w - drawn), row));
-        }
-        let row_y = inner.y + lines.len() as u16;
-        hits.add(
-            Rect {
-                y: row_y,
-                height: 1,
-                ..inner
-            },
-            Target::HistoryRow(i),
-        );
-        lines.push(Line::from(spans));
-    }
-    while lines.len() < inner.height.saturating_sub(2) as usize {
-        lines.push(Line::raw(""));
-    }
-    let btns = vec![
-        button(
-            th,
-            "Enter",
-            Key::BtnUndoSelected.tr(),
-            Some(th.accent),
-            true,
-        ),
-        Span::raw("  "),
-        button(th, "Esc", Key::BtnClose.tr(), None, true),
-    ];
-    hit_spans(
-        hits,
-        inner.x,
-        inner.y + lines.len() as u16,
-        &btns,
-        &[
-            (0, Target::Key(KeyCode::Enter)),
-            (2, Target::Key(KeyCode::Esc)),
+            (
+                button(th, "Esc", Key::BtnClose.tr(), None, true),
+                Target::Key(KeyCode::Esc),
+            ),
         ],
-    );
-    lines.push(Line::from(btns));
-    f.render_widget(Paragraph::new(lines), inner);
+        ..Sheet::default()
+    };
+    sheet::draw(f, th, area, 104, sheet, hits);
+}
+
+/// What the journal says about undoing an entry, and in which colour.
+fn history_tag(th: &Theme, e: &rada_core::journal::JournalEntry) -> (String, Color) {
+    match (&e.undo_state, e.reversible) {
+        (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
+        (UndoState::Partial { remaining }, _) => (tf(Key::HistPartly, &[remaining]), th.muted),
+        _ if e.reversible && e.unrecorded_from.is_some() => {
+            (Key::HistPartlyUndoable.tr().to_string(), th.warn)
+        }
+        (_, false) => (Key::HistPermanent.tr().to_string(), th.error),
+        _ if e.undo_steps == 0 => (Key::HistNothing.tr().to_string(), th.muted),
+        _ => (Key::HistCanUndo.tr().to_string(), th.accent),
+    }
+}
+
+/// One entry of the journal: its state, when, what, and whether it can still be undone.
+fn history_row(
+    th: &Theme,
+    e: &rada_core::journal::JournalEntry,
+    sel: bool,
+    w: usize,
+) -> Line<'static> {
+    let row = if sel { th.selected() } else { Style::default() };
+    let (g, gc) = match e.status {
+        EntryStatus::Finished(RunStatus::Completed) => ("✔", th.success),
+        EntryStatus::Finished(RunStatus::CompletedWithProblems) => ("▲", th.warn),
+        EntryStatus::Finished(RunStatus::Aborted) | EntryStatus::Finished(RunStatus::Cancelled) => {
+            ("■", th.warn)
+        }
+        EntryStatus::Finished(RunStatus::Interrupted) => ("?", th.warn),
+        EntryStatus::Interrupted => ("?", th.error),
+    };
+    let (tag, tag_color) = history_tag(th, e);
+    let when = fmt::clock(e.time);
+    let right = format!(" {tag}");
+    let title_w = w.saturating_sub(4 + 13 + right.width());
+    let mut spans = vec![
+        Span::styled(if sel { "▎" } else { " " }, th.accent_style().patch(row)),
+        Span::styled(format!("{g} "), Style::default().fg(gc).patch(row)),
+        Span::styled(pad(&when, 13), th.dim().patch(row)),
+        Span::styled(
+            pad(&display::truncate(&e.title, title_w), title_w),
+            th.base().patch(row),
+        ),
+        Span::styled(right, Style::default().fg(tag_color).patch(row)),
+    ];
+    let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
+    if drawn < w {
+        spans.push(Span::styled(" ".repeat(w - drawn), row));
+    }
+    Line::from(spans)
 }
 
 /// Every action with its keys in both schemes side by side, grouped, scrollable.

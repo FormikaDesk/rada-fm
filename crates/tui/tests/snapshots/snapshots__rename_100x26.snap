@@ -9,15 +9,15 @@ expression: shot(&mut h)
 │   ⌂  Home                │ │ ☐   Name ↑        Date modified    Type                        Size │
 │                          │ │                                                                     │
 │ TAGS                     │ │ ☐ ▸ data          6 days ago       Folder                           │
-│   ●  Red                 │ │ ☐ ▸ src           6 days ago       Folder                           │
 │   ● ╭──────────────────────────────────────────────────────────────────────────────────────╮     │
-│   ● │                                                                                      │ 1 B │
-│   ● │   Rename                                                                             │0 MB │
-│   ● │                                                                                      │42 B │
-│   ● │  New name                                                                            │37 B │
-│   ● │  › main.rs                                                                           │2 KB │
+│   ● │                                                                                      │     │
+│   ● │   Rename                                                                             │ 1 B │
+│   ● │                                                                                      │0 MB │
+│   ● │  New name                                                                            │42 B │
+│   ● │  › main.rs                                                                           │37 B │
+│   ● │                                                                                      │2 KB │
 │     │                                                                                      │73 B │
-│     │                                                                                      │13 B │
+│     │   Enter  Plan    Esc  Cancel                                                         │13 B │
 │     │                                                                                      │16 B │
 │     ╰──────────────────────────────────────────────────────────────────────────────────────╯ 6 B │
 │                          │ │                                                                     │

@@ -24,6 +24,7 @@ mod panels;
 mod plan;
 pub mod popup;
 mod preview;
+mod sheet;
 mod sidebar;
 pub mod soft;
 mod tabs;

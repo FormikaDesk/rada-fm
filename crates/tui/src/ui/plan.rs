@@ -585,24 +585,29 @@ pub fn draw(
     }
     let left_w: usize = left.iter().map(|s| s.content.width()).sum();
     let btn_w: usize = buttons.iter().map(|s| s.content.width()).sum();
-    let gap = iw.saturating_sub(left_w + btn_w);
-    let mut foot_spans = Vec::new();
-    let mut hit_index: Vec<(usize, usize, Target)> = Vec::new();
-    if gap >= 2 {
-        foot_spans.extend(left);
-        foot_spans.push(Span::styled(" ".repeat(gap), ctx.surface()));
+    let button_lines = if btn_w > iw {
+        stacked_buttons(&buttons, &button_hits)
     } else {
-        foot_spans.push(Span::styled(
-            " ".repeat(iw.saturating_sub(btn_w)),
-            ctx.surface(),
-        ));
-    }
-    let offset = foot_spans.len();
-    for (a, b, t) in button_hits {
-        hit_index.push((offset + a, offset + b, t));
-    }
-    foot_spans.extend(buttons);
-    foot.push(Line::from(foot_spans.clone()));
+        let gap = iw.saturating_sub(left_w + btn_w);
+        let mut foot_spans = Vec::new();
+        if gap >= 2 {
+            foot_spans.extend(left);
+            foot_spans.push(Span::styled(" ".repeat(gap), ctx.surface()));
+        } else {
+            foot_spans.push(Span::styled(
+                " ".repeat(iw.saturating_sub(btn_w)),
+                ctx.surface(),
+            ));
+        }
+        let offset = foot_spans.len();
+        let hit_index = button_hits
+            .into_iter()
+            .map(|(a, b, t)| (offset + a, offset + b, t))
+            .collect();
+        foot_spans.extend(buttons);
+        vec![(foot_spans, hit_index)]
+    };
+    foot.extend(button_lines.iter().map(|(s, _)| Line::from(s.clone())));
 
     // The card: as tall as it needs, within the screen.
     let want = body.len() as u16 + foot.len() as u16 + 4;
@@ -645,8 +650,15 @@ pub fn draw(
         );
     }
     // Clickable: the buttons (last line of the footer) and the pills of the conflict control.
-    if foot_h > 0 {
-        hit_groups(hits, inner.x, foot_y + foot_h - 1, &foot_spans, &hit_index);
+    // The last rows of the footer are the buttons: those that were cut have no click.
+    let drawn = button_lines.len().min(foot_h as usize);
+    for (i, (spans, groups)) in button_lines
+        .iter()
+        .skip(button_lines.len() - drawn)
+        .enumerate()
+    {
+        let y = foot_y + foot_h - drawn as u16 + i as u16;
+        hit_groups_within(hits, inner, y, spans, groups);
     }
     if let Some(line) = seg_line
         && line >= scroll
@@ -662,6 +674,48 @@ pub fn draw(
     }
     let _ = Color::Reset;
     let _ = Theme::NAMES;
+}
+
+/// The spans of a row of buttons and, among them, where a click lands.
+type ButtonRow<'a> = (Vec<Span<'a>>, Vec<(usize, usize, Target)>);
+
+/// A button to a row, for a window too narrow for them side by side: the spans of each row and
+/// where in them the click lands.
+fn stacked_buttons<'a>(
+    buttons: &[Span<'a>],
+    hits: &[(usize, usize, Target)],
+) -> Vec<ButtonRow<'a>> {
+    let Some((_, cancel_end, cancel)) = hits.first() else {
+        return vec![(buttons.to_vec(), Vec::new())];
+    };
+    let mut rows = vec![(
+        buttons[..*cancel_end].to_vec(),
+        vec![(0, *cancel_end, cancel.clone())],
+    )];
+    // After the first button comes the gap, then the one that runs the plan.
+    if buttons.len() > cancel_end + 1 {
+        let run = hits.get(1).map(|(a, b, t)| (0, b - a, t.clone()));
+        rows.push((
+            buttons[cancel_end + 1..].to_vec(),
+            run.into_iter().collect(),
+        ));
+    }
+    rows
+}
+
+/// [`hit_groups`] cut to the window: a button wider than the room is clickable where it shows.
+fn hit_groups_within(
+    hits: &mut Hits,
+    inner: Rect,
+    y: u16,
+    spans: &[Span],
+    groups: &[(usize, usize, Target)],
+) {
+    let mut local = Hits::default();
+    hit_groups(&mut local, inner.x, y, spans, groups);
+    for (rect, target) in local.all() {
+        hits.add(rect.intersection(inner), target.clone());
+    }
 }
 
 /// How tall the window is: what it needs, at least [`CARD_MIN`] while the screen allows it,
