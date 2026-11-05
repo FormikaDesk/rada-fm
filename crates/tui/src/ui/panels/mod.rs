@@ -130,7 +130,8 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     let _ = th;
     if app.windows.modal.is_none() {
         let now = app.notice_now();
-        notice::draw(f, app, main, now);
+        let rows = frame::pad(main, is_airy(f)).height;
+        notice::draw(f, app, main, now, rows);
     }
     nav_row
 }
@@ -227,7 +228,12 @@ fn draw_middle(f: &mut Frame, app: &mut App, area: Rect) -> Rect {
     // The cards never cover the text: the list is made shorter while they are there.
     let now = app.notice_now();
     let notice_h = if app.windows.modal.is_none() {
-        notice::stack_height(app, now, inner.width as usize)
+        notice::stack_height(
+            app,
+            now,
+            inner.width as usize,
+            frame::pad(inner, airy).height,
+        )
     } else {
         0
     };

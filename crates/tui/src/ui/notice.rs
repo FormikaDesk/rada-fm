@@ -201,17 +201,82 @@ fn height(c: &Card, width: usize) -> u16 {
     title_lines(c, width).len() as u16 + 1 + 2
 }
 
-/// The rows the pile takes on a list `room` cells wide (0 when there is nothing to show).
-pub fn stack_height(app: &App, now: Instant, room: usize) -> u16 {
-    let cards = cards(app, now);
-    let w = common_width(&cards, room);
-    cards.iter().map(|c| height(c, w)).sum()
+/// Rows of the list that stay when the cards come: its titles and one entry.
+const LIST_KEEP: u16 = 3;
+/// The fewest rows a card takes: its border, one line of title and the links.
+const CARD_MIN: u16 = 4;
+
+/// The cards that fit, and how many were left out.
+struct Pile {
+    cards: Vec<Card>,
+    hidden: usize,
+    width: usize,
 }
 
-/// Draw the pile in the bottom right of `area` (the list), the first card on top.
-pub fn draw(f: &mut Frame, app: &mut App, area: Rect, now: Instant) {
-    let cards = cards(app, now);
-    if cards.is_empty() || area.width < 24 || area.height < 4 {
+/// What matters most comes first: an error, then the operation that is running, then the rest.
+fn rank(c: &Card) -> u8 {
+    match (c.tone, c.id) {
+        (Tone::Danger, _) => 0,
+        (_, 0) => 1,
+        _ => 2,
+    }
+}
+
+/// The cards that fit in `rows`, chosen by rank and then the newest first, kept in the order of
+/// the screen. The list keeps [`LIST_KEEP`] rows, or one when not even a card would fit then;
+/// the most important card is cut short rather than left out.
+fn fit(all: Vec<Card>, width: usize, rows: u16) -> Pile {
+    let total = all.len();
+    let mut budget = rows.saturating_sub(LIST_KEEP);
+    if budget < CARD_MIN {
+        budget = rows.saturating_sub(1);
+    }
+    let mut order: Vec<usize> = (0..total).collect();
+    order.sort_by_key(|&i| (rank(&all[i]), std::cmp::Reverse(i)));
+    let mut slots: Vec<Option<Card>> = all.into_iter().map(Some).collect();
+    let mut chosen: Vec<(usize, Card)> = Vec::new();
+    let mut used = 0;
+    for i in order {
+        let Some(mut c) = slots[i].take() else {
+            continue;
+        };
+        if chosen.is_empty() && budget >= CARD_MIN && height(&c, width) > budget {
+            c.max_lines = usize::from(budget - 3);
+        }
+        let h = height(&c, width);
+        if used + h > budget {
+            break;
+        }
+        used += h;
+        chosen.push((i, c));
+    }
+    chosen.sort_by_key(|(i, _)| *i);
+    Pile {
+        hidden: total - chosen.len(),
+        cards: chosen.into_iter().map(|(_, c)| c).collect(),
+        width,
+    }
+}
+
+/// The pile for a list `room` cells wide and `rows` tall.
+fn pile(app: &App, now: Instant, room: usize, rows: u16) -> Pile {
+    let all = cards(app, now);
+    let width = common_width(&all, room);
+    fit(all, width, rows)
+}
+
+/// The rows the pile takes on a list `room` cells wide and `rows` tall (0 when there is
+/// nothing to show).
+pub fn stack_height(app: &App, now: Instant, room: usize, rows: u16) -> u16 {
+    let p = pile(app, now, room, rows);
+    p.cards.iter().map(|c| height(c, p.width)).sum()
+}
+
+/// Draw the pile in the bottom right of `area` (the list), the first card on top; `rows` is the
+/// height the list was given the room of.
+pub fn draw(f: &mut Frame, app: &mut App, area: Rect, now: Instant, rows: u16) {
+    let p = pile(app, now, area.width as usize, rows.min(area.height));
+    if p.cards.is_empty() || area.width < 24 || area.height < 4 {
         return;
     }
     let th = app.settings.th.clone();
@@ -221,27 +286,42 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect, now: Instant) {
         set: app.settings.icons,
         basic: app.settings.basic,
     };
-    let width = common_width(&cards, area.width as usize);
-    let total: u16 = cards.iter().map(|c| height(c, width)).sum();
-    if total > area.height {
-        return;
-    }
-    let x = area.right().saturating_sub(width as u16 + 1);
-    let mut y = area.bottom() - total;
+    let total: u16 = p.cards.iter().map(|c| height(c, p.width)).sum();
+    let x = area.right().saturating_sub(p.width as u16 + 1);
+    let mut y = area.bottom() - total.min(area.height);
     let mut targets: Vec<(Rect, Target)> = Vec::new();
-    for c in &cards {
-        let h = height(c, width);
+    for (i, c) in p.cards.iter().enumerate() {
+        let h = height(c, p.width);
         let rect = Rect {
             x,
             y,
-            width: width as u16,
+            width: p.width as u16,
             height: h,
         };
         draw_card(f, &ctx, c, rect, &mut targets);
+        if i == 0 && p.hidden > 0 {
+            say_more(f, &ctx, rect, p.hidden);
+        }
         y += h;
     }
     for (r, t) in targets {
         app.frame.hits.add(r, t);
+    }
+}
+
+/// "+N" on the top edge of the first card: that many notifications did not fit.
+fn say_more(f: &mut Frame, ctx: &Ctx, rect: Rect, hidden: usize) {
+    let text = format!(" +{hidden} ");
+    let at = rect.right().saturating_sub(text.width() as u16 + 2);
+    let style = ctx.dim();
+    let buf = f.buffer_mut();
+    for (i, ch) in text.chars().enumerate() {
+        let x = at + i as u16;
+        if x > rect.x && x + 1 < rect.right() {
+            buf[(x, rect.y)]
+                .set_symbol(&ch.to_string())
+                .set_style(style);
+        }
     }
 }
 

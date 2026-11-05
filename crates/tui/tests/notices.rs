@@ -324,3 +324,57 @@ fn the_card_says_it_in_italian_too() {
         assert_eq!(card_text(&h), "1 elemento spostato in Documenti, 2 saltati");
     });
 }
+
+/// Three notifications, the error the oldest: an operation's result, a warning, an error.
+fn three(h: &mut H) {
+    use rada_tui::app::Notice;
+    h.app
+        .notify(Notice::new(NoticeKind::Error, "cannot rename setup.sh"));
+    h.app.notify(
+        Notice::new(NoticeKind::Ok, "3 items moved to the trash").with_action(NoticeAction::Undo),
+    );
+    h.app
+        .notify(Notice::new(NoticeKind::Warn, "2 items were skipped"));
+}
+
+#[test]
+fn a_pile_that_does_not_fit_shows_what_fits_the_error_first_and_how_many_are_left() {
+    let sb = rada_core::testutil::Sandbox::new();
+    for n in ["a.txt", "b.txt", "c.txt"] {
+        sb.write(format!("w/{n}"), n);
+    }
+    let dir = sb.path("w");
+    let mut h = H::new(sb, dir, 40, 16);
+    three(&mut h);
+    let s = h.screen();
+    assert!(s.contains("Cannot rename"), "the error comes first: {s}");
+    assert!(s.contains("+1"), "one did not fit: {s}");
+    assert!(
+        h.app.frame.hits.find(&Target::Row(0)).is_some(),
+        "the list keeps a row: {s}"
+    );
+}
+
+#[test]
+fn the_keys_of_a_window_leave_the_notifications_alone() {
+    use rada_tui::app::Notice;
+    let (mut h, _dir, _dest) = files();
+    h.app.notify(
+        Notice::new(NoticeKind::Ok, "3 items moved to the trash").with_action(NoticeAction::Undo),
+    );
+    h.app.advance_notices(Duration::from_millis(800));
+    // The window opens by itself, not by a key that would be the first to reach the card.
+    h.app.windows.modal = Some(Modal::Help);
+    h.key(KeyCode::Down);
+    h.key(KeyCode::Down);
+    assert!(
+        h.app.current_notice().is_some(),
+        "keys typed in the help are not for the card"
+    );
+    // Once the window is closed, the next key is the one that closes the card.
+    h.key(KeyCode::Esc);
+    assert!(h.app.windows.modal.is_none());
+    h.app.advance_notices(Duration::from_millis(800));
+    h.key(KeyCode::Down);
+    assert!(h.app.current_notice().is_none());
+}

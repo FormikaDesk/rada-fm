@@ -71,7 +71,10 @@ impl App {
         {
             return true;
         }
-        self.windows.notices.on_key(now);
+        // The cards are not on screen while a window is open: its keys are not for them.
+        if self.windows.modal.is_none() {
+            self.windows.notices.on_key(now);
+        }
         false
     }
 

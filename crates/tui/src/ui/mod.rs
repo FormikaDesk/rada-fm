@@ -373,7 +373,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // its text: when the list is full it is made shorter for as long as they are there.
     let now = app.notice_now();
     let notice_h = if app.windows.modal.is_none() {
-        notice::stack_height(app, now, main.width as usize)
+        notice::stack_height(app, now, main.width as usize, main.height)
     } else {
         0
     };
@@ -419,7 +419,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     // Notifications sit at the bottom right of the list; a window in front hides them.
     if app.windows.modal.is_none() {
-        notice::draw(f, app, notice_area, now);
+        notice::draw(f, app, notice_area, now, notice_area.height);
     }
     finish(f, app, area, (address_h > 0).then_some(address_row));
 }
