@@ -2,18 +2,21 @@
 # Tries scripts/set-version.sh on a copy of the files it touches: nothing in the repository changes.
 #   scripts/test-set-version
 # The copy must pass --check; after a move to another version it must pass again, with the new
-# version where the old one was; and it must fail when a stale version or an unknown key is put
-# in docs/install.md or in the Install section of README.md.
+# version where the old one was; it must fail when a stale version or an unknown key is put
+# in docs/install.md or in the Install section of README.md; and a move must leave alone what
+# only has the same number: a crate from the registry in Cargo.lock (also one whose name starts
+# with "rada"), a dependency in Cargo.toml, a version of the past in the prose.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-mkdir -p "$tmp/scripts" "$tmp/docs" "$tmp/crates/rada"
+mkdir -p "$tmp/scripts" "$tmp/docs" "$tmp/crates/rada" "$tmp/crates/core" "$tmp/crates/tui"
 cp "$root/scripts/set-version.sh" "$tmp/scripts/"
 cp "$root/Cargo.toml" "$root/Cargo.lock" "$root/README.md" "$tmp/"
 cp "$root/docs/install.md" "$root/docs/platforms.md" "$root/docs/updates.md" "$root/docs/verify.md" "$tmp/docs/"
 cp "$root/crates/rada/README.md" "$tmp/crates/rada/"
+for c in rada core tui; do cp "$root/crates/$c/Cargo.toml" "$tmp/crates/$c/"; done
 set_version="$tmp/scripts/set-version.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -21,11 +24,35 @@ current="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$tmp/Cargo.toml" | head -n 1)"
 
 "$set_version" --check > /dev/null || fail "the files of the repository do not pass --check"
 
+# What has the number of the workspace and is not part of it.
+printf '\n[[package]]\nname = "not-ours"\nversion = "%s"\n\n[[package]]\nname = "rada-lookalike"\nversion = "%s"\n' \
+    "$current" "$current" >> "$tmp/Cargo.lock"
+sed -i "/^\[workspace.dependencies\]/a thirdparty = { version = \"=$current\" }" "$tmp/Cargo.toml"
+past="${current%%-*}-alpha.0"
+printf '\nAn old release was called %s.\n' "$past" >> "$tmp/README.md"
+
+# The version the lock gives to a package.
+locked() { awk -v n="$1" '$0 == "name = \"" n "\"" { f = 1; next } f && /^version = / { print $3; exit }' "$tmp/Cargo.lock" | tr -d '"'; }
+# Everything that must be as it was, and the crates of the workspace at $1.
+expect_untouched_and_moved_to() {
+    for c in not-ours rada-lookalike; do
+        [[ "$(locked "$c")" == "$current" ]] || fail "$c was changed in Cargo.lock: $(locked "$c")"
+    done
+    for c in rada rada-core rada-tui; do
+        [[ "$(locked "$c")" == "$1" ]] || fail "$c is not at $1 in Cargo.lock: $(locked "$c")"
+    done
+    grep -qF "thirdparty = { version = \"=$current\" }" "$tmp/Cargo.toml" || fail "a dependency of Cargo.toml was changed"
+    grep -qF "An old release was called $past." "$tmp/README.md" || fail "a version of the past in README.md was changed"
+    grep -qF 'rada-core = { path = "crates/core", version = "='"$1"'" }' "$tmp/Cargo.toml" || fail "Cargo.toml asks for another rada-core than $1"
+    grep -qx "version = \"$1\"" "$tmp/Cargo.toml" || fail "the workspace is not at $1"
+}
+
 # Same base version as now: the prose that names the release without a suffix stays right.
 new="${current%%-*}-rc.99"
 [[ "$new" != "$current" ]] || new="${current%%-*}-rc.98"
 "$set_version" "$new" > /dev/null || fail "set-version.sh $new"
 "$set_version" --check > /dev/null || fail "--check fails right after set-version.sh"
+expect_untouched_and_moved_to "$new"
 grep -qF "$new" "$tmp/docs/install.md" || fail "install.md does not name $new"
 grep -qF "$new" "$tmp/README.md" || fail "README.md does not name $new"
 # (From 0.6.0 to 0.6.0-rc.99 the old version is inside the new one: nothing to look for.)
@@ -68,5 +95,20 @@ stable="${current%%-*}"
 "$set_version" "$stable" > /dev/null || fail "set-version.sh $stable"
 "$set_version" --check > /dev/null || fail "--check fails on the stable version $stable"
 grep -qF "rada-$stable-x86_64-unknown-linux-musl" "$tmp/docs/install.md" || fail "install.md does not name the file of $stable"
+
+expect_untouched_and_moved_to "$stable"
+
+# To another number altogether, from one that the crates of the registry in the lock share.
+if [[ "$current" == "$stable" ]]; then
+    next="${stable%.*}.$(( ${stable##*.} + 1 ))"
+    "$set_version" "$next" > /dev/null || fail "set-version.sh $next"
+    "$set_version" --check > /dev/null || fail "--check fails on $next"
+    expect_untouched_and_moved_to "$next"
+    for f in README.md docs/install.md docs/platforms.md docs/updates.md crates/rada/README.md; do
+        if ! OLD="$stable" perl -ne 'exit 1 if /(?<![0-9.])\Q$ENV{OLD}\E(?![0-9]|\.[0-9]|-(?:alpha|beta|rc|pre))/' "$tmp/$f"; then
+            fail "$f still names $stable"
+        fi
+    done
+fi
 
 echo "ok: scripts/set-version.sh keeps docs/install.md and README.md current"
