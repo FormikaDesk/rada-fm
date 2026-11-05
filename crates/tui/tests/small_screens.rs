@@ -393,3 +393,45 @@ fn every_window_fits_every_size_with_its_buttons_and_its_clicks() {
         all.join("\n")
     );
 }
+
+fn notify_three(h: &mut H) {
+    use rada_tui::app::{Notice, NoticeAction, NoticeKind};
+    h.app
+        .notify(Notice::new(NoticeKind::Error, "cannot rename setup.sh"));
+    h.app.notify(
+        Notice::new(NoticeKind::Ok, "3 items moved to the trash").with_action(NoticeAction::Undo),
+    );
+    h.app
+        .notify(Notice::new(NoticeKind::Warn, "2 items were skipped"));
+}
+
+#[test]
+fn three_notifications_never_take_the_whole_list() {
+    for (w, h) in SIZES {
+        let run = std::panic::catch_unwind(|| {
+            let mut hh = scene(w, h);
+            notify_three(&mut hh);
+            let buf = hh.redrawn_buffer();
+            let text = hh.screen();
+            let rows = hh.app.frame.hits.find(&Target::Row(0)).is_some();
+            let card = text.contains("Cannot rename");
+            let undrawn: Vec<_> = hh
+                .app
+                .frame
+                .hits
+                .all()
+                .filter(|(r, t)| matches!(t, Target::Notice(..)) && undrawn(&buf, *r))
+                .map(|(r, t)| format!("{t:?} at {r:?}"))
+                .collect();
+            (rows, card, undrawn, text)
+        });
+        let Ok((rows, card, undrawn, text)) = run else {
+            panic!("{w}x{h}: panicked");
+        };
+        assert!(undrawn.is_empty(), "{w}x{h}: {undrawn:?}\n{text}");
+        if w >= 40 && h >= 16 {
+            assert!(rows, "{w}x{h}: the list has no row left\n{text}");
+            assert!(card, "{w}x{h}: no card is visible\n{text}");
+        }
+    }
+}
