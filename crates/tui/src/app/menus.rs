@@ -36,7 +36,7 @@ impl App {
         match kind {
             MenuKind::New => {
                 // Nothing is made *in* a list of tagged items.
-                let nowhere = ro || self.tab.tag_view().is_some();
+                let nowhere = ro || self.tab.virtual_view().is_some();
                 vec![
                     MenuItem::act(NewFolder, !nowhere, false),
                     MenuItem::act(NewFile, !nowhere, false),
@@ -238,7 +238,7 @@ impl App {
         use Action::*;
         let cur = self.tab.current();
         let mut items = vec![MenuItem::act(Open, true, false)];
-        if self.tab.tag_view().is_some() {
+        if self.tab.virtual_view().is_some() {
             items.push(MenuItem::act(ShowInFolder, true, false));
         }
         if cur.is_some_and(|e| e.package) {
@@ -260,7 +260,7 @@ impl App {
     /// The clipboard, and changing the item.
     fn item_edit_items(&self, ro: bool) -> Vec<MenuItem> {
         use Action::*;
-        let nowhere = ro || self.tab.tag_view().is_some();
+        let nowhere = ro || self.tab.virtual_view().is_some();
         let has_clip = self.ops.clipboard.is_some();
         let mut items = vec![
             MenuItem::act(Cut, !ro, true),
@@ -303,7 +303,7 @@ impl App {
     fn space_menu_items(&self) -> Vec<MenuItem> {
         use Action::*;
         let ro = self.tab.archive.is_some();
-        let nowhere = ro || self.tab.tag_view().is_some();
+        let nowhere = ro || self.tab.virtual_view().is_some();
         let has_clip = self.ops.clipboard.is_some();
         let mut items = vec![
             MenuItem::sub(MenuKind::New, Key::MenuNew.tr(), !nowhere, false),

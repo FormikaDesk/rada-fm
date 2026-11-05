@@ -10,6 +10,7 @@ use super::selection::Selection;
 use super::{App, Config, FilterState, LoadState, ToastKind, Viewport};
 use crate::nav::NavMove;
 use crate::view::ViewMode;
+use rada_core::ViewKind;
 use rada_core::archive::ArchiveView;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{DirListing, SortKey, SortSpec};
@@ -263,7 +264,7 @@ impl App {
         let generation = self.tabs.next_generation();
         self.tab.load = LoadState::Loading(cwd.clone());
         self.svc.loader.load(cwd.clone(), generation);
-        if self.tab.archive.is_none() && self.tab.tag_view().is_none() {
+        if self.tab.archive.is_none() && self.tab.virtual_view().is_none() {
             self.svc.watcher.watch(cwd);
         }
         self.preview.invalidate();
@@ -285,11 +286,8 @@ impl App {
         if p == self.home() {
             return Key::HomeLabel.tr().to_string();
         }
-        if rada_core::recents::is_view(p) {
-            return Key::PlaceRecent.tr().to_string();
-        }
-        if let Some(tag) = rada_core::tagsearch::view_name(p) {
-            return tf(Key::TagViewTitle, &[&rada_core::display::text(&tag)]);
+        if let Some(kind) = ViewKind::of(p) {
+            return super::listing::view_title(&kind);
         }
         let on_disk = p
             .file_name()
@@ -396,7 +394,7 @@ impl App {
                         .map(Path::to_path_buf)
                         .unwrap_or_else(|| cwd.clone()),
                     // A list of tagged items is not a place to come back to.
-                    None if rada_core::tagsearch::view_name(cwd).is_some() => self.svc.home.clone(),
+                    None if ViewKind::of(cwd).is_some() => self.svc.home.clone(),
                     None => cwd.clone(),
                 };
                 SavedTab {

@@ -185,7 +185,7 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     if cols.date > 0 {
         head.push(gap());
         // In the list of recent files the date is the one of the last use.
-        let title = if app.tab.recents_view() {
+        let title = if app.tab.is_recent_view() {
             Key::ColUsed
         } else {
             Key::ColModified
@@ -410,7 +410,7 @@ fn row<'a>(
     spans.push(Span::styled(name_txt, with(name_style)));
     // In the list of a tag's items, or of recent files, the folder each one is in, dim after
     // the name.
-    if app.tab.tag_view().is_some() {
+    if app.tab.virtual_view().is_some() {
         let room = cols.name.saturating_sub(used);
         if room > 8
             && let Some(parent) = e.path.parent()

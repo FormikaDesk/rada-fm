@@ -202,7 +202,7 @@ impl App {
             self.tab
                 .cwd
                 .file_name()
-                .filter(|_| self.tab.tag_view().is_none())
+                .filter(|_| self.tab.virtual_view().is_none())
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "archive".into())
         }

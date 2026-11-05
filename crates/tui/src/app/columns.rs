@@ -40,7 +40,7 @@ impl App {
     pub fn want_parent_column(&mut self) {
         if self.tab.view != ViewMode::Columns
             || self.tab.archive.is_some()
-            || self.tab.tag_view().is_some()
+            || self.tab.virtual_view().is_some()
         {
             return;
         }

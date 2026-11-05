@@ -185,7 +185,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     plan_modal(&mut h);
     run_plan_and_wait(&mut h);
     h.wait("the renamed item in the list", |a| {
-        a.tab.tag_view().is_some()
+        a.tab.virtual_view().is_some()
             && a.tab
                 .listing
                 .all()
@@ -203,7 +203,7 @@ fn nothing_can_be_made_in_the_list_but_the_items_can_be_worked_on() {
     // Up leaves the list the way one came: the home folder here.
     h.press("alt+up");
     h.wait("the folder", |a| {
-        a.tab.tag_view().is_none() && !a.tab.is_loading()
+        a.tab.virtual_view().is_none() && !a.tab.is_loading()
     });
     assert_eq!(h.app.tab.cwd, home);
 }

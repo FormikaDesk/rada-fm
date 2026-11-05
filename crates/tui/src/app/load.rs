@@ -3,6 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
+use rada_core::ViewKind;
 use rada_core::archive::ArchiveView;
 use rada_core::events::{DirEvent, WatchEvent};
 use rada_core::i18n::{Key, tf};
@@ -72,7 +73,7 @@ impl App {
         };
         self.swap_recents_sort(&path);
         self.tab.listing = DirListing::new(path.clone(), entries, self.tab.sort);
-        let virtual_dir = archive.is_some() || rada_core::tagsearch::view_name(&path).is_some();
+        let virtual_dir = archive.is_some() || ViewKind::of(&path).is_some();
         self.tab.archive = archive;
         if !same_dir {
             self.enter_folder(path, virtual_dir);
@@ -90,8 +91,8 @@ impl App {
     /// The list of recent files has an order of its own while it is open; the folders get
     /// theirs back when it is left.
     fn swap_recents_sort(&mut self, path: &Path) {
-        let into_recents = rada_core::recents::is_view(path);
-        if into_recents != self.tab.recents_view() {
+        let into_recents = ViewKind::of(path) == Some(ViewKind::Recent);
+        if into_recents != self.tab.is_recent_view() {
             if into_recents {
                 self.tabs.sort_outside_recents = Some(self.tab.sort);
                 self.tab.sort = Self::RECENT_SORT;

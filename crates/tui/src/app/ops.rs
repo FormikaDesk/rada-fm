@@ -248,7 +248,7 @@ impl App {
     pub(super) fn start_paste(&mut self) {
         if self.refuse_if_busy()
             || self.refuse_in_archive(Key::WhatPasteHere.tr())
-            || self.refuse_in_tag_view(Key::WhatPaste.tr())
+            || self.refuse_in_virtual_view(Key::WhatPaste.tr())
         {
             return;
         }

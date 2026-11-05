@@ -103,7 +103,7 @@ impl InputView {
 impl App {
     pub(super) fn ask_new_folder(&mut self) {
         if !self.refuse_in_archive(Key::WhatCreateFolder.tr())
-            && !self.refuse_in_tag_view(Key::WhatCreateFolder.tr())
+            && !self.refuse_in_virtual_view(Key::WhatCreateFolder.tr())
         {
             self.windows.modal = Some(Modal::Input(InputView::new(
                 InputKind::NewDir,
@@ -115,7 +115,7 @@ impl App {
     pub(super) fn ask_new_file(&mut self) {
         if !self.refuse_if_busy()
             && !self.refuse_in_archive(Key::WhatCreateFile.tr())
-            && !self.refuse_in_tag_view(Key::WhatCreateFile.tr())
+            && !self.refuse_in_virtual_view(Key::WhatCreateFile.tr())
         {
             self.windows.modal = Some(Modal::Input(InputView::new(
                 InputKind::NewFile,

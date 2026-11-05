@@ -114,7 +114,7 @@ impl App {
     pub(super) fn open_terminal_here(&mut self) {
         let dir = match &self.tab.archive {
             Some(a) => a.archive.parent().map(Path::to_path_buf),
-            None if self.tab.tag_view().is_some() => {
+            None if self.tab.virtual_view().is_some() => {
                 // Where the item under the cursor is.
                 Some(
                     self.folder_for_new(

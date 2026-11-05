@@ -79,8 +79,10 @@ impl App {
 
     /// The folder being shown, when it is a real one a choice can be about.
     fn chooser_here(&self) -> Option<PathBuf> {
-        (self.tab.archive.is_none() && self.tab.tag_view().is_none() && !self.tab.recents_view())
-            .then(|| self.tab.cwd.clone())
+        (self.tab.archive.is_none()
+            && self.tab.virtual_view().is_none()
+            && !self.tab.is_recent_view())
+        .then(|| self.tab.cwd.clone())
     }
 
     /// The marked entries that satisfy `keep`, as paths.

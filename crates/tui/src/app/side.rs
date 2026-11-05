@@ -6,6 +6,7 @@ use crate::fmt;
 use crate::keymap::Action;
 use crate::sidebar::{self, Item, Mode, Origin};
 use crossterm::event::{KeyCode, KeyEvent};
+use rada_core::ViewKind;
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::Entry;
@@ -340,7 +341,7 @@ impl App {
             Key::SideMenuOpen.tr().into(),
             path.to_path_buf(),
         )];
-        if rada_core::tagsearch::view_name(path).is_some() {
+        if ViewKind::of(path).is_some() {
             // A tag is not a folder: nothing to pin or eject.
             return MenuView::new(at, items);
         }
@@ -386,7 +387,7 @@ impl App {
     }
 
     pub(super) fn toggle_bookmark(&mut self) {
-        if self.refuse_in_tag_view(Key::WhatBookmark.tr()) {
+        if self.refuse_in_virtual_view(Key::WhatBookmark.tr()) {
             return;
         }
         let cwd = self.tab.cwd.clone();

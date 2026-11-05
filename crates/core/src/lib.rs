@@ -25,11 +25,13 @@ pub mod statefile;
 pub mod tagsearch;
 pub mod uistate;
 pub mod update;
+pub mod view;
 pub mod watch;
 pub mod workers;
 pub mod zoxide;
 
 pub use error::{Error, Result};
+pub use view::ViewKind;
 
 #[cfg(any(test, feature = "testutil"))]
 pub mod testplatform;

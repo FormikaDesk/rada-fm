@@ -102,7 +102,7 @@ impl App {
     pub fn want_folder_sizes(&mut self, indices: impl Iterator<Item = usize>) {
         if self.folder_size_mode() == SizeMode::Off
             || self.tab.archive.is_some()
-            || self.tab.tag_view().is_some()
+            || self.tab.virtual_view().is_some()
         {
             return;
         }

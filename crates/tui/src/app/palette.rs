@@ -126,7 +126,7 @@ impl App {
 
     /// The folders above this one and the ones inside it.
     fn add_nearby(&self, list: &mut Items) {
-        if self.tab.tag_view().is_none() {
+        if self.tab.virtual_view().is_none() {
             for anc in self.tab.cwd.ancestors().skip(1).take(4) {
                 list.plain(anc, PaletteKind::Parent);
             }

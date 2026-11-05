@@ -20,7 +20,9 @@ fn at(day: u64) -> SystemTime {
 
 fn go_recent(h: &mut H) {
     h.click(&Target::Place(rada_core::recents::view_path()));
-    h.wait("the list", |a| a.tab.recents_view() && !a.tab.is_loading());
+    h.wait("the list", |a| {
+        a.tab.is_recent_view() && !a.tab.is_loading()
+    });
 }
 
 fn mac_with(spec: MacLikeSpec, sb: Sandbox, start: PathBuf) -> (H, Arc<MacLike>) {
@@ -62,7 +64,7 @@ fn recents_newest_first_read_only() {
     // Nothing is made in it.
     h.keys("N");
     h.press("ctrl+shift+n");
-    assert!(h.app.tab.recents_view(), "still the list");
+    assert!(h.app.tab.is_recent_view(), "still the list");
     // Enter opens the file.
     h.press("enter");
     h.pump(50);

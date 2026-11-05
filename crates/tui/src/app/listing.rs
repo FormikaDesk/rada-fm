@@ -1,6 +1,7 @@
 //! What the front tab shows: the entries of the folder that pass the filter, which one is under
 //! the cursor, and what an operation would apply to.
 
+use rada_core::ViewKind;
 use rada_core::i18n::{Key, tf};
 use rada_core::model::{Entry, SortKey, SortSpec};
 use std::collections::BTreeSet;
@@ -74,23 +75,19 @@ impl TabState {
         self.sel.toggle_all(all);
     }
 
-    /// The tag whose items the list shows, when it is not a folder but the view of a tag.
-    pub fn tag_view(&self) -> Option<String> {
-        rada_core::tagsearch::view_name(&self.cwd)
+    /// What the list is when it is not a folder: the items of a tag, the recent files.
+    pub fn virtual_view(&self) -> Option<ViewKind> {
+        ViewKind::of(&self.cwd)
     }
 
     /// Whether the list shows the files used lately (the "Recent" entry of the sidebar).
-    pub fn recents_view(&self) -> bool {
-        rada_core::recents::is_view(&self.cwd)
+    pub fn is_recent_view(&self) -> bool {
+        self.virtual_view() == Some(ViewKind::Recent)
     }
 
-    /// What the list is when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
+    /// What the list is called when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
     pub fn view_title(&self) -> Option<String> {
-        if self.recents_view() {
-            return Some(Key::PlaceRecent.tr().to_string());
-        }
-        self.tag_view()
-            .map(|tag| tf(Key::TagViewTitle, &[&rada_core::display::text(&tag)]))
+        self.virtual_view().map(|kind| view_title(&kind))
     }
 
     pub fn sort_label(&self) -> String {
@@ -100,6 +97,14 @@ impl TabState {
 
     pub fn is_loading(&self) -> bool {
         matches!(self.load, LoadState::Loading(_))
+    }
+}
+
+/// The name of a list that is not a folder, for the title of the list and of its tab.
+pub(super) fn view_title(kind: &ViewKind) -> String {
+    match kind {
+        ViewKind::Recent => Key::PlaceRecent.tr().to_string(),
+        ViewKind::Tag(tag) => tf(Key::TagViewTitle, &[&rada_core::display::text(tag)]),
     }
 }
 

@@ -14,6 +14,7 @@ use crate::fs::{DirItem, FileKind, FsEngine};
 use crate::model::{self, EntryUpdate};
 use crate::platform::{Platform, Unmounted, Volume};
 use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
+use crate::view::ViewKind;
 
 // ------------------------------------------------------------------------------ folders
 
@@ -203,7 +204,7 @@ fn dir_loop(
         }
 
         if let Some((path, generation)) = load {
-            if let Some(name) = crate::tagsearch::view_name(&path) {
+            if let Some(kind) = ViewKind::of(&path) {
                 // A search can take a while: on a thread of its own, so that the next folder
                 // the person opens is not kept waiting behind it.
                 let (fs, platform, out, latest) =
@@ -212,16 +213,19 @@ fn dir_loop(
                     .name("rada-tag-view".into())
                     .spawn(move || {
                         let stale = || latest.load(Ordering::SeqCst) != generation;
-                        let result = if crate::recents::is_view(&path) {
-                            crate::recents::entries(fs.as_ref(), platform.as_ref(), &stale)
-                        } else {
-                            let query = crate::tagsearch::TagQuery::new(&name);
-                            crate::tagsearch::entries(
-                                fs.as_ref(),
-                                platform.as_ref(),
-                                &query,
-                                &stale,
-                            )
+                        let result = match kind {
+                            ViewKind::Recent => {
+                                crate::recents::entries(fs.as_ref(), platform.as_ref(), &stale)
+                            }
+                            ViewKind::Tag(name) => {
+                                let query = crate::tagsearch::TagQuery::new(&name);
+                                crate::tagsearch::entries(
+                                    fs.as_ref(),
+                                    platform.as_ref(),
+                                    &query,
+                                    &stale,
+                                )
+                            }
                         };
                         if stale() {
                             return;

@@ -60,7 +60,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     let bar = Style::default().bg(th.cmdbar);
     let set = app.settings.icons;
     let ro = app.tab.archive.is_some();
-    let nowhere = ro || app.tab.tag_view().is_some();
+    let nowhere = ro || app.tab.virtual_view().is_some();
     let has_target = !app.tab.sel.marked.is_empty() || app.tab.current().is_some();
     let mut b = Bar::default();
     b.push(Span::styled(" ", bar));

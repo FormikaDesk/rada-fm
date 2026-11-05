@@ -103,7 +103,7 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     head.push(Span::styled(pad_left(&t, cols.size), st));
     if cols.date > 0 {
         head.push(gap());
-        let name = if app.tab.recents_view() {
+        let name = if app.tab.is_recent_view() {
             Key::ColUsed
         } else {
             Key::ColModified

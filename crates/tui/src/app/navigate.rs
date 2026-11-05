@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use rada_core::ViewKind;
 use rada_core::events::CoreEvent;
 use rada_core::i18n::{Key, tf};
 
@@ -42,7 +43,7 @@ impl App {
 
     pub(super) fn go_parent(&mut self) {
         // A tag's items have no parent: leave the way one came.
-        if self.tab.tag_view().is_some() {
+        if self.tab.virtual_view().is_some() {
             if self.tab.nav.back_target().is_some() {
                 self.go_history(true);
             } else {
@@ -149,7 +150,7 @@ impl App {
     /// From a list of tagged or recent items: open the folder the item under the cursor is in,
     /// with the cursor on it.
     pub(super) fn show_in_folder(&mut self) {
-        if self.tab.tag_view().is_none() {
+        if self.tab.virtual_view().is_none() {
             self.toast(ToastKind::Info, Key::TShowInFolderHere.tr(), 2);
             return;
         }
@@ -168,7 +169,7 @@ impl App {
     /// The folder to use for something made next to the items: the one the first of them is
     /// in when the list is a tag's items, the folder shown otherwise.
     pub(super) fn folder_for_new(&self, items: &[PathBuf]) -> PathBuf {
-        if self.tab.tag_view().is_some() {
+        if self.tab.virtual_view().is_some() {
             if let Some(dir) = items.first().and_then(|p| p.parent()) {
                 return dir.to_path_buf();
             }
@@ -178,16 +179,18 @@ impl App {
     }
 
     /// Say why nothing can be made here when the list is a tag's items, not a folder.
-    pub(super) fn refuse_in_tag_view(&mut self, what: &str) -> bool {
-        if self.tab.recents_view() {
-            self.toast(ToastKind::Warn, tf(Key::TRecentRefuse, &[&what]), 5);
-            return true;
+    pub(super) fn refuse_in_virtual_view(&mut self, what: &str) -> bool {
+        match self.tab.virtual_view() {
+            Some(ViewKind::Recent) => {
+                self.toast(ToastKind::Warn, tf(Key::TRecentRefuse, &[&what]), 5);
+                true
+            }
+            Some(ViewKind::Tag(tag)) => {
+                self.toast(ToastKind::Warn, tf(Key::TTagViewRefuse, &[&tag, &what]), 5);
+                true
+            }
+            None => false,
         }
-        let Some(tag) = self.tab.tag_view() else {
-            return false;
-        };
-        self.toast(ToastKind::Warn, tf(Key::TTagViewRefuse, &[&tag, &what]), 5);
-        true
     }
 
     /// The system's quick look at the item under the cursor (macOS).
