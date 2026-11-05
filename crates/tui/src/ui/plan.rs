@@ -44,6 +44,8 @@ pub fn policy_step(p: ConflictPolicy, dir: isize) -> ConflictPolicy {
 
 /// Items listed before "… and N more".
 const LISTED: usize = 6;
+/// The least height of the window while the screen has room for it.
+const CARD_MIN: u16 = 12;
 
 /// The mark in the round head of the window.
 fn mark_of(ctx: &Ctx, kind: OpKind, redo: bool) -> &'static str {
@@ -603,10 +605,8 @@ pub fn draw(
     foot.push(Line::from(foot_spans.clone()));
 
     // The card: as tall as it needs, within the screen.
-    let foot_h = foot.len() as u16;
-    let want = body.len() as u16 + foot_h + 4;
-    let h = want.clamp(12, area.height.saturating_sub(2));
-    let r = super::widgets::centered(area, w, h);
+    let want = body.len() as u16 + foot.len() as u16 + 4;
+    let r = super::widgets::centered(area, w, card_height(want, area.height));
     let inner_card = popup::card(f.buffer_mut(), r, th, popup::Edge::Own);
     let inner = Rect {
         x: inner_card.x + 2,
@@ -614,6 +614,8 @@ pub fn draw(
         width: inner_card.width.saturating_sub(4),
         height: inner_card.height.saturating_sub(2),
     };
+    let foot = fit_footer(foot, inner.height);
+    let foot_h = foot.len() as u16;
     let content_h = inner.height.saturating_sub(foot_h) as usize;
     let max_scroll = body.len().saturating_sub(content_h);
     let scroll = pv.scroll.min(max_scroll);
@@ -643,7 +645,9 @@ pub fn draw(
         );
     }
     // Clickable: the buttons (last line of the footer) and the pills of the conflict control.
-    hit_groups(hits, inner.x, foot_y + foot_h - 1, &foot_spans, &hit_index);
+    if foot_h > 0 {
+        hit_groups(hits, inner.x, foot_y + foot_h - 1, &foot_spans, &hit_index);
+    }
     if let Some(line) = seg_line
         && line >= scroll
         && line < scroll + content_h
@@ -658,6 +662,19 @@ pub fn draw(
     }
     let _ = Color::Reset;
     let _ = Theme::NAMES;
+}
+
+/// How tall the window is: what it needs, at least [`CARD_MIN`] while the screen allows it,
+/// and never more than the screen leaves around it.
+fn card_height(want: u16, screen: u16) -> u16 {
+    want.max(CARD_MIN).min(screen.saturating_sub(2))
+}
+
+/// The footer with what fits: the last lines, which hold the buttons, are the ones kept.
+fn fit_footer(mut foot: Vec<Line<'_>>, room: u16) -> Vec<Line<'_>> {
+    let cut = foot.len().saturating_sub(room as usize);
+    foot.drain(..cut);
+    foot
 }
 
 /// The first letter in capitals, for a label that stands alone ("tieni entrambi" → "Tieni
