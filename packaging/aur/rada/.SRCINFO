@@ -1,6 +1,6 @@
 pkgbase = rada
 	pkgdesc = A terminal file manager where every destructive action is planned first and can be undone
-	pkgver = 0.6.0
+	pkgver = 0.6.1
 	pkgrel = 1
 	url = https://github.com/FormikaDesk/rada-fm
 	arch = x86_64
@@ -16,7 +16,7 @@ pkgbase = rada
 	optdepends = ttf-jetbrains-mono-nerd: the icons of the file types
 	options = !lto
 	options = !debug
-	source = rada-0.6.0.tar.gz::https://github.com/FormikaDesk/rada-fm/archive/refs/tags/v0.6.0.tar.gz
-	sha256sums = 4390008aacb3d52aeaffbfd114aa9714f980cdfd5c577b1087971566c8fd764c
+	source = rada-0.6.1.tar.gz::https://github.com/FormikaDesk/rada-fm/archive/refs/tags/v0.6.1.tar.gz
+	sha256sums = 7920ff45c1ed70c8b21c84652cc0ce55e8ed1a2ab2162ea7cb06f86289865960
 
 pkgname = rada

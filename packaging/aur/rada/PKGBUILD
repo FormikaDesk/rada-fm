@@ -9,8 +9,8 @@ pkgname=rada
 # (a pkgver cannot hold a hyphen): v0.6.0-rc.16 -> 0.6.0rc16. `vercmp 0.6.0rc16 0.6.0` is -1:
 # pacman orders the release candidate before 0.6.0 (with an underscore, 0.6.0_rc16, it would
 # come after it) and rc9 before rc10.
-_tag=v0.6.0
-pkgver=0.6.0
+_tag=v0.6.1
+pkgver=0.6.1
 pkgrel=1
 pkgdesc='A terminal file manager where every destructive action is planned first and can be undone'
 arch=('x86_64' 'aarch64')
@@ -30,7 +30,7 @@ optdepends=(
 # the binary is stripped by the build itself, so there is nothing for a debug package.
 options=('!lto' '!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$_tag.tar.gz")
-sha256sums=('4390008aacb3d52aeaffbfd114aa9714f980cdfd5c577b1087971566c8fd764c')
+sha256sums=('7920ff45c1ed70c8b21c84652cc0ce55e8ed1a2ab2162ea7cb06f86289865960')
 
 _srcdir() {
   # GitHub names the folder of a tag archive after the repository and the tag without its "v".
