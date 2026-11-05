@@ -208,19 +208,20 @@ mod windows {
     use windows_sys::Win32::Storage::FileSystem::{
         DELETE, FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
         FILE_DISPOSITION_FLAG_POSIX_SEMANTICS, FILE_DISPOSITION_INFO, FILE_DISPOSITION_INFO_EX,
-        FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FileDispositionInfo,
-        FileDispositionInfoEx, SetFileInformationByHandle,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ, FileDispositionInfo, FileDispositionInfoEx, SetFileInformationByHandle,
     };
 
     use super::super::{Fingerprint, FsMeta, Removed};
 
     pub(in super::super) fn remove_if(p: &Path, expect: &Fingerprint) -> io::Result<Removed> {
         // Nobody else may write, rename or delete the file while this handle is open, and a
-        // link is looked at itself.
+        // link is looked at itself. A link to a folder is itself a folder to the system, and
+        // opening one needs the backup flag.
         let f = match OpenOptions::new()
             .access_mode(DELETE | FILE_READ_ATTRIBUTES)
             .share_mode(FILE_SHARE_READ)
-            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
             .open(p)
         {
             Ok(f) => f,

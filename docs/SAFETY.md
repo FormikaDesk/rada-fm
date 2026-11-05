@@ -8,10 +8,10 @@ Every cell restates a sentence further down this page, where the details and the
 | Operation | Plan before | Undo | After a crash | Main notes |
 |---|---|---|---|---|
 | **Copy** | Yes | Removes exactly what the copy created; a file modified since is left alone and reported | The half-written temporary file is deleted; a copy that had finished but was not recorded is added to the history if it is what the step declared | Written under a temporary name and renamed only when complete; what could not be kept is listed in the plan and in the result |
-| **Move** | Yes | Moves back, with the same contents, permissions, times, hard links and holes | A move killed between the copy and the removal of the source keeps both; undo then removes the copy | Across filesystems: copy, verify, then remove the source, file by file |
+| **Move** | Yes | Moves back, with the same contents, permissions, times, hard links and holes | A move killed between the copy and the removal of the source keeps both; undo then removes the copy | Across filesystems: copy, verify, then remove the source, file by file; a source that was replaced meanwhile is not removed |
 | **Rename** | Yes | Yes, from the journal; undo compares names without regard to case where the filesystem ignores it | The step that was in doubt is settled at the next start | Never replaces a name that appeared meanwhile, except on the filesystems named in the limits |
 | **Trash** | Yes | Restores from the trash | If rada is stopped between the move and its record, the item is in the system's trash but the history does not bring it back | Restore it from the trash itself in that case |
-| **Permanent deletion** | Yes | **No**: it cannot be undone | The operation is marked *interrupted* and you are told once | The file is compared with its fingerprint at the last moment; the plan says it is permanent and asks you to type `yes` |
+| **Permanent deletion** | Yes | **No**: it cannot be undone | The operation is marked *interrupted* and you are told once | Each file, also inside a folder, is compared with the fingerprint the plan saw at the last moment, and one that changed is kept and reported; the plan says it is permanent and asks you to type `yes` |
 | **Extract an archive** | Yes | Removes exactly what was extracted; a member you edited since is left alone and reported | The temporary file is removed at the next start | A member that would land outside the destination is not extracted; setuid, setgid and sticky bits are dropped; a bomb asks for a typed `yes` |
 | **Create an archive** | Yes | Removes the finished archive (kept if you changed it) | The half-written temporary file is deleted; a finished archive found at its destination is never taken as rada's own | Written under a temporary name and renamed into place; cancelling removes it |
 
@@ -341,7 +341,7 @@ These are real, and we would rather you read them here than discover them.
   it, never earlier, but it cannot stop another program from changing the folder between two
   of its steps.
 - **Removing a name is checked, not guaranteed.** Before it removes a file (undo of a copy,
-  delete) rada compares the file with its fingerprint (size, times, kind) at the last moment:
+  delete, the source of a move across filesystems) rada compares the file with its fingerprint (size, times, kind) at the last moment:
   on Linux and macOS it opens the folder once, looks at the name with `fstatat` (never
   following a link) and takes it off with `unlinkat` through that same open folder, so a
   folder swapped for a link in between is not followed; on Windows it opens the file so that

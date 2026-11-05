@@ -310,9 +310,10 @@ impl Engine {
                         path: n.path.clone(),
                     });
                 }
+                // What the scan saw, so that a file changed since is not the one deleted.
                 _ => steps.push(Step::RemoveFile {
                     path: n.path.clone(),
-                    expect: None,
+                    expect: Some(n.meta.fingerprint()),
                 }),
             }
         }

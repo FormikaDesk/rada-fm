@@ -914,6 +914,8 @@ impl Engine {
         options: CopyOptions,
     ) -> Result<StepResult> {
         self.require_free(dst)?;
+        // A move removes the source at the end: only the file that was copied may go.
+        let seen = self.seen_before_move(src, options)?;
         let to_device = self.platform.on_device(dst);
         let device = to_device || self.platform.on_device(src);
         // A device has no half-written file to hide and no rename to trust: it gets the real name.
@@ -935,7 +937,7 @@ impl Engine {
         self.copy_data(ctl, &req, dst)?;
         let not_preserved = self.finish_copy(&req, dst, to_device, attrs.mode, attrs.owner)?;
         Ok(StepResult {
-            after: self.settle_source(src, dst, options)?,
+            after: self.settle_source(src, dst, options, seen.as_ref())?,
             not_preserved,
             ..StepResult::done()
         })
@@ -988,12 +990,23 @@ impl Engine {
         Ok(not_preserved)
     }
 
+    fn seen_before_move(&self, src: &Path, options: CopyOptions) -> Result<Option<Fingerprint>> {
+        if !options.remove_source {
+            return Ok(None);
+        }
+        self.fs
+            .lstat(src)
+            .map(|m| Some(m.fingerprint()))
+            .map_err(|e| Error::io("inspect", src, e))
+    }
+
     /// The fingerprint of the copy, and then the end of the source when the copy was a move.
     fn settle_source(
         &self,
         src: &Path,
         dst: &Path,
         options: CopyOptions,
+        seen: Option<&Fingerprint>,
     ) -> Result<Option<Fingerprint>> {
         let fs = &*self.fs;
         let after = fs.lstat(dst).ok().map(|m| {
@@ -1003,16 +1016,23 @@ impl Engine {
                 m.fingerprint()
             }
         });
-        if options.remove_source
-            && let Err(e) = fs.remove_file(src)
-            // Someone else already removed the source: the move is what they wanted.
-            && e.kind() != io::ErrorKind::NotFound
-        {
+        if let Some(seen) = seen {
             // Never leave the item in two places: undo the copy.
-            let _ = fs.remove_file(dst);
-            return Err(Error::io("remove source after copy", src, e));
+            self.remove_moved_source(src, seen)
+                .inspect_err(|_| drop(fs.remove_file(dst)))?;
         }
         Ok(after)
+    }
+
+    /// The copy is complete: the source goes, unless something else took its name while the
+    /// data was being copied.
+    fn remove_moved_source(&self, src: &Path, seen: &Fingerprint) -> Result<()> {
+        match self.fs.remove_file_if(src, seen) {
+            // Someone else already removed the source: the move is what they wanted.
+            Ok(Removed::Done | Removed::Gone) => Ok(()),
+            Ok(Removed::Changed(_)) => Err(Error::SourceChanged(src.to_path_buf())),
+            Err(e) => Err(Error::io("remove source after copy", src, e)),
+        }
     }
 
     fn hard_link(
