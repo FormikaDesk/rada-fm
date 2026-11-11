@@ -60,6 +60,13 @@ fn matches(name: &str, words: &[String]) -> bool {
     words.iter().all(|w| name.contains(w.as_str()))
 }
 
+/// Whether the folder at `path` is on the filesystem the search started on. A listing does not
+/// say which one its items are on everywhere (not on Windows): then the folder itself is asked.
+fn on_filesystem(fs: &dyn FsEngine, path: &Path, listed: Option<u64>, start: Option<u64>) -> bool {
+    let dev = listed.or_else(|| fs.lstat(path).ok().and_then(|m| m.dev));
+    dev == start
+}
+
 /// The entries under `root` whose name has all the words, in the order they were found. Each
 /// entry's `name` is its full path (two files called `a.txt` in different folders are different
 /// rows), its `display` the name on disk.
@@ -94,7 +101,7 @@ pub fn entries(
         for item in listing.items {
             visited += 1;
             let Ok(meta) = item.meta else { continue };
-            if meta.is_dir() && meta.kind != crate::fs::FileKind::Symlink && meta.dev == start.dev {
+            if meta.is_dir() && on_filesystem(fs, &item.path, meta.dev, start.dev) {
                 pending.push(item.path.clone());
             }
             if matches(&item.name.to_string_lossy(), &words) {
