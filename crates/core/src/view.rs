@@ -47,11 +47,17 @@ mod tests {
 
     #[test]
     fn a_search_path_says_where_and_for_what() {
-        let p = search::view_path(Path::new("/home/u/src"), "main rs").unwrap();
+        // A whole path as this system writes one: on Windows that needs the drive.
+        let root = PathBuf::from(if cfg!(windows) {
+            r"C:\home\u\src"
+        } else {
+            "/home/u/src"
+        });
+        let p = search::view_path(&root, "main rs").unwrap();
         assert_eq!(
             ViewKind::of(&p),
             Some(ViewKind::Search {
-                root: PathBuf::from("/home/u/src"),
+                root,
                 query: "main rs".into()
             })
         );

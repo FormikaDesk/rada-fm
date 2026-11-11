@@ -115,14 +115,21 @@ pub fn entries(
 mod tests {
     use super::*;
 
+    /// A folder written the way this system writes a whole path: `/home/u` is not one on
+    /// Windows, where it lacks the drive.
+    fn folder() -> PathBuf {
+        PathBuf::from(if cfg!(windows) {
+            r"C:\home\u\src"
+        } else {
+            "/home/u/src"
+        })
+    }
+
     #[test]
     fn a_view_path_names_the_words_and_the_folder() {
-        let p = view_path(Path::new("/home/u/src"), "  main   rs ").unwrap();
+        let p = view_path(&folder(), "  main   rs ").unwrap();
         assert!(!p.is_absolute());
-        assert_eq!(
-            parse(&p),
-            Some(("main rs".to_string(), PathBuf::from("/home/u/src")))
-        );
+        assert_eq!(parse(&p), Some(("main rs".to_string(), folder())));
     }
 
     #[test]
