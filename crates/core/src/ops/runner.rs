@@ -1,6 +1,7 @@
 //! Running an operation with journaling.
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use super::engine::Engine;
 use super::exec::{
@@ -9,8 +10,8 @@ use super::exec::{
 use super::plan::*;
 use crate::Result;
 use crate::fs::local::content_hash;
-use crate::fs::{FileKind, FsEngine};
-use crate::journal::Journal;
+use crate::fs::{FileKind, FsEngine, Stamp};
+use crate::journal::{Intent, Journal};
 
 pub struct RunOutcome {
     pub id: String,
@@ -44,6 +45,8 @@ struct Recording<'a> {
     hashed: HashMap<(u64, u64), String>,
     /// The name the running step gives its temporary file, as its pending record says.
     tag: Option<String>,
+    /// The step that is running, for a record written in the middle of it.
+    current: Option<(usize, Step)>,
 }
 
 impl Recording<'_> {
@@ -132,8 +135,9 @@ impl ExecHandler for Recording<'_> {
         // Written before the step runs: if the process dies in it, the next start can see
         // from the disk whether it happened.
         self.tag = None;
+        self.current = matches!(step, Step::ProduceFile { .. }).then(|| (index, step.clone()));
         if self.writing()
-            && let Some(intent) = crate::journal::Intent::of(step)
+            && let Some(intent) = Intent::of(step)
         {
             let tag = format!("{}-{index}", self.id);
             match self
@@ -151,6 +155,19 @@ impl ExecHandler for Recording<'_> {
 
     fn temp_tag(&self) -> Option<String> {
         self.tag.clone()
+    }
+
+    fn publishing(&mut self, dst: &Path, size: u64, mtime: Option<Stamp>) -> bool {
+        if self.writing() {
+            let intent = Intent::publishing(dst, size, mtime).with_temp(self.tag.clone());
+            if let Err(e) = self.journal.pending(self.id, intent)
+                && let Some((index, step)) = self.current.take()
+            {
+                self.journal_failed(index, &step, &e, false);
+                self.current = Some((index, step));
+            }
+        }
+        !matches!(self.state, JournalState::Stopped) && self.inner.publishing(dst, size, mtime)
     }
 
     fn step_finished(&mut self, index: usize, step: &Step, result: &StepResult) {
@@ -213,6 +230,7 @@ impl Engine {
             gap: None,
             hashed: HashMap::new(),
             tag: None,
+            current: None,
         };
         let mut report = self.execute(plan, &mut rec, cancel);
         let mut errors = rec.errors;

@@ -18,6 +18,7 @@ use super::archives::ExtractInto;
 use super::engine::Engine;
 use super::plan::{ConflictPolicy, Plan};
 use super::planner::TransferOptions;
+use super::recipe::RecipePlan;
 use super::rename::Pattern;
 use super::scan::{Scan, ScanControl};
 use super::tags::TagChange;
@@ -152,6 +153,8 @@ pub enum OpRequest {
         #[serde(default)]
         entry: Option<String>,
     },
+    /// Several requests as one operation, among them new files made by other programs.
+    Recipe(RecipePlan),
 }
 
 /// What planning a request produced.
@@ -247,6 +250,7 @@ impl OpRequest {
                 change.validate()
             }
             OpRequest::Undo { .. } => Ok(()),
+            OpRequest::Recipe(recipe) => recipe.validate(),
         }
     }
 
@@ -301,6 +305,7 @@ impl Engine {
         req.validate()?;
         self.refuse_archive_writes(req)?;
         let planned = match req {
+            OpRequest::Recipe(recipe) => self.plan_recipe(recipe, ctl)?,
             OpRequest::Copy {
                 sources,
                 destination,

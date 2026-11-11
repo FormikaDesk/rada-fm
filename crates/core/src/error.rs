@@ -47,6 +47,10 @@ pub enum Error {
     #[error("{}: {message}", display::path(.path))]
     Archive { path: PathBuf, message: String },
 
+    /// A program an action ran did not do what was asked of it.
+    #[error("{program}: {message}")]
+    Program { program: String, message: String },
+
     #[error("trash: {0}")]
     Trash(String),
 

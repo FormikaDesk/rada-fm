@@ -350,6 +350,53 @@
       "required": [
         "op"
       ]
+    },
+    {
+      "description": "Several requests as one operation, among them new files made by other programs.",
+      "type": "object",
+      "properties": {
+        "failure": {
+          "description": "What becomes of what was made when a step fails.",
+          "$ref": "#/$defs/FailurePolicy",
+          "default": "keep"
+        },
+        "notes": {
+          "description": "Lines the recipe wants shown with the plan.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "op": {
+          "type": "string",
+          "const": "recipe"
+        },
+        "recipe": {
+          "description": "The name of the recipe that asks.",
+          "type": "string"
+        },
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SubRequest"
+          }
+        },
+        "title": {
+          "description": "The title of the plan; without one it is made from the requests.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "recipe",
+        "requests"
+      ]
     }
   ],
   "$defs": {
@@ -361,6 +408,101 @@
         "tar_gz",
         "tar_zst",
         "tar_xz"
+      ]
+    },
+    "Arg": {
+      "description": "One argument of a program. Paths are filled in when the step runs; each is one argument,\nwhatever characters it holds.",
+      "oneOf": [
+        {
+          "description": "Given as it is.",
+          "type": "object",
+          "properties": {
+            "lit": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "lit"
+          ]
+        },
+        {
+          "description": "The path of the input with this number, from 0.",
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "input"
+          ]
+        },
+        {
+          "description": "Every input, one argument each.",
+          "type": "string",
+          "const": "inputs"
+        },
+        {
+          "description": "What the program before this one in the chain wrote.",
+          "type": "string",
+          "const": "prev"
+        },
+        {
+          "description": "The file this program is to write.",
+          "type": "string",
+          "const": "out"
+        },
+        {
+          "description": "The folder the programs work in, for one that names its output by itself.",
+          "type": "string",
+          "const": "out_dir"
+        },
+        {
+          "description": "LibreOffice's option for a profile of its own inside the work folder, so that it\nneither waits for nor changes the person's own.",
+          "type": "string",
+          "const": "profile_url"
+        }
+      ]
+    },
+    "ChecksumAlgo": {
+      "type": "string",
+      "enum": [
+        "sha256"
+      ]
+    },
+    "Collect": {
+      "description": "How the file the last program wrote is found.",
+      "oneOf": [
+        {
+          "description": "It is where [`Arg::Out`] said.",
+          "type": "string",
+          "const": "exact"
+        },
+        {
+          "description": "It is the only file with this extension in the work folder ([`Arg::OutDir`]).",
+          "type": "object",
+          "properties": {
+            "single": {
+              "type": "object",
+              "properties": {
+                "ext": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ext"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "single"
+          ]
+        }
       ]
     },
     "ConflictPolicy": {
@@ -427,6 +569,173 @@
           "required": [
             "mode",
             "name"
+          ]
+        }
+      ]
+    },
+    "FailurePolicy": {
+      "description": "What becomes of the steps that worked when another of the same plan fails.",
+      "oneOf": [
+        {
+          "description": "What was made stays, and can be undone.",
+          "type": "string",
+          "const": "keep"
+        },
+        {
+          "description": "What was made is taken back.",
+          "type": "string",
+          "const": "rollback"
+        }
+      ]
+    },
+    "ProduceSpec": {
+      "description": "One new file to make.",
+      "type": "object",
+      "properties": {
+        "inputs": {
+          "description": "The files that are read. They are never changed.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "output": {
+          "description": "The file to write (a whole path). If the name is taken when the file is ready, it\ngets the next free one (`name (1).ext`): nothing is ever replaced.",
+          "type": "string"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerSpec"
+        },
+        "size_hint": {
+          "description": "About how many bytes the file will be, to check the free space.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "inputs",
+        "output",
+        "producer"
+      ]
+    },
+    "ProducerSpec": {
+      "description": "What is to write the file.",
+      "oneOf": [
+        {
+          "description": "One program, or several run one after the other.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "string",
+              "const": "program"
+            },
+            "chain": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProgramCall"
+              }
+            },
+            "collect": {
+              "$ref": "#/$defs/Collect",
+              "default": "exact"
+            },
+            "ok_exit": {
+              "description": "Exit codes that mean success (default 0).",
+              "type": "array",
+              "default": [
+                0
+              ],
+              "items": {
+                "type": "integer",
+                "format": "int32"
+              }
+            },
+            "timeout_secs": {
+              "description": "Seconds each program is given (default 600).",
+              "type": "integer",
+              "format": "uint64",
+              "default": 600,
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "chain"
+          ]
+        },
+        {
+          "description": "The checksum of the one input, as `sha256sum` writes it.",
+          "type": "object",
+          "properties": {
+            "algo": {
+              "$ref": "#/$defs/ChecksumAlgo"
+            },
+            "by": {
+              "type": "string",
+              "const": "checksum"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "algo"
+          ]
+        }
+      ]
+    },
+    "ProgramCall": {
+      "description": "A program by the name recipes call it (`qpdf`, `gs`, `magick`, `ffmpeg`, `soffice`…, or\none the configuration names), and its arguments.",
+      "type": "object",
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Arg"
+          }
+        },
+        "program": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "program",
+        "args"
+      ]
+    },
+    "SubRequest": {
+      "description": "One of the requests of a recipe.",
+      "oneOf": [
+        {
+          "description": "Any request but an undo or another recipe.",
+          "type": "object",
+          "properties": {
+            "op": {
+              "$ref": "#"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "op"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "produce": {
+              "$ref": "#/$defs/ProduceSpec"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "produce"
           ]
         }
       ]

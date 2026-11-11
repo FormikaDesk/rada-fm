@@ -122,4 +122,26 @@ rada --schema request            # print the JSON Schema (also: plan)
 rada --request job.json          # plan it and open the usual confirmation window (`-` reads stdin)
 ```
 
-Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `make_file`, `trash`, `delete`, `extract`, `compress`, `set_tags`, `undo`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
+Operations: `copy`, `move`, `rename`, `bulk_rename`, `make_dir`, `make_file`, `trash`, `delete`, `extract`, `compress`, `set_tags`, `undo`, `recipe`. Paths must be absolute; unknown fields are refused rather than ignored. In Rust: `Engine::plan_request` (and `Jobs::plan_request` for the asynchronous version) turns an `OpRequest` into a `Plan` without touching anything; `plan_to_json` serialises it. Non-UTF-8 file names survive the round trip. Nothing runs without a confirmation: a deletion request still asks you to type `yes`.
+
+A `recipe` is several requests as one operation (one plan, one undo), and the way to ask for a new file made by another program or for a checksum:
+
+```json
+{"op": "recipe", "recipe": "smaller-pdf", "requests": [
+  {"produce": {
+    "inputs": ["/home/me/report.pdf"],
+    "output": "/home/me/report (small).pdf",
+    "producer": {"by": "program", "chain": [
+      {"program": "gs", "args": [{"lit": "-sDEVICE=pdfwrite"}, {"lit": "-dPDFSETTINGS=/ebook"},
+                                 {"lit": "-dNOPAUSE"}, {"lit": "-dBATCH"}, {"lit": "-o"}, "out", {"input": 0}]}
+    ]}
+  }},
+  {"produce": {
+    "inputs": ["/home/me/report.pdf"],
+    "output": "/home/me/report.pdf.sha256",
+    "producer": {"by": "checksum", "algo": "sha256"}
+  }}
+]}
+```
+
+A program is named, never given as a path: `qpdf`, `gs`, `magick`, `sips`, `ffmpeg`, `ffprobe`, `soffice`, or a name the configuration gives a file to (`[recipes] programs`). Its arguments are a list: `{"lit": "text"}`, `{"input": n}`, `"inputs"`, `"prev"` (what the program before it in the chain wrote), `"out"` (the file it must write), `"out_dir"` with `"collect": {"single": {"ext": "pdf"}}` for a program that names its output itself, and `"profile_url"` for LibreOffice. `timeout_secs` (600) and `ok_exit` (`[0]`) can be set. The output is always a new file: see [SAFETY.md](SAFETY.md#actions-that-run-another-program) for what is and is not guaranteed.

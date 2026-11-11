@@ -73,6 +73,23 @@ fn made_outcome(plan: &Plan) -> Outcome {
     }
 }
 
+/// The first file an action will write, and the folder it will be in.
+fn produced_outcome(plan: &Plan) -> Outcome {
+    use rada_core::ops::Step;
+    let made = plan.steps.iter().find_map(|s| match s {
+        Step::ProduceFile { dst, .. } => Some(dst.clone()),
+        _ => None,
+    });
+    Outcome {
+        folder: plan.destination.clone(),
+        select: made.as_deref().map(name_of),
+        subject: made
+            .as_deref()
+            .map(|p| rada_core::display::name(&name_of(p)))
+            .unwrap_or_default(),
+    }
+}
+
 /// "1 item copied to X" / "3 items copied to X", and the ones with nothing to name.
 fn done_text(kind: OpKind, n: u64, dest: &str, subject: &str) -> String {
     let count = fmt::thousands(n);
@@ -109,6 +126,7 @@ fn done_text(kind: OpKind, n: u64, dest: &str, subject: &str) -> String {
         OpKind::MakeFile => tf(Key::NFileCreated, &[&subject]),
         OpKind::Delete => counted(Key::NDeleteOne, Key::NDeleteMany),
         OpKind::Undo => Key::NUndone.tr().to_string(),
+        OpKind::Action => two(Key::NActionOne, Key::NActionMany, subject),
     }
 }
 
@@ -132,6 +150,7 @@ impl App {
             OpKind::Compress => compressed_outcome(plan),
             OpKind::Rename | OpKind::BulkRename => renamed_outcome(plan),
             OpKind::MakeDir | OpKind::MakeFile => made_outcome(plan),
+            OpKind::Action => produced_outcome(plan),
             OpKind::Trash => Outcome {
                 folder: self
                     .places

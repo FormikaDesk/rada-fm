@@ -14,6 +14,7 @@ Every cell restates a sentence further down this page, where the details and the
 | **Permanent deletion** | Yes | **No**: it cannot be undone | The operation is marked *interrupted* and you are told once | Each file, also inside a folder, is compared with the fingerprint the plan saw at the last moment, and one that changed is kept and reported; the plan says it is permanent and asks you to type `yes` |
 | **Extract an archive** | Yes | Removes exactly what was extracted; a member you edited since is left alone and reported | The temporary file is removed at the next start | A member that would land outside the destination is not extracted; setuid, setgid and sticky bits are dropped; a bomb asks for a typed `yes` |
 | **Create an archive** | Yes | Removes the finished archive (kept if you changed it) | The half-written temporary file is deleted; a finished archive found at its destination is never taken as rada's own | Written under a temporary name and renamed into place; cancelling removes it |
+| **Action that runs another program** | Yes, with the file that will run | Removes the new file, if it has not changed since | The work folder is removed; a file that had got its name is added to the history only if its size and time are the ones recorded | rada answers only for the one file it publishes: new, never over another. What else the program does is outside every guarantee here |
 
 Not in the table, and in the [limits](#limits-known-and-by-design): a **power cut** or a
 kernel crash is not the same as a killed process; on a **phone or a camera** undo is not
@@ -294,6 +295,69 @@ password-protected ZIP and 7z made with real tools; a cut or damaged archive bef
 the plan; the full disk; `SIGKILL` in the middle of a big member in `archives_crash.rs`; and
 `archives_write.rs`, where random trees (odd names, symlinks, read-only folders, permissions)
 are compressed and extracted in all four formats and must come back identical.
+
+### Actions that run another program
+
+An action makes one new file by running another program (Ghostscript, qpdf, ImageMagick,
+ffmpeg, LibreOffice…) or by reading files itself (a checksum). It is the one kind of step in
+which rada is not the one that writes, so the promises are narrower, and they are these
+(`actions.rs`, `process.rs`).
+
+**What rada guarantees**
+
+- **The file that is declared, and only that one, gets a name.** The program writes in a work
+  folder of its own (`.rada-work-…`, readable by you alone) next to the destination. One file
+  leaves it, when the program has ended with an exit code the recipe accepts and the file is
+  there, is a regular file and is not empty. The work folder is removed whatever happened:
+  success, failure, a timeout, a cancel.
+- **Nothing is ever overwritten.** The file gets its name by a rename that cannot replace an
+  existing one. If the name was taken in the meantime, the file gets the next free one
+  (`name (1).ext`, up to 50) and the result says which. On a filesystem that cannot refuse a
+  taken name atomically the step fails and says so: there is no fallback that looks first and
+  renames after.
+- **The inputs are checked before and after.** Each file that is read is compared with what
+  the plan saw right before the program starts: if one changed, the program is not started.
+  They are compared again when it ends: if one changed while it ran, what it wrote is
+  discarded. An action reads regular files only, never a link or a folder.
+- **Undo removes the new file only if it is still the one that was written.** A file you
+  edited since is left where it is and reported.
+- **The program is a file fixed by the plan, started without a shell.** A recipe names a
+  program (`qpdf`); the plan turns the name into the whole path of a file and shows it, and
+  that file is what runs. Arguments are passed as a list, each path one argument whatever
+  characters it holds. Shells and interpreters (`sh`, `bash`, `cmd`, `powershell`, `python`,
+  `perl` and the like) are refused under any name, also when the configuration names them.
+- **The program is bounded.** It has no input, a short list of environment variables, its
+  temporary files inside the work folder, a low priority and a time limit. On a timeout or a
+  cancel it is killed with everything it started (a process group on Linux and macOS, a Job
+  Object on Windows), and what it left running when it ended is killed too.
+- **A killed rada leaves a coherent state.** The journal gets two records for such a step:
+  one before the program starts, one when the file is whole and about to get its name, with
+  its size and time. At the next start the work folder is removed, by its exact name and only
+  next to the destination. A file found at the destination is taken as the step's, so that
+  undo covers it, only if its size and time are the recorded ones; otherwise it is left alone
+  and you are told. If the second record cannot be written and you choose to stop, the file
+  is not given its name.
+- **Several requests of one recipe are one operation**: one plan, one entry in the history,
+  one undo. A recipe whose requests write the same name, or in which one reads what another
+  removes or makes, is refused when the plan is made. If a step fails, what the others made
+  stays and can be undone.
+
+**What rada does not guarantee**
+
+- **Anything else the program does.** rada cannot see or undo what a program writes outside
+  its work folder, sends over the network or changes in its own settings. The file it
+  publishes is checked for being there and not empty, not for being *right*: a program that
+  writes a damaged PDF and exits with 0 gets it published.
+- **That the program is the one you think.** The plan shows the file that will run; whether
+  that file is a genuine Ghostscript is yours to know.
+- **A program that leaves its group.** One that detaches itself on purpose (a new session, a
+  service it asks the system to start) is outside the group that is killed.
+- **Every process, when rada itself dies suddenly.** On Windows everything the program
+  started goes with rada. On Linux the program is killed, but not what it had started in
+  turn. On macOS the program is left running.
+- **An older rada reading the journal.** rada 0.6.1 skips the record that opens an action
+  instead of taking it for damage, so it neither shows nor undoes it; after an action was
+  undone it may still offer to redo an older operation.
 
 ## Limits, known and by design
 

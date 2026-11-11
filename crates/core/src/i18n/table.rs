@@ -84,6 +84,7 @@ strings! {
     VerbExtract => "Extract", "Estrai";
     VerbCompress => "Compress", "Comprimi";
     VerbTags => "Change tags", "Cambia i tag";
+    VerbAction => "Action", "Azione";
 
     // What happens to one item (lower case, in the list of the plan)
     ActCopy => "copy", "copia";
@@ -114,6 +115,9 @@ strings! {
     TitleUndo => "Undo: {0}", "Annulla: {0}";
     TitleMkdir => "Create folder {0}", "Crea la cartella {0}";
     TitleMkfile => "Create file {0}", "Crea il file {0}";
+    TitleChecksum => "Write the checksum of {0}", "Scrivi il checksum di {0}";
+    TitleProduce => "Make {0} with {1}", "Crea {0} con {1}";
+    TitleRecipe => "Run the recipe {0}", "Esegui la ricetta {0}";
     TitleExtract => "Extract {0}", "Estrai {0}";
     TitleExtractTo => "Extract {0} to {1}", "Estrai {0} in {1}";
     TitleExtractFrom => "Extract {0} from {1} to {2}", "Estrai {0} da {1} in {2}";
@@ -144,6 +148,8 @@ strings! {
     StepRemoveDir => "remove folder {0}", "rimuovi la cartella {0}";
     StepRestore => "restore {0}", "ripristina {0}";
     StepTags => "tags of {0}: {1} -> {2}", "tag di {0}: {1} -> {2}";
+    StepProduce => "write {0} with {1}", "scrivi {0} con {1}";
+    StepChecksum => "write the checksum {0}", "scrivi il checksum {0}";
 
     // ---- the journal: the Undo button says what it would undo
     DoneCopy => "copy of {0}", "copia di {0}";
@@ -156,6 +162,7 @@ strings! {
     DoneExtract => "extraction of {0}", "estrazione di {0}";
     DoneCompress => "compression of {0}", "compressione di {0}";
     DoneTags => "tag change of {0}", "modifica dei tag di {0}";
+    DoneAction => "action on {0}", "azione su {0}";
     DoneUndo => "undo", "annullamento";
 
     // ---- warnings of a plan ({0} is the count, {1} a detail already in brackets)
@@ -236,6 +243,10 @@ strings! {
     WSetuidDroppedMany => "setuid/setgid permission bits are dropped from {0} files", "i permessi setuid/setgid vengono tolti da {0} file";
     WLinkTargetMissingOne => "{0} hard link points to a file that is not part of the selection and is skipped", "{0} collegamento fisico punta a un file che non fa parte della selezione e viene saltato";
     WLinkTargetMissingMany => "{0} hard links point to a file that is not part of the selection and are skipped", "{0} collegamenti fisici puntano a un file che non fa parte della selezione e vengono saltati";
+    WDeviceAction => "an action cannot read from or write to a phone or a camera: copy the files to a folder of this computer first", "un'azione non può leggere da un telefono o da una fotocamera né scriverci: copia prima i file in una cartella di questo computer";
+    WProgramMissingOne => "a program this action needs is not installed{1}", "un programma che serve a questa azione non è installato{1}";
+    WProgramMissingMany => "{0} programs this action needs are not installed{1}", "{0} programmi che servono a questa azione non sono installati{1}";
+    WActionProgram => "another program does the writing: rada guarantees only the file it publishes (a new file, checked, never over another), not what else that program does", "a scrivere è un altro programma: rada garantisce solo il file che pubblica (un file nuovo, controllato, mai sopra un altro), non ciò che quel programma fa per il resto";
     WOther => "see details", "vedi i dettagli";
     // ---- dates and times
     JustNow => "just now", "adesso";
@@ -497,6 +508,7 @@ strings! {
     OpNounMkdir => "the creation of the folder", "la creazione della cartella";
     OpNounMkfile => "the creation of the file", "la creazione del file";
     OpNounTags => "the tag change", "la modifica dei tag";
+    OpNounAction => "the action", "l'azione";
     OpNounDelete => "the deletion", "l'eliminazione";
     BadgeRemoved => "will be removed", "verrà tolto";
     BadgeBack => "goes back", "torna al suo posto";
@@ -511,6 +523,14 @@ strings! {
     NoteUndoCompress => "You can undo this with {0}: the archive will be removed.", "Si potrà annullare con {0}: l'archivio verrà tolto.";
     NoteUndoRename => "You can undo this with {0}: the names will go back.", "Si potrà annullare con {0}: i nomi torneranno quelli di prima.";
     NoteUndoTags => "You can undo this with {0}: the tags will go back.", "Si potrà annullare con {0}: i tag torneranno quelli di prima.";
+    NoteUndoAction => "Undo with {0} removes the new file, unless it has changed.", "Annullando con {0} il file nuovo viene tolto, se non è cambiato.";
+    PlanActWrites => "Writes", "Scrive";
+    PlanActReads => "Reads", "Legge";
+    PlanActRuns => "Runs", "Esegue";
+    PlanActNew => "a new file: it never replaces one", "file nuovo: non sostituisce mai";
+    PlanActChecksum => "SHA-256, computed by rada", "SHA-256, calcolato da rada";
+    PlanActOther => "and {0} more", "e altri {0}";
+    PlanActKeep => "If a step fails, what was already made stays and can be undone.", "Se un passo fallisce, ciò che è già stato creato resta e si può annullare.";
     NoteUndoNew => "You can undo this with {0}: what is made will be removed.", "Si potrà annullare con {0}: ciò che viene creato verrà tolto.";
     NoteNoUndoTrash => "Not in the trash: the files are removed for good.", "Non finiscono nel cestino: i file vengono tolti per sempre.";
     PolicyTrashNote => "replaced items go to the trash first, so undo brings them back", "gli elementi sostituiti vanno prima nel cestino, così annullando tornano";
@@ -826,6 +846,9 @@ strings! {
     NTagsMany => "Tags changed on {0} items", "Tag modificati su {0} elementi";
     NFolderCreated => "Folder created: {0}", "Cartella creata: {0}";
     NFileCreated => "File created: {0}", "File creato: {0}";
+    NActionOne => "New file made: {0}", "File nuovo creato: {0}";
+    NActionMany => "{0} new files made", "{0} file nuovi creati";
+    NActionPartial => "{0}: {1} of {2} done", "{0}: {1} di {2} fatti";
     NDeleteOne => "1 item deleted permanently", "1 elemento eliminato definitivamente";
     NDeleteMany => "{0} items deleted permanently", "{0} elementi eliminati definitivamente";
     NLeftOutOne => ", 1 skipped", ", 1 saltato";

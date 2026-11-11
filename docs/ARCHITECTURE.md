@@ -100,6 +100,7 @@ All OS-dependent behaviour sits behind the `Platform` trait (`core/src/platform/
 1. `crates/core/src/ops/plan.rs` — `Step`, `Plan`, `Step::inverse`. The vocabulary of the engine.
 2. `crates/core/src/ops/request.rs` — `OpRequest` and `plan_request`: from a request to a `Plan`.
 3. `crates/core/src/ops/exec.rs` — `Engine::execute`, `run_step`, error handling, cancellation.
+   Steps that run another program are in `ops/action.rs` (the types), `ops/recipe.rs` (the request and its plan), `ops/produce.rs` (the run) and `platform/process.rs` (the program in a group of its own).
 4. `crates/core/src/journal.rs` — the on-disk record and how it is replayed.
 5. `crates/core/src/ops/undo.rs` — journal entry → inverse `Plan`, with the safety checks.
 6. `crates/core/src/events.rs` — every message a worker can send. The contract between core and UI.

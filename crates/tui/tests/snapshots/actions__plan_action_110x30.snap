@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/actions.rs
+expression: shot(&mut h)
+---
+ rada  ▸ empty  ✕   +                                                                                 ? Help
+  ←   →   ↑   ⟳     ⌂ Home › demo › empty │ ⌕ Search files or type a command…           Ctrl+P     ≣ Details
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  New ▾  │  Cut   Copy   Paste   Rename   Compress   Delete  │  Sort ▾   Tags ▾  │  Undo                     ⋯
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+╭──────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────╮
+│   ⌂  Home      ╭──────────────────────────────────────────────────────────────────────────╮details         │
+│                │                                                                          │                │
+│ TAGS           │    +    Write the checksum of report.pdf                                 │                │
+│   ●  Red       │         In ~/demo/papers                                                 │                │
+│   ●  Orange    │  ──────────────────────────────────────────────────────────────────────  │                │
+│   ●  Yellow    │   Writes   report.pdf.sha256  ·  a new file: it never replaces one       │                │
+│   ●  Green     │   Reads    ~/demo/papers/report.pdf                                      │                │
+│   ●  Blue      │   Runs     SHA-256, computed by rada                                     │                │
+│   ●  Purple    │                                                                          │                │
+│   ●  Gray      │   A note of the recipe.                                                  │                │
+│                │   If a step fails, what was already made stays and can be undone.        │                │
+│                │                                                                          │                │
+│                │   ● Undo with Ctrl+Z removes the new file, unless it has changed.        │                │
+│                │                                                                          │                │
+│                │  Tab buttons  ·  ↑↓ scroll                   Cancel  Esc    Run  Enter   │                │
+│                │                                                                          │                │
+│                ╰──────────────────────────────────────────────────────────────────────────╯                │
+│                          │ │                                    │                                          │
+│                          │ │                                    │                                          │
+╰──────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯
+ 0 items                                                                                  v0.6.0 ⟳   ≣  ▦  ▥
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   Enter  run     Esc  cancel
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀

@@ -106,7 +106,8 @@ impl Sim<'_> {
             Step::SetTags { .. } => {}
             Step::ExtractFile { dst, .. }
             | Step::ExtractSymlink { dst, .. }
-            | Step::Compress { dst, .. } => {
+            | Step::Compress { dst, .. }
+            | Step::ProduceFile { dst, .. } => {
                 self.set(dst, true);
             }
             Step::FinishDir { .. } => {}
@@ -211,6 +212,7 @@ impl Sim<'_> {
             // Never recorded as an inverse: extraction and compression are undone by removing
             // what they made.
             Step::TrashItem { .. }
+            | Step::ProduceFile { .. }
             | Step::ExtractFile { .. }
             | Step::ExtractSymlink { .. }
             | Step::Compress { .. } => Ok(()),

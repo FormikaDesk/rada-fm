@@ -169,7 +169,8 @@ impl App {
             self.notify(notice);
             return;
         }
-        let (kind, headline) = headline(&report, &title);
+        let action = done.as_ref().is_some_and(|r| r.kind == OpKind::Action);
+        let (kind, headline) = headline(&report, &title, action);
         if lines.is_empty() {
             self.toast(kind, headline, 4);
         } else {
@@ -307,9 +308,15 @@ fn replan_for(plan: &Plan) -> Replan {
 }
 
 /// The kind of card and the first line for how an operation ended.
-fn headline(report: &ExecReport, title: &str) -> (ToastKind, String) {
+fn headline(report: &ExecReport, title: &str, action: bool) -> (ToastKind, String) {
     use RunStatus::*;
     match report.status() {
+        // An action keeps what it made: said as how many of its steps went through.
+        CompletedWithProblems if action => {
+            let total = report.done + report.failed.len() as u64 + report.skipped_dependent;
+            let text = tf(Key::NActionPartial, &[&title, &report.done, &total]);
+            (ToastKind::Warn, text)
+        }
         Completed if report.kept.is_empty() && report.not_preserved.is_empty() => {
             (ToastKind::Ok, tf(Key::NDoneDefault, &[&title]))
         }

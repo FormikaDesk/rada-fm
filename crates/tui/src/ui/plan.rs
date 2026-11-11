@@ -12,7 +12,7 @@
 use rada_core::display;
 use rada_core::fs::FileKind;
 use rada_core::i18n::{Key, tf};
-use rada_core::ops::{ConflictPolicy, ItemAction, OpKind, Severity, Step};
+use rada_core::ops::{ConflictPolicy, ItemAction, OpKind, Producer, Severity, Step};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -56,7 +56,7 @@ fn mark_of(ctx: &Ctx, kind: OpKind, redo: bool) -> &'static str {
         OpKind::Copy => Action::Copy,
         OpKind::Move => Action::Cut,
         OpKind::Rename | OpKind::BulkRename => Action::Rename,
-        OpKind::MakeDir | OpKind::MakeFile => Action::NewFolder,
+        OpKind::MakeDir | OpKind::MakeFile | OpKind::Action => Action::NewFolder,
         OpKind::Trash | OpKind::Delete => Action::Trash,
         OpKind::Undo => Action::Undo,
         OpKind::Extract => Action::ExtractHere,
@@ -122,6 +122,7 @@ fn op_noun(kind: OpKind) -> Key {
         OpKind::MakeDir => Key::OpNounMkdir,
         OpKind::MakeFile => Key::OpNounMkfile,
         OpKind::SetTags => Key::OpNounTags,
+        OpKind::Action => Key::OpNounAction,
         OpKind::Delete | OpKind::Undo => Key::OpNounDelete,
     }
 }
@@ -188,6 +189,7 @@ fn undo_note(kind: OpKind) -> Option<Key> {
         OpKind::Compress => Key::NoteUndoCompress,
         OpKind::Rename | OpKind::BulkRename => Key::NoteUndoRename,
         OpKind::SetTags => Key::NoteUndoTags,
+        OpKind::Action => Key::NoteUndoAction,
         OpKind::MakeDir | OpKind::MakeFile => Key::NoteUndoNew,
         OpKind::Delete | OpKind::Undo => return None,
     })
@@ -243,7 +245,9 @@ pub fn draw(
     body.push(Line::from(popup::rule(ctx, iw)));
 
     // What will happen.
-    if !plan.renames.is_empty() {
+    if plan.kind == OpKind::Action {
+        body.extend(action_lines(ctx, plan, home, iw));
+    } else if !plan.renames.is_empty() {
         for (from, to) in plan.renames.iter().take(LISTED) {
             let a = from.file_name().map(display::name).unwrap_or_default();
             let b = to.file_name().map(display::name).unwrap_or_default();
@@ -861,11 +865,93 @@ fn step_word(w: Key) -> String {
     }
 }
 
+/// A label and what it is about, the label in its own column.
+fn labelled(ctx: &Ctx, label: &str, text: String, iw: usize) -> Line<'static> {
+    let label = pad(label, 9);
+    let room = iw.saturating_sub(label.width() + 1);
+    Line::from(vec![
+        Span::styled(format!(" {label}"), ctx.dim()),
+        Span::styled(display::truncate(&text, room), ctx.base()),
+    ])
+}
+
+/// What one step that makes a file will write, read and run.
+fn produce_lines(
+    ctx: &Ctx,
+    step: &Step,
+    home: &std::path::Path,
+    iw: usize,
+    out: &mut Vec<Line<'static>>,
+) {
+    let Step::ProduceFile {
+        dst,
+        producer,
+        inputs,
+        ..
+    } = step
+    else {
+        return;
+    };
+    let name = dst.file_name().map(display::name).unwrap_or_default();
+    let written = format!("{name}  ·  {}", Key::PlanActNew.tr());
+    out.push(labelled(ctx, Key::PlanActWrites.tr(), written, iw));
+    for input in inputs.iter().take(3) {
+        let read = fmt::short_path(&input.path, home);
+        out.push(labelled(ctx, Key::PlanActReads.tr(), read, iw));
+    }
+    match producer {
+        Producer::Checksum { .. } => {
+            let how = Key::PlanActChecksum.tr().to_string();
+            out.push(labelled(ctx, Key::PlanActRuns.tr(), how, iw));
+        }
+        Producer::Program { chain, .. } => {
+            for c in chain {
+                let run = format!(
+                    "{}  ·  {}",
+                    display::text(&c.program.name),
+                    display::path(&c.program.path)
+                );
+                out.push(labelled(ctx, Key::PlanActRuns.tr(), run, iw));
+            }
+        }
+    }
+}
+
+/// The body of the plan of an action: each file that will be written with what is read and
+/// run for it, then what becomes of the rest if a step fails.
+fn action_lines(
+    ctx: &Ctx,
+    plan: &rada_core::ops::Plan,
+    home: &std::path::Path,
+    iw: usize,
+) -> Vec<Line<'static>> {
+    let mut out = Vec::new();
+    let made = |s: &&Step| matches!(s, Step::ProduceFile { .. });
+    let shown = plan.steps.iter().filter(made).take(LISTED);
+    let rest = plan.steps.len() - shown.clone().count();
+    for step in shown {
+        produce_lines(ctx, step, home, iw, &mut out);
+    }
+    if rest > 0 {
+        let more = format!(" {}", tf(Key::PlanActOther, &[&rest]));
+        out.push(Line::from(Span::styled(more, ctx.faint())));
+    }
+    out.push(Line::raw(""));
+    for note in plan.notes.iter().take(3) {
+        let note = display::truncate(note, iw.saturating_sub(1));
+        out.push(Line::from(Span::styled(format!(" {note}"), ctx.dim())));
+    }
+    let keep = display::truncate(Key::PlanActKeep.tr(), iw.saturating_sub(1));
+    out.push(Line::from(Span::styled(format!(" {keep}"), ctx.dim())));
+    out
+}
+
 /// One line per step, paths relative to the plan's bases.
 fn step_label(step: &Step, b: &Bases) -> Option<String> {
     Some(match step {
         Step::MakeDir { path, .. } => format!("{}{}", step_word(Key::StepWFolder), b.rel_dst(path)),
         Step::MakeFile { path, .. } => format!("{}{}", step_word(Key::StepWFile), b.rel_dst(path)),
+        Step::ProduceFile { dst, .. } => format!("{}{}", step_word(Key::StepWFile), b.rel_dst(dst)),
         Step::FinishDir { .. } => return None,
         Step::CopyFile {
             dst, remove_source, ..

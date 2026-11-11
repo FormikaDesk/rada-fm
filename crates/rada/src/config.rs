@@ -75,6 +75,11 @@
 //!                            # package (rada only says which tool to use)
 //! source_dir = "~/rada-fm"   # the git checkout the `source` method updates
 //!
+//! [recipes]
+//! programs = { qpdf = "/opt/qpdf/bin/qpdf" }   # the file an action runs for a program's
+//!                            # name, when it is not on the PATH or is not one rada knows.
+//!                            # A whole path; shells and interpreters are refused
+//!
 //! [devices]
 //! hide = ["tmpfs", "/boot"]   # replaces the built-in list of mounts kept out of the disks
 //!                               # (a name is a filesystem type, `fuse.*` a prefix of types;
@@ -113,6 +118,8 @@ pub struct FileConfig {
     pub bookmarks: Vec<String>,
     pub image_limits: ImageLimits,
     pub archive_limits: ArchiveLimits,
+    /// `[recipes] programs`: the file to run for a program's name.
+    pub recipe_programs: std::collections::BTreeMap<String, std::path::PathBuf>,
     pub archive_preview_entries: usize,
     pub archive_preview_seconds: f32,
     pub mouse: bool,
@@ -239,6 +246,11 @@ struct UpdateRaw {
 }
 
 #[derive(Deserialize, Default)]
+struct RecipesRaw {
+    programs: Option<std::collections::BTreeMap<String, std::path::PathBuf>>,
+}
+
+#[derive(Deserialize, Default)]
 struct DevicesRaw {
     hide: Option<Vec<String>>,
 }
@@ -283,6 +295,7 @@ struct Raw {
     git: Option<bool>,
     git_path: Option<String>,
     devices: Option<DevicesRaw>,
+    recipes: Option<RecipesRaw>,
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
     keymap: Option<String>,
@@ -323,6 +336,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
             method: update.method,
             source_dir: update.source_dir,
         },
+        recipe_programs: raw.recipes.and_then(|r| r.programs).unwrap_or_default(),
         archive_limits: ArchiveLimits {
             max_total_bytes: archives
                 .max_extract_gb

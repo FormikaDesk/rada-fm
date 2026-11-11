@@ -196,6 +196,9 @@ impl Intent {
                 Intent::create(dst, None, None).pointing_to(target)
             }
             Step::Compress { dst, .. } => Intent::create(dst, None, None).unverifiable(),
+            // Until the file is ready to be given its name nothing is known of it: the second
+            // record, written then, says what it is (see `Intent::publishing`).
+            Step::ProduceFile { dst, .. } => Intent::create(dst, None, None).unverifiable(),
             Step::MakeDir { path, .. } => Intent::Dir { path: path.clone() },
             Step::MakeFile { path, .. } => Intent::create(path, Some(0), None),
             Step::Rename { from, to, .. } => Intent::Rename {
@@ -204,6 +207,12 @@ impl Intent {
             },
             _ => return None,
         })
+    }
+
+    /// The second record of a step that makes a file with another program: the file is whole
+    /// and about to get the name `dst`. Its size and time are what recovery looks for.
+    pub fn publishing(dst: &Path, size: u64, mtime: Option<Stamp>) -> Intent {
+        Intent::create(dst, Some(size), mtime)
     }
 
     fn create(dst: &Path, size: Option<u64>, mtime: Option<Stamp>) -> Intent {
@@ -244,20 +253,11 @@ enum Record {
         id: String,
         intent: Intent,
     },
-    Begin {
-        id: String,
-        time: i64,
-        kind: OpKind,
-        title: String,
-        reversible: bool,
-        totals: Totals,
-        /// What was asked, so the operation can be planned again (redo).
-        #[serde(default)]
-        request: Option<OpRequest>,
-        /// Set when this operation re-did an undone one.
-        #[serde(default)]
-        redo_of: Option<String>,
-    },
+    Begin(Begun),
+    /// The `begin` of an operation that runs other programs. It has a name of its own because
+    /// a rada older than actions cannot read what it says (the kind, the request): a record
+    /// it does not know it skips, where a `begin` it cannot read would count as damage.
+    BeginAction(Begun),
     Undo {
         id: String,
         step: Step,
@@ -293,6 +293,47 @@ enum Record {
         id: String,
         index: usize,
     },
+}
+
+/// What the record that opens an operation says.
+#[derive(Serialize, Deserialize)]
+struct Begun {
+    id: String,
+    time: i64,
+    kind: OpKind,
+    title: String,
+    reversible: bool,
+    totals: Totals,
+    /// What was asked, so the operation can be planned again (redo).
+    #[serde(default)]
+    request: Option<OpRequest>,
+    /// Set when this operation re-did an undone one.
+    #[serde(default)]
+    redo_of: Option<String>,
+}
+
+impl Begun {
+    /// The entry of an operation that has only begun.
+    fn into_entry(self) -> JournalEntry {
+        JournalEntry {
+            id: self.id,
+            time: self.time,
+            kind: self.kind,
+            title: self.title,
+            reversible: self.reversible,
+            totals: self.totals,
+            status: EntryStatus::Interrupted,
+            done: 0,
+            failed: 0,
+            bytes: 0,
+            undo_steps: 0,
+            undo_state: UndoState::NotUndone,
+            unrecorded_from: None,
+            request: self.request,
+            redoable: false,
+            damaged: None,
+        }
+    }
 }
 
 /// An operation the process of which died, and what is known about the step it died in.
@@ -376,6 +417,7 @@ impl JournalEntry {
             OpKind::Compress => tf(DoneCompress, &[&items]),
             OpKind::SetTags => tf(DoneTags, &[&items]),
             OpKind::Undo => t(DoneUndo).to_string(),
+            OpKind::Action => tf(DoneAction, &[&items]),
         }
     }
 }
@@ -413,9 +455,10 @@ const TORN: &[u8] = b"#torn";
 
 /// The record types this version writes; a well-formed line of another type is from a newer
 /// rada.
-const KNOWN: [&str; 7] = [
+const KNOWN: [&str; 8] = [
     "pending",
     "begin",
+    "begin_action",
     "undo",
     "digest",
     "end",
@@ -605,19 +648,22 @@ impl Journal {
         let lock = self
             .take_lock(&format!("{id}.lock"))?
             .ok_or_else(|| Error::Journal(format!("operation {id} is locked already")))?;
-        let written = self.append(
-            &Record::Begin {
-                id: id.clone(),
-                time: now_secs(),
-                kind,
-                title: title.to_string(),
-                reversible,
-                totals,
-                request: request.cloned(),
-                redo_of: redo_of.map(str::to_string),
-            },
-            true,
-        );
+        let begun = Begun {
+            id: id.clone(),
+            time: now_secs(),
+            kind,
+            title: title.to_string(),
+            reversible,
+            totals,
+            request: request.cloned(),
+            redo_of: redo_of.map(str::to_string),
+        };
+        let record = if kind == OpKind::Action {
+            Record::BeginAction(begun)
+        } else {
+            Record::Begin(begun)
+        };
+        let written = self.append(&record, true);
         match written {
             Ok(()) => self.running()?.insert(id.clone(), lock),
             Err(e) => {
@@ -854,43 +900,14 @@ impl Journal {
         // The line each operation's `end` record is on.
         let mut ended: HashMap<String, usize> = HashMap::new();
         let damage = self.read_records(|n, r| match r {
-            Record::Begin {
-                id,
-                time,
-                kind,
-                title,
-                reversible,
-                totals,
-                request,
-                redo_of,
-            } => {
+            Record::Begin(begun) | Record::BeginAction(begun) => {
                 // A new operation ends the redo history, unless it *is* a redo.
-                match redo_of {
-                    Some(r) => redo_stack.retain(|x| *x != r),
+                match &begun.redo_of {
+                    Some(r) => redo_stack.retain(|x| x != r),
                     None => redo_stack.clear(),
                 }
-                order.push(id.clone());
-                map.insert(
-                    id.clone(),
-                    JournalEntry {
-                        id,
-                        time,
-                        kind,
-                        title,
-                        reversible,
-                        totals,
-                        status: EntryStatus::Interrupted,
-                        done: 0,
-                        failed: 0,
-                        bytes: 0,
-                        undo_steps: 0,
-                        undo_state: UndoState::NotUndone,
-                        unrecorded_from: None,
-                        request,
-                        redoable: false,
-                        damaged: None,
-                    },
-                );
+                order.push(begun.id.clone());
+                map.insert(begun.id.clone(), begun.into_entry());
             }
             Record::Pending { .. } | Record::Digest { .. } => {}
             Record::Undo { id, .. } => {

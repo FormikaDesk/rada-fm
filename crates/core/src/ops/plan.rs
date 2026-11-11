@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::action::{FailurePolicy, InputStamp, Producer};
 use crate::archive::ArchiveKind;
 use crate::archive::writer::CompressItem;
 use crate::fs::{Fingerprint, Stamp};
@@ -32,6 +33,8 @@ pub enum OpKind {
     Compress,
     /// Change the tags of files (the Finder's tags on macOS, `user.xdg.tags` on Linux).
     SetTags,
+    /// Make new files by running other programs, or by reading files (a checksum).
+    Action,
 }
 
 impl OpKind {
@@ -49,6 +52,7 @@ impl OpKind {
             OpKind::Extract => t(Key::VerbExtract),
             OpKind::Compress => t(Key::VerbCompress),
             OpKind::SetTags => t(Key::VerbTags),
+            OpKind::Action => t(Key::VerbAction),
         }
     }
 }
@@ -247,6 +251,21 @@ pub enum Step {
         before: Vec<crate::platform::Tag>,
         after: Vec<crate::platform::Tag>,
     },
+    /// One new file, written by another program or computed from the inputs. It is made in a
+    /// folder of its own next to `dst` and given its name only when complete; a name that was
+    /// taken in the meantime is never replaced, the file gets the next free one.
+    ProduceFile {
+        #[serde(with = "pathcodec::path")]
+        #[schemars(with = "String")]
+        dst: PathBuf,
+        producer: Producer,
+        /// What is read, as the plan saw it: checked before the producer starts and after it
+        /// ends.
+        inputs: Vec<InputStamp>,
+        /// About how large the file will be, when the recipe can tell.
+        #[serde(default)]
+        size_hint: Option<u64>,
+    },
 }
 
 /// Tag names for a sentence: `Red, Work`, or `none`.
@@ -272,7 +291,7 @@ impl Step {
             | Step::RemoveFile { path, .. }
             | Step::SetTags { path, .. }
             | Step::RemoveDir { path } => path,
-            Step::Compress { dst, .. } => dst,
+            Step::Compress { dst, .. } | Step::ProduceFile { dst, .. } => dst,
             Step::ExtractFile { src, .. } | Step::ExtractSymlink { src, .. } => src,
             Step::CopyFile { src, .. } | Step::CopySymlink { src, .. } => src,
             Step::HardLink { link, .. } => link,
@@ -289,7 +308,8 @@ impl Step {
             | Step::CopySymlink { dst, .. }
             | Step::ExtractFile { dst, .. }
             | Step::ExtractSymlink { dst, .. }
-            | Step::Compress { dst, .. } => Some(dst),
+            | Step::Compress { dst, .. }
+            | Step::ProduceFile { dst, .. } => Some(dst),
             Step::HardLink { link, .. } => Some(link),
             Step::Rename { to, .. } => Some(to),
             Step::Restore { item } => Some(&item.original),
@@ -352,6 +372,13 @@ impl Step {
                 before,
                 after,
             } => tf(StepTags, &[&p(path), &tag_names(before), &tag_names(after)]),
+            Step::ProduceFile { dst, producer, .. } => match producer {
+                Producer::Checksum { .. } => tf(StepChecksum, &[&p(dst)]),
+                Producer::Program { .. } => {
+                    let programs = display::text(&producer.program_names().join(", "));
+                    tf(StepProduce, &[&p(dst), &programs])
+                }
+            },
         }
     }
 
@@ -477,6 +504,12 @@ impl Step {
                 before: after.clone(),
                 after: before.clone(),
             }),
+            // The file is removed under the name it was given, and only if it is still the
+            // one that was written.
+            Step::ProduceFile { dst, .. } => Some(Step::RemoveFile {
+                path: result.published_as.clone().unwrap_or_else(|| dst.clone()),
+                expect: result.after.clone(),
+            }),
             Step::RemoveFile { .. } | Step::Restore { .. } => None,
         }
     }
@@ -505,6 +538,8 @@ pub struct StepResult {
     /// What could not be carried over to a copy (owner, extended attributes, ACLs, a hard
     /// link the destination cannot make...), in words.
     pub not_preserved: Vec<String>,
+    /// For `ProduceFile`: the name the file got, when the one asked for was taken.
+    pub published_as: Option<PathBuf>,
 }
 
 impl StepResult {
@@ -517,6 +552,7 @@ impl StepResult {
             trashed: None,
             removed_dir_mode: None,
             not_preserved: Vec::new(),
+            published_as: None,
         }
     }
     pub fn noop(note: impl Into<String>) -> Self {
@@ -622,6 +658,12 @@ pub enum WarningKind {
     DeviceRename,
     /// An archive cannot be written straight onto a phone or a camera.
     DeviceArchive,
+    /// An action cannot read from or write to a phone or a camera.
+    DeviceAction,
+    /// A program an action needs is not installed.
+    ProgramMissing,
+    /// Another program does the writing: rada answers only for the file it publishes.
+    ActionProgram,
     Other,
 }
 
@@ -757,6 +799,9 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::DeviceNoTrash => t(WDeviceNoTrash).to_string(),
         WarningKind::DeviceRename => t(WDeviceRename).to_string(),
         WarningKind::DeviceArchive => t(WDeviceArchive).to_string(),
+        WarningKind::DeviceAction => t(WDeviceAction).to_string(),
+        WarningKind::ProgramMissing => pl(n, WProgramMissingOne, WProgramMissingMany, x),
+        WarningKind::ActionProgram => t(WActionProgram).to_string(),
         WarningKind::Other => detail.map_or_else(|| t(WOther).to_string(), str::to_string),
     }
 }
@@ -908,6 +953,12 @@ pub struct Plan {
     /// For a new archive: about how large it will be (a guess from the kind of files).
     #[serde(default)]
     pub estimated_bytes: Option<u64>,
+    /// What the recipe that asked for this plan wants said about it.
+    #[serde(default)]
+    pub notes: Vec<String>,
+    /// What becomes of the steps that worked when another one fails.
+    #[serde(default)]
+    pub failure: FailurePolicy,
 }
 
 /// The operation an undo plan takes back.
@@ -936,6 +987,8 @@ impl Plan {
             redo_of: None,
             undoes: None,
             estimated_bytes: None,
+            notes: Vec::new(),
+            failure: FailurePolicy::Keep,
         }
     }
 

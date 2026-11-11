@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- **Actions: a new file made by another program, as a plan like any other.** A request (`rada --request`, op `recipe`) can ask for one new file made by `qpdf`, `gs`, `magick`, `sips`, `ffmpeg`, `ffprobe` or `soffice`, by a chain of them, or by rada itself (a SHA-256 checksum in the format of `sha256sum`), and for several such files and ordinary operations as one plan with one undo. The plan shows the file that will run, what is read and the one file that will be written. The program runs without a shell in a work folder of its own, bounded in time, and is killed with everything it started on a timeout or a cancel; the file gets its name only when complete and never over another one (a name taken meanwhile gives `name (1).ext`); the inputs are checked before and after; undo removes the new file if it has not changed. Shells and interpreters are never run. `[recipes] programs` in the configuration names the file for a program that is not on the `PATH`. What rada guarantees and what it does not is in `docs/SAFETY.md`. There is no way to start an action from the interface yet.
 - **Search by name in the folders under this one.** When the words typed in the bar match nothing in the folder, the last suggestion is *Search "words" in subfolders*: it lists what matches as a read-only list, like the items of a tag. It does not follow links or leave the filesystem, skips what it cannot read, and says when it stopped at its limit (2000 matches).
 
 ### Fixed

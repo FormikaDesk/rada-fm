@@ -95,8 +95,22 @@ impl Services {
         journal: Option<Journal>,
         archive_limits: ArchiveLimits,
     ) -> Services {
+        let programs = rada_core::ops::Programs::default();
+        Services::start_for(fs, platform, journal, archive_limits, programs)
+    }
+
+    /// [`start_with`](Self::start_with) and the programs the configuration names for actions.
+    pub fn start_for(
+        fs: Arc<dyn FsEngine>,
+        platform: Arc<dyn Platform>,
+        journal: Option<Journal>,
+        archive_limits: ArchiveLimits,
+        programs: rada_core::ops::Programs,
+    ) -> Services {
         let (tx, rx) = unbounded();
-        let engine = Engine::new(fs.clone(), platform.clone()).with_archive_limits(archive_limits);
+        let engine = Engine::new(fs.clone(), platform.clone())
+            .with_archive_limits(archive_limits)
+            .with_programs(programs);
         let journal_ok = journal.is_some();
         let jobs = Jobs::new(engine, journal.map(Arc::new), tx.clone());
         // Operations a killed process left half done are settled before anything new runs.

@@ -17,6 +17,13 @@
 //! * a move that was cut between "copy in place" and "remove the source" has the file in two
 //!   places: the copy is treated as not made (undo removes it), the source is untouched.
 //!
+//! * a step that ran another program worked in a folder of its own, `.rada-work-<tag>` next to
+//!   the destination: it is removed, looked for by that exact name and nowhere else. Such a
+//!   step writes two records: the first before the program starts, when nothing is known of
+//!   the file; the second when the file is whole and about to get its name, with its size and
+//!   time. Cut before the second, nothing was given a name. Cut after it, the destination is
+//!   taken as the step's only if it is that file, like any other.
+//!
 //! Then the operation gets an `end` record (status `interrupted`) and is not looked at again.
 //!
 //! An operation is touched only after its lock has been taken (see `journal`): the process
@@ -28,8 +35,8 @@
 use std::path::{Path, PathBuf};
 
 use super::engine::Engine;
-use super::names;
 use super::plan::Step;
+use super::{action, names};
 use crate::Result;
 use crate::fs::{FsMeta, Stamp};
 use crate::journal::{Intent, Interrupted, Journal};
@@ -126,7 +133,11 @@ impl Engine {
         let mut adopted: Vec<Step> = Vec::new();
         if let Some(intent) = &it.in_doubt {
             self.remove_temps(intent, pid, &mut rec);
+            // A program was cut before its file got a name: what is at the destination, if
+            // anything, was there before, and there is nothing to say about it.
+            let unpublished = self.remove_work_dir(intent, &mut rec) && unverifiable(intent);
             if it.entry.reversible
+                && !unpublished
                 && let Some(step) = self.adopt(intent, &mut rec)
             {
                 adopted.push(step);
@@ -162,6 +173,34 @@ impl Engine {
                 }
             }
         }
+    }
+
+    /// The folder a step that ran another program worked in. Only a real folder with exactly
+    /// the name the step's tag gives, next to the destination; whether there was one.
+    fn remove_work_dir(&self, intent: &Intent, rec: &mut Recovered) -> bool {
+        let Intent::Create {
+            dst,
+            temp: Some(tag),
+            ..
+        } = intent
+        else {
+            return false;
+        };
+        // The tag is a journal id and a number: anything else could name another place.
+        if tag.is_empty() || !tag.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+            return false;
+        }
+        let work = action::work_dir(dst, tag);
+        if !self.fs.lstat(&work).is_ok_and(|m| m.is_dir()) {
+            return false;
+        }
+        match self.fs.remove_dir_all(&work) {
+            Ok(()) => rec.removed_temps.push(work),
+            Err(e) => rec
+                .notes
+                .push(format!("cannot remove {}: {e}", work.display())),
+        }
+        true
     }
 
     /// Whether `dst` is not the link the step was making: it was to point at `target` (a
@@ -303,6 +342,17 @@ impl Engine {
         });
         Some(step)
     }
+}
+
+/// Whether the record says nothing of what the step was writing.
+fn unverifiable(intent: &Intent) -> bool {
+    matches!(
+        intent,
+        Intent::Create {
+            unverifiable: true,
+            ..
+        }
+    )
 }
 
 /// Whether the file at `dst` is not the one the interrupted step declared it would write (its

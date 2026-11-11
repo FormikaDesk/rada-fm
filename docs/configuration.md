@@ -56,6 +56,11 @@ channel = "auto"          # auto | stable | prerelease (see Updates)
 method = "auto"           # auto | binary | source | package
 source_dir = "~/rada-fm"  # the git checkout the `source` method updates
 
+[recipes]
+programs = { qpdf = "/opt/qpdf/bin/qpdf" }   # the file an action runs for a program's name, when it
+                      # is not on the PATH or is not one rada knows; a whole path. Shells and
+                      # interpreters are refused (see SAFETY.md, "Actions that run another program")
+
 [devices]
 hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
                       # disks: a name is a filesystem type (`fuse.*` a prefix), `/path` a mount point,

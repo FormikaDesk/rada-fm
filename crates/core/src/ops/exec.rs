@@ -102,6 +102,12 @@ pub trait ExecHandler {
     fn temp_tag(&self) -> Option<String> {
         None
     }
+    /// A step that makes a file with another program has the file whole and is about to give
+    /// it the name `dst`: the journal writes that down first. `false` when it could not and
+    /// the run is to stop: then the name is not given.
+    fn publishing(&mut self, _dst: &Path, _size: u64, _mtime: Option<Stamp>) -> bool {
+        true
+    }
     /// The journal could not be written while recording `f.step`. The default is to stop:
     /// a handler with nobody to ask does not go on without a way back.
     fn on_journal_failure(&mut self, _f: &Failure<'_>) -> JournalChoice {
@@ -263,9 +269,9 @@ struct ArchiveMember<'a> {
 }
 
 /// Progress/cancel adapter handed to the filesystem copy loop.
-struct Ctl<'a> {
-    handler: &'a mut dyn ExecHandler,
-    cancel: &'a Cancel,
+pub(super) struct Ctl<'a> {
+    pub(super) handler: &'a mut dyn ExecHandler,
+    pub(super) cancel: &'a Cancel,
     prog: &'a mut Progress,
     base_bytes: u64,
     last_emit: &'a mut Instant,
@@ -487,6 +493,12 @@ impl Engine {
                 }
                 Err(Error::Cancelled) => {
                     run.report.cancelled = true;
+                    return false;
+                }
+                // The journal could not be written and the person chose to stop: there is
+                // nothing left to ask about this step.
+                Err(error) if matches!(step, Step::ProduceFile { .. }) && run.halted() => {
+                    run.report.failed.push(failed(index, step, &error));
                     return false;
                 }
                 Err(error) => match run.record_failure(st, index, step, &error, attempt) {
@@ -790,6 +802,15 @@ impl Engine {
                 before,
                 after,
             } => self.set_tags(path, before, after),
+            Step::ProduceFile {
+                dst,
+                producer,
+                inputs,
+                size_hint,
+            } => {
+                st.unsynced_dirs.extend(dst.parent().map(Path::to_path_buf));
+                self.produce_file(ctl, dst, producer, inputs, *size_hint)
+            }
         }
     }
 

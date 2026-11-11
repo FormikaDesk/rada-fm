@@ -743,7 +743,9 @@ fn start_services(
         Some(s) => Arc::new(s),
         None => Arc::new(LocalFs),
     };
-    let services = Services::start_with(fs, platform, journal, cfg_file.archive_limits)
+    let programs = rada_core::ops::Programs::new(cfg_file.recipe_programs.clone());
+    let limits = cfg_file.archive_limits;
+    let services = Services::start_for(fs, platform, journal, limits, programs)
         .with_folder_sizes(cfg_file.folder_size_settings()?)
         // A demo scene must not depend on, or change, the folders the person goes to.
         .with_zoxide(rada_core::zoxide::Zoxide::new(

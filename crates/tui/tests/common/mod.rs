@@ -18,6 +18,17 @@ use rada_tui::{IconSet, Services, Theme, ui};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
+thread_local! {
+    /// The programs the engine of the next harness of this test runs for actions.
+    static PROGRAMS: std::cell::RefCell<rada_core::ops::Programs> = Default::default();
+}
+
+/// Give the next harness made by this test the programs its actions may run (a stand-in under
+/// a name of the test's own): what `[recipes] programs` does in the configuration.
+pub fn give_programs(programs: rada_core::ops::Programs) {
+    PROGRAMS.with(|p| *p.borrow_mut() = programs);
+}
+
 /// Adjusts the configuration before the interface starts.
 pub type Tweak = Box<dyn FnOnce(&mut Config)>;
 
@@ -187,7 +198,9 @@ impl H {
         system: Option<System>,
     ) -> H {
         let (fs, platform) = system.unwrap_or_else(|| (Arc::new(LocalFs), sb.platform()));
-        let svc = Services::start_with(fs, platform, Some(sb.journal()), archive_limits);
+        let programs = PROGRAMS.with(|p| p.borrow().clone());
+        let journal = Some(sb.journal());
+        let svc = Services::start_for(fs, platform, journal, archive_limits, programs);
         let mut cfg = Config {
             start_dir: start,
             icons: IconSet::UnicodeIcons,
