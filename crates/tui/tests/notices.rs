@@ -378,3 +378,30 @@ fn the_keys_of_a_window_leave_the_notifications_alone() {
     h.key(KeyCode::Down);
     assert!(h.app.current_notice().is_none());
 }
+
+#[test]
+fn what_is_typed_in_the_bar_leaves_the_notifications_alone() {
+    use rada_tui::app::Notice;
+    use rada_tui::hits::Target;
+    let (mut h, _dir, _dest) = files();
+    // The bar is opened with the mouse: no key reaches the card before the typing.
+    h.click(&Target::Address);
+    assert!(h.app.windows.address.is_some());
+    h.app.notify(
+        Notice::new(NoticeKind::Ok, "3 items moved to the trash").with_action(NoticeAction::Undo),
+    );
+    h.app.advance_notices(Duration::from_millis(800));
+    h.keys("abc");
+    h.key(KeyCode::Backspace);
+    assert!(
+        h.app.current_notice().is_some(),
+        "keys typed in the bar are not for the card"
+    );
+    // Once the bar is closed, the next key is the one that closes the card.
+    h.key(KeyCode::Esc);
+    h.key(KeyCode::Esc);
+    assert!(h.app.windows.address.is_none());
+    h.app.advance_notices(Duration::from_millis(800));
+    h.key(KeyCode::Down);
+    assert!(h.app.current_notice().is_none());
+}

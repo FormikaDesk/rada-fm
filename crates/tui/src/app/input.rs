@@ -75,8 +75,9 @@ impl App {
         {
             return true;
         }
-        // The cards are not on screen while a window is open: its keys are not for them.
-        if self.windows.modal.is_none() {
+        // The cards are not on screen while a window is open: its keys are not for them. What
+        // is typed in the bar is for the bar too.
+        if self.windows.modal.is_none() && self.windows.address.is_none() {
             self.windows.notices.on_key(now);
         }
         false
