@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/search.rs
+expression: "picture(60, 20)"
+---
+ rada  ▸ Search: report  ✕   +                      ? Help
+  ←   →   ↑   ⟳     Search: report                Ctrl+P
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶             ⋯
+╭───╮ ╭────────────────────────────────────────────────────╮
+│ ⌂ │ │ ☐   Name ↑                 Where              Size │
+│   │ │                                                    │
+│   │ │▌☐ · Report draft.txt       …drafts/old         5 B │
+│   │ │ ☐ · report-final.pdf       2025/q4            12 B │
+│   │ │ ☐ · report.pdf             .                   3 B │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+│   │ │                                                    │
+╰───╯ ╰────────────────────────────────────────────────────╯
+ 3 items                                           ≣  ▦  ▥

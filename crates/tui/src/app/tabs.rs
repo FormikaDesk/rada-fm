@@ -45,6 +45,18 @@ pub struct TabState {
     pub view: ViewMode,
     /// Number of rows the list can show; set by the renderer.
     pub viewport: Viewport,
+    /// For a list that is not a folder: how its source is doing.
+    pub view_run: Option<ViewRun>,
+}
+
+/// The source of a list that is not a folder, while it runs and after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ViewRun {
+    /// The read the entries belong to.
+    pub generation: u64,
+    pub progress: rada_core::views::ViewProgress,
+    /// More entries may still come.
+    pub running: bool,
 }
 
 /// The tabs behind the front one, which one is in front, and what is remembered between
@@ -263,6 +275,7 @@ impl App {
         self.windows.address = None;
         let generation = self.tabs.next_generation();
         self.tab.load = LoadState::Loading(cwd.clone());
+        self.svc.loader.set_show_hidden(self.settings.show_hidden);
         self.svc.loader.load(cwd.clone(), generation);
         if self.tab.archive.is_none() && self.tab.virtual_view().is_none() {
             self.svc.watcher.watch(cwd);
@@ -393,6 +406,10 @@ impl App {
                         .parent()
                         .map(Path::to_path_buf)
                         .unwrap_or_else(|| cwd.clone()),
+                    // A search can be made again where and for what it was.
+                    None if matches!(ViewKind::of(cwd), Some(ViewKind::Search { .. })) => {
+                        cwd.clone()
+                    }
                     // A list of tagged items is not a place to come back to.
                     None if ViewKind::of(cwd).is_some() => self.svc.home.clone(),
                     None => cwd.clone(),

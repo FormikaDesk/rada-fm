@@ -400,6 +400,8 @@ strings! {
     FlagExecutable => "executable", "eseguibile";
     TagViewTitle => "Tag: {0}", "Tag: {0}";
     SearchViewTitle => "Search: {0}", "Cerca: {0}";
+    SearchRunning => "Searching… {0} found · {1} seen · Esc to stop", "Ricerca… {0} trovati · {1} viste · Esc per fermare";
+    ColWhere => "Where", "Dove";
     PropsSelectedOne => "1 selected", "1 selezionato";
     PropsSelectedMany => "{0} selected", "{0} selezionati";
 
@@ -874,7 +876,13 @@ strings! {
     TTagViewRefuse => "this list is the items tagged \"{0}\", not a folder — cannot {1} here", "questo elenco contiene gli elementi con il tag \"{0}\", non è una cartella — qui non si può {1}";
     TSearchUnavailable => "cannot search here: the folder's name is not plain text", "qui non si può cercare: il nome della cartella non è testo semplice";
     TSearchRefuse => "this list is the result of a search, not a folder — cannot {0} here", "questo elenco è il risultato di una ricerca, non una cartella — qui non si può {0}";
-    TSearchTruncated => "the search stopped at its limit ({0} matches or too many items looked at): there may be more", "la ricerca si è fermata al limite ({0} risultati o troppi elementi esaminati): potrebbero essercene altri";
+    TSearchLimitResults => "the search stopped at {0} matches: there may be more", "la ricerca si è fermata a {0} risultati: potrebbero essercene altri";
+    TSearchLimitVisited => "the search stopped after looking at {0} items: there may be more matches", "la ricerca si è fermata dopo aver esaminato {0} elementi: potrebbero esserci altri risultati";
+    TSearchLimitTime => "the search stopped after {0} seconds: there may be more matches", "la ricerca si è fermata dopo {0} secondi: potrebbero esserci altri risultati";
+    TSearchLimitDepth => "folders nested more than {0} deep were not searched", "le cartelle annidate oltre {0} livelli non sono state esaminate";
+    TSearchStopped => "search stopped: {0} found so far", "ricerca fermata: {0} trovati finora";
+    TUnreadableOne => "1 folder could not be read", "1 cartella non leggibile";
+    TUnreadableMany => "{0} folders could not be read", "{0} cartelle non leggibili";
     TRecentRefuse => "this list is the files used lately, not a folder — cannot {0} here", "questo elenco contiene i file usati di recente, non è una cartella — qui non si può {0}";
     TShowInFolderHere => "this is already a folder: nothing to show", "questa è già una cartella: non c'è altro da mostrare";
     TAtTop => "already at the top", "sei già in cima";

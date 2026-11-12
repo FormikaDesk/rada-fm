@@ -14,6 +14,7 @@ use crate::fs::FsEngine;
 use crate::model::{self, Entry};
 use crate::platform::spawn::spawn_retrying_busy;
 use crate::platform::{Platform, Tag, TagColor, TagStore};
+use crate::views::Problem;
 
 /// What a view path starts with.
 pub const SCHEME: &str = "tag:";
@@ -77,6 +78,41 @@ impl Default for ScanLimits {
     }
 }
 
+thread_local! {
+    /// The folders a walk on this thread could not read, while somebody is asking for them.
+    static PROBLEMS: std::cell::RefCell<Option<Vec<Problem>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Run `find` and hand back, with its answer, the folders a walk of the disk could not read
+/// while it ran. The walk is deep inside the platform's tag store, which has no other way to
+/// say so; where the system has an index and nothing is walked, there are none.
+pub fn with_problems<T>(find: impl FnOnce() -> T) -> (T, Vec<Problem>) {
+    PROBLEMS.with(|p| *p.borrow_mut() = Some(Vec::new()));
+    let found = find();
+    let problems = PROBLEMS.with(|p| p.borrow_mut().take()).unwrap_or_default();
+    (found, problems)
+}
+
+/// The entries of `dir`, or nothing when it cannot be read (which is noted).
+fn listing_of(dir: PathBuf) -> Option<std::fs::ReadDir> {
+    match std::fs::read_dir(&dir) {
+        Ok(rd) => Some(rd),
+        Err(e) => {
+            note_problem(dir, &e);
+            None
+        }
+    }
+}
+
+fn note_problem(path: PathBuf, e: &std::io::Error) {
+    PROBLEMS.with(|p| {
+        if let Some(list) = p.borrow_mut().as_mut() {
+            let reason = crate::workers::unreadable_reason(e);
+            list.push(Problem { path, reason });
+        }
+    });
+}
+
 /// Walk `root` (not into hidden folders, not through links) and collect the items whose
 /// tags match. Stops when `cancel` says so, or at the limits, with what it has.
 pub fn scan<S: TagStore + ?Sized>(
@@ -91,7 +127,7 @@ pub fn scan<S: TagStore + ?Sized>(
     let mut stack = vec![root.to_path_buf()];
     let mut seen = 0usize;
     while let Some(dir) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&dir) else {
+        let Some(rd) = listing_of(dir) else {
             continue;
         };
         for e in rd.flatten() {

@@ -233,6 +233,11 @@ impl App {
         match hit {
             NoticeHit::Undo => self.dispatch(Action::Undo),
             NoticeHit::Redo => self.dispatch(Action::Redo),
+            NoticeHit::Show if shown.as_ref().is_some_and(|n| !n.lines.is_empty()) => {
+                if let Some(n) = shown {
+                    self.show_lines(n.text, n.lines);
+                }
+            }
             NoticeHit::Show => {
                 if let Some(Notice {
                     show: Some(folder),

@@ -9,6 +9,7 @@
 //! The row under the cursor is shaded from one end to the other, the selected ones are
 //! tinted, both with rounded ends (see `soft`).
 
+use rada_core::ViewKind;
 use rada_core::display;
 use rada_core::fs::FileKind;
 use rada_core::i18n::{Key, tf};
@@ -22,7 +23,7 @@ use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look, RowTone};
-use super::widgets::{SPIN, hit_spans, pad, pad_left};
+use super::widgets::{SPIN, hit_spans, pad, pad_left, tail};
 use crate::app::App;
 use crate::fmt::{self, DateStyle};
 use crate::hits::Target;
@@ -43,6 +44,67 @@ const TAGS_FROM: usize = 80;
 /// date stays, only the column goes. The list of the panels view follows the same width.
 pub const DATE_FROM: usize = 90;
 
+/// A column of the table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Column {
+    Name,
+    /// The folder an item is in, for a list whose items are in many.
+    Where,
+    Modified,
+    Type,
+    Size,
+    Tags,
+}
+
+/// The columns a list may have, in the order they are drawn. What the list is decides the
+/// set; the width decides which of them fit (see [`columns_of`]). The titles and the rows are
+/// drawn by going through the set, so a list with another set needs no drawing of its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ColumnSet(&'static [Column]);
+
+impl ColumnSet {
+    /// A folder, and the lists that show where an item is next to its name.
+    pub const FOLDER: ColumnSet = ColumnSet(&[
+        Column::Name,
+        Column::Modified,
+        Column::Type,
+        Column::Size,
+        Column::Tags,
+    ]);
+    /// The result of a search: where each item is has a column of its own.
+    pub const SEARCH: ColumnSet = ColumnSet(&[
+        Column::Name,
+        Column::Where,
+        Column::Modified,
+        Column::Type,
+        Column::Size,
+        Column::Tags,
+    ]);
+
+    /// The columns of the list `view` stands for (`None`: a folder).
+    pub fn of(view: Option<&ViewKind>) -> ColumnSet {
+        match view {
+            Some(ViewKind::Search { .. }) => ColumnSet::SEARCH,
+            _ => ColumnSet::FOLDER,
+        }
+    }
+
+    pub fn has(self, column: Column) -> bool {
+        self.0.contains(&column)
+    }
+
+    /// The columns after the name, which is always the first.
+    fn after_name(self) -> impl Iterator<Item = Column> {
+        self.0.iter().copied().filter(|c| *c != Column::Name)
+    }
+}
+
+/// The least the "Where" column is worth showing with, and the most it takes.
+const WHERE_MIN: usize = 10;
+const WHERE_MAX: usize = 30;
+/// The name keeps at least this much room before the "Where" column is let in.
+const NAME_MIN_WITH_WHERE: usize = 14;
+
 /// Which columns fit, and how wide each is.
 pub struct Columns {
     pub icon: usize,
@@ -53,6 +115,10 @@ pub struct Columns {
     pub tags: usize,
     pub gap: usize,
     pub name: usize,
+    /// The "Where" column; 0 when the list has none or it does not fit.
+    pub place: usize,
+    /// The columns the list may have, in their order.
+    pub set: ColumnSet,
 }
 
 /// What the caller decides about the table: which optional columns it may have. They follow
@@ -80,6 +146,17 @@ impl ListOpts {
 }
 
 pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyle) -> Columns {
+    columns_of(ColumnSet::FOLDER, area_width, opts, icon_w, dates)
+}
+
+/// The widths of the columns of `set` in an area `area_width` wide.
+pub fn columns_of(
+    set: ColumnSet,
+    area_width: usize,
+    opts: ListOpts,
+    icon_w: usize,
+    dates: DateStyle,
+) -> Columns {
     let gap = 2;
     let date_w = match dates {
         DateStyle::Relative => 14,
@@ -110,6 +187,11 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
         tags = TAG_W;
         name -= TAG_W + gap;
     }
+    let place = if set.has(Column::Where) {
+        room_for_where(&mut name, [&mut kind, &mut date], gap)
+    } else {
+        0
+    };
     Columns {
         icon: icon_w,
         date,
@@ -118,7 +200,29 @@ pub fn columns(area_width: usize, opts: ListOpts, icon_w: usize, dates: DateStyl
         tags,
         gap,
         name,
+        place,
+        set,
     }
+}
+
+/// The width of the "Where" column, taken from the name; 0 when it does not fit. Where an
+/// item is matters more than what kind of thing it is, and then than its date: `others` give
+/// their room up, in that order, until the column fits. It takes a third of what the name
+/// has, while the name keeps its room.
+fn room_for_where(name: &mut usize, others: [&mut usize; 2], gap: usize) -> usize {
+    let needed = NAME_MIN_WITH_WHERE + WHERE_MIN + gap;
+    for column in others {
+        if *name < needed && *column > 0 {
+            *name += *column + gap;
+            *column = 0;
+        }
+    }
+    if *name < needed {
+        return 0;
+    }
+    let place = (*name / 3).clamp(WHERE_MIN, WHERE_MAX);
+    *name -= place + gap;
+    place
 }
 
 /// Draw the table of the front tab in `area` (any area: nothing here knows where it is).
@@ -126,7 +230,8 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let th = app.settings.th.clone();
     let look = Look::of(app);
     let count = app.tab.visible.len();
-    let cols = columns(
+    let cols = columns_of(
+        ColumnSet::of(app.tab.virtual_view().as_ref()),
         area.width as usize,
         opts,
         app.settings.icons.width(),
@@ -182,36 +287,46 @@ pub fn draw_list(f: &mut Frame, app: &mut App, area: Rect, opts: ListOpts) {
     let (t, st) = label(Key::ColName.tr(), SortKey::Name);
     head_hits.push((head.len(), Target::SortBy(SortKey::Name)));
     head.push(Span::styled(pad(&t, cols.name), st));
-    if cols.date > 0 {
-        head.push(gap());
-        // In the list of recent files the date is the one of the last use.
-        let title = if app.tab.is_recent_view() {
-            Key::ColUsed
-        } else {
-            Key::ColModified
-        };
-        let (t, st) = label(title.tr(), SortKey::Modified);
-        head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
-        head.push(Span::styled(pad(&t, cols.date), st));
-    }
-    if cols.kind > 0 {
-        head.push(gap());
-        let (t, st) = label(Key::ColType.tr(), SortKey::Type);
-        head_hits.push((head.len(), Target::SortBy(SortKey::Type)));
-        head.push(Span::styled(pad(&t, cols.kind), st));
-    }
-    if cols.size > 0 {
-        head.push(gap());
-        let (t, st) = label(Key::ColSize.tr(), SortKey::Size);
-        head_hits.push((head.len(), Target::SortBy(SortKey::Size)));
-        head.push(Span::styled(pad_left(&t, cols.size), st));
-    }
-    if cols.tags > 0 {
-        head.push(gap());
-        head.push(Span::styled(
-            pad(Key::ColTags.tr(), cols.tags),
-            th.dim().patch(head_bg),
-        ));
+    for column in cols.set.after_name() {
+        match column {
+            Column::Where if cols.place > 0 => {
+                head.push(gap());
+                let title = pad(Key::ColWhere.tr(), cols.place);
+                head.push(Span::styled(title, th.dim().patch(head_bg)));
+            }
+            Column::Modified if cols.date > 0 => {
+                head.push(gap());
+                // In the list of recent files the date is the one of the last use.
+                let title = if app.tab.is_recent_view() {
+                    Key::ColUsed
+                } else {
+                    Key::ColModified
+                };
+                let (t, st) = label(title.tr(), SortKey::Modified);
+                head_hits.push((head.len(), Target::SortBy(SortKey::Modified)));
+                head.push(Span::styled(pad(&t, cols.date), st));
+            }
+            Column::Type if cols.kind > 0 => {
+                head.push(gap());
+                let (t, st) = label(Key::ColType.tr(), SortKey::Type);
+                head_hits.push((head.len(), Target::SortBy(SortKey::Type)));
+                head.push(Span::styled(pad(&t, cols.kind), st));
+            }
+            Column::Size if cols.size > 0 => {
+                head.push(gap());
+                let (t, st) = label(Key::ColSize.tr(), SortKey::Size);
+                head_hits.push((head.len(), Target::SortBy(SortKey::Size)));
+                head.push(Span::styled(pad_left(&t, cols.size), st));
+            }
+            Column::Tags if cols.tags > 0 => {
+                head.push(gap());
+                head.push(Span::styled(
+                    pad(Key::ColTags.tr(), cols.tags),
+                    th.dim().patch(head_bg),
+                ));
+            }
+            _ => {}
+        }
     }
     head.push(Span::styled(" ", head_bg));
     let drawn: usize = head.iter().map(|s| s.content.width()).sum();
@@ -409,8 +524,8 @@ fn row<'a>(
     let mut used = name_txt.width();
     spans.push(Span::styled(name_txt, with(name_style)));
     // In the list of a tag's items, or of recent files, the folder each one is in, dim after
-    // the name.
-    if app.tab.virtual_view().is_some() {
+    // the name; a list with a column for it says it there.
+    if app.tab.virtual_view().is_some() && cols.place == 0 {
         let room = cols.name.saturating_sub(used);
         if room > 8
             && let Some(parent) = e.path.parent()
@@ -434,52 +549,63 @@ fn row<'a>(
     ));
 
     let gap = || Span::styled(" ".repeat(cols.gap), with(Style::default()));
-    if cols.date > 0 {
-        spans.push(gap());
-        let text = display::truncate(app.folder_info.date_text(listing_index), cols.date);
-        spans.push(Span::styled(pad(&text, cols.date), with(dim)));
-    }
-    if cols.kind > 0 {
-        spans.push(gap());
-        let text = display::truncate(&rada_core::i18n::type_label(&e.type_label), cols.kind);
-        spans.push(Span::styled(pad(&text, cols.kind), with(dim)));
-    }
-    if cols.size > 0 {
-        spans.push(gap());
-        let s = if e.kind == FileKind::File {
-            fmt::size(e.size)
-        } else {
-            app.folder_size_text(e, cols.size)
-        };
-        spans.push(Span::styled(
-            pad_left(&s, cols.size),
-            with(if is_cursor {
-                Style::default().add_modifier(Modifier::BOLD)
-            } else {
-                th.dim()
-            }),
-        ));
-    }
-    if cols.tags > 0 {
-        spans.push(gap());
-        // A dot in each tag's colour, three at most, then "+N": the colour says it all.
-        let dots = super::tagdots::dots(th, &e.tags);
-        let mut text_w = 0;
-        for (i, (text, color)) in dots.iter().enumerate() {
-            if i > 0 {
-                spans.push(Span::styled(" ", with(Style::default())));
-                text_w += 1;
+    for column in cols.set.after_name() {
+        match column {
+            Column::Where if cols.place > 0 => {
+                spans.push(gap());
+                let text = tail(&where_text(app, e), cols.place);
+                spans.push(Span::styled(pad(&text, cols.place), with(dim)));
             }
-            text_w += text.width();
-            spans.push(Span::styled(
-                text.clone(),
-                row_style.patch(Style::default().fg(*color)),
-            ));
+            Column::Modified if cols.date > 0 => {
+                spans.push(gap());
+                let text = display::truncate(app.folder_info.date_text(listing_index), cols.date);
+                spans.push(Span::styled(pad(&text, cols.date), with(dim)));
+            }
+            Column::Type if cols.kind > 0 => {
+                spans.push(gap());
+                let text =
+                    display::truncate(&rada_core::i18n::type_label(&e.type_label), cols.kind);
+                spans.push(Span::styled(pad(&text, cols.kind), with(dim)));
+            }
+            Column::Size if cols.size > 0 => {
+                spans.push(gap());
+                let s = if e.kind == FileKind::File {
+                    fmt::size(e.size)
+                } else {
+                    app.folder_size_text(e, cols.size)
+                };
+                spans.push(Span::styled(
+                    pad_left(&s, cols.size),
+                    with(if is_cursor {
+                        Style::default().add_modifier(Modifier::BOLD)
+                    } else {
+                        th.dim()
+                    }),
+                ));
+            }
+            Column::Tags if cols.tags > 0 => {
+                spans.push(gap());
+                // A dot in each tag's colour, three at most, then "+N": the colour says it all.
+                let dots = super::tagdots::dots(th, &e.tags);
+                let mut text_w = 0;
+                for (i, (text, color)) in dots.iter().enumerate() {
+                    if i > 0 {
+                        spans.push(Span::styled(" ", with(Style::default())));
+                        text_w += 1;
+                    }
+                    text_w += text.width();
+                    spans.push(Span::styled(
+                        text.clone(),
+                        row_style.patch(Style::default().fg(*color)),
+                    ));
+                }
+                spans.push(Span::styled(
+                    " ".repeat(cols.tags.saturating_sub(text_w)),
+                    with(Style::default()),
+                ));
+            }
+            _ => {}
         }
-        spans.push(Span::styled(
-            " ".repeat(cols.tags.saturating_sub(text_w)),
-            with(Style::default()),
-        ));
     }
     // Make the highlight reach the right edge.
     let drawn: usize = spans.iter().map(|s| s.content.width()).sum();
@@ -490,6 +616,22 @@ fn row<'a>(
         ));
     }
     Line::from(spans)
+}
+
+/// Where an item of a search is: the folder it is in, from the folder that was searched
+/// ("." for that folder itself).
+fn where_text(app: &App, e: &Entry) -> String {
+    let Some(parent) = e.path.parent() else {
+        return String::new();
+    };
+    match app.tab.virtual_view() {
+        Some(ViewKind::Search { root, .. }) => match parent.strip_prefix(&root) {
+            Ok(inside) if inside.as_os_str().is_empty() => ".".to_string(),
+            Ok(inside) => display::path(inside),
+            Err(_) => fmt::short_path(parent, app.home()),
+        },
+        _ => fmt::short_path(parent, app.home()),
+    }
 }
 
 #[cfg(test)]

@@ -306,7 +306,7 @@ pub use panels::GitView;
 pub use preview::{ImageStatus, ImageView, PreviewPane};
 pub use prompt::{InputKind, InputView};
 pub use props::PropsView;
-pub use tabs::TabState;
+pub use tabs::{TabState, ViewRun};
 pub use update::{UpdateStatus, UpdateView, Updates};
 
 /// The language of the system's tag names (where there are tags).

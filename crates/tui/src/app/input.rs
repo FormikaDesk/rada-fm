@@ -276,6 +276,8 @@ impl App {
     fn clear_or_cancel(&mut self) {
         if self.ops.cancel() {
             self.toast(ToastKind::Info, Key::TCancelling.tr(), 3);
+        } else if self.stop_search() {
+            // What was found so far stays: the list says that it was stopped.
         } else if !self.tab.sel.marked.is_empty() {
             self.tab.sel.clear_marks();
         } else if self.tab.filter.is_some() {

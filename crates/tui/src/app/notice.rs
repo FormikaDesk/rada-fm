@@ -52,6 +52,8 @@ pub struct Notice {
     pub select: Option<std::ffi::OsString>,
     /// How long it stays on screen once it is shown (never, for an error).
     pub ttl: Duration,
+    /// What "Show" opens when it is not a folder: lines for the window of results.
+    pub lines: Vec<String>,
 }
 
 impl Notice {
@@ -71,6 +73,7 @@ impl Notice {
             show: None,
             select: None,
             ttl: Notice::TTL,
+            lines: Vec::new(),
         }
     }
 
@@ -82,6 +85,12 @@ impl Notice {
     pub fn showing(mut self, folder: PathBuf, select: Option<std::ffi::OsString>) -> Notice {
         self.show = Some(folder);
         self.select = select;
+        self
+    }
+
+    /// "Show" opens a window with these lines (the folders that could not be read).
+    pub fn listing(mut self, lines: Vec<String>) -> Notice {
+        self.lines = lines;
         self
     }
 
@@ -100,6 +109,7 @@ impl Notice {
         matches!(self.kind, NoticeKind::Info | NoticeKind::Warn)
             && self.action == NoticeAction::None
             && self.show.is_none()
+            && self.lines.is_empty()
     }
 
     /// The same words, whatever card it is.
@@ -108,6 +118,7 @@ impl Notice {
             && self.text == other.text
             && self.action == other.action
             && self.show == other.show
+            && self.lines == other.lines
     }
 }
 

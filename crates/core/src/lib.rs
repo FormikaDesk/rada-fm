@@ -27,6 +27,7 @@ pub mod tagsearch;
 pub mod uistate;
 pub mod update;
 pub mod view;
+pub mod views;
 pub mod watch;
 pub mod workers;
 pub mod zoxide;

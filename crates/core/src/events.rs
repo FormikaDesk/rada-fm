@@ -103,8 +103,23 @@ pub enum DirEvent {
         /// Set when the folder could not be opened because the system is waiting for the
         /// person to allow it (macOS asks per terminal and per folder).
         denied: Option<Box<crate::platform::AccessDenied>>,
-        /// A search stopped at its bounds: the list may be missing matches.
-        truncated: bool,
+    },
+    /// More entries of a list that is not a folder (a search, a tag, the recent files), in
+    /// the order they were found, with how far the source has got. The list is not complete
+    /// until [`DirEvent::ViewDone`].
+    ViewBatch {
+        generation: u64,
+        path: PathBuf,
+        entries: Vec<Entry>,
+        progress: crate::views::ViewProgress,
+    },
+    /// The source of a list has ended: how, and the folders it could not read.
+    ViewDone {
+        generation: u64,
+        path: PathBuf,
+        result: Result<crate::views::ViewEnd, String>,
+        problems: Vec<crate::views::Problem>,
+        progress: crate::views::ViewProgress,
     },
     Patched {
         generation: u64,

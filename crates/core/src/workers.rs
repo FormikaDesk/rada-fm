@@ -11,10 +11,11 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crate::events::{CoreEvent, DirEvent, PreviewEvent};
 use crate::fs::{DirItem, FileKind, FsEngine};
-use crate::model::{self, EntryUpdate};
+use crate::model::{self, Entry, EntryUpdate};
 use crate::platform::{Platform, Unmounted, Volume};
 use crate::preview::{self, ImageState, ImageWorker, Limits, Preview};
 use crate::view::ViewKind;
+use crate::views::{Problem, ViewCx, ViewProgress, ViewSink};
 
 // ------------------------------------------------------------------------------ folders
 
@@ -61,7 +62,7 @@ pub struct TreeKid {
 }
 
 /// A few words for why a folder cannot be listed.
-fn unreadable_reason(e: &std::io::Error) -> String {
+pub(crate) fn unreadable_reason(e: &std::io::Error) -> String {
     use crate::i18n::{Key, t, tf};
     if e.kind() == std::io::ErrorKind::PermissionDenied {
         return t(Key::NavNoPermission).to_string();
@@ -131,12 +132,116 @@ enum DirReq {
     },
 }
 
+/// What the worker of a list that is not a folder is told while it runs.
+#[derive(Clone, Default)]
+struct ViewFlags {
+    /// The newest generation asked for: a search that is still running for an older one
+    /// stops, and what it found is not wanted.
+    latest: Arc<AtomicU64>,
+    /// The generation the person asked to stop: what it found so far is the list.
+    stopped: Arc<AtomicU64>,
+    /// Whether hidden items are listed.
+    show_hidden: Arc<AtomicBool>,
+}
+
 #[derive(Clone)]
 pub struct DirLoader {
     tx: Sender<DirReq>,
-    /// The newest generation asked for: a search that is still running for an older one
-    /// stops.
-    latest: Arc<AtomicU64>,
+    flags: ViewFlags,
+}
+
+/// How often a search that finds nothing new still says how far it is.
+const PROGRESS_EVERY: Duration = Duration::from_millis(120);
+
+/// Most unreadable folders kept to be shown: past that, only the count would be read anyway.
+const MAX_PROBLEMS: usize = 500;
+
+/// One run of the source of a list, on a thread of its own.
+struct ViewRun {
+    fs: Arc<dyn FsEngine>,
+    platform: Arc<dyn Platform>,
+    out: Sender<CoreEvent>,
+    flags: ViewFlags,
+    generation: u64,
+    path: PathBuf,
+}
+
+impl ViewRun {
+    fn stale(&self) -> bool {
+        self.flags.latest.load(Ordering::SeqCst) != self.generation
+    }
+
+    fn run(self, kind: &ViewKind) {
+        let cx = ViewCx {
+            fs: self.fs.as_ref(),
+            platform: self.platform.as_ref(),
+            show_hidden: self.flags.show_hidden.load(Ordering::SeqCst),
+        };
+        let mut sink = ChannelSink {
+            run: &self,
+            problems: Vec::new(),
+            progress: ViewProgress::default(),
+            told: Instant::now(),
+        };
+        let result = crate::views::source(kind).run(&cx, &mut sink);
+        let (problems, progress) = (sink.problems, sink.progress);
+        if self.stale() {
+            return;
+        }
+        let _ = self.out.send(CoreEvent::Dir(DirEvent::ViewDone {
+            generation: self.generation,
+            path: self.path.clone(),
+            result,
+            problems,
+            progress,
+        }));
+    }
+}
+
+/// Sends what a source finds to the interface as it finds it.
+struct ChannelSink<'a> {
+    run: &'a ViewRun,
+    problems: Vec<Problem>,
+    progress: ViewProgress,
+    /// When the interface was last told something.
+    told: Instant,
+}
+
+impl ChannelSink<'_> {
+    fn send(&mut self, entries: Vec<Entry>) {
+        self.told = Instant::now();
+        let _ = self.run.out.send(CoreEvent::Dir(DirEvent::ViewBatch {
+            generation: self.run.generation,
+            path: self.run.path.clone(),
+            entries,
+            progress: self.progress,
+        }));
+    }
+}
+
+impl ViewSink for ChannelSink<'_> {
+    fn batch(&mut self, entries: Vec<Entry>) {
+        if !self.run.stale() {
+            self.send(entries);
+        }
+    }
+
+    fn problem(&mut self, problem: Problem) {
+        if self.problems.len() < MAX_PROBLEMS {
+            self.problems.push(problem);
+        }
+    }
+
+    fn progress(&mut self, progress: ViewProgress) {
+        self.progress = progress;
+        if self.told.elapsed() >= PROGRESS_EVERY && !self.run.stale() {
+            self.send(Vec::new());
+        }
+    }
+
+    fn cancelled(&self) -> bool {
+        self.run.stale() || self.run.flags.stopped.load(Ordering::SeqCst) == self.run.generation
+    }
 }
 
 impl DirLoader {
@@ -146,24 +251,34 @@ impl DirLoader {
         out: Sender<CoreEvent>,
     ) -> DirLoader {
         let (tx, rx) = unbounded::<DirReq>();
-        let latest = Arc::new(AtomicU64::new(0));
-        let seen = latest.clone();
+        let flags = ViewFlags::default();
+        let seen = flags.clone();
         std::thread::Builder::new()
             .name("rada-dir".into())
             .spawn(move || dir_loop(rx, fs, platform, out, seen))
             .expect("spawn dir worker");
-        DirLoader { tx, latest }
+        DirLoader { tx, flags }
     }
 
     /// Read a whole directory (or, for a `tag:` path, look for the items with that tag).
     pub fn load(&self, path: PathBuf, generation: u64) {
-        self.latest.fetch_max(generation, Ordering::SeqCst);
+        self.flags.latest.fetch_max(generation, Ordering::SeqCst);
         let _ = self.tx.send(DirReq::Load { path, generation });
+    }
+
+    /// Whether the lists that are not a folder show hidden items, from the next one on.
+    pub fn set_show_hidden(&self, show: bool) {
+        self.flags.show_hidden.store(show, Ordering::SeqCst);
+    }
+
+    /// Stop the search that runs for `generation`: what it has found is the list.
+    pub fn stop_view(&self, generation: u64) {
+        self.flags.stopped.store(generation, Ordering::SeqCst);
     }
 
     /// Re-inspect only these paths of `dir`.
     pub fn patch(&self, dir: PathBuf, paths: Vec<PathBuf>, generation: u64) {
-        self.latest.fetch_max(generation, Ordering::SeqCst);
+        self.flags.latest.fetch_max(generation, Ordering::SeqCst);
         let _ = self.tx.send(DirReq::Patch {
             dir,
             paths,
@@ -177,7 +292,7 @@ fn dir_loop(
     fs: Arc<dyn FsEngine>,
     platform: Arc<dyn Platform>,
     out: Sender<CoreEvent>,
-    latest: Arc<AtomicU64>,
+    flags: ViewFlags,
 ) {
     while let Ok(first) = rx.recv() {
         // Coalesce: only the newest full load matters; patches for the same dir merge.
@@ -207,50 +322,17 @@ fn dir_loop(
             if let Some(kind) = ViewKind::of(&path) {
                 // A search can take a while: on a thread of its own, so that the next folder
                 // the person opens is not kept waiting behind it.
-                let (fs, platform, out, latest) =
-                    (fs.clone(), platform.clone(), out.clone(), latest.clone());
+                let run = ViewRun {
+                    fs: fs.clone(),
+                    platform: platform.clone(),
+                    out: out.clone(),
+                    flags: flags.clone(),
+                    generation,
+                    path,
+                };
                 let _ = std::thread::Builder::new()
-                    .name("rada-tag-view".into())
-                    .spawn(move || {
-                        let stale = || latest.load(Ordering::SeqCst) != generation;
-                        let mut truncated = false;
-                        let result = match kind {
-                            ViewKind::Recent => {
-                                crate::recents::entries(fs.as_ref(), platform.as_ref(), &stale)
-                            }
-                            ViewKind::Tag(name) => {
-                                let query = crate::tagsearch::TagQuery::new(&name);
-                                crate::tagsearch::entries(
-                                    fs.as_ref(),
-                                    platform.as_ref(),
-                                    &query,
-                                    &stale,
-                                )
-                            }
-                            ViewKind::Search { root, query } => crate::search::entries(
-                                fs.as_ref(),
-                                platform.as_ref(),
-                                &root,
-                                &query,
-                                &stale,
-                            )
-                            .map(|found| {
-                                truncated = found.truncated;
-                                found.entries
-                            }),
-                        };
-                        if stale() {
-                            return;
-                        }
-                        let _ = out.send(CoreEvent::Dir(DirEvent::Loaded {
-                            generation,
-                            path,
-                            result,
-                            archive: None,
-                            denied: None,
-                            truncated,
-                        }));
-                    });
+                    .name("rada-view".into())
+                    .spawn(move || run.run(&kind));
                 continue;
             }
             // A path that runs through a file is inside an archive. An ordinary folder costs
@@ -284,7 +366,6 @@ fn dir_loop(
                     result,
                     archive,
                     denied,
-                    truncated: false,
                 }))
                 .is_err()
             {

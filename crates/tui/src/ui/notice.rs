@@ -104,7 +104,7 @@ pub fn cards(app: &App, now: Instant) -> Vec<Card> {
             }
             NoticeAction::None => {}
         }
-        if n.show.is_some() {
+        if n.show.is_some() || !n.lines.is_empty() {
             if !links.is_empty() {
                 links.push(link("  ·  ", true, NoticeHit::Card));
             }

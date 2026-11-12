@@ -182,6 +182,22 @@ impl App {
         }
     }
 
+    /// Ctrl+Enter in the search mode: look for what is typed in the folders below too,
+    /// whether or not something in this one matches. Where there is no folder to search in (a
+    /// list that is not one, an archive, the choice of a file) it is Enter.
+    fn bar_search_below(&mut self) {
+        let here = self.session.chooser.is_none()
+            && self.tab.archive.is_none()
+            && self.tab.virtual_view().is_none();
+        let Some(a) = self.windows.address.take_if(|_| here) else {
+            return self.bar_enter();
+        };
+        if a.filtering {
+            self.set_filter(None);
+        }
+        self.search_below(a.text.trim());
+    }
+
     /// List what has `words` in its name in this folder and the ones under it.
     fn search_below(&mut self, words: &str) {
         match rada_core::search::view_path(&self.tab.cwd, words) {
@@ -267,6 +283,7 @@ impl App {
         };
         match key.code {
             KeyCode::Esc => return self.cancel_address_edit(),
+            KeyCode::Enter if ctrl && asks_to_search(a) => return self.bar_search_below(),
             KeyCode::Enter if a.mode() != BarMode::Path => return self.bar_enter(),
             KeyCode::Enter => {
                 a.choose(&sugg);
@@ -325,6 +342,12 @@ impl App {
             self.open_dir(target);
         }
     }
+}
+
+/// Whether Ctrl+Enter on this text is a search: words, or a text between slashes, which reads
+/// as a path and is a regular expression.
+fn asks_to_search(a: &AddressEdit) -> bool {
+    a.mode() == BarMode::Search || rada_core::search::is_regex(a.text.trim())
 }
 
 /// The suggestion to search under this folder, when nothing here matches and there is a folder

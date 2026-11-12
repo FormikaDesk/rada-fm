@@ -2275,6 +2275,7 @@ dependencies = [
  "plist",
  "proptest",
  "rada-core",
+ "regex",
  "resvg",
  "schemars",
  "serde",

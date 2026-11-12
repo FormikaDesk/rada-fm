@@ -85,9 +85,18 @@ impl TabState {
         self.virtual_view() == Some(ViewKind::Recent)
     }
 
-    /// What the list is called when it is not a folder: "Tag: Blu", "Recent". `None` for a folder.
+    /// What the list is called when it is not a folder: "Tag: Blu", "Recent". `None` for a
+    /// folder. A search that is still running says how far it is instead, and how to stop it.
     pub fn view_title(&self) -> Option<String> {
-        self.virtual_view().map(|kind| view_title(&kind))
+        let kind = self.virtual_view()?;
+        match (&kind, self.view_run) {
+            (ViewKind::Search { .. }, Some(run)) if run.running => {
+                let found = crate::fmt::thousands(run.progress.found as u64);
+                let seen = crate::fmt::thousands(run.progress.visited as u64);
+                Some(tf(Key::SearchRunning, &[&found, &seen]))
+            }
+            _ => Some(view_title(&kind)),
+        }
     }
 
     pub fn sort_label(&self) -> String {
@@ -139,6 +148,11 @@ impl App {
     pub(super) fn toggle_hidden(&mut self) {
         let keep = self.tab.cursor_name();
         self.settings.show_hidden = !self.settings.show_hidden;
+        self.svc.loader.set_show_hidden(self.settings.show_hidden);
+        // A search did not look into the hidden folders, or did: it is made again.
+        if matches!(self.tab.virtual_view(), Some(ViewKind::Search { .. })) {
+            self.refresh();
+        }
         self.rebuild_visible();
         self.tab.restore_cursor(keep);
         // A folder's preview lists what the list lists.

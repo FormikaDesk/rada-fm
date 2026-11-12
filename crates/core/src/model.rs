@@ -467,6 +467,13 @@ impl DirListing {
         &self.entries
     }
 
+    /// Add entries at the end, as they are: a list that is still being found is put in order
+    /// once, when it is whole (see [`DirListing::set_sort`]), so that what is on screen does
+    /// not move while the rest arrives.
+    pub fn append(&mut self, entries: Vec<Entry>) {
+        self.entries.extend(entries);
+    }
+
     /// Give the folders the sizes counted for them (`size_of` is asked for each folder's
     /// path). The listing is ordered again when the order depends on them and something
     /// changed; returns whether it did.

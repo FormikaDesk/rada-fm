@@ -14,6 +14,7 @@ impl App {
     pub fn refresh(&mut self) {
         let generation = self.tabs.next_generation();
         self.tab.load = LoadState::Loading(self.tab.cwd.clone());
+        self.svc.loader.set_show_hidden(self.settings.show_hidden);
         self.svc.loader.load(self.tab.cwd.clone(), generation);
         self.redraw.dirty = true;
     }

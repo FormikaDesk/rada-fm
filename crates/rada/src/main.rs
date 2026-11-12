@@ -807,14 +807,18 @@ fn pick_view_prefs(cfg_file: &config::FileConfig, dirs: &Dirs) -> Result<ViewPre
         Some(n) => rada_tui::panels::NavMode::parse(n).with_context(|| tf(Key::MBadNav, &[&n]))?,
     };
     let saved_ui = rada_core::uistate::load(&dirs.rada_state());
-    // Only folders that are still there come back.
+    // Only folders that are still there come back, and the searches that were made in one.
     let mut saved_ui = saved_ui;
-    if saved_ui.tabs.iter().any(|t| !t.path.is_dir()) {
+    let comes_back = |p: &std::path::Path| match rada_core::ViewKind::of(p) {
+        Some(rada_core::ViewKind::Search { root, .. }) => root.is_dir(),
+        _ => p.is_dir(),
+    };
+    if saved_ui.tabs.iter().any(|t| !comes_back(&t.path)) {
         let active_path = saved_ui
             .tabs
             .get(saved_ui.active_tab)
             .map(|t| t.path.clone());
-        saved_ui.tabs.retain(|t| t.path.is_dir());
+        saved_ui.tabs.retain(|t| comes_back(&t.path));
         saved_ui.active_tab = active_path
             .and_then(|p| saved_ui.tabs.iter().position(|t| t.path == p))
             .unwrap_or(0);
