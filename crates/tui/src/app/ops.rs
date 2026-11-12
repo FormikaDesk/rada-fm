@@ -1,15 +1,17 @@
 //! What is being done to files: what waits on the clipboard, the plan being prepared, the
 //! operation that is running and the label of the undo.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::events::FailureInfo;
+use rada_core::health::{Health, Verdict};
 use rada_core::i18n::{Key, tf};
 use rada_core::journal::JournalEntry;
 use rada_core::ops::{
-    ConflictPolicy, ErrorChoice, Plan, Scan, TransferOptions, UndoPlan, WarningKind,
+    Cancel, ConflictPolicy, ErrorChoice, Plan, Scan, TransferOptions, UndoPlan, WarningKind,
 };
 
 use super::{App, Modal, ToastKind};
@@ -85,6 +87,9 @@ pub struct Operations {
     pub undo_label: Option<String>,
     /// Text for the system clipboard (the "copy path" command); the event loop takes it.
     pub copied_text: Option<String>,
+    /// The opinions on the undo of the operations of the history, by id: given again while
+    /// the folders they looked into do not change, forgotten when an operation ends.
+    pub health: HashMap<String, Verdict>,
 }
 
 impl Operations {
@@ -204,6 +209,22 @@ pub struct HistoryView {
     pub entries: Vec<JournalEntry>,
     pub selected: usize,
     pub loading: bool,
+    /// The opinion on the undo of each entry that has one, as the worker gives them.
+    pub health: HashMap<String, Health>,
+    /// The worker that looks at the files: stopped when the window goes.
+    pub(super) checking: Option<Checking>,
+}
+
+/// The job that gives the opinions of a history window. Dropped with the window, it stops.
+pub struct Checking {
+    pub(super) job: JobId,
+    cancel: Cancel,
+}
+
+impl Drop for Checking {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
 }
 
 pub struct ResultView {
@@ -219,8 +240,37 @@ impl App {
             entries: Vec::new(),
             selected: 0,
             loading: true,
+            health: HashMap::new(),
+            checking: None,
         }));
         self.svc.jobs.load_history();
+    }
+
+    /// The entries of the history arrived: look at what their undo would find, the rows in
+    /// view first (they come newest first, as they are shown).
+    pub(super) fn check_history(&mut self) {
+        let Some(Modal::History(h)) = &mut self.windows.modal else {
+            return;
+        };
+        let handle = self
+            .svc
+            .jobs
+            .check_history(h.entries.clone(), self.ops.health.clone());
+        h.checking = Some(Checking {
+            job: handle.id,
+            cancel: handle.cancel,
+        });
+    }
+
+    /// An opinion arrived: for the window that asked for it, and for the next time.
+    pub(super) fn on_health(&mut self, job: JobId, id: String, verdict: Verdict) {
+        if let Some(Modal::History(h)) = &mut self.windows.modal
+            && h.checking.as_ref().is_some_and(|c| c.job == job)
+        {
+            h.health.insert(id.clone(), verdict.health);
+            self.redraw.dirty = true;
+        }
+        self.ops.health.insert(id, verdict);
     }
 
     pub(super) fn begin_plan(&mut self, what: &str, handle: JobHandle) {

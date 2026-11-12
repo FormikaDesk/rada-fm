@@ -31,6 +31,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::fs::Stamp;
+use crate::health::UndoLimit;
 use crate::i18n::{t, tf};
 use crate::oplock::OpLock;
 use crate::ops::{OpKind, OpRequest, RunStatus, Step, Totals};
@@ -310,6 +311,10 @@ struct Begun {
     /// Set when this operation re-did an undone one.
     #[serde(default)]
     redo_of: Option<String>,
+    /// Why its undo cannot be promised, as the plan knew it (another program, a phone).
+    /// Absent for most: a rada that does not know the field reads the record as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    undo_limit: Option<UndoLimit>,
 }
 
 impl Begun {
@@ -332,6 +337,7 @@ impl Begun {
             request: self.request,
             redoable: false,
             damaged: None,
+            undo_limit: self.undo_limit,
         }
     }
 }
@@ -382,6 +388,8 @@ pub struct JournalEntry {
     /// finished before it: what the journal says about it cannot be trusted, so it is neither
     /// settled nor undone.
     pub damaged: Option<usize>,
+    /// Why its undo cannot be promised, as its plan knew it.
+    pub undo_limit: Option<UndoLimit>,
 }
 
 impl JournalEntry {
@@ -629,6 +637,19 @@ impl Journal {
 
     // ---------------------------------------------------------------- writing
 
+    /// [`begin`](Self::begin) the operation `plan` describes, with what its plan knows of the
+    /// limits of its undo.
+    pub fn begin_plan(&self, plan: &crate::ops::Plan) -> Result<String> {
+        self.begin_with(
+            plan.kind,
+            &plan.title,
+            plan.reversible,
+            plan.totals,
+            (plan.request.as_ref(), plan.redo_of.as_deref()),
+            plan.undo_limit(),
+        )
+    }
+
     pub fn begin(
         &self,
         kind: OpKind,
@@ -637,6 +658,18 @@ impl Journal {
         totals: Totals,
         request: Option<&OpRequest>,
         redo_of: Option<&str>,
+    ) -> Result<String> {
+        self.begin_with(kind, title, reversible, totals, (request, redo_of), None)
+    }
+
+    fn begin_with(
+        &self,
+        kind: OpKind,
+        title: &str,
+        reversible: bool,
+        totals: Totals,
+        (request, redo_of): (Option<&OpRequest>, Option<&str>),
+        undo_limit: Option<UndoLimit>,
     ) -> Result<String> {
         let n = self.counter.fetch_add(1, Ordering::Relaxed);
         let ms = SystemTime::now()
@@ -657,6 +690,7 @@ impl Journal {
             totals,
             request: request.cloned(),
             redo_of: redo_of.map(str::to_string),
+            undo_limit,
         };
         let record = if kind == OpKind::Action {
             Record::BeginAction(begun)
@@ -1014,6 +1048,32 @@ impl Journal {
         Ok(out)
     }
 
+    /// [`load_undo`](Self::load_undo) of each of `ids`, reading the journal once.
+    pub fn load_undo_many(&self, ids: &[String]) -> Result<HashMap<String, UndoSteps>> {
+        let mut out: HashMap<String, Undo> =
+            ids.iter().map(|id| (id.clone(), Undo::default())).collect();
+        self.read_records(|_, r| match r {
+            Record::Undo { id, step } => {
+                if let Some(u) = out.get_mut(&id) {
+                    u.steps.push(step);
+                }
+            }
+            Record::Undone { id, remaining, .. } => {
+                if let Some(u) = out.get_mut(&id) {
+                    u.remaining = Some(remaining);
+                    u.done_since.clear();
+                }
+            }
+            Record::UndoneStep { id, index } => {
+                if let Some(u) = out.get_mut(&id) {
+                    u.done_since.push(index);
+                }
+            }
+            _ => {}
+        })?;
+        Ok(out.into_iter().map(|(id, u)| (id, u.finish())).collect())
+    }
+
     /// Undo steps of one entry, in execution order, with the indices still outstanding.
     pub fn load_undo(&self, id: &str) -> Result<(Vec<Step>, Vec<usize>)> {
         let mut steps = Vec::new();
@@ -1036,5 +1096,27 @@ impl Journal {
         let mut remaining = remaining.unwrap_or_else(|| (0..steps.len()).collect());
         remaining.retain(|i| !done_since.contains(i));
         Ok((steps, remaining))
+    }
+}
+
+/// The undo steps of one entry, in execution order, and the indices still outstanding.
+pub type UndoSteps = (Vec<Step>, Vec<usize>);
+
+/// The undo of one entry as the journal is read: its steps, the last full account of what was
+/// left, and the steps carried out since.
+#[derive(Default)]
+struct Undo {
+    steps: Vec<Step>,
+    remaining: Option<Vec<usize>>,
+    done_since: Vec<usize>,
+}
+
+impl Undo {
+    fn finish(self) -> UndoSteps {
+        let mut remaining = self
+            .remaining
+            .unwrap_or_else(|| (0..self.steps.len()).collect());
+        remaining.retain(|i| !self.done_since.contains(i));
+        (self.steps, remaining)
     }
 }

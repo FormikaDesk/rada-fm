@@ -608,6 +608,16 @@ strings! {
     HistPermanent => "permanent", "definitiva";
     HistNothing => "nothing to undo", "niente da annullare";
     HistCanUndo => "can undo", "annullabile";
+    HealthToCheckOne => "to check (1 file changed)", "da verificare (1 file cambiato)";
+    HealthToCheckMany => "to check ({0} files changed)", "da verificare ({0} file cambiati)";
+    HealthTooMany => "to check: too many files", "da verificare: troppi file";
+    HealthNotGuaranteed => "not guaranteed", "non garantito";
+    HealthSayUndoable => "Every step was recorded and what it left is as it left it: undo can put it all back.", "Ogni passo è registrato e ciò che ha lasciato è com'era: l'annullamento può rimettere tutto a posto.";
+    HealthSayChanged => "Some of what it left changed or is gone since: undo leaves those alone and says which; its plan checks every item again.", "Parte di ciò che ha lasciato è cambiata o non c'è più: l'annullamento non la tocca e dice quale; il suo piano ricontrolla ogni elemento.";
+    HealthSayTooMany => "It left too many items to look at here: the plan of the undo checks each of them.", "Ha lasciato troppi elementi per guardarli qui: il piano dell'annullamento li controlla uno per uno.";
+    HealthSayAction => "rada can remove the file it wrote, if you have not changed it; it does not see anything else the program did.", "rada può togliere il file che ha scritto, se non l'hai cambiato; non vede altro di ciò che il programma ha fatto.";
+    HealthSayDevice => "It worked on a phone or a camera, which may have changed things on its own: the undo is not guaranteed.", "Ha lavorato su un telefono o una fotocamera, che può aver cambiato le cose da sé: l'annullamento non è garantito.";
+    HealthSayGaps => "Some steps ran without their way back being written: undo covers only what came before them.", "Alcuni passi sono stati eseguiti senza registrare come tornare indietro: l'annullamento copre solo ciò che viene prima.";
     BtnUndoSelected => "Undo selected", "Annulla la selezionata";
     HelpClassic => "Classic", "Classica";
     HelpMouse => "Mouse", "Mouse";

@@ -996,6 +996,20 @@ impl Plan {
         }
     }
 
+    /// Why the undo of this plan cannot be promised, if it cannot: it runs other programs, or
+    /// it works on a phone or a camera (its own warning says so).
+    pub fn undo_limit(&self) -> Option<crate::health::UndoLimit> {
+        use crate::health::UndoLimit;
+        if self.kind == OpKind::Action {
+            return Some(UndoLimit::Action);
+        }
+        let device = self
+            .warnings
+            .iter()
+            .any(|w| w.kind == WarningKind::DeviceUndo);
+        device.then_some(UndoLimit::Device)
+    }
+
     /// What a scan that was cancelled gets instead of a plan: no steps, and a warning that
     /// blocks it.
     pub fn from_cancelled_scan(kind: OpKind, title: impl Into<String>) -> Plan {

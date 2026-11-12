@@ -9,6 +9,7 @@ pub mod filetype;
 pub mod foldersize;
 pub mod fs;
 pub mod git;
+pub mod health;
 pub mod i18n;
 pub mod jobs;
 pub mod journal;

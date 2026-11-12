@@ -659,6 +659,33 @@ fn rada_0_6_1_skips_what_an_action_writes_in_the_journal_and_reads_the_rest() {
     assert!(reading.read > actions);
 }
 
+#[test]
+fn rada_0_6_1_reads_a_start_that_says_its_undo_cannot_be_promised() {
+    let sb = Sandbox::new();
+    let j = sb.journal();
+    let mut plan = Plan::empty(OpKind::Copy, "to a phone");
+    plan.warnings.push(Warning {
+        kind: WarningKind::DeviceUndo,
+        severity: Severity::Warning,
+        message: String::new(),
+        count: 1,
+        examples: Vec::new(),
+    });
+    let id = j.begin_plan(&plan).unwrap();
+    j.end(&id, RunStatus::Completed, 0, 0, 0).unwrap();
+
+    let journal = text(j.path());
+    assert!(journal.contains(r#""undo_limit":"device""#), "{journal}");
+    let reading = journal_061::read(&journal);
+
+    assert_eq!(reading.damaged, Vec::new(), "0.6.1 would call this damage");
+    assert_eq!(
+        (reading.read, reading.skipped),
+        (2, 0),
+        "a plain begin to it"
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // Killed in the middle
 // ---------------------------------------------------------------------------------------------

@@ -111,6 +111,14 @@ one. If it is run anyway, that item fails and the window says in words why: a mi
 the permissions say (`EPERM`: a locked item, one the system protects, a privacy setting).
 *Tests:* `permissions.rs` (core and interface), with a folder of mode 0555 inside a writable one.
 
+The **history** marks each operation that can still be undone (● can undo, ◐ to check, ○ not
+guaranteed). The mark is only an opinion, from one `lstat` of each item the undo would act on
+(at most 2000 for an operation), compared with the fingerprint taken when the step ran: no
+contents are read, and the plan of the undo makes all its checks again whatever the mark says.
+An operation that ran another program or worked on a phone or a camera is *not guaranteed*
+because its plan wrote so in the record of its start (`undo_limit`); a rada that does not know
+that field reads the record as before. *Tests:* `health.rs` (core), `history_health.rs`.
+
 A file that changed after the operation is not removed even if it changes after the plan was
 shown: undo looks at it again when it gets to it. *Tests:* `remove_race.rs` replaces the copy
 between the plan and the run, and in the instant before it is removed, and puts a link in its

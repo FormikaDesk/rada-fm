@@ -2,6 +2,7 @@
 //! later receives [`JobEvent`]s; it never scans, plans, copies or reads the journal
 //! itself.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -9,7 +10,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crossbeam_channel::Sender;
 
 use crate::events::{CoreEvent, FailureInfo, JobEvent, JobId};
-use crate::journal::Journal;
+use crate::health::{self, Verdict};
+use crate::journal::{Journal, JournalEntry};
 use crate::ops::{
     Cancel, ConflictPolicy, Engine, ErrorChoice, ExecHandler, Failure, JournalChoice, OpRequest,
     Plan, Progress, Scan, ScanControl, TransferOptions, UndoPlan,
@@ -286,6 +288,33 @@ impl Jobs {
         })
     }
 
+    /// The opinion on the undo of each of `entries`, one event each, in that order (the rows
+    /// in view first). An opinion of `cached` that still holds is given again without a look;
+    /// the files of the others are looked at a few operations at a time, reading the journal
+    /// once for each few.
+    pub fn check_history(
+        &self,
+        entries: Vec<JournalEntry>,
+        cached: HashMap<String, Verdict>,
+    ) -> JobHandle {
+        let journal = self.journal.clone();
+        self.spawn(move |job, cancel, engine, out| {
+            let Some(journal) = journal else {
+                return;
+            };
+            let fs = engine.fs.as_ref();
+            for few in entries.chunks(HEALTH_BATCH) {
+                if cancel.is_cancelled() {
+                    return;
+                }
+                let looked = verdicts(few, &cached, &journal, fs, &cancel);
+                for (id, verdict) in looked {
+                    let _ = out.send(CoreEvent::Job(JobEvent::Health { job, id, verdict }));
+                }
+            }
+        })
+    }
+
     // ------------------------------------------------------------------ execution
 
     pub fn execute(&self, plan: Plan) -> JobHandle {
@@ -401,4 +430,42 @@ impl Forward {
         }
         rx.recv().unwrap_or(ErrorChoice::Abort)
     }
+}
+
+/// Operations whose files are looked at between two readings of the journal.
+const HEALTH_BATCH: usize = 16;
+
+/// The opinions on `few` operations: an opinion of `cached` that still holds, what can be
+/// said without the disk, otherwise a look at their files.
+fn verdicts(
+    few: &[JournalEntry],
+    cached: &HashMap<String, Verdict>,
+    journal: &Journal,
+    fs: &dyn crate::fs::FsEngine,
+    cancel: &Cancel,
+) -> Vec<(String, Verdict)> {
+    let mut known: HashMap<&str, Verdict> = HashMap::new();
+    for e in few.iter().filter(|e| e.is_undoable() || e.can_retry_undo()) {
+        let held = cached.get(&e.id).filter(|v| health::still_holds(fs, v));
+        let quick = health::without_disk(e).map(|health| Verdict {
+            health,
+            folders: Vec::new(),
+        });
+        known.extend(held.cloned().or(quick).map(|v| (e.id.as_str(), v)));
+    }
+    let to_look: Vec<String> = few
+        .iter()
+        .filter(|e| (e.is_undoable() || e.can_retry_undo()) && !known.contains_key(e.id.as_str()))
+        .map(|e| e.id.clone())
+        .collect();
+    let undo = journal.load_undo_many(&to_look).unwrap_or_default();
+    let stop = || cancel.is_cancelled();
+    for (id, (steps, remaining)) in &undo {
+        if let Some(v) = health::look(fs, steps, remaining, &stop) {
+            known.insert(id.as_str(), v);
+        }
+    }
+    few.iter()
+        .filter_map(|e| known.remove(e.id.as_str()).map(|v| (e.id.clone(), v)))
+        .collect()
 }

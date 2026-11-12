@@ -68,6 +68,12 @@ pub enum JobEvent {
         job: JobId,
         entries: Vec<JournalEntry>,
     },
+    /// The opinion on the undo of one operation of the history.
+    Health {
+        job: JobId,
+        id: String,
+        verdict: crate::health::Verdict,
+    },
     /// At start, operations a dead process had left half done were settled.
     Recovered {
         items: Vec<crate::ops::Recovered>,

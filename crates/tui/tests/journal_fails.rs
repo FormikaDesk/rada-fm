@@ -100,6 +100,7 @@ fn the_history_marks_an_operation_undoable_only_in_part() {
         request: None,
         redoable: false,
         damaged: None,
+        undo_limit: None,
     };
     h.app.on_core_event(CoreEvent::Job(JobEvent::History {
         job: 0,

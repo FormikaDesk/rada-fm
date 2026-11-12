@@ -57,6 +57,7 @@ impl App {
                 self.notify(Notice::new(NoticeKind::Error, text));
             }
             JobEvent::History { entries, .. } => self.on_history_loaded(entries),
+            JobEvent::Health { job, id, verdict } => self.on_health(job, id, verdict),
         }
     }
 
@@ -73,6 +74,7 @@ impl App {
             h.entries = entries;
             h.loading = false;
             h.selected = 0;
+            self.check_history();
         }
     }
 
@@ -118,6 +120,8 @@ impl App {
     }
 
     fn on_finished(&mut self, job: JobId, title: String, report: ExecReport, journal_errors: u64) {
+        // What the history said of the undos may not hold after this.
+        self.ops.health.clear();
         if let Some(done) = self.ops.finish(job) {
             self.finish(title, report, journal_errors, Some(done));
             // Refresh even if live updates are unavailable.

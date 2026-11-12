@@ -1,0 +1,25 @@
+---
+source: crates/tui/tests/history_health.rs
+assertion_line: 233
+expression: timeless(&mut h)
+---
+ rada  ▸ w  ✕   +                                   ? Help  
+  ←   →   ↑   ⟳     ⌂ Home › w                    Ctrl+P    
+  +▾  │  ✂   ⧉   ⎘   ✎   ▣   ✗  │  ⇅   ◆  │  ↶             ⋯
+╭╭────────────────────────────────────────────────────────╮╮
+││                                                        ││
+││   History                                              ││
+││                                                        ││
+││  ▎✔ —            gap                ○ not guaranteed   ││
+││      Some steps ran without their way back being       ││
+││      written: undo covers only what came before them.  ││
+││   ✔ —            phone              ○ not guaranteed   ││
+││   ✔ —            action             ○ not guaranteed   ││
+││   ✔ —            plain                    ● can undo   ││
+││                                                        ││
+││   Enter  Undo selected    Esc  Close                   ││
+││                                                        ││
+│╰────────────────────────────────────────────────────────╯│
+│   │ │                                                    │
+╰───╯ ╰────────────────────────────────────────────────────╯
+ 4 items                                           ≣  ▦  ▥

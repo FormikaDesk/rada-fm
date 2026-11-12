@@ -3,6 +3,7 @@
 
 use rada_core::display;
 use rada_core::error::Denied;
+use rada_core::health::{Health, Unsure};
 use rada_core::i18n::{Key, tf};
 use rada_core::journal::{EntryStatus, UndoState};
 use rada_core::ops::RunStatus;
@@ -774,8 +775,19 @@ fn history_body(
     }
     let first_entry = body.len();
     for (i, e) in h.entries.iter().enumerate() {
-        let row = history_row(th, e, i == h.selected, w);
+        let health = h.health.get(&e.id);
+        let row = history_row(th, e, health, i == h.selected, w);
         body.push((row, Some(Target::HistoryRow(i))));
+        // Under the row chosen, what its mark means for this operation.
+        if i == h.selected
+            && let Some(say) = health.map(|h| health_says(*h))
+        {
+            let say = plain(std::iter::once(say.into()), w.saturating_sub(4), th.dim());
+            body.extend(say.into_iter().map(|(mut line, _)| {
+                line.spans.insert(0, Span::raw("    "));
+                (line, None)
+            }));
+        }
     }
     // A list never shrinks to nothing: three rows at least.
     while body.len() < 3 {
@@ -821,8 +833,57 @@ fn draw_history(
     sheet::draw(f, th, area, 104, sheet, hits);
 }
 
+/// The sentence under the row chosen: what its mark means for that operation.
+fn health_says(health: Health) -> &'static str {
+    match health {
+        Health::Undoable => Key::HealthSayUndoable.tr(),
+        Health::ToCheck { .. } => Key::HealthSayChanged.tr(),
+        Health::TooMany => Key::HealthSayTooMany.tr(),
+        Health::NotGuaranteed(Unsure::Action) => Key::HealthSayAction.tr(),
+        Health::NotGuaranteed(Unsure::Device) => Key::HealthSayDevice.tr(),
+        Health::NotGuaranteed(Unsure::Gaps) => Key::HealthSayGaps.tr(),
+    }
+}
+
+/// The mark of an opinion on an undo (● can be undone, ◐ to check, ○ not guaranteed), what
+/// it says, and in which colour. `undo` is what the row says without an opinion.
+fn health_tag(th: &Theme, health: Health, undo: String) -> (String, Color) {
+    match health {
+        Health::Undoable => (format!("● {undo}"), th.accent),
+        Health::ToCheck { changed } => {
+            let n = i18n_count(changed, Key::HealthToCheckOne, Key::HealthToCheckMany);
+            (format!("◐ {n}"), th.warn)
+        }
+        Health::TooMany => (format!("◐ {}", Key::HealthTooMany.tr()), th.warn),
+        Health::NotGuaranteed(_) => (format!("○ {}", Key::HealthNotGuaranteed.tr()), th.warn),
+    }
+}
+
+/// `one` for 1, `many` (with the number) for the others.
+fn i18n_count(n: usize, one: Key, many: Key) -> String {
+    if n == 1 {
+        one.tr().to_string()
+    } else {
+        tf(many, &[&n])
+    }
+}
+
+/// What the journal says about undoing an entry, and in which colour; with an opinion on
+/// the undo, its mark.
+fn history_tag(
+    th: &Theme,
+    e: &rada_core::journal::JournalEntry,
+    health: Option<&Health>,
+) -> (String, Color) {
+    let (tag, color) = journal_tag(th, e);
+    match health {
+        Some(h) => health_tag(th, *h, tag),
+        None => (tag, color),
+    }
+}
+
 /// What the journal says about undoing an entry, and in which colour.
-fn history_tag(th: &Theme, e: &rada_core::journal::JournalEntry) -> (String, Color) {
+fn journal_tag(th: &Theme, e: &rada_core::journal::JournalEntry) -> (String, Color) {
     match (&e.undo_state, e.reversible) {
         (UndoState::Undone, _) => (Key::HistUndone.tr().to_string(), th.muted),
         (UndoState::Partial { remaining }, _) => (tf(Key::HistPartly, &[remaining]), th.muted),
@@ -839,6 +900,7 @@ fn history_tag(th: &Theme, e: &rada_core::journal::JournalEntry) -> (String, Col
 fn history_row(
     th: &Theme,
     e: &rada_core::journal::JournalEntry,
+    health: Option<&Health>,
     sel: bool,
     w: usize,
 ) -> Line<'static> {
@@ -852,7 +914,7 @@ fn history_row(
         EntryStatus::Finished(RunStatus::Interrupted) => ("?", th.warn),
         EntryStatus::Interrupted => ("?", th.error),
     };
-    let (tag, tag_color) = history_tag(th, e);
+    let (tag, tag_color) = history_tag(th, e, health);
     let when = fmt::clock(e.time);
     let right = format!(" {tag}");
     let title_w = w.saturating_sub(4 + 13 + right.width());

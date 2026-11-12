@@ -80,6 +80,14 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 Renaming to a name that already exists opens the same plan. *Skip* is the default and changes nothing; *keep both* uses the next free `name (1).ext`; *overwrite* sends the old item to the trash first, so `Ctrl+Z` brings everything back. Only a file can replace a file, and a folder an empty folder. Bulk rename still refuses name conflicts.
 
+The **history of operations** (`F3`, `U` with the vim keys) lists every operation of the journal, newest first; `Enter` undoes the one chosen. Beside each one that can still be undone there is a mark, worked out in the background when the window opens (the rows in view first):
+
+- **● can undo**: every step was recorded, and what it left is as it left it;
+- **◐ to check (N files changed)**: some of what it left changed or is gone since; the undo leaves those alone and says which. Past 2000 items nothing is looked at (*to check: too many files*);
+- **○ not guaranteed**: it ran another program (rada can remove the file it wrote, if you have not changed it; it does not see anything else the program did), it worked on a phone or a camera, or some of its steps ran without their way back being written.
+
+Under the row chosen a sentence says what its mark means for it. The mark is an opinion from one look at each item (no contents are read); the plan of the undo checks every item again and decides. Marks are kept while the folders they looked into do not change, and forgotten when an operation ends.
+
 ### Mouse
 
 Click a name to put the cursor there; the box on its left (or `Space`) selects; double-click opens; the wheel scrolls (a turn is three rows, or one row of tiles); `Ctrl+click` adds one item and `Shift+click` selects a range. Everything drawn as a button or a field is clickable: the tabs (middle click closes), **← → ↑ ⟳**, the path segments, the bar, every button of the command bar, a column title to sort, an item of the navigation pane (right-click for *Open* and *Pin / Unpin*), the buttons of the details pane, the Details / Icons switch, every key of the hints, a command or place offered by the bar, and the buttons of any window. What the pointer is over is lit with a quiet tone (the theme's *row under the mouse*): a row of the list, a button, a tab, a path segment, a menu entry. The row the cursor is on, a selected row and the tab in front are left as they are; where a field or the main button already has a fill the text is underlined instead, and with 16 colours everything is. `mouse = false` (or `--no-mouse`) turns it all off. While rada owns the mouse, **hold `Shift` and drag to select text** in the terminal as usual. The mouse's own back and forward buttons are not reported by the terminal library (use `Alt+←` / `Alt+→`). Drag and drop is planned for a later release.

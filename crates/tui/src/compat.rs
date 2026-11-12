@@ -141,6 +141,8 @@ pub fn ascii_for(ch: char) -> Option<char> {
         '♪' => '~',
         '★' | '◆' | '◉' | '●' | '♦' => '*',
         '○' => 'o',
+        // half full: an opinion that says "to check"
+        '◐' => '?',
         '☐' => '-',
         '☑' | '✕' | '✖' | '✗' => 'x',
         '✓' | '✔' | '√' => '+',
@@ -220,6 +222,7 @@ pub fn std_for(ch: char) -> Option<char> {
         '⌄' => '▾',
         '◆' | '⎇' => '♦',
         '◉' => '●',
+        '◐' => '▒',
         // the eighths of a progress bar round to the half, the thin edges become a line
         '▉' | '▊' => '█',
         '▋' => '▌',

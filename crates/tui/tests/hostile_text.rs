@@ -194,6 +194,7 @@ fn what_the_journal_says_of_an_operation_is_shown_escaped() {
         request: None,
         redoable: false,
         damaged: None,
+        undo_limit: None,
     };
     h.app.on_core_event(CoreEvent::Job(JobEvent::History {
         job: 0,
