@@ -7,6 +7,7 @@ use common::*;
 use crossterm::event::{KeyCode, MouseButton, MouseEventKind};
 use rada_core::events::{CoreEvent, FailureInfo};
 use rada_core::i18n::Key;
+use rada_core::model::SortKey;
 use rada_core::ops::{Cancel, ErrorChoice};
 use rada_core::update::{Mode, Notice as Release, UpdateEvent};
 use rada_tui::app::{
@@ -434,4 +435,42 @@ fn three_notifications_never_take_the_whole_list() {
             assert!(card, "{w}x{h}: no card is visible\n{text}");
         }
     }
+}
+
+#[test]
+fn the_titles_of_the_columns_answer_no_click_under_the_preview_drawn_over_them() {
+    let mut h = scene(60, 20);
+    let buf = h.redrawn_buffer();
+    let name = h
+        .app
+        .frame
+        .hits
+        .find(&Target::SortBy(SortKey::Name))
+        .unwrap();
+    // The pane starts at its rule, between the title of the names and the edge of the box.
+    let pane = (name.x + 1..buf.area.width - 1)
+        .find(|x| buf[(*x, name.y)].symbol() == "│")
+        .expect("the preview over the list");
+    // Left of the pane the title of the names sorts.
+    let click = |h: &mut H, x: u16| {
+        for kind in [
+            MouseEventKind::Down(MouseButton::Left),
+            MouseEventKind::Up(MouseButton::Left),
+        ] {
+            h.mouse(kind, x, name.y, crossterm::event::KeyModifiers::NONE);
+        }
+    };
+    let sort = h.app.tab.sort;
+    click(&mut h, name.x);
+    assert_ne!(h.app.tab.sort, sort);
+    let sort = h.app.tab.sort;
+    for x in pane..buf.area.width - 1 {
+        assert!(
+            !matches!(h.app.frame.hits.at(x, name.y), Some(Target::SortBy(_))),
+            "a title answers at {x},{} under the preview",
+            name.y
+        );
+        click(&mut h, x);
+    }
+    assert_eq!(h.app.tab.sort, sort, "the order did not change");
 }

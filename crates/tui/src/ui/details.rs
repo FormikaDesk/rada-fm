@@ -437,6 +437,9 @@ pub fn draw_overlay(f: &mut Frame, app: &mut App, main: Rect) {
         ..main
     };
     f.render_widget(Clear, area);
+    // What the list registered under the pane (the titles of its columns) is covered: a
+    // click there is on the pane. Its own buttons come after and win.
+    app.frame.hits.add(area, Target::Preview);
     let th = app.settings.th.clone();
     let rule: Vec<Line> = (0..area.height)
         .map(|_| Line::from(Span::styled("│", th.faint())))

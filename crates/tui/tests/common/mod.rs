@@ -364,18 +364,40 @@ impl H {
 
     /// Centre of what the last frame registered for `target`.
     pub fn where_is(&mut self, target: &Target) -> (u16, u16) {
-        let _ = self.screen();
-        let r = self
-            .app
-            .frame
-            .hits
-            .find(target)
-            .unwrap_or_else(|| panic!("{target:?} is not on screen:\n{}", self.screen()));
+        let r = self.rect_of(target);
         (r.x + r.width / 2, r.y)
     }
 
+    fn rect_of(&mut self, target: &Target) -> ratatui::layout::Rect {
+        let _ = self.screen();
+        self.app
+            .frame
+            .hits
+            .find(target)
+            .unwrap_or_else(|| panic!("{target:?} is not on screen:\n{}", self.screen()))
+    }
+
+    /// Where a click reaches `target`: its middle, or the first cell of it that answers. What
+    /// is drawn over a part of it (the preview over the list) takes the clicks there, as it
+    /// does for a person.
+    pub fn click_point(&mut self, target: &Target) -> (u16, u16) {
+        let r = self.rect_of(target);
+        let hits = &self.app.frame.hits;
+        let cells = (r.y..r.bottom()).flat_map(|y| (r.x..r.right()).map(move |x| (x, y)));
+        match std::iter::once((r.x + r.width / 2, r.y))
+            .chain(cells)
+            .find(|(x, y)| hits.at(*x, *y) == Some(target))
+        {
+            Some(at) => at,
+            None => panic!(
+                "{target:?} is covered by something else:\n{}",
+                self.screen()
+            ),
+        }
+    }
+
     pub fn click_on(&mut self, target: &Target, mods: KeyModifiers) {
-        let (x, y) = self.where_is(target);
+        let (x, y) = self.click_point(target);
         self.mouse(MouseEventKind::Down(MouseButton::Left), x, y, mods);
     }
 
@@ -386,7 +408,7 @@ impl H {
     /// Two clicks on `target`, one right after the other: its place is looked up once, and
     /// nothing is drawn in between.
     pub fn double_click(&mut self, target: &Target) {
-        let (x, y) = self.where_is(target);
+        let (x, y) = self.click_point(target);
         for _ in 0..2 {
             self.mouse(
                 MouseEventKind::Down(MouseButton::Left),
@@ -398,7 +420,7 @@ impl H {
     }
 
     pub fn right_click(&mut self, target: &Target) {
-        let (x, y) = self.where_is(target);
+        let (x, y) = self.click_point(target);
         self.mouse(
             MouseEventKind::Down(MouseButton::Right),
             x,

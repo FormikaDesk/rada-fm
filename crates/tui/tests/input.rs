@@ -432,7 +432,7 @@ fn ctrl_click_adds_shift_click_selects_a_range_plain_click_resets() {
 #[test]
 fn the_wheel_scrolls_the_list_and_the_preview() {
     let mut h = harness();
-    let (x, y) = h.where_is(&Target::Row(0));
+    let (x, y) = h.click_point(&Target::Row(0));
     h.mouse(MouseEventKind::ScrollDown, x, y, KeyModifiers::NONE);
     assert_eq!(h.cursor_name(), "c.txt", "three rows per notch");
     h.mouse(MouseEventKind::ScrollUp, x, y, KeyModifiers::NONE);
@@ -481,7 +481,9 @@ fn breadcrumb_segments_and_hint_bar_items_are_clickable() {
 
 #[test]
 fn clicking_a_column_title_sorts_and_clicking_again_reverses() {
-    let mut h = harness();
+    // Wide enough for the column of the size beside the preview.
+    let (sb, dir) = files();
+    let mut h = H::new(sb, dir, 200, 30);
     h.click(&Target::SortBy(rada_core::model::SortKey::Size));
     assert!(h.app.tab.sort_label().starts_with("size"));
     h.click(&Target::SortBy(rada_core::model::SortKey::Size));
