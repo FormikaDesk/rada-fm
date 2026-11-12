@@ -21,7 +21,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look, RowTone};
 use super::widgets::{Bar, SPIN, field_parts, pad};
-use crate::app::{App, BarItem, BarMode, MenuKind};
+use crate::app::{App, BarHit, BarItem, BarMode, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::Action;
@@ -467,7 +467,7 @@ pub fn draw_address(f: &mut Frame, app: &mut App, area: Rect) {
 /// places that match the words typed.
 pub fn draw_suggestions(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     match app.windows.address.as_ref().map(|a| a.mode()) {
-        Some(BarMode::Search) => draw_bar_hits(f, app, row, screen),
+        Some(BarMode::Search | BarMode::Command) => draw_bar_hits(f, app, row, screen),
         _ => draw_paths(f, app, row, screen),
     }
 }
@@ -525,6 +525,45 @@ fn draw_paths(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     }
 }
 
+/// A suggestion as it is drawn: its label, its detail, its kind, and the letters of the label
+/// that match what was typed.
+type HitRow = (String, String, String, Vec<usize>);
+
+fn hit_row(app: &App, h: &BarHit) -> HitRow {
+    match &h.item {
+        BarItem::Command(action) => (
+            action.label().to_string(),
+            app.settings.keymap.hint(*action).unwrap_or_default(),
+            Key::BarCommand.tr().to_string(),
+            h.label_pos.clone(),
+        ),
+        BarItem::Zoxide(path) => (
+            display::name(path.file_name().unwrap_or(path.as_os_str())),
+            fmt::short_path(path, app.home()),
+            Key::BarZoxide.tr().to_string(),
+            h.label_pos.clone(),
+        ),
+        BarItem::Problem(message) => (
+            message.clone(),
+            String::new(),
+            Key::BarProblem.tr().to_string(),
+            Vec::new(),
+        ),
+        BarItem::Search(words) => (
+            tf(Key::BarSearchBelow, &[&display::text(words)]),
+            String::new(),
+            Key::BarSearch.tr().to_string(),
+            Vec::new(),
+        ),
+        BarItem::Place(item) => (
+            item.label.clone(),
+            item.detail.clone(),
+            Key::BarGoTo.tr().to_string(),
+            h.label_pos.clone(),
+        ),
+    }
+}
+
 fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     let th = app.settings.th.clone();
     let look = Look::of(app);
@@ -534,43 +573,16 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
     if a.hits.is_empty() || row.y + row.height >= screen.height {
         return;
     }
-    let rows: Vec<(String, String, String, Vec<usize>)> = a
-        .hits
-        .iter()
-        .map(|h| match &h.item {
-            BarItem::Command(action) => (
-                action.label().to_string(),
-                app.settings.keymap.hint(*action).unwrap_or_default(),
-                Key::BarCommand.tr().to_string(),
-                h.label_pos.clone(),
-            ),
-            BarItem::Zoxide(path) => (
-                display::name(path.file_name().unwrap_or(path.as_os_str())),
-                fmt::short_path(path, app.home()),
-                Key::BarZoxide.tr().to_string(),
-                h.label_pos.clone(),
-            ),
-            BarItem::Search(words) => (
-                tf(Key::BarSearchBelow, &[&display::text(words)]),
-                String::new(),
-                Key::BarSearch.tr().to_string(),
-                Vec::new(),
-            ),
-            BarItem::Place(item) => (
-                item.label.clone(),
-                item.detail.clone(),
-                Key::BarGoTo.tr().to_string(),
-                h.label_pos.clone(),
-            ),
-        })
-        .collect();
+    let rows: Vec<HitRow> = a.hits.iter().map(|h| hit_row(app, h)).collect();
     let selected = a.hit_selected;
+    // What is wrong with a command line is a sentence: it gets the room of one.
+    let problem = a.hits.iter().any(|h| matches!(h.item, BarItem::Problem(_)));
     let label_w = rows
         .iter()
         .map(|r| r.0.width())
         .max()
         .unwrap_or(10)
-        .clamp(14, 30);
+        .clamp(14, if problem { 72 } else { 30 });
     let detail_w = rows
         .iter()
         .map(|r| r.1.width())
@@ -596,10 +608,13 @@ fn draw_bar_hits(f: &mut Frame, app: &mut App, row: Rect, screen: Rect) {
         let mut spans = vec![Span::styled(" ", row_style)];
         let mut used = 1;
         let shown = display::truncate(label, label_w);
+        let wrong = matches!(a.hits[i].item, BarItem::Problem(_));
         for (ci, c) in shown.chars().enumerate() {
             let hl = pos.contains(&ci);
             let st = if hl {
                 th.accent_style().add_modifier(Modifier::BOLD)
+            } else if wrong {
+                th.base().fg(th.error)
             } else {
                 th.base()
             };

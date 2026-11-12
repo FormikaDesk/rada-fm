@@ -8,6 +8,7 @@ use super::{
 };
 use crate::keymap::Action;
 use crate::panels::LayoutPref;
+use crate::registry::{Avail, Surface};
 use crate::view::ViewMode;
 use rada_core::model::{Entry, SortKey};
 use rada_core::ops::OpRequest;
@@ -30,18 +31,11 @@ impl App {
         self.windows.modal = Some(Modal::Menu(MenuView::new(at, items)));
     }
 
-    pub(super) fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
+    pub fn menu_items(&self, kind: MenuKind) -> Vec<MenuItem> {
         use Action::*;
-        let ro = self.tab.archive.is_some();
         match kind {
-            MenuKind::New => {
-                // Nothing is made *in* a list of tagged items.
-                let nowhere = ro || self.tab.virtual_view().is_some();
-                vec![
-                    MenuItem::act(NewFolder, !nowhere, false),
-                    MenuItem::act(NewFile, !nowhere, false),
-                ]
-            }
+            // Nothing is made *in* a list of tagged items.
+            MenuKind::New => self.acts(Surface::NewMenu, &[(NewFolder, false), (NewFile, false)]),
             MenuKind::Sort => self.sort_menu_items(),
             MenuKind::View => self.view_menu_items(),
             MenuKind::Tags => self.tag_menu_items(),
@@ -50,7 +44,7 @@ impl App {
                 MenuItem::command(MenuCmd::CheckUpdates, Key::MenuCheckUpdates.tr(), true),
                 MenuItem::command(MenuCmd::About, Key::MenuAbout.tr(), false),
             ],
-            MenuKind::More => self.more_menu_items(ro),
+            MenuKind::More => self.more_menu_items(),
         }
     }
 
@@ -142,21 +136,38 @@ impl App {
         ]
     }
 
-    fn more_menu_items(&self, ro: bool) -> Vec<MenuItem> {
-        use Action::*;
-        let mut v = vec![
-            MenuItem::act(Redo, true, false),
-            MenuItem::act(History, true, false),
-            MenuItem::act(BulkRename, !ro, false),
-        ];
-        if ro || self.on_archive_item() {
-            v.push(MenuItem::act(ExtractHere, true, true));
-            v.push(MenuItem::act(ExtractToFolder, true, false));
+    /// The entry of `action` in the menu `surface`, greyed or left out as its card says.
+    fn act(&self, surface: Surface, action: Action, gap: bool) -> Option<MenuItem> {
+        match action.spec().availability(&self.facts(surface)) {
+            Avail::Enabled => Some(MenuItem::act(action, true, gap)),
+            Avail::Disabled(_) => Some(MenuItem::act(action, false, gap)),
+            Avail::Hidden => None,
         }
-        v.push(MenuItem::act(OpenTerminal, !ro, true));
-        v.push(MenuItem::act(Refresh, true, false));
-        v.push(MenuItem::act(Help, true, true));
-        v
+    }
+
+    /// The entries of several actions, each with whether a separator goes above it.
+    fn acts(&self, surface: Surface, actions: &[(Action, bool)]) -> Vec<MenuItem> {
+        actions
+            .iter()
+            .filter_map(|(action, gap)| self.act(surface, *action, *gap))
+            .collect()
+    }
+
+    fn more_menu_items(&self) -> Vec<MenuItem> {
+        use Action::*;
+        self.acts(
+            Surface::MoreMenu,
+            &[
+                (Redo, false),
+                (History, false),
+                (BulkRename, false),
+                (ExtractHere, true),
+                (ExtractToFolder, false),
+                (OpenTerminal, true),
+                (Refresh, false),
+                (Help, true),
+            ],
+        )
     }
 
     /// The head of a submenu: the tags of what is selected get a title, the others none.
@@ -213,7 +224,7 @@ impl App {
     }
 
     /// The menu of the right button (or the Menu key): on an item, or on empty space.
-    pub(super) fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
+    pub fn context_menu(&self, on_item: bool, at: (u16, u16)) -> MenuView {
         let items = if on_item {
             self.item_menu_items()
         } else {
@@ -227,56 +238,54 @@ impl App {
     }
 
     fn item_menu_items(&self) -> Vec<MenuItem> {
-        let ro = self.tab.archive.is_some();
-        let mut items = self.item_opening_items(ro);
-        items.extend(self.item_edit_items(ro));
-        items.extend(self.item_about_items(ro));
+        let mut items = self.item_opening_items();
+        items.extend(self.item_edit_items());
+        items.extend(self.item_about_items());
         items
     }
 
-    fn item_opening_items(&self, ro: bool) -> Vec<MenuItem> {
+    fn item_opening_items(&self) -> Vec<MenuItem> {
         use Action::*;
-        let cur = self.tab.current();
-        let mut items = vec![MenuItem::act(Open, true, false)];
-        if self.tab.virtual_view().is_some() {
-            items.push(MenuItem::act(ShowInFolder, true, false));
-        }
-        if cur.is_some_and(|e| e.package) {
-            items.push(MenuItem::act(ShowPackage, true, false));
-        }
+        let on = Surface::ItemMenu;
+        let facts = self.facts(on);
+        let mut items = self.acts(
+            on,
+            &[(Open, false), (ShowInFolder, false), (ShowPackage, false)],
+        );
         items.push(MenuItem::open_with(
-            cur.is_some_and(|e| !e.is_navigable_dir()) && !ro,
+            OpenWith.spec().availability(&facts) == Avail::Enabled,
         ));
-        if self.svc.platform.opener().can_quick_look() {
-            items.push(MenuItem::act(QuickLook, !ro, false));
-        }
-        if self.on_archive_item() || ro {
-            items.push(MenuItem::act(ExtractHere, true, true));
-            items.push(MenuItem::act(ExtractToFolder, true, false));
-        }
+        items.extend(self.acts(
+            on,
+            &[
+                (QuickLook, false),
+                (ExtractHere, true),
+                (ExtractToFolder, false),
+            ],
+        ));
         items
     }
 
     /// The clipboard, and changing the item.
-    fn item_edit_items(&self, ro: bool) -> Vec<MenuItem> {
+    fn item_edit_items(&self) -> Vec<MenuItem> {
         use Action::*;
-        let nowhere = ro || self.tab.virtual_view().is_some();
-        let has_clip = self.ops.clipboard.is_some();
-        let mut items = vec![
-            MenuItem::act(Cut, !ro, true),
-            MenuItem::act(Copy, true, false),
-            MenuItem::act(Paste, has_clip && !nowhere, false),
-            MenuItem::act(Rename, !ro, true),
-        ];
-        if !ro {
-            items.push(MenuItem::act(Compress, true, false));
-        }
-        items
+        self.acts(
+            Surface::ItemMenu,
+            &[
+                (Cut, true),
+                (Copy, false),
+                (Paste, false),
+                (Rename, true),
+                (Compress, false),
+            ],
+        )
     }
 
     /// About the item, and taking it away: last, and red.
-    fn item_about_items(&self, ro: bool) -> Vec<MenuItem> {
+    fn item_about_items(&self) -> Vec<MenuItem> {
         use Action::*;
+        let on = Surface::ItemMenu;
+        let ro = self.facts(on).read_only;
         let cur = self.tab.current();
         let mut items = Vec::new();
         let mut gap = true;
@@ -291,34 +300,51 @@ impl App {
             items.push(MenuItem::bookmark(e.path.clone(), !pinned, gap));
             gap = false;
         }
-        items.push(MenuItem::act(CopyPath, true, gap));
-        items.push(MenuItem::act(Properties, true, true));
-        items.push(MenuItem::act(Trash, !ro, true));
-        if !ro {
-            items.push(MenuItem::act(DeletePermanently, true, false));
-        }
+        items.extend(self.acts(
+            on,
+            &[
+                (CopyPath, gap),
+                (Properties, true),
+                (Trash, true),
+                (DeletePermanently, false),
+            ],
+        ));
         items
     }
 
     fn space_menu_items(&self) -> Vec<MenuItem> {
         use Action::*;
-        let ro = self.tab.archive.is_some();
-        let nowhere = ro || self.tab.virtual_view().is_some();
-        let has_clip = self.ops.clipboard.is_some();
-        let mut items = vec![
-            MenuItem::sub(MenuKind::New, Key::MenuNew.tr(), !nowhere, false),
-            MenuItem::act(Paste, has_clip && !nowhere, false),
-            MenuItem::sub(MenuKind::Sort, Key::MenuSortBy.tr(), true, true),
-            MenuItem::sub(MenuKind::View, Key::MenuView.tr(), true, false),
-            MenuItem::act(Refresh, true, true),
-            MenuItem::act(SelectAll, true, false),
-        ];
-        if ro {
-            items.push(MenuItem::act(ExtractHere, true, true));
-            items.push(MenuItem::act(ExtractToFolder, true, false));
-        } else {
-            items.push(MenuItem::act(OpenTerminal, true, true));
-        }
+        let on = Surface::SpaceMenu;
+        let nowhere = self.facts(on).nowhere();
+        let mut items = vec![MenuItem::sub(
+            MenuKind::New,
+            Key::MenuNew.tr(),
+            !nowhere,
+            false,
+        )];
+        items.extend(self.act(on, Paste, false));
+        items.push(MenuItem::sub(
+            MenuKind::Sort,
+            Key::MenuSortBy.tr(),
+            true,
+            true,
+        ));
+        items.push(MenuItem::sub(
+            MenuKind::View,
+            Key::MenuView.tr(),
+            true,
+            false,
+        ));
+        items.extend(self.acts(
+            on,
+            &[
+                (Refresh, true),
+                (SelectAll, false),
+                (ExtractHere, true),
+                (ExtractToFolder, false),
+                (OpenTerminal, true),
+            ],
+        ));
         items
     }
 

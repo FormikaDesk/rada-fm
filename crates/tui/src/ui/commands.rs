@@ -23,6 +23,7 @@ use crate::app::{App, MenuKind};
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
 use crate::keymap::Action;
+use crate::registry::{Avail, Surface};
 
 /// How much of each button is drawn.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -59,9 +60,10 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
     let look = Look::of(app);
     let bar = Style::default().bg(th.cmdbar);
     let set = app.settings.icons;
-    let ro = app.tab.archive.is_some();
-    let nowhere = ro || app.tab.virtual_view().is_some();
-    let has_target = !app.tab.sel.marked.is_empty() || app.tab.current().is_some();
+    let facts = app.facts(Surface::Buttons);
+    let nowhere = facts.nowhere();
+    let has_target = facts.has_target;
+    let answers = |a: Action| a.spec().availability(&facts) == Avail::Enabled;
     let mut b = Bar::default();
     b.push(Span::styled(" ", bar));
 
@@ -126,7 +128,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut first,
             Glyph::Cut,
             Key::LCut.tr(),
-            has_target && !ro,
+            answers(Action::Cut),
             Target::Act(Action::Cut),
         );
     }
@@ -135,7 +137,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Copy,
         Key::LCopy.tr(),
-        has_target,
+        answers(Action::Copy),
         Target::Act(Action::Copy),
     );
     button(
@@ -143,7 +145,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Paste,
         Key::LPaste.tr(),
-        app.ops.clipboard.is_some() && !nowhere,
+        answers(Action::Paste),
         Target::Act(Action::Paste),
     );
     if !reduced {
@@ -152,7 +154,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut first,
             Glyph::Rename,
             Key::LRename.tr(),
-            app.tab.current().is_some() && !ro,
+            answers(Action::Rename),
             Target::Act(Action::Rename),
         );
         button(
@@ -160,7 +162,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
             &mut first,
             Glyph::Compress,
             Key::BtnCompress.tr(),
-            has_target && !ro,
+            answers(Action::Compress),
             Target::Act(Action::Compress),
         );
     }
@@ -169,7 +171,7 @@ fn build<'a>(app: &App, level: Level, with_desc: bool, reduced: bool) -> Bar<'a>
         &mut first,
         Glyph::Delete,
         Key::BtnDelete.tr(),
-        has_target && !ro,
+        answers(Action::Trash),
         Target::Act(Action::Trash),
     );
     if !reduced {

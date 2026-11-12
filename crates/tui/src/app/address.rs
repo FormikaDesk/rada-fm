@@ -33,6 +33,8 @@ pub enum BarMode {
     Path,
     /// Words to filter the files by and to find a command with.
     Search,
+    /// A line that starts with `:`: a command by its name, with its arguments.
+    Command,
 }
 
 /// What a suggestion of the search mode does.
@@ -44,6 +46,8 @@ pub enum BarItem {
     Place(PaletteItem),
     /// Go to a folder zoxide knows.
     Zoxide(PathBuf),
+    /// Why the command line was not run, with where the problem is.
+    Problem(String),
     /// List what has these words in its name, in this folder and the ones under it.
     Search(String),
 }
@@ -66,16 +70,6 @@ pub fn looks_like_path(text: &str) -> bool {
         || (cfg!(windows)
             && t.chars().nth(1) == Some(':')
             && t.chars().next().is_some_and(|c| c.is_ascii_alphabetic()))
-}
-
-/// Whether a command is worth offering in the bar: what is done to files, to the view, to
-/// the tabs and to the program; not each step of the cursor.
-pub(super) fn offered(a: Action) -> bool {
-    use crate::keymap::Group;
-    matches!(
-        a.group(),
-        Group::Files | Group::View | Group::Tabs | Group::Program
-    ) || matches!(a, Action::SelectAll)
 }
 
 /// Most suggestions shown under the field.
@@ -102,6 +96,13 @@ pub struct AddressEdit {
     pub hit_selected: Option<usize>,
     /// The bar put the filter on the folder (and takes it off when it is left empty).
     pub filtering: bool,
+    /// What else is in `listed` besides its subfolders: for the path of a file.
+    pub(super) files: Vec<String>,
+    /// The completions of the command line being gone through with Tab: where the word
+    /// starts, what it can become, and which one is in the text now.
+    pub(super) cycle: Option<(usize, Vec<String>, usize)>,
+    /// Where the arrows are in the history of the command line.
+    pub(super) recalled: Option<usize>,
     /// The folders zoxide gave for the text it was asked about (empty until it answers).
     pub(super) zoxide: Vec<PathBuf>,
     /// The text zoxide was last asked about, so that typing does not ask again and again.
@@ -109,12 +110,20 @@ pub struct AddressEdit {
 }
 
 impl AddressEdit {
+    /// The folder whose names are known for completing what is typed, once the worker said.
+    pub fn listed(&self) -> Option<&Path> {
+        self.listed.as_deref()
+    }
+
     pub fn new(text: String) -> AddressEdit {
         let cursor = text.chars().count();
         AddressEdit {
             text,
             cursor,
             names: Vec::new(),
+            files: Vec::new(),
+            cycle: None,
+            recalled: None,
             listed: None,
             asked: None,
             selected: None,
@@ -132,6 +141,8 @@ impl AddressEdit {
         let t = self.text.trim();
         if t.is_empty() {
             BarMode::Empty
+        } else if t.starts_with(':') {
+            BarMode::Command
         } else if looks_like_path(t) {
             BarMode::Path
         } else {

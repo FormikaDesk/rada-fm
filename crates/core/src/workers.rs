@@ -25,26 +25,31 @@ pub fn complete_dirs(fs: Arc<dyn FsEngine>, dir: PathBuf, out: Sender<CoreEvent>
     let _ = std::thread::Builder::new()
         .name("rada-complete".into())
         .spawn(move || {
-            const LIMIT: usize = 5000;
-            let mut names: Vec<String> = fs
-                .read_dir(&dir)
-                .map(|listing| {
-                    listing
-                        .items
-                        .into_iter()
-                        .filter(|it| {
-                            it.meta.as_ref().is_ok_and(|m| m.is_dir())
-                                || (it.meta.as_ref().is_ok_and(|m| m.is_symlink())
-                                    && fs.stat(&it.path).is_ok_and(|m| m.is_dir()))
-                        })
-                        .take(LIMIT)
-                        .map(|it| crate::display::name(&it.name))
-                        .collect()
-                })
-                .unwrap_or_default();
-            names.sort_by_key(|n| n.to_lowercase());
-            let _ = out.send(CoreEvent::Complete { dir, names });
+            let (names, files) = names_in(fs.as_ref(), &dir);
+            let _ = out.send(CoreEvent::Complete { dir, names, files });
         });
+}
+
+/// The names in `dir`, the folders (and the links to folders) apart from the rest, each list
+/// sorted. Both empty when the folder cannot be read.
+fn names_in(fs: &dyn FsEngine, dir: &std::path::Path) -> (Vec<String>, Vec<String>) {
+    const LIMIT: usize = 5000;
+    let (mut dirs, mut files) = (Vec::new(), Vec::new());
+    let items = fs.read_dir(dir).map(|l| l.items).unwrap_or_default();
+    for it in items.into_iter().take(LIMIT) {
+        let is_dir = it.meta.as_ref().is_ok_and(|m| m.is_dir())
+            || (it.meta.as_ref().is_ok_and(|m| m.is_symlink())
+                && fs.stat(&it.path).is_ok_and(|m| m.is_dir()));
+        let name = crate::display::name(&it.name);
+        if is_dir {
+            dirs.push(name);
+        } else {
+            files.push(name);
+        }
+    }
+    dirs.sort_by_key(|n| n.to_lowercase());
+    files.sort_by_key(|n| n.to_lowercase());
+    (dirs, files)
 }
 
 /// One subfolder in the navigation tree of the panels view: how many items it holds and whether

@@ -1,0 +1,100 @@
+---
+source: crates/tui/tests/command_registry.rs
+expression: report(&mut h)
+---
+-- the bar offers
+select_all | Select all
+copy | Copy
+cut | Cut
+paste | Paste
+trash | Move to trash
+delete_permanently | Delete permanently
+rename | Rename
+bulk_rename | Rename many
+new_folder | New folder
+extract_here | Extract here
+extract_to_folder | Extract to a folder…
+compress | Compress…
+undo | Undo
+redo | Redo
+history | Operation history
+filter | Filter this folder
+palette | Jump to…
+sort | Change sort order
+sort_reverse | Reverse sort
+toggle_hidden | Show / hide hidden files
+toggle_hex | Hex dump of a binary file
+preview_down | Scroll preview down
+preview_up | Scroll preview up
+bookmark | Pin / unpin this folder
+switch_pane | Move between the list and the sidebar
+toggle_sidebar | Show / hide the sidebar
+help | Help
+quit | Quit
+new_file | New empty file
+refresh | Refresh the folder
+focus_address | Edit the address
+toggle_details | Show / hide the details pane
+view_details | View as details
+view_icons | View as icons
+toggle_view | Switch the view: Details, Icons, Columns
+properties | Properties
+open_with | Open with…
+copy_path | Copy the path
+open_terminal | Open a terminal here
+context_menu | Open the context menu
+new_tab | New tab
+close_tab | Close tab
+next_tab | Next tab
+prev_tab | Previous tab
+update | Update rada
+quick_look | Quick Look
+show_package | Show package contents
+view_columns | View as columns
+toggle_tags | Show / hide the Tag column
+show_in_folder | Show in folder
+-- a chooser refuses
+
+-- menu New
+[x] New folder
+[x] New empty file
+-- menu More
+[x] Redo
+[x] Operation history
+[x] Rename many
+[x] Open a terminal here (gap)
+[x] Refresh the folder
+[x] Help (gap)
+-- menu Help
+[x] Help
+[x] Check for updates (gap)
+[x] About rada
+-- menu of an item
+[x] Open
+[x] Open with…
+[x] Cut (gap)
+[x] Copy
+[ ] Paste
+[x] Rename (gap)
+[x] Compress…
+[x] Tags (gap)
+[x] Copy the path
+[x] Properties (gap)
+[x] Move to trash (gap)
+[x] Delete permanently
+-- menu of the empty space
+[x] New
+[ ] Paste
+[x] Sort by (gap)
+[x] View
+[x] Refresh the folder (gap)
+[x] Select all
+[x] Open a terminal here (gap)
+-- buttons that answer
+cut: on
+copy: on
+paste: on
+rename: on
+compress: on
+trash: on
+new: on

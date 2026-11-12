@@ -1,0 +1,79 @@
+---
+source: crates/tui/tests/command_registry.rs
+expression: report(&mut h)
+---
+-- the bar offers
+new_folder | New folder
+filter | Filter this folder
+palette | Jump to…
+sort | Change sort order
+sort_reverse | Reverse sort
+toggle_hidden | Show / hide hidden files
+toggle_hex | Hex dump of a binary file
+preview_down | Scroll preview down
+preview_up | Scroll preview up
+switch_pane | Move between the list and the sidebar
+toggle_sidebar | Show / hide the sidebar
+help | Help
+quit | Quit
+refresh | Refresh the folder
+focus_address | Edit the address
+toggle_details | Show / hide the details pane
+view_details | View as details
+view_icons | View as icons
+toggle_view | Switch the view: Details, Icons, Columns
+properties | Properties
+copy_path | Copy the path
+new_tab | New tab
+close_tab | Close tab
+next_tab | Next tab
+prev_tab | Previous tab
+view_columns | View as columns
+toggle_tags | Show / hide the Tag column
+show_in_folder | Show in folder
+-- a chooser refuses
+toggle_mark select_all select_up select_down select_to_first select_to_last copy cut paste trash delete_permanently rename bulk_rename extract_here extract_to_folder compress undo redo history bookmark new_file open_with open_terminal context_menu update quick_look show_package
+-- menu New
+[x] New folder
+[x] New empty file
+-- menu More
+[x] Redo
+[x] Operation history
+[x] Rename many
+[x] Open a terminal here (gap)
+[x] Refresh the folder
+[x] Help (gap)
+-- menu Help
+[x] Help
+[x] Check for updates (gap)
+[x] About rada
+-- menu of an item
+[x] Open
+[ ] Open with…
+[x] Cut (gap)
+[x] Copy
+[ ] Paste
+[x] Rename (gap)
+[x] Compress…
+[x] Tags (gap)
+[x] Pin to navigation
+[x] Copy the path
+[x] Properties (gap)
+[x] Move to trash (gap)
+[x] Delete permanently
+-- menu of the empty space
+[x] New
+[ ] Paste
+[x] Sort by (gap)
+[x] View
+[x] Refresh the folder (gap)
+[x] Select all
+[x] Open a terminal here (gap)
+-- buttons that answer
+cut: off
+copy: off
+paste: off
+rename: off
+compress: off
+trash: off
+new: off

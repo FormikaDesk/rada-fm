@@ -690,6 +690,23 @@ strings! {
     // ---- the bar at the top
     BarPlaceholder => "Search files or type a command…", "Cerca file o digita un comando…";
     BarCommand => "command", "comando";
+    BarProblem => "not run", "non eseguito";
+    CmdFind => "Search by name in the folders below", "Cerca per nome nelle sottocartelle";
+    CmdCd => "Go to a folder", "Vai a una cartella";
+    WhyReadOnly => "an archive cannot be changed", "un archivio non si può modificare";
+    WhyNotAFolder => "this list is not a folder: nothing can be made in it", "questo elenco non è una cartella: non ci si può creare nulla";
+    WhyNothingCopied => "nothing was copied or cut", "non è stato copiato né tagliato nulla";
+    WhyNothingSelected => "nothing is selected", "non c'è nulla di selezionato";
+    WhyNotAFile => "this is for a file", "serve un file";
+    WhyNotHere => "not available here", "qui non disponibile";
+    LineOpenQuote => "this quote is never closed", "queste virgolette non vengono chiuse";
+    LineLoneBackslash => "nothing follows this backslash", "dopo questa barra rovesciata non c'è nulla";
+    LineUnknownOption => "no option called --{0}", "non esiste l'opzione --{0}";
+    LineTooMany => "one word too many (put a name with spaces between quotes)", "una parola di troppo (un nome con spazi va tra virgolette)";
+    LineMissing => "{0} is missing", "manca {0}";
+    LineNotANumber => "{0} is not a number", "{0} non è un numero";
+    LineNotAChoice => "{0} is not one of: {1}", "{0} non è tra: {1}";
+    LineAt => "column {0}: {1}", "colonna {0}: {1}";
     BarGoTo => "go to", "vai a";
     BarSearch => "search", "ricerca";
     BarSearchBelow => "Search \"{0}\" in subfolders", "Cerca \"{0}\" nelle sottocartelle";

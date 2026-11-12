@@ -54,6 +54,9 @@ pub struct UiState {
     pub tabs: Vec<SavedTab>,
     #[serde(default)]
     pub active_tab: usize,
+    /// The lines run on the command line, oldest first, each once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<String>,
 }
 
 const FILE: &str = "ui.json";

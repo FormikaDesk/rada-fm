@@ -56,6 +56,10 @@ impl App {
             return;
         }
         if let Some(action) = self.settings.keymap.action_for(&key) {
+            // The colon is the key of the command line, where the keys have one for it.
+            if action == Action::Palette && key.code == KeyCode::Char(':') {
+                return self.open_command_line();
+            }
             self.on_action_key(key, action);
         }
     }
@@ -85,7 +89,9 @@ impl App {
             return true;
         }
         if self.windows.address.is_some() {
-            self.on_address_key(key);
+            if !self.on_command_line_key(key) {
+                self.on_address_key(key);
+            }
             return true;
         }
         if self.tab.filter.as_ref().is_some_and(|f| f.editing) {
@@ -196,13 +202,9 @@ impl App {
         if self.session.chooser.is_none() {
             return false;
         }
-        if !self
-            .session
-            .chooser
-            .as_ref()
-            .is_some_and(|c| c.allows(action))
-        {
-            self.toast(ToastKind::Info, Key::ChooseRefused.tr(), 2);
+        let at_the_keys = self.facts(crate::registry::Surface::Keys);
+        if let crate::registry::Avail::Disabled(why) = action.spec().availability(&at_the_keys) {
+            self.toast(ToastKind::Info, why.tr(), 2);
             return true;
         }
         match action {

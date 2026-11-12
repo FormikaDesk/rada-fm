@@ -257,6 +257,7 @@ mod archives;
 mod bar;
 mod chooser;
 mod clean;
+mod cmdline;
 mod columns;
 mod demo;
 mod eject;
@@ -487,7 +488,7 @@ impl App {
             CoreEvent::Mounted { id, name, result } => self.on_mounted(id, name, result),
             CoreEvent::Paths(p) => self.on_paths(p),
             CoreEvent::Job(j) => self.on_job(j),
-            CoreEvent::Complete { dir, names } => self.on_complete(dir, names),
+            CoreEvent::Complete { dir, names, files } => self.on_complete(dir, names, files),
             CoreEvent::Git { dir, status } => self.on_git(dir, status),
             CoreEvent::Tree { dir, hidden, kids } => self.on_tree(dir, hidden, kids),
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),

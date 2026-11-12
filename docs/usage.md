@@ -59,7 +59,7 @@ Both schemes are active together by default. `keymap = "vim"` or `"classic"` kee
 | back · forward in the folder history | `Alt+←` · `Alt+→`, or `Ctrl+O` · `Ctrl+G` (both schemes) | |
 | history of operations | `U` | `F3` |
 | filter this folder (in the bar) | `/` | `Ctrl+F` |
-| the bar: commands, files, folders, recents, pinned, disks | `:` | `Ctrl+P` |
+| the bar: commands, files, folders, recents, pinned, disks | `:` (opens it as the command line, see below) | `Ctrl+P` |
 | edit the address · refresh | `Ctrl+L` `Alt+D` `F4` · `F5` (both schemes) | |
 | properties · open with… · copy path · terminal here | `i` · `O` · `Y` · `t` | `Alt+Enter` · `Alt+O` · `Ctrl+Shift+C` · `Ctrl+Alt+T` |
 | tabs: new · close · next · previous · jump | `Ctrl+T` `Ctrl+W` `Ctrl+Tab` `Ctrl+Shift+Tab` `Alt+1…9` (both schemes) | |
@@ -108,6 +108,21 @@ The preview of a source file, a script or a markup file shows comments, strings,
 ### Jumping with zoxide
 
 If [zoxide](https://github.com/ajeetdsouza/zoxide) is installed, the bar (`Ctrl+P`) uses it. When what you type is no command, no place and no name in the folder you are in, the bar offers the folders `zoxide query --list` gives for it (at most five, marked *zoxide*): pick one with `↓` or `Tab` and press `Enter` (or click it), or press `Enter` at once for the first. Besides that, every folder rada enters is told to zoxide (`zoxide add`, in the background), so that the two share what you visit. If zoxide is not installed nothing happens and no error is shown; `zoxide = false` in `config.toml` makes rada never call it (see [configuration](configuration.md)).
+
+### Commands typed after `:`
+
+With the vim keys, `:` opens the bar with a colon already written: the **command line**. A command is a name followed by its arguments, separated by spaces; a name with spaces goes between quotes (`"my notes"`) or with a backslash before each space (`my\ notes`), `~` is your home folder, an option is written `--reverse`, and an argument can also be given by its name (`by=size`). Every action of the keys has a command (its name is the one used in `[keys]` of `config.toml`, such as `copy`, `new_tab`, `toggle_hidden`); without arguments it does what its key does. A few take arguments:
+
+| command | what it does |
+|---|---|
+| `:mkdir name` | a new folder here (also `:new_folder`) |
+| `:rename pattern` | renames what is selected, or the item under the cursor, with a pattern of the bulk rename (`{name}_{n:3}.{ext}`) |
+| `:sort name\|size\|date\|type [--reverse]` | the order of the list |
+| `:cd folder` | goes to a folder; relative to the one shown, `~` is home |
+| `:find text` | searches by name in this folder and the ones below, as `Ctrl+Enter` does in the bar; a text between slashes is a regular expression (`:find /^img_\d+/`), which the bar alone would take for a path |
+| `:undo`, `:redo`, `:history`, `:help` | as `Ctrl+Z`, `Ctrl+Y`, `F3` and `?` |
+
+A command that changes files never does it at once: it opens the **plan** window like its key, and `Ctrl+Z` undoes it. When a line cannot be read, or the command cannot be used where you are (`:mkdir` in an archive or in a search), the bar stays open and says why under it, with the column where the problem is (*column 7: colour is not one of: name, size, date, type*). A line whose first word is not a command is read as words, as in the bar: the commands and places that match are offered, and `Enter` runs the first. `Tab` completes the name of a command, the value of an argument that has a list of them, an option, or a path (folders and files); pressing it again goes to the next. `↑` and `↓` go through the lines run before, which are kept, each once, for the next start (in `ui.json` in the state folder). The classic keys have no `:` (`Ctrl+P` opens the bar), and on an Italian keyboard `:` is `Shift+.`: the full stop alone still shows and hides hidden files.
 
 ## Requests as data
 

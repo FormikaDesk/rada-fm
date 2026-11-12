@@ -94,25 +94,17 @@ impl Chooser {
         matches!(self.kind, Kind::Save { .. })
     }
 
-    /// Whether an action may be done. Everything that looks, moves around or shows is
-    /// allowed; whatever changes a file, starts another program or touches the settings is
-    /// not. A new folder is the one thing made, and only where a folder is the answer.
+    /// Whether an action may be done while choosing: the card of the action says (see
+    /// `registry::chooser_rule`).
     pub fn allows(&self, action: Action) -> bool {
-        use Action::*;
-        match action {
-            Up | Down | Parent | Open | First | Last | PageUp | PageDown | HalfPageUp
-            | HalfPageDown | GoHome | Back | Forward | ClearSelection | Filter | Palette | Sort
-            | SortReverse | ToggleHidden | ToggleHex | PreviewDown | PreviewUp | SwitchPane
-            | ToggleSidebar | Help | Quit | Refresh | FocusAddress | ToggleDetails
-            | ViewDetails | ViewIcons | ViewColumns | ToggleView | ToggleTags | Properties
-            | CopyPath | NewTab | CloseTab | NextTab | PrevTab | ShowInFolder => true,
-            ToggleMark | SelectAll | SelectUp | SelectDown | SelectToFirst | SelectToLast => {
-                self.multiple
-            }
-            NewFolder => matches!(self.kind, Kind::Folder | Kind::Save { .. }),
-            Copy | Cut | Paste | Trash | DeletePermanently | Rename | BulkRename | ExtractHere
-            | ExtractToFolder | Compress | Undo | Redo | History | Bookmark | NewFile
-            | OpenWith | OpenTerminal | ContextMenu | Update | QuickLook | ShowPackage => false,
+        action.spec().chooser.allows(self.facts())
+    }
+
+    /// What the registry of commands needs to know of this chooser.
+    pub fn facts(&self) -> crate::registry::ChooserFacts {
+        crate::registry::ChooserFacts {
+            multiple: self.multiple,
+            makes_folders: matches!(self.kind, Kind::Folder | Kind::Save { .. }),
         }
     }
 }

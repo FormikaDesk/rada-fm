@@ -5,11 +5,11 @@ use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::address::{MAX_COMMANDS, MAX_PLACES, SEP, expand, is_separator, offered};
+use super::address::{MAX_COMMANDS, MAX_PLACES, SEP, expand, is_separator};
 use super::{AddressEdit, App, BarHit, BarItem, BarMode, FilterState, ToastKind};
-use crate::chooser::Chooser;
 use crate::keymap::Action;
 use crate::palette::{PaletteKind, PaletteView};
+use crate::registry::{Avail, Surface};
 use crate::{fmt, fuzzy};
 use rada_core::i18n::Key;
 
@@ -78,6 +78,11 @@ impl App {
             return;
         };
         match a.mode() {
+            // A command is not a word to filter the files by: only what matches it is offered.
+            BarMode::Command => {
+                self.bar_stops_filtering(false);
+                self.refresh_bar_hits();
+            }
             BarMode::Search => {
                 let text = a.text.trim().to_string();
                 self.set_filter(Some(FilterState {
@@ -89,27 +94,35 @@ impl App {
                 }
                 self.refresh_bar_hits();
             }
-            _ => {
-                let was = a.filtering;
-                if let Some(a) = &mut self.windows.address {
-                    a.hits.clear();
-                    a.hit_selected = None;
-                    a.filtering = false;
-                }
-                if was {
-                    self.set_filter(None);
-                }
-            }
+            _ => self.bar_stops_filtering(true),
+        }
+    }
+
+    /// The files are no longer filtered by what the bar holds; with `clear`, nothing is
+    /// offered under it either.
+    fn bar_stops_filtering(&mut self, clear: bool) {
+        let Some(a) = &mut self.windows.address else {
+            return;
+        };
+        let was = a.filtering;
+        a.filtering = false;
+        if clear {
+            a.hits.clear();
+            a.hit_selected = None;
+        }
+        if was {
+            self.set_filter(None);
         }
     }
 
     /// The commands and the places that match what is typed, best first.
-    fn refresh_bar_hits(&mut self) {
+    pub(super) fn refresh_bar_hits(&mut self) {
         let chooser = self.session.chooser.clone();
+        let offered = self.bar_commands();
         let Some(a) = &mut self.windows.address else {
             return;
         };
-        let q = a.text.trim().to_string();
+        let q = words_of(&a.text);
         let q_text = q.clone();
         // An entry of the folder with exactly that name is a path that exists.
         let named_here = self
@@ -118,7 +131,7 @@ impl App {
             .all()
             .iter()
             .any(|e| e.name == q_text.as_str());
-        let mut hits = command_hits(&q, chooser.as_ref());
+        let mut hits = command_hits(&q, &offered);
         if let Some(p) = &mut a.palette {
             p.query = q;
             p.cursor = p.query.chars().count();
@@ -143,7 +156,8 @@ impl App {
         }
         // Last, and only when nothing in this folder matches: the arrows keep moving through
         // the files that do, and Enter keeps running the best command.
-        if let Some(hit) = search_hit(&q_text, chooser.is_none(), &self.tab) {
+        let free = chooser.is_none() && a.mode() != BarMode::Command;
+        if let Some(hit) = search_hit(&q_text, free, &self.tab) {
             hits.push(hit);
         }
         a.hit_selected = a.hit_selected.filter(|i| *i < hits.len());
@@ -179,6 +193,7 @@ impl App {
             BarItem::Place(item) => self.open_dir(item.path),
             BarItem::Zoxide(path) => self.open_dir(path),
             BarItem::Search(words) => self.search_below(&words),
+            BarItem::Problem(_) => {}
         }
     }
 
@@ -199,7 +214,7 @@ impl App {
     }
 
     /// List what has `words` in its name in this folder and the ones under it.
-    fn search_below(&mut self, words: &str) {
+    pub(super) fn search_below(&mut self, words: &str) {
         match rada_core::search::view_path(&self.tab.cwd, words) {
             Some(path) => self.open_dir(path),
             None => self.toast(ToastKind::Warn, Key::TSearchUnavailable.tr(), 4),
@@ -239,7 +254,15 @@ impl App {
         let Some(a) = &mut self.windows.address else {
             return;
         };
-        let (dir, _) = a.target(&cwd, &home);
+        a.cycle = None;
+        let dir = match a.mode() {
+            // On the command line the path is the argument being typed, if it is one.
+            BarMode::Command => match super::cmdline::typed_path(&a.text, &cwd, &home) {
+                Some((dir, _, _)) => dir,
+                None => return,
+            },
+            _ => a.target(&cwd, &home).0,
+        };
         if a.asked.as_deref() != Some(dir.as_path()) {
             a.asked = Some(dir.clone());
             self.svc.complete_dirs(dir);
@@ -247,11 +270,12 @@ impl App {
     }
 
     /// A list of subfolders arrived from the worker.
-    pub(super) fn on_complete(&mut self, dir: PathBuf, names: Vec<String>) {
+    pub(super) fn on_complete(&mut self, dir: PathBuf, names: Vec<String>, files: Vec<String>) {
         if let Some(a) = &mut self.windows.address
             && a.asked.as_deref() == Some(dir.as_path())
         {
             a.names = names;
+            a.files = files;
             a.listed = Some(dir);
             a.selected = None;
         }
@@ -362,13 +386,27 @@ fn search_hit(words: &str, free: bool, tab: &super::TabState) -> Option<BarHit> 
     })
 }
 
+impl App {
+    /// The commands the bar may offer here, in the order of the list of actions.
+    pub fn bar_commands(&self) -> Vec<Action> {
+        let facts = self.facts(Surface::Bar);
+        Action::ALL
+            .iter()
+            .copied()
+            .filter(|a| a.spec().availability(&facts) == Avail::Enabled)
+            .collect()
+    }
+}
+
+/// The words a text of the bar is matched by: on the command line, what comes after the colon.
+fn words_of(text: &str) -> String {
+    text.trim().trim_start_matches(':').trim().to_string()
+}
+
 /// The commands whose names match what is typed (in this language or in English), best first.
-fn command_hits(q: &str, chooser: Option<&Chooser>) -> Vec<BarHit> {
+fn command_hits(q: &str, offered: &[Action]) -> Vec<BarHit> {
     let mut commands: Vec<(i64, BarHit)> = Vec::new();
-    for &action in Action::ALL
-        .iter()
-        .filter(|a| offered(**a) && chooser.is_none_or(|c| c.allows(**a)))
-    {
+    for &action in offered {
         let label = action.label();
         let english = action.label_key().in_lang(rada_core::i18n::Lang::En);
         let best = match (fuzzy::score(q, label), fuzzy::score(q, english)) {

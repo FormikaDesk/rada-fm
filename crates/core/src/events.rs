@@ -169,6 +169,8 @@ pub enum CoreEvent {
         dir: PathBuf,
         /// Names of the subfolders, sorted; empty when the folder cannot be read.
         names: Vec<String>,
+        /// Names of what else is in the folder, sorted: for completing the path of a file.
+        files: Vec<String>,
     },
     /// What git says about a folder (the panels view): `None` for a folder that is not in a
     /// repository.
