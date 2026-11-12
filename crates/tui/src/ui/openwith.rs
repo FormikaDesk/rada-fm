@@ -124,9 +124,18 @@ pub fn draw(
     if let Some((menu, _)) = anchor {
         popup::seam(buf, menu, g.rect, th);
     }
-    if inner.width < 10 || inner.height < 6 {
+    if inner.width < 10 || inner.height < 2 {
         return;
     }
+    // Where the card is shorter than it asked for, the list gets the rows left; with too few,
+    // only the title and the programs are drawn, without the rule, the box and the note.
+    let head = 2 + u16::from(g.filter_row);
+    let full = inner.height > head + 3;
+    let list_h = if full {
+        g.list_h.min(usize::from(inner.height - head - 3))
+    } else {
+        usize::from(inner.height - head + 1)
+    };
     let rw = (inner.width as usize).saturating_sub(2);
     let x0 = inner.x + 1;
     let mut y = inner.y;
@@ -166,8 +175,10 @@ pub fn draw(
         );
         y += 1;
     }
-    popup::put(buf, region(y), Line::from(popup::rule(ctx, rw)));
-    y += 1;
+    if full {
+        popup::put(buf, region(y), Line::from(popup::rule(ctx, rw)));
+        y += 1;
+    }
 
     // The list.
     let rows = v.rows();
@@ -193,7 +204,7 @@ pub fn draw(
         lines_drawn += 1;
     }
     // Scroll so that the cursor is in view.
-    let room = g.list_h.saturating_sub(lines_drawn);
+    let room = list_h.saturating_sub(lines_drawn);
     let total = rows.len() + usize::from(apps_n > 0);
     let start = if total <= room {
         0
@@ -237,53 +248,33 @@ pub fn draw(
         y += 1;
         shown += 1;
     }
+    if !full {
+        return;
+    }
     // Fill the list to its height, so that the box below stays where it is.
-    y = inner.y + 1 + u16::from(g.filter_row) + 1 + g.list_h as u16 + 1;
-    // The box.
-    let mark = icons::ui(
-        ctx.set,
-        if v.always {
-            Glyph::Checked
-        } else {
-            Glyph::Unchecked
-        },
-    );
-    let mark = if mark.is_empty() {
-        if v.always { "[x]" } else { "[ ]" }
-    } else {
-        mark
-    };
-    let ext = std::path::Path::new(&v.file)
-        .extension()
-        .map(|e| e.to_string_lossy().into_owned());
-    let label = match &ext {
-        Some(e) => tf(Key::AlwaysForExt, &[&e]),
-        None => Key::AlwaysForKind.tr().to_string(),
+    let y = inner.y + head + list_h as u16 + 1;
+    draw_always(buf, ctx, v, inner, y, hits);
+}
+
+/// The box "always use this for .ext" at row `y` of the card, and the note under it.
+fn draw_always(
+    buf: &mut ratatui::buffer::Buffer,
+    ctx: &Ctx,
+    v: &OpenWithView,
+    inner: Rect,
+    y: u16,
+    hits: &mut Hits,
+) {
+    let rw = (inner.width as usize).saturating_sub(2);
+    let region = |y: u16| Rect {
+        x: inner.x + 1,
+        y,
+        width: rw as u16,
+        height: 1,
     };
     let usable = v.current().is_some();
-    let box_style = if usable { ctx.base() } else { ctx.faint() };
-    let mark_style = if v.always && usable {
-        ctx.accent()
-    } else {
-        box_style
-    };
-    let key_w = 4;
-    let label = display::truncate(&label, rw.saturating_sub(4 + key_w));
-    let gap = rw.saturating_sub(2 + 2 + label.width() + key_w);
     let box_row = region(y);
-    popup::put(
-        buf,
-        box_row,
-        Line::from(vec![
-            Span::styled(format!(" {mark} "), mark_style),
-            Span::styled(label, box_style),
-            Span::styled(" ".repeat(gap), ctx.surface()),
-            Span::styled(
-                pad(key_name("Tab"), key_w),
-                if usable { ctx.dim() } else { ctx.faint() },
-            ),
-        ]),
-    );
+    popup::put(buf, box_row, always_line(ctx, v, rw, usable));
     if usable {
         hits.add(
             Rect {
@@ -294,17 +285,48 @@ pub fn draw(
             Target::OpenWithAlways,
         );
     }
+    let note = display::truncate(Key::OnlyInRada.tr(), rw.saturating_sub(3));
     popup::put(
         buf,
         region(y + 1),
-        Line::from(Span::styled(
-            format!(
-                "   {}",
-                display::truncate(Key::OnlyInRada.tr(), rw.saturating_sub(3))
-            ),
-            ctx.faint(),
-        )),
+        Line::from(Span::styled(format!("   {note}"), ctx.faint())),
     );
+}
+
+/// The row of the box, `rw` wide: its mark, its label and its key.
+fn always_line(ctx: &Ctx, v: &OpenWithView, rw: usize, usable: bool) -> Line<'static> {
+    let glyph = if v.always {
+        Glyph::Checked
+    } else {
+        Glyph::Unchecked
+    };
+    let mark = match icons::ui(ctx.set, glyph) {
+        "" if v.always => "[x]",
+        "" => "[ ]",
+        mark => mark,
+    };
+    let label = match std::path::Path::new(&v.file).extension() {
+        Some(e) => tf(Key::AlwaysForExt, &[&e.to_string_lossy()]),
+        None => Key::AlwaysForKind.tr().to_string(),
+    };
+    let box_style = if usable { ctx.base() } else { ctx.faint() };
+    let mark_style = if v.always && usable {
+        ctx.accent()
+    } else {
+        box_style
+    };
+    let key_w = 4;
+    let label = display::truncate(&label, rw.saturating_sub(4 + key_w));
+    let gap = rw.saturating_sub(2 + 2 + label.width() + key_w);
+    Line::from(vec![
+        Span::styled(format!(" {mark} "), mark_style),
+        Span::styled(label, box_style),
+        Span::styled(" ".repeat(gap), ctx.surface()),
+        Span::styled(
+            pad(key_name("Tab"), key_w),
+            if usable { ctx.dim() } else { ctx.faint() },
+        ),
+    ])
 }
 
 fn draw_row(

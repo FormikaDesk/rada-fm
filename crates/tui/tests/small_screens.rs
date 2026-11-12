@@ -474,3 +474,19 @@ fn the_titles_of_the_columns_answer_no_click_under_the_preview_drawn_over_them()
     }
     assert_eq!(h.app.tab.sort, sort, "the order did not change");
 }
+
+#[test]
+fn open_with_shows_its_title_and_the_program_chosen_at_every_size() {
+    for (w, hh) in SIZES {
+        let mut h = scene(w, hh);
+        open_with(&mut h);
+        let text = h.screen();
+        // A narrow card cuts the title with an ellipsis; its beginning must show.
+        assert!(text.contains("Open"), "{w}x{hh}: no title\n{text}");
+        assert!(text.contains("Tex"), "{w}x{hh}: no program\n{text}");
+        assert!(
+            h.app.frame.hits.find(&Target::OpenWithRow(0)).is_some(),
+            "{w}x{hh}: the program does not answer a click"
+        );
+    }
+}

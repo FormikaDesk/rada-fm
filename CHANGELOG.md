@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Moving to the trash and renaming no longer touch a file that changed after the plan was shown.** The item is compared with what the plan saw at the last moment, as a permanent deletion already is; one that changed is left where it is and reported.
 - **The launcher entry passes the checks of newer `desktop-file-validate` versions.** Its keywords no longer repeat "File Manager" ("Gestore di file"), which the generic name already gives to the desktop's search.
 - **On a narrow terminal the titles of the columns no longer answer a click under the preview drawn over the list.** At 60 columns a click on the preview could sort the list by size.
+- **"Open with" on a very small terminal shows its programs.** Where the card had less room than it asked for it stayed empty; now it shows the title and the programs that fit, and leaves out the box and the note.
 
 ## [0.6.1] - 2026-11-05
 
