@@ -33,8 +33,12 @@ fn tests() -> std::sync::MutexGuard<'static, Vec<Entry>> {
 /// interface and the sandbox down is watched too.
 pub struct Watch;
 
-/// Dropped first: the next step is the teardown.
+/// Dropped first: the next step is the teardown, beginning with the interface.
 pub struct Teardown;
+
+/// Dropped between two parts of the harness: says that the one named is next, so that a
+/// teardown that stops for good says which part it stopped in.
+pub struct Next(pub &'static str);
 
 impl Watch {
     pub fn start() -> Watch {
@@ -69,6 +73,13 @@ impl Drop for Watch {
 impl Drop for Teardown {
     fn drop(&mut self) {
         call("tearing down: the interface, its workers and the sandbox".into());
+        step("dropping the interface and its workers");
+    }
+}
+
+impl Drop for Next {
+    fn drop(&mut self) {
+        step(self.0);
     }
 }
 

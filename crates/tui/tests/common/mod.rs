@@ -41,7 +41,9 @@ pub type System = (
 pub struct H {
     _teardown: watchdog::Teardown,
     pub app: App,
+    _then_term: watchdog::Next,
     pub term: Terminal<TestBackend>,
+    _then_sb: watchdog::Next,
     _sb: Sandbox,
     _watch: watchdog::Watch,
 }
@@ -251,7 +253,9 @@ impl H {
         let mut h = H {
             _teardown: watchdog::Teardown,
             app,
+            _then_term: watchdog::Next("dropping the terminal"),
             term: Terminal::new(TestBackend::new(w, h)).unwrap(),
+            _then_sb: watchdog::Next("removing the sandbox and checking the real paths"),
             _sb: sb,
             _watch: watchdog::Watch::start(),
         };
