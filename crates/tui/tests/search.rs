@@ -430,6 +430,8 @@ fn picture(w: u16, h: u16) -> String {
     h.keys("report");
     h.press("ctrl+enter");
     h.wait("the result", search_view);
+    // The places of the navigation pane come from a worker: the picture waits for them.
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     let screen = h.screen();
     let lines: Vec<&str> = screen.lines().map(str::trim_end).collect();
     lines.join("\n") + "\n"

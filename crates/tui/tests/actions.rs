@@ -64,6 +64,8 @@ fn shot(h: &mut H) -> String {
 fn plan_window(sb: Sandbox, dir: PathBuf, req: OpRequest, w: u16, h: u16) -> H {
     let mut h = H::with_request(sb, dir, w, h, req);
     plan_modal(&mut h);
+    // The places of the navigation pane come from a worker: the picture waits for them.
+    h.wait("the places", |a| !a.places.paths.places.is_empty());
     h.app.hooks.clock = Some(fixed_now());
     h
 }
