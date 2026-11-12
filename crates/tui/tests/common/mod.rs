@@ -199,6 +199,9 @@ impl H {
         tweak: Option<Tweak>,
         system: Option<System>,
     ) -> H {
+        // Watched from here: starting the services and the interface can stop for good too.
+        let watch = watchdog::Watch::start();
+        watchdog::step("starting the services");
         let (fs, platform) = system.unwrap_or_else(|| (Arc::new(LocalFs), sb.platform()));
         let programs = PROGRAMS.with(|p| p.borrow().clone());
         let journal = Some(sb.journal());
@@ -243,6 +246,7 @@ impl H {
         if let Some(t) = tweak {
             t(&mut cfg);
         }
+        watchdog::step("starting the interface");
         let mut app = App::new(cfg, svc, images);
         // The version is in the status bar: pinned, a release does not change every snapshot.
         app.updates.version = "0.6.0".into();
@@ -257,7 +261,7 @@ impl H {
             term: Terminal::new(TestBackend::new(w, h)).unwrap(),
             _then_sb: watchdog::Next("removing the sandbox and checking the real paths"),
             _sb: sb,
-            _watch: watchdog::Watch::start(),
+            _watch: watch,
         };
         h.settle();
         h
