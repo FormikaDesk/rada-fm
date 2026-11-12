@@ -13,5 +13,5 @@ StartupNotify=false
 StartupWMClass=com.formikadesk.rada
 Categories=System;FileTools;FileManager;Utility;
 MimeType=inode/directory;
-Keywords=files;folders;file manager;explorer;browser;terminal;tui;undo;trash;
-Keywords[it]=file;cartelle;gestore di file;esplora risorse;terminale;annulla;cestino;
+Keywords=files;folders;explorer;browser;terminal;tui;undo;trash;
+Keywords[it]=file;cartelle;esplora risorse;terminale;annulla;cestino;

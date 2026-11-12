@@ -428,20 +428,32 @@ fn spawn_terminal_explains_when_there_is_no_terminal() {
     );
 }
 
-#[test]
-fn repo_entry_file_is_a_valid_desktop_file() {
-    let Ok(out) = Command::new("desktop-file-validate")
-        .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packaging/linux/rada.desktop"))
+/// `desktop-file-validate` on `file`: `None` where the tool is not installed.
+fn validate(file: &Path) -> Option<()> {
+    let out = Command::new("desktop-file-validate")
+        .arg(file)
         .output()
-    else {
-        return;
-    };
+        .ok()?;
     let msg = text(&out);
     // Hints are fine; errors and warnings are not.
     assert!(
         out.status.success() && !msg.contains("error:") && !msg.contains("warning:"),
         "{msg}"
     );
+    Some(())
+}
+
+#[test]
+fn repo_entry_file_is_a_valid_desktop_file() {
+    validate(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packaging/linux/rada.desktop"));
+}
+
+#[test]
+fn the_entry_written_by_setup_is_a_valid_desktop_file() {
+    let sb = Sandbox::new();
+    sb.fake_update_db();
+    assert!(sb.rada(&["setup", "desktop"]).status.success());
+    validate(&sb.p("data/applications/rada.desktop"));
 }
 
 fn put_scalable(sb: &Sandbox, bytes: &[u8]) -> PathBuf {
