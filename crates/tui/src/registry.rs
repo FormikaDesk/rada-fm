@@ -909,7 +909,9 @@ mod tests {
         assert_eq!(sort.text("by"), Some("size"));
         assert!(sort.flag("reverse"));
         assert!(!args_of("sort by=date").flag("reverse"));
-        assert_eq!(args_of("cd ~/src").text("folder"), Some("/home/u/src"));
+        // The home folder with the rest joined the way the system writes a path.
+        let src = Path::new(HOME).join("src").display().to_string();
+        assert_eq!(args_of("cd ~/src").text("folder"), Some(src.as_str()));
         assert_eq!(args_of("cd ~").text("folder"), Some(HOME));
     }
 
