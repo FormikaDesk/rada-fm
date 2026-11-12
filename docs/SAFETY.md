@@ -103,6 +103,14 @@ another name elsewhere is removed as usual, because the contents stay. A copy ma
 rada has no hash recorded and is judged by the fingerprint alone. Read-only folders come back read-only; undo opens a folder
 only for as long as the run needs, and puts its permissions back.
 
+An item the user has no right to take out of its folder (on a Mac, a program the system
+installed in /Applications, owned by root) is named in the **plan** of a move or of the trash,
+before anything is done: moving it needs an administrator's password, and rada never asks for
+one. If it is run anyway, that item fails and the window says in words why: a missing right
+(`EACCES`, which another user such as an administrator has) or a refusal of the system whatever
+the permissions say (`EPERM`: a locked item, one the system protects, a privacy setting).
+*Tests:* `permissions.rs` (core and interface), with a folder of mode 0555 inside a writable one.
+
 A file that changed after the operation is not removed even if it changes after the plan was
 shown: undo looks at it again when it gets to it. *Tests:* `remove_race.rs` replaces the copy
 between the plan and the run, and in the instant before it is removed, and puts a link in its

@@ -282,6 +282,7 @@ mod tests {
                 path: PathBuf::from("x"),
                 attempt: 1,
                 journal: false,
+                denied: None,
             },
             reply,
         }) else {

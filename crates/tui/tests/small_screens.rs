@@ -69,6 +69,7 @@ fn failure(h: &mut H, journal: bool) {
             path: "b".into(),
             attempt: 1,
             journal,
+            denied: None,
         },
         reply,
     });

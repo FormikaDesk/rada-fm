@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **On a narrow terminal the titles of the columns no longer answer a click under the preview drawn over the list.** At 60 columns a click on the preview could sort the list by size.
 - **"Open with" on a very small terminal shows its programs.** Where the card had less room than it asked for it stayed empty; now it shows the title and the programs that fit, and leaves out the box and the note.
 - **Typing in the bar no longer closes the notifications**, as keys typed in a window already did not.
+- **A folder you cannot move is named in the plan, not only when it fails.** Moving or trashing an item you have no right to take out of its folder (on a Mac, a program of the system in /Applications) now gives a warning in the plan; if it is run anyway, the failure says in words what is wrong and what to do (an administrator's password, the system's file manager or the program's uninstaller), and tells a missing right apart from a refusal of the system whatever the permissions say. *Retry*, which cannot help there, comes last and faint.
 
 ## [0.6.1] - 2026-11-05
 

@@ -101,6 +101,14 @@ impl Error {
         }
     }
 
+    /// Why the system refused, when it refused a change for want of a right.
+    pub fn denied(&self) -> Option<Denied> {
+        match self {
+            Error::Io { source, .. } | Error::Io2 { source, .. } => denied_by(source),
+            _ => None,
+        }
+    }
+
     pub fn is_cross_device(&self) -> bool {
         match self {
             Error::CrossDevice(..) => true,
@@ -125,6 +133,33 @@ pub fn is_exdev(e: &io::Error) -> bool {
     {
         let _ = e;
         false
+    }
+}
+
+/// How the system said no to a change: the two are fixed in different ways.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Denied {
+    /// `EACCES`: the permissions of the item or of its folder do not give the right. Another
+    /// user (an administrator) has it.
+    NoRight,
+    /// `EPERM`: the system forbids it whatever the permissions say (a locked item, one
+    /// protected by the system, a privacy setting).
+    NotPermitted,
+}
+
+/// [`Denied`] for an error of the system, `None` for any other error.
+pub fn denied_by(e: &io::Error) -> Option<Denied> {
+    #[cfg(unix)]
+    {
+        match e.raw_os_error() {
+            Some(libc::EACCES) => Some(Denied::NoRight),
+            Some(libc::EPERM) => Some(Denied::NotPermitted),
+            _ => None,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        (e.kind() == io::ErrorKind::PermissionDenied).then_some(Denied::NoRight)
     }
 }
 

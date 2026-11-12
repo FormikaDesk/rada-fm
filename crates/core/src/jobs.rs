@@ -386,6 +386,7 @@ impl Forward {
             path: f.step.path().to_path_buf(),
             attempt: f.attempt,
             journal,
+            denied: f.error.denied(),
         };
         if self
             .out

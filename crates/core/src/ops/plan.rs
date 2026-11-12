@@ -664,6 +664,9 @@ pub enum WarningKind {
     ProgramMissing,
     /// Another program does the writing: rada answers only for the file it publishes.
     ActionProgram,
+    /// Items the user has no right to take out of their folder (a folder of another user,
+    /// such as a program the system installed): moving them will fail.
+    NotMovable,
     Other,
 }
 
@@ -778,6 +781,7 @@ fn message_for(kind: WarningKind, n: u64, detail: Option<&str>) -> String {
         WarningKind::AttributesNotKept => t(WAttributesNotKept).to_string(),
         WarningKind::CannotTag => pl(n, WCannotTagOne, WCannotTagMany, x),
         WarningKind::InvalidName => tf(WInvalidName, &[&x]),
+        WarningKind::NotMovable => pl(n, WNotMovableOne, WNotMovableMany, x),
         WarningKind::Missing => pl(n, WMissingOne, WMissingMany, x),
         WarningKind::Merge => pl(n, WMergeOne, WMergeMany, x),
         WarningKind::ModifiedSince => pl(n, WModifiedSinceOne, WModifiedSinceMany, x),

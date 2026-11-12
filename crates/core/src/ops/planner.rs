@@ -44,6 +44,18 @@ impl TransferOptions {
     }
 }
 
+/// What a plan that takes the items of `scan` as they are (trash, delete) is about.
+fn totals_of(scan: &Scan) -> Totals {
+    let st = scan.stats();
+    Totals {
+        items: scan.roots.len() as u64,
+        files: st.files,
+        dirs: st.dirs,
+        symlinks: st.symlinks,
+        bytes: st.bytes,
+    }
+}
+
 fn summary_of(r: &ScanNode, action: ItemAction) -> ItemSummary {
     let st = r.stats();
     ItemSummary {
@@ -190,6 +202,9 @@ impl Engine {
                 }
             }
         }
+        if opts.mode == TransferMode::Move {
+            self.warn_not_movable(scan, &mut t.ws);
+        }
         if !blocked && !t.ws_has_blocking() {
             for root in &scan.roots {
                 let start = t.steps.len();
@@ -249,6 +264,29 @@ impl Engine {
         plan
     }
 
+    /// Say which of the items selected the user cannot take out of their folder.
+    fn warn_not_movable(&self, scan: &Scan, ws: &mut WarningSet) {
+        for r in &scan.roots {
+            if self.cannot_take_out(&r.path, r.meta.is_dir()) {
+                ws.add(WarningKind::NotMovable, Severity::Warning, Some(&r.path));
+            }
+        }
+    }
+
+    /// Whether taking `path` out of its folder needs a right the user lacks: writing in the
+    /// folder it is in and, for a folder that goes under another one, writing in the folder
+    /// itself (its `..` changes). Only where the permissions say so: on Windows they do not,
+    /// and a phone or a camera has rules of its own.
+    fn cannot_take_out(&self, path: &Path, is_dir: bool) -> bool {
+        if !cfg!(unix) || self.platform.on_device(path) {
+            return false;
+        }
+        let Some(parent) = path.parent() else {
+            return false;
+        };
+        !self.fs.can_write(parent) || (is_dir && !self.fs.can_write(path))
+    }
+
     // ------------------------------------------------------------------ trash / delete
 
     pub fn plan_trash(&self, scan: &Scan) -> Plan {
@@ -259,15 +297,9 @@ impl Engine {
         let mut plan = Plan::empty(OpKind::Trash, title);
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
-        let st = scan.stats();
-        plan.totals = Totals {
-            items: scan.roots.len() as u64,
-            files: st.files,
-            dirs: st.dirs,
-            symlinks: st.symlinks,
-            bytes: st.bytes,
-        };
+        plan.totals = totals_of(scan);
         let selected: Vec<PathBuf> = scan.roots.iter().map(|r| r.path.clone()).collect();
+        self.warn_not_movable(scan, &mut ws);
         for r in &scan.roots {
             if r.path.parent().is_none() {
                 ws.add_with(
@@ -302,14 +334,7 @@ impl Engine {
         let mut ws = WarningSet::default();
         scan_problems(scan, &mut ws);
         ws.add(WarningKind::Irreversible, Severity::Warning, None);
-        let st = scan.stats();
-        plan.totals = Totals {
-            items: scan.roots.len() as u64,
-            files: st.files,
-            dirs: st.dirs,
-            symlinks: st.symlinks,
-            bytes: st.bytes,
-        };
+        plan.totals = totals_of(scan);
         fn walk(n: &ScanNode, steps: &mut Vec<Step>, ws: &mut WarningSet) {
             match n.meta.kind {
                 FileKind::Dir => {

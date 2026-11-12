@@ -2361,6 +2361,11 @@
           "description": "Another program does the writing: rada answers only for the file it publishes.",
           "type": "string",
           "const": "ActionProgram"
+        },
+        {
+          "description": "Items the user has no right to take out of their folder (a folder of another user,\nsuch as a program the system installed): moving them will fail.",
+          "type": "string",
+          "const": "NotMovable"
         }
       ]
     }

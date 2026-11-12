@@ -27,6 +27,7 @@ fn ask(h: &mut H) -> crossbeam_channel::Receiver<ErrorChoice> {
             path: "b".into(),
             attempt: 1,
             journal: true,
+            denied: None,
         },
         reply,
     });

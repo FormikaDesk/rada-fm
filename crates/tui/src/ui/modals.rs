@@ -2,6 +2,7 @@
 //! One window at a time, centred, with everything behind it dimmed.
 
 use rada_core::display;
+use rada_core::error::Denied;
 use rada_core::i18n::{Key, tf};
 use rada_core::journal::{EntryStatus, UndoState};
 use rada_core::ops::RunStatus;
@@ -14,7 +15,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::popup::{Ctx, Tone};
 use super::sheet::{self, Sheet};
-use super::widgets::{SPIN, button, centered, field_parts, pad, pad_left, tail};
+use super::widgets::{SPIN, button, centered, field_parts, key_name, pad, pad_left, tail};
 use crate::app::*;
 use crate::fmt;
 use crate::hits::{Hits, Target};
@@ -554,13 +555,7 @@ fn draw_failure(
         Key::WentWrong.tr()
     };
     let mut body = plain(std::iter::once(info.message.clone()), tw, th.fg(th.error));
-    if info.journal {
-        body.extend(plain(
-            std::iter::once(Key::JournalFailNote.tr().to_string()),
-            tw,
-            th.dim(),
-        ));
-    }
+    body.extend(failure_notes(th, info, tw));
     if info.attempt > 1 {
         let attempt = tf(Key::AttemptN, &[&info.attempt]);
         body.extend(plain(std::iter::once(attempt), tw, th.dim()));
@@ -573,18 +568,48 @@ fn draw_failure(
     let sheet = Sheet {
         title: titled(ctx, Key::ChipError.tr(), Tone::Danger, headline),
         body,
-        buttons: failure_buttons(th, info.journal),
+        buttons: failure_buttons(th, info.journal, info.denied.is_some()),
         after,
         ..Sheet::default()
     };
     sheet::draw(f, th, area, 88, sheet, hits);
 }
 
-fn failure_buttons(th: &Theme, journal: bool) -> Vec<(Span<'static>, Target)> {
+/// What is said under the message of a failure: that the journal could not be written, or in
+/// words what a refusal of the system means and what to do instead.
+fn failure_notes(
+    th: &Theme,
+    info: &rada_core::events::FailureInfo,
+    tw: usize,
+) -> Vec<(Line<'static>, Option<Target>)> {
+    let mut out = Vec::new();
+    if info.journal {
+        let note = Key::JournalFailNote.tr().to_string();
+        out.extend(plain(std::iter::once(note), tw, th.dim()));
+    }
+    let advice = info.denied.map(|d| match d {
+        Denied::NoRight => Key::FailNoRight,
+        Denied::NotPermitted => Key::FailNotPermitted,
+    });
+    let advice = advice.map(|k| k.tr().to_string());
+    out.extend(plain(advice.into_iter(), tw, th.base()));
+    out
+}
+
+/// The buttons of a failure. When the system refused for want of a right, trying again
+/// changes nothing: Retry is still there, last and faint.
+fn failure_buttons(th: &Theme, journal: bool, denied: bool) -> Vec<(Span<'static>, Target)> {
     let keys: Vec<(char, Key, bool)> = if journal {
         vec![
             ('a', Key::BtnAbort, true),
             ('c', Key::BtnContinueNoUndo, false),
+        ]
+    } else if denied {
+        vec![
+            ('s', Key::BtnSkip, true),
+            ('S', Key::BtnSkipAll, false),
+            ('a', Key::BtnAbort, false),
+            ('r', Key::BtnRetry, false),
         ]
     } else {
         vec![
@@ -596,13 +621,12 @@ fn failure_buttons(th: &Theme, journal: bool) -> Vec<(Span<'static>, Target)> {
     };
     keys.into_iter()
         .map(|(c, label, main)| {
-            let span = button(
-                th,
-                &c.to_string(),
-                label.tr(),
-                main.then_some(th.accent),
-                true,
-            );
+            let key = c.to_string();
+            let span = if denied && c == 'r' {
+                Span::styled(format!(" {}  {} ", key_name(&key), label.tr()), th.faint())
+            } else {
+                button(th, &key, label.tr(), main.then_some(th.accent), true)
+            };
             (span, Target::Key(KeyCode::Char(c)))
         })
         .collect()
