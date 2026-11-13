@@ -147,3 +147,21 @@ fn damage_is_reported_at_start_with_the_line_and_the_file() {
         _ => panic!("the damage was not reported"),
     }
 }
+
+/// Two handles on the same journal in one process, beginning in the same millisecond, used to
+/// give their operations the same id: the second record then hid the first.
+#[test]
+fn two_handles_on_one_journal_never_give_the_same_id() {
+    let sb = Sandbox::new();
+    let (j1, j2) = (sb.journal(), sb.journal());
+    let mut ids: Vec<String> = (0..20)
+        .flat_map(|i| {
+            let p = sb.path(format!("f{i}"));
+            [finished(&j1, "one", &p), finished(&j2, "two", &p)]
+        })
+        .collect();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), 40);
+    assert_eq!(j1.entries().unwrap().len(), 40);
+}

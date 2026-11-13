@@ -430,6 +430,14 @@ impl JournalEntry {
     }
 }
 
+/// The id of an operation begun at `ms`. The counter is the process's, not a journal handle's:
+/// two handles on the same file that begin in the same millisecond must not give the same id.
+fn op_id(ms: u128) -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{ms:x}-{:x}-{n}", std::process::id())
+}
+
 struct Writer {
     file: File,
 }
@@ -437,7 +445,6 @@ struct Writer {
 pub struct Journal {
     path: PathBuf,
     writer: Mutex<Writer>,
-    counter: AtomicU64,
     /// The locks of the operations this process is running, by id.
     running: Mutex<HashMap<String, OpLock>>,
     /// The record that is to fail, and how many of its kind are still to be written before it
@@ -537,7 +544,6 @@ impl Journal {
         Ok(Journal {
             path,
             writer: Mutex::new(Writer { file }),
-            counter: AtomicU64::new(0),
             running: Mutex::new(HashMap::new()),
             #[cfg(any(test, feature = "testutil"))]
             fault: Mutex::new(None),
@@ -671,12 +677,11 @@ impl Journal {
         (request, redo_of): (Option<&OpRequest>, Option<&str>),
         undo_limit: Option<UndoLimit>,
     ) -> Result<String> {
-        let n = self.counter.fetch_add(1, Ordering::Relaxed);
         let ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let id = format!("{ms:x}-{:x}-{n}", std::process::id());
+        let id = op_id(ms);
         // Before the record: whoever sees the operation in the file finds its lock taken.
         let lock = self
             .take_lock(&format!("{id}.lock"))?
@@ -1118,5 +1123,13 @@ impl Undo {
             .unwrap_or_else(|| (0..self.steps.len()).collect());
         remaining.retain(|i| !self.done_since.contains(i));
         (self.steps, remaining)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn two_operations_begun_in_the_same_millisecond_get_different_ids() {
+        assert_ne!(super::op_id(5), super::op_id(5));
     }
 }
