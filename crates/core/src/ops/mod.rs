@@ -33,7 +33,7 @@ pub use planner::{TransferMode, TransferOptions};
 pub use programs::Programs;
 pub use recipe::{ProduceSpec, ProducerSpec, ProgramCall, RecipePlan, SubRequest};
 pub use recover::Recovered;
-pub use rename::{Pattern, Preview};
+pub use rename::{Facts, Pattern, Preview, RenamePreview, RenamePreviewer};
 pub use request::{OpRequest, Planned, plan_to_json};
 pub use runner::RunOutcome;
 pub use scan::{LinkState, Scan, ScanControl, ScanNode, ScanProgress};

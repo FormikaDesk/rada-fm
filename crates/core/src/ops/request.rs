@@ -438,7 +438,7 @@ impl Engine {
                     .map_err(Error::Invalid)?
                     .with_counter(counter_start.unwrap_or(1), counter_step.unwrap_or(1));
                 Planned {
-                    plan: self.plan_bulk_rename(items, &p),
+                    plan: self.plan_bulk_rename_with(items, &p, ctl),
                     scan: None,
                     undo: None,
                 }

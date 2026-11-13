@@ -34,7 +34,7 @@ mod video;
 mod worker;
 
 pub use video::Ffprobe;
-pub use worker::{MetaCache, MetaEvent, MetaWorker};
+pub use worker::{MetaCache, MetaEvent, MetaReader, MetaWorker};
 
 /// What a file says about itself. Only the part that fits its kind is ever filled.
 #[derive(Clone, Debug, Default, PartialEq)]

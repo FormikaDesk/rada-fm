@@ -2,6 +2,7 @@
 //! tag, open with; their keys and what each one starts.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::archive::ArchiveKind;
@@ -10,6 +11,7 @@ use rada_core::i18n::Key;
 use rada_core::ops::{ConflictPolicy, ExtractInto, OpRequest, Pattern};
 use rada_core::platform::PathRules;
 
+use super::bulkrename::BulkPreview;
 use super::{App, Modal};
 
 pub enum InputKind {
@@ -20,9 +22,11 @@ pub enum InputKind {
     /// The name of the file to save, when rada is the system's file chooser.
     SaveAs,
     BulkRename {
-        items: Vec<PathBuf>,
+        items: Arc<Vec<PathBuf>>,
         /// The platform's rules, so the preview refuses what the plan will refuse.
         rules: PathRules,
+        /// The new names, made in the background.
+        preview: BulkPreview,
     },
     /// The folder to extract an archive into, named after the archive unless changed.
     ExtractTo {
@@ -152,20 +156,36 @@ impl App {
         if items.is_empty() {
             return;
         }
-        let rules = self.svc.platform.path_rules();
-        self.windows.modal = Some(Modal::Input(InputView::new(
-            InputKind::BulkRename { items, rules },
-            "{name}_{n:2}.{ext}".to_string(),
-        )));
+        let kind = InputKind::BulkRename {
+            items: Arc::new(items),
+            rules: self.svc.platform.path_rules(),
+            preview: BulkPreview::default(),
+        };
+        let mut iv = InputView::new(kind, "{name}_{n:2}.{ext}".to_string());
+        self.ask_bulk_preview(&mut iv);
+        self.windows.modal = Some(Modal::Input(iv));
     }
 
     pub(super) fn on_input_key(&mut self, mut iv: InputView, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let bulk = matches!(iv.kind, InputKind::BulkRename { .. });
         match key.code {
-            KeyCode::Esc => {}
-            KeyCode::Enter if !iv.text.is_empty() => self.submit_input(iv),
+            KeyCode::Esc => {
+                if bulk {
+                    self.svc.renames.stop();
+                }
+            }
+            KeyCode::Enter if !iv.text.is_empty() => match App::bulk_refusal(&iv) {
+                Some(why) => self.reject_input(iv, why),
+                None => self.submit_input(iv),
+            },
+            KeyCode::Char('x') if ctrl && bulk => {
+                self.drop_refused(&mut iv);
+                self.windows.modal = Some(Modal::Input(iv));
+            }
             code => {
                 iv.press(code, ctrl);
+                self.ask_bulk_preview(&mut iv);
                 self.windows.modal = Some(Modal::Input(iv));
             }
         }
@@ -205,6 +225,8 @@ impl App {
                 }
             }
             InputKind::BulkRename { items, .. } => {
+                // The plan reads what it needs itself, through the same cache.
+                self.svc.renames.stop();
                 if let Err(e) = self.submit_bulk_rename(items, &iv.text) {
                     self.reject_input(iv, e);
                 }

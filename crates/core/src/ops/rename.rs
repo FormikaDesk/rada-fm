@@ -6,6 +6,9 @@
 //!   `{ext}`  extension (no dot)
 //!   `{n}`    counter         `{n:3}` zero-padded to 3 digits
 //!   `{parent}` name of the containing folder
+//!   `{exif.date:%Y-%m-%d}`, `{audio.track:02}`, `{pdf.title}`… what the file says about
+//!   itself, `{mtime}` when it was last changed, `{exif.date|mtime}` the first that is there
+//!   (see [`fields`])
 //!   `{{` `}}` literal braces
 //!   `s/find/replace/`  literal search-and-replace on the whole name
 
@@ -18,9 +21,16 @@ use super::engine::Engine;
 use super::names;
 use super::plan::*;
 use super::planner::seen_by_plan;
+use super::scan::ScanControl;
 use crate::fs::Fingerprint;
 use crate::i18n::{Key, tf};
 use crate::platform::PathRules;
+
+mod fields;
+mod preview;
+
+pub use fields::Facts;
+pub use preview::{RenamePreview, RenamePreviewer};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Part {
@@ -29,6 +39,7 @@ enum Part {
     Ext,
     Counter { width: usize },
     Parent,
+    Field(fields::FieldPart),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,6 +77,9 @@ fn parse_token(tok: &str) -> Result<Part, String> {
         Some((h, a)) => (h, Some(a)),
         None => (tok, None),
     };
+    if fields::is_field(head) {
+        return fields::parse(head, arg).map(Part::Field);
+    }
     Ok(match (head, arg) {
         ("name", None) => Part::Name(CaseMode::Keep),
         ("name", Some("lower")) => Part::Name(CaseMode::Lower),
@@ -80,7 +94,7 @@ fn parse_token(tok: &str) -> Result<Part, String> {
     })
 }
 
-fn parse_width(w: &str) -> Result<usize, String> {
+pub(super) fn parse_width(w: &str) -> Result<usize, String> {
     if w.is_empty() || !w.bytes().all(|b| b.is_ascii_digit()) {
         return Err(tf(Key::RenBadWidth, &[&format!("{w:?}")]));
     }
@@ -173,8 +187,19 @@ impl Pattern {
             .ok_or_else(|| Key::RenCounterTooLarge.tr().to_string())
     }
 
-    /// The new name for the `index`-th item.
+    /// The new name for the `index`-th item, knowing nothing of it but its path: a field of
+    /// its metadata is then missing.
     pub fn render(&self, index: usize, path: &Path) -> Result<OsString, String> {
+        self.render_with(index, path, &Facts::default())
+    }
+
+    /// The new name for the `index`-th item, with what is known of it.
+    pub fn render_with(
+        &self,
+        index: usize,
+        path: &Path,
+        facts: &Facts,
+    ) -> Result<OsString, String> {
         let name = path.file_name().ok_or("no file name")?;
         match &self.kind {
             Kind::Replace { find, with } => {
@@ -185,64 +210,191 @@ impl Pattern {
                 Ok(OsString::from(text.replace(find.as_str(), with)))
             }
             Kind::Template(parts) => {
-                let p = Path::new(name);
-                let stem = p.file_stem().unwrap_or(name);
-                let ext = p.extension().unwrap_or(OsStr::new(""));
                 let mut out = OsString::new();
                 for part in parts {
-                    match part {
-                        Part::Lit(s) => out.push(s),
-                        Part::Name(CaseMode::Keep) => out.push(stem),
-                        Part::Name(mode) => match stem.to_str() {
-                            Some(t) => out.push(if *mode == CaseMode::Lower {
-                                t.to_lowercase()
-                            } else {
-                                t.to_uppercase()
-                            }),
-                            None => out.push(stem),
-                        },
-                        Part::Ext => out.push(ext),
-                        Part::Counter { width } => {
-                            let n = self.counter_at(index)?;
-                            out.push(format!("{n:0width$}", width = *width));
-                        }
-                        Part::Parent => {
-                            out.push(
-                                path.parent()
-                                    .and_then(Path::file_name)
-                                    .unwrap_or(OsStr::new("")),
-                            );
-                        }
-                    }
+                    self.push_part(&mut out, part, index, path, facts)?;
                 }
                 Ok(out)
             }
         }
     }
 
-    /// Pure preview (no I/O): safe to call on every keystroke.
+    fn push_part(
+        &self,
+        out: &mut OsString,
+        part: &Part,
+        index: usize,
+        path: &Path,
+        facts: &Facts,
+    ) -> Result<(), String> {
+        let name = Path::new(path.file_name().unwrap_or_default());
+        let stem = name.file_stem().unwrap_or(name.as_os_str());
+        match part {
+            Part::Lit(s) => out.push(s),
+            Part::Name(mode) => match (mode, stem.to_str()) {
+                (CaseMode::Lower, Some(t)) => out.push(t.to_lowercase()),
+                (CaseMode::Upper, Some(t)) => out.push(t.to_uppercase()),
+                _ => out.push(stem),
+            },
+            Part::Ext => out.push(name.extension().unwrap_or(OsStr::new(""))),
+            Part::Counter { width } => {
+                let n = self.counter_at(index)?;
+                out.push(format!("{n:0width$}", width = *width));
+            }
+            Part::Parent => out.push(
+                path.parent()
+                    .and_then(Path::file_name)
+                    .unwrap_or(OsStr::new("")),
+            ),
+            Part::Field(f) => out.push(f.render(facts)?),
+        }
+        Ok(())
+    }
+
+    fn fields(&self) -> impl Iterator<Item = &fields::FieldPart> {
+        let parts = match &self.kind {
+            Kind::Template(parts) => parts.as_slice(),
+            Kind::Replace { .. } => &[],
+        };
+        parts.iter().filter_map(|p| match p {
+            Part::Field(f) => Some(f),
+            _ => None,
+        })
+    }
+
+    /// Whether the names need what the files say about themselves, which takes reading them.
+    pub fn needs_meta(&self) -> bool {
+        self.fields().any(fields::FieldPart::needs_meta)
+    }
+
+    /// Whether the names need the time each item was last changed.
+    pub fn needs_mtime(&self) -> bool {
+        self.fields().any(fields::FieldPart::needs_mtime)
+    }
+
+    /// Pure preview (no I/O), with nothing known of the items but their paths.
     /// `rules` are the platform's, the ones the plan will check the names against.
     pub fn preview(&self, items: &[PathBuf], rules: &PathRules) -> Vec<Preview> {
+        let none = Facts::default();
         items
             .iter()
             .enumerate()
-            .map(|(i, p)| {
-                let to = self
-                    .render(i, p)
-                    .and_then(|n| names::validate(rules, &n).map(|_| n));
-                Preview {
-                    from: p.clone(),
-                    to,
-                }
-            })
+            .map(|(i, p)| self.preview_one(i, p, &none, rules))
             .collect()
+    }
+
+    /// What the `index`-th item would be called, or why it cannot be.
+    pub fn preview_one(
+        &self,
+        index: usize,
+        path: &Path,
+        facts: &Facts,
+        rules: &PathRules,
+    ) -> Preview {
+        let to = self
+            .render_with(index, path, facts)
+            .and_then(|n| names::validate(rules, &n).map(|_| n));
+        Preview {
+            from: path.to_path_buf(),
+            to,
+        }
     }
 }
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+type Pairs = (
+    Vec<(PathBuf, PathBuf)>,
+    HashMap<PathBuf, Option<Fingerprint>>,
+);
+
+impl Engine {
+    /// The new name of each item, and each item as the plan saw it. The fingerprint is taken
+    /// before the file is read for its metadata: a file changed after that is refused when
+    /// the plan runs.
+    fn rename_pairs(
+        &self,
+        items: &[PathBuf],
+        pattern: &Pattern,
+        rules: &PathRules,
+        ws: &mut WarningSet,
+        mut ctl: ScanControl<'_>,
+    ) -> Pairs {
+        let mut pairs = Vec::new();
+        let mut looked = HashMap::new();
+        for (i, from) in items.iter().enumerate() {
+            if ctl.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let Ok(meta) = self.fs.lstat(from) else {
+                ws.add(WarningKind::Missing, Severity::Blocking, Some(from));
+                continue;
+            };
+            looked.insert(from.clone(), seen_by_plan(from, &meta, items));
+            let facts = self.facts_of(i, from, meta.mtime, pattern, &mut ctl);
+            match pattern.preview_one(i, from, &facts, rules).to {
+                Ok(new) if from.with_file_name(&new) != *from => {
+                    pairs.push((from.clone(), from.with_file_name(new)))
+                }
+                Ok(_) => {}
+                Err(why) => ws.add_with(
+                    WarningKind::InvalidName,
+                    Severity::Blocking,
+                    Some(from),
+                    Some(why),
+                ),
+            }
+        }
+        (pairs, looked)
+    }
+
+    /// What the pattern needs to know of `path`, and no more: a file is only read when a field
+    /// of its metadata is in the pattern.
+    fn facts_of(
+        &self,
+        index: usize,
+        path: &Path,
+        mtime: Option<std::time::SystemTime>,
+        pattern: &Pattern,
+        ctl: &mut ScanControl<'_>,
+    ) -> Facts {
+        let cancel = ctl.cancel;
+        let stop = || cancel.load(Ordering::Relaxed);
+        let meta = pattern.needs_meta().then(|| {
+            let read = self.meta.read(path, &stop).1;
+            (ctl.progress)(&super::scan::ScanProgress {
+                files: index as u64 + 1,
+                dirs: 0,
+                bytes: 0,
+                current: path.to_path_buf(),
+            });
+            read
+        });
+        Facts {
+            meta,
+            mtime: mtime.filter(|_| pattern.needs_mtime()),
+        }
+    }
+}
+
 impl Engine {
     pub fn plan_bulk_rename(&self, items: &[PathBuf], pattern: &Pattern) -> Plan {
+        let never = std::sync::atomic::AtomicBool::new(false);
+        let ctl = ScanControl {
+            cancel: &never,
+            progress: &mut |_| {},
+        };
+        self.plan_bulk_rename_with(items, pattern, ctl)
+    }
+
+    /// [`plan_bulk_rename`](Self::plan_bulk_rename), saying how far the reading of the files'
+    /// metadata is and giving it up when `ctl` says so (the plan is then not to be used).
+    pub fn plan_bulk_rename_with(
+        &self,
+        items: &[PathBuf],
+        pattern: &Pattern,
+        ctl: ScanControl<'_>,
+    ) -> Plan {
         let mut plan = Plan::empty(
             OpKind::BulkRename,
             crate::i18n::tf(
@@ -269,32 +421,7 @@ impl Engine {
                 .collect()
         };
 
-        let mut pairs: Vec<(PathBuf, PathBuf)> = Vec::new();
-        let mut looked: HashMap<PathBuf, Option<Fingerprint>> = HashMap::new();
-        for (i, from) in items.iter().enumerate() {
-            let Ok(meta) = self.fs.lstat(from) else {
-                ws.add(WarningKind::Missing, Severity::Blocking, Some(from));
-                continue;
-            };
-            looked.insert(from.clone(), seen_by_plan(from, &meta, items));
-            match pattern
-                .render(i, from)
-                .and_then(|n| names::validate(&rules, &n).map(|_| n))
-            {
-                Ok(new) => {
-                    let to = from.with_file_name(new);
-                    if to != *from {
-                        pairs.push((from.clone(), to));
-                    }
-                }
-                Err(why) => ws.add_with(
-                    WarningKind::InvalidName,
-                    Severity::Blocking,
-                    Some(from),
-                    Some(why),
-                ),
-            }
-        }
+        let (pairs, looked) = self.rename_pairs(items, pattern, &rules, &mut ws, ctl);
 
         let sources: HashSet<Vec<OsString>> = pairs.iter().map(|(f, _)| key(f)).collect();
         let mut seen: HashMap<Vec<OsString>, &PathBuf> = HashMap::new();
@@ -409,6 +536,23 @@ mod tests {
         assert_eq!(r("{parent}-{n}", 1, "/x/v1.2/file.txt"), "v1.2-2");
         assert_eq!(r("{{literal}}", 0, "/x/f"), "{literal}");
         assert_eq!(r("s/IMG_/Photo_/", 0, "/x/IMG_001.jpg"), "Photo_001.jpg");
+    }
+
+    #[test]
+    fn a_pattern_says_whether_the_files_have_to_be_read() {
+        let p = Pattern::parse("{exif.date|mtime:%Y-%m-%d}_{n:3}.{ext}").unwrap();
+        assert!(p.needs_meta() && p.needs_mtime());
+        let p = Pattern::parse("{mtime:%Y}_{name}").unwrap();
+        assert!(!p.needs_meta() && p.needs_mtime());
+        let p = Pattern::parse("{name}_{n}").unwrap();
+        assert!(!p.needs_meta() && !p.needs_mtime());
+        assert!(!Pattern::parse("s/{exif.date}/x/").unwrap().needs_meta());
+        // Knowing nothing of the file, its field is missing.
+        let p = Pattern::parse("{audio.title}.{ext}").unwrap();
+        let e = p.render(0, Path::new("/x/a.mp3")).unwrap_err();
+        assert!(e.contains("{audio.title}"), "{e}");
+        assert!(Pattern::parse("{name|mtime}").is_err());
+        assert!(Pattern::parse("{exif.date:%B}").is_err());
     }
 
     #[test]

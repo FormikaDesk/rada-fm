@@ -114,6 +114,11 @@ strings! {
     RenWidthRange => "the width in {n:W} must be between 1 and {0} (got {1})", "la larghezza in {n:W} deve essere tra 1 e {0} (trovato {1})";
     RenCounterTooLarge => "the counter is too large for this item: it would pass the biggest number it can hold", "il contatore è troppo grande per questo elemento: supererebbe il numero più alto che può contenere";
     TitleBulkRename => "Rename {0}", "Rinomina {0}";
+    RenUnknownField => "unknown field {0} (exif.date, exif.time, exif.camera, exif.place, audio.artist, audio.title, audio.album, audio.track, audio.year, pdf.title, pdf.author, video.duration, mtime)", "campo sconosciuto {0} (exif.date, exif.time, exif.camera, exif.place, audio.artist, audio.title, audio.album, audio.track, audio.year, pdf.title, pdf.author, video.duration, mtime)";
+    RenMixedFields => "{0} and {1} cannot stand in for each other: one is a date, a number, a length or a text and the other is not", "{0} e {1} non possono sostituirsi: uno è una data, un numero, una durata o un testo e l'altro no";
+    RenNoFormat => "{0} takes no format after ':'", "{0} non vuole un formato dopo ':'";
+    RenBadClock => "bad date format {0}: use %Y %y %m %d %H %M %S %j and %%", "formato di data non valido {0}: usa %Y %y %m %d %H %M %S %j e %%";
+    RenNoValue => "no value for {0}", "nessun valore per {0}";
     TitleUndo => "Undo: {0}", "Annulla: {0}";
     TitleMkdir => "Create folder {0}", "Crea la cartella {0}";
     TitleMkfile => "Create file {0}", "Crea il file {0}";
@@ -611,6 +616,9 @@ strings! {
     InExtractHint => "Into a folder named (the archive's folder if the name is unchanged and it has one at its top)", "In una cartella chiamata (quella dell'archivio se il nome non cambia e ne ha una in cima)";
     InArchiveHint => "Archive name — Tab changes the format: {0}", "Nome dell'archivio — Tab cambia il formato: {0}";
     InBulkHint => "Pattern:  {name} {ext} {n} {n:3} {parent} {name:lower}   or   s/find/replace/", "Modello:  {name} {ext} {n} {n:3} {parent} {name:lower}   oppure   s/cerca/sostituisci/";
+    InBulkReading => "Reading metadata… {0}/{1}", "Lettura dei metadati… {0}/{1}";
+    InBulkRefused => "Not renamable: {0} · change the pattern, or Ctrl+X takes them out", "Non rinominabili: {0} · correggi il modello, oppure Ctrl+X li toglie";
+    InBulkNoneLeft => "no item could be renamed with this pattern: change it", "nessun elemento si potrebbe rinominare con questo modello: correggilo";
     BtnPlan => "Plan", "Piano";
     ChipHistory => "History", "Cronologia";
     ReadingJournal => "{0} reading the journal…", "{0} leggo il registro…";
@@ -753,6 +761,7 @@ strings! {
     // ---- the status bar and the key hints
     HRun => "run", "esegui";
     HCancel => "cancel", "chiudi";
+    HTakeOut => "take out", "togli";
     HOk => "ok", "ok";
     HGo => "go", "vai";
     HClose => "close", "chiudi";

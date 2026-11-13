@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use common::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rada_core::testutil::*;
-use rada_tui::app::Modal;
+use rada_tui::app::{InputKind, Modal};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
@@ -229,6 +229,13 @@ fn rename_asks_for_a_plan_and_bulk_rename_previews_names() {
     h.app
         .on_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL)); // mark all
     h.keys("R");
+    h.wait("the preview of the names", |a| match &a.windows.modal {
+        Some(Modal::Input(iv)) => match &iv.kind {
+            InputKind::BulkRename { preview, .. } => preview.ready_for(&iv.text),
+            _ => false,
+        },
+        _ => false,
+    });
     let s = h.screen();
     assert!(
         s.contains("Bulk rename") && s.contains("→"),

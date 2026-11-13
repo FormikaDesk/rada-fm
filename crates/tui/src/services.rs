@@ -12,8 +12,8 @@ use rada_core::fs::FsEngine;
 use rada_core::git::Git;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
-use rada_core::meta::{MetaLimits, MetaTools, MetaWorker};
-use rada_core::ops::Engine;
+use rada_core::meta::{MetaLimits, MetaReader, MetaTools, MetaWorker};
+use rada_core::ops::{Engine, RenamePreviewer};
 use rada_core::places::{PlacesStore, standard_places, with_extra_places};
 use rada_core::platform::Platform;
 use rada_core::watch::DirWatcher;
@@ -32,6 +32,9 @@ pub struct Services {
     /// Reads what the file under the cursor says about itself (EXIF, tags, a video's length).
     /// It runs no program until [`with_meta`](Services::with_meta) says which.
     pub meta: MetaWorker,
+    /// Makes the preview of a bulk rename, reading the files through the same cache as
+    /// [`meta`](Services::meta) and the plans.
+    pub renames: RenamePreviewer,
     /// Whether and how far folders are counted (off until [`with_folder_sizes`] says).
     ///
     /// [`with_folder_sizes`]: Services::with_folder_sizes
@@ -116,7 +119,8 @@ impl Services {
             .with_archive_limits(archive_limits)
             .with_programs(programs);
         let journal_ok = journal.is_some();
-        let jobs = Jobs::new(engine, journal.map(Arc::new), tx.clone());
+        let reader = MetaReader::new(MetaTools::none(), MetaLimits::default());
+        let jobs = Jobs::new(engine, journal.map(Arc::new), tx.clone()).with_meta(reader.clone());
         // Operations a killed process left half done are settled before anything new runs.
         jobs.recover_on_start();
         Services {
@@ -125,7 +129,8 @@ impl Services {
             parent_loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn_with(fs.clone(), Some(platform.clone()), tx.clone()),
             sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
-            meta: MetaWorker::spawn(MetaTools::none(), MetaLimits::default(), tx.clone()),
+            meta: MetaWorker::spawn_with(reader.clone(), tx.clone()),
+            renames: RenamePreviewer::spawn(reader, tx.clone()),
             size_settings: SizeSettings {
                 mode: SizeMode::Off,
                 ..SizeSettings::default()
@@ -182,7 +187,10 @@ impl Services {
 
     /// Read metadata with these programs (`ffprobe`, for videos).
     pub fn with_meta(mut self, tools: MetaTools) -> Services {
-        self.meta = MetaWorker::spawn(tools, MetaLimits::default(), self.notes.clone());
+        let reader = MetaReader::new(tools, MetaLimits::default());
+        self.jobs = self.jobs.with_meta(reader.clone());
+        self.meta = MetaWorker::spawn_with(reader.clone(), self.notes.clone());
+        self.renames = RenamePreviewer::spawn(reader, self.notes.clone());
         self
     }
 

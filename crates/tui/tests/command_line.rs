@@ -162,6 +162,26 @@ fn rename_with_a_pattern_renames_what_is_selected_through_a_plan() {
 }
 
 #[test]
+fn rename_takes_the_fields_of_the_files_and_their_fallbacks() {
+    let (sb, dir) = scene();
+    let photo = rada_core::testmedia::jpeg(&[rada_core::testmedia::exif_segment()]);
+    std::fs::write(dir.join("sub/img_001.jpg"), photo).unwrap();
+    let mut h = H::new(sb, dir.join("sub"), 120, 32);
+    ready(&mut h);
+    h.press("ctrl+a");
+    run(&mut h, "rename {exif.date|mtime:%Y}_{name}.{ext}");
+    plan_modal(&mut h);
+    run_plan_and_wait(&mut h);
+    let year = jiff::Zoned::now().year();
+    assert!(dir.join("sub/2024_img_001.jpg").exists());
+    let x = |y: i16| dir.join(format!("sub/{y}_img_x.jpg")).exists();
+    assert!(
+        x(year) || x(year - 1),
+        "the time of the last change stands in"
+    );
+}
+
+#[test]
 fn sort_takes_a_key_and_an_option() {
     let mut h = harness();
     ready(&mut h);

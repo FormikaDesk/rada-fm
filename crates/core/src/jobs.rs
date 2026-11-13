@@ -75,6 +75,12 @@ impl Jobs {
             });
     }
 
+    /// Plans read metadata through `reader` (a bulk rename by date or by artist).
+    pub fn with_meta(mut self, reader: crate::meta::MetaReader) -> Jobs {
+        self.engine = self.engine.with_meta(reader);
+        self
+    }
+
     pub fn has_journal(&self) -> bool {
         self.journal.is_some()
     }

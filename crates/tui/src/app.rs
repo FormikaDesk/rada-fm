@@ -255,6 +255,7 @@ mod actions;
 mod address;
 mod archives;
 mod bar;
+mod bulkrename;
 mod chooser;
 mod clean;
 mod cmdline;
@@ -496,6 +497,7 @@ impl App {
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
             CoreEvent::Meta(m) => self.on_meta_event(m),
+            CoreEvent::RenamePreview(p) => self.on_rename_preview(p),
             CoreEvent::Update(u) => self.on_update_event(u),
             CoreEvent::Ejected {
                 mount,

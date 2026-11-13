@@ -207,6 +207,8 @@ pub enum CoreEvent {
     Size(crate::foldersize::SizeEvent),
     /// What a file says about itself (EXIF, tags, a PDF's title…), read in the background.
     Meta(crate::meta::MetaEvent),
+    /// The preview of a bulk rename, made in the background (it may read the files).
+    RenamePreview(crate::ops::RenamePreview),
     /// The update worker: a newer version, progress, the end.
     Update(crate::update::UpdateEvent),
     /// The font offered at the first start was installed (a sentence to show), or why not.

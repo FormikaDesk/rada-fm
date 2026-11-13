@@ -80,6 +80,33 @@ In the plan window: `Enter` runs, `c` changes how name conflicts are resolved (s
 
 Renaming to a name that already exists opens the same plan. *Skip* is the default and changes nothing; *keep both* uses the next free `name (1).ext`; *overwrite* sends the old item to the trash first, so `Ctrl+Z` brings everything back. Only a file can replace a file, and a folder an empty folder. Bulk rename still refuses name conflicts.
 
+### Bulk rename
+
+`R` with the vim keys (in the classic ones, *Rename many* in the menu or in the bar) renames what is selected with a **pattern**. Under the field, the new name of each item as you type, made in the background; the plan comes with `Enter`.
+
+| in the pattern | becomes |
+|---|---|
+| `{name}`, `{name:lower}`, `{name:upper}` | the name without its extension |
+| `{ext}` | the extension, without the dot |
+| `{n}`, `{n:3}` | a counter, from 1, here padded to 3 digits |
+| `{parent}` | the name of the folder the item is in |
+| `{mtime}`, `{mtime:%Y-%m-%d}` | when the item was last changed |
+| `{exif.date:%Y-%m-%d}`, `{exif.time:%H%M%S}` | when a photo was taken, as the camera's clock said |
+| `{exif.camera}`, `{exif.place}` | the camera; the place written in the photo |
+| `{audio.artist}`, `{audio.title}`, `{audio.album}`, `{audio.year}`, `{audio.track:02}` | the tags of a song |
+| `{pdf.title}`, `{pdf.author}` | what a PDF says of itself |
+| `{video.duration}` | the length of a video (`45s`, `4m05s`, `1h02m03s`), only when `ffprobe` is installed |
+| `{{`, `}}` | a brace |
+| `s/find/replace/` (the whole pattern) | the name with every *find* replaced |
+
+A date takes `%Y` `%y` `%m` `%d` `%H` `%M` `%S` `%j` and `%%` (all digits, which every system accepts in a name); without a format a date is `2024-05-01` and a time `143005`. A number takes the width it is padded to. A text from the file has what no system accepts in a name (`/ \ : * ? " < > |`) put as `_`: an artist *AC/DC* gives `AC_DC`, never a folder.
+
+After `|` comes what to use when the file does not say: `{exif.date|mtime:%Y-%m-%d}` is the day the photo was taken, or the day the file was last changed. The fields after `|` must be of the same kind (dates with dates, texts with texts).
+
+When the pattern needs what files say about themselves, they are read first, with the same limits as the details pane, and the window says *Reading metadata… 12/40*; `Esc` closes it and stops the reading. An item that does not have the field, and has nothing after `|` that it has, is marked with the reason (*✖ no value for {exif.date}*), and `Enter` starts no plan while there is one: change the pattern, or press `Ctrl+X` to take the marked items out of the rename. The plan checks everything again, as for any rename: names the system accepts, two items that would get the same name, a name already taken, a change of case only, and each item compared at the last moment with what the plan saw.
+
+**`{exif.place}` is often empty.** It is the place the photo names (XMP or IPTC, written by some cameras and by photo programs); a phone usually writes only coordinates, and rada does not turn coordinates into a place. Give it a fallback (`{exif.place|exif.camera}`) or take those items out.
+
 The **history of operations** (`F3`, `U` with the vim keys) lists every operation of the journal, newest first; `Enter` undoes the one chosen. Beside each one that can still be undone there is a mark, worked out in the background when the window opens (the rows in view first):
 
 - **● can undo**: every step was recorded, and what it left is as it left it;
@@ -124,7 +151,7 @@ With the vim keys, `:` opens the bar with a colon already written: the **command
 | command | what it does |
 |---|---|
 | `:mkdir name` | a new folder here (also `:new_folder`) |
-| `:rename pattern` | renames what is selected, or the item under the cursor, with a pattern of the bulk rename (`{name}_{n:3}.{ext}`) |
+| `:rename pattern` | renames what is selected, or the item under the cursor, with a pattern of the [bulk rename](#bulk-rename) (`{name}_{n:3}.{ext}`, `{exif.date\|mtime:%Y-%m-%d}_{n:2}.{ext}`) |
 | `:sort name\|size\|date\|type [--reverse]` | the order of the list |
 | `:cd folder` | goes to a folder; relative to the one shown, `~` is home |
 | `:find text` | searches by name in this folder and the ones below, as `Ctrl+Enter` does in the bar; a text between slashes is a regular expression (`:find /^img_\d+/`), which the bar alone would take for a path |

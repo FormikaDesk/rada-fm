@@ -3,6 +3,7 @@ use std::sync::Arc;
 use super::programs::Programs;
 use crate::archive::ArchiveLimits;
 use crate::fs::{FsEngine, LocalFs};
+use crate::meta::MetaReader;
 use crate::platform::Platform;
 
 /// Everything an operation needs from the outside world.
@@ -14,6 +15,9 @@ pub struct Engine {
     pub archive_limits: ArchiveLimits,
     /// The programs the configuration names for actions, over the built-in table.
     pub programs: Programs,
+    /// What files say about themselves, for a bulk rename that names them by it. It runs no
+    /// program until [`with_meta`](Self::with_meta) gives one.
+    pub meta: MetaReader,
 }
 
 impl Engine {
@@ -23,6 +27,7 @@ impl Engine {
             platform,
             archive_limits: ArchiveLimits::default(),
             programs: Programs::default(),
+            meta: MetaReader::default(),
         }
     }
 
@@ -33,6 +38,7 @@ impl Engine {
             platform,
             archive_limits: ArchiveLimits::default(),
             programs: Programs::default(),
+            meta: MetaReader::default(),
         }
     }
 
@@ -43,6 +49,11 @@ impl Engine {
 
     pub fn with_programs(mut self, programs: Programs) -> Self {
         self.programs = programs;
+        self
+    }
+
+    pub fn with_meta(mut self, meta: MetaReader) -> Self {
+        self.meta = meta;
         self
     }
 }

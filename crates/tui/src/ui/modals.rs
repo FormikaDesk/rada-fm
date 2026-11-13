@@ -668,26 +668,46 @@ fn input_texts(kind: &InputKind) -> (&'static str, String) {
     }
 }
 
-/// What a bulk rename would do to the first names: from, and to (or the problem).
+/// What a bulk rename would do to the first names: from, and to (or the problem). The rows
+/// are made in the background; until they come, those of the pattern before stay.
 fn input_preview(iv: &InputView) -> Vec<(String, String)> {
-    match &iv.kind {
-        InputKind::BulkRename { items, rules } => match rada_core::ops::Pattern::parse(&iv.text) {
-            Ok(p) => p
-                .preview(items, rules)
-                .into_iter()
-                .take(12)
-                .map(|pv| {
-                    let from = pv.from.file_name().map(display::name).unwrap_or_default();
-                    let to = match pv.to {
-                        Ok(n) => display::name(&n),
-                        Err(e) => format!("✖ {e}"),
-                    };
-                    (from, to)
-                })
-                .collect(),
-            Err(_) => Vec::new(),
-        },
-        _ => Vec::new(),
+    let InputKind::BulkRename { preview, .. } = &iv.kind else {
+        return Vec::new();
+    };
+    if rada_core::ops::Pattern::parse(&iv.text).is_err() {
+        return Vec::new();
+    }
+    preview
+        .rows
+        .iter()
+        .take(12)
+        .map(|pv| {
+            let from = pv.from.file_name().map(display::name).unwrap_or_default();
+            let to = match &pv.to {
+                Ok(n) => display::name(n),
+                Err(e) => format!("✖ {e}"),
+            };
+            (from, to)
+        })
+        .collect()
+}
+
+/// Under the field of a bulk rename, when the pattern is good: how far the reading of the
+/// files is, or how many items cannot be renamed and how to take them out.
+fn bulk_state(th: &Theme, iv: &InputView) -> Option<Span<'static>> {
+    let InputKind::BulkRename { preview, .. } = &iv.kind else {
+        return None;
+    };
+    if let Some((done, total)) = preview.reading {
+        let text = tf(Key::InBulkReading, &[&done, &total]);
+        return Some(Span::styled(text, th.dim()));
+    }
+    match preview.refused_now(&iv.text) {
+        0 => None,
+        n => Some(Span::styled(
+            format!("✖ {}", tf(Key::InBulkRefused, &[&n])),
+            th.fg(th.error),
+        )),
     }
 }
 
@@ -714,7 +734,7 @@ fn input_lead(th: &Theme, iv: &InputView, hint: &str, w: usize) -> Vec<Line<'sta
         ]),
         match problem {
             Some(e) => Line::from(Span::styled(format!("✖ {e}"), th.fg(th.error))),
-            None => Line::raw(""),
+            None => bulk_state(th, iv).map_or_else(|| Line::raw(""), Line::from),
         },
     ]
 }

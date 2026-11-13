@@ -15,7 +15,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::soft::{self, Look};
 use super::widgets::{Bar, key_name, segment_bar};
-use crate::app::{App, BarMode, Modal};
+use crate::app::{App, BarMode, InputKind, Modal};
 use crate::fmt;
 use crate::hits::Target;
 use crate::icons::{self, Glyph};
@@ -61,10 +61,18 @@ fn hints(app: &App) -> Vec<Hint> {
                 Hint::fixed("Enter", Key::HRun),
                 Hint::fixed("Esc", Key::HCancel),
             ],
-            Modal::Input(_) => vec![
-                Hint::fixed("Enter", Key::HOk),
-                Hint::fixed("Esc", Key::HCancel),
-            ],
+            Modal::Input(iv) => {
+                let mut h = vec![
+                    Hint::fixed("Enter", Key::HOk),
+                    Hint::fixed("Esc", Key::HCancel),
+                ];
+                if let InputKind::BulkRename { preview, .. } = &iv.kind
+                    && preview.refused_now(&iv.text) > 0
+                {
+                    h.push(Hint::fixed("Ctrl+X", Key::HTakeOut));
+                }
+                h
+            }
             Modal::Palette(_) => vec![
                 Hint::fixed("Enter", Key::HGo),
                 Hint::fixed("Esc", Key::HClose),
