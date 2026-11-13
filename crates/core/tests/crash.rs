@@ -147,7 +147,8 @@ fn crash_at(point: &str, mv: bool) -> Outcome {
         .spawn()
         .unwrap();
     let end = Instant::now() + Duration::from_secs(60);
-    while !marker.exists() && Instant::now() < end {
+    // The child makes the file before it writes the word in it: wait for the word.
+    while std::fs::read(&marker).map_or(true, |b| b.is_empty()) && Instant::now() < end {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert_eq!(

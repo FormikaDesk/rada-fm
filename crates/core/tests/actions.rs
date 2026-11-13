@@ -754,7 +754,8 @@ fn killed_at(point: &str) -> (Scene, Recovered) {
         .spawn()
         .unwrap();
     let end = std::time::Instant::now() + Duration::from_secs(60);
-    while !marker.exists() && std::time::Instant::now() < end {
+    // The child makes the file before it writes the word in it: wait for the word.
+    while std::fs::read(&marker).map_or(true, |b| b.is_empty()) && std::time::Instant::now() < end {
         std::thread::sleep(Duration::from_millis(10));
     }
     let reached = std::fs::read(&marker).unwrap_or_default();
