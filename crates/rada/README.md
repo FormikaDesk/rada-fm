@@ -25,7 +25,7 @@ Binaries are on the [releases page](https://github.com/formikadesk/rada-fm/relea
 **Linux** (x86_64 and aarch64, static):
 
 ```sh
-v=0.6.1; n="rada-$v-$(uname -m)-unknown-linux-musl"
+v=0.7.0-rc.1; n="rada-$v-$(uname -m)-unknown-linux-musl"
 curl -fLO "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.tar.gz"
 tar xzf "$n.tar.gz" && mkdir -p ~/.local/bin && install -m 755 "$n/rada" ~/.local/bin/rada
 rada --version      # not found? add ~/.local/bin to your PATH: docs/install.md#linux
@@ -34,7 +34,7 @@ rada --version      # not found? add ~/.local/bin to your PATH: docs/install.md#
 **macOS** (Apple silicon; for an Intel Mac, `x86_64-apple-darwin`):
 
 ```sh
-v=0.6.1; n="rada-$v-aarch64-apple-darwin"
+v=0.7.0-rc.1; n="rada-$v-aarch64-apple-darwin"
 curl -fLO "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.tar.gz"
 tar xzf "$n.tar.gz" && mkdir -p ~/.local/bin && install -m 755 "$n/rada" ~/.local/bin/rada
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # then open a new terminal; rada --version
@@ -43,7 +43,7 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc    # then open a new ter
 **Windows** (x86_64, PowerShell; [Windows Terminal](https://aka.ms/terminal) recommended):
 
 ```powershell
-$v = "0.6.1"; $n = "rada-$v-x86_64-pc-windows-msvc"; $d = "$env:LOCALAPPDATA\Programs\rada"
+$v = "0.7.0-rc.1"; $n = "rada-$v-x86_64-pc-windows-msvc"; $d = "$env:LOCALAPPDATA\Programs\rada"
 Invoke-WebRequest "https://github.com/formikadesk/rada-fm/releases/download/v$v/$n.zip" -OutFile "$env:TEMP\$n.zip"
 Expand-Archive -Force "$env:TEMP\$n.zip" "$env:TEMP\rada-unpacked"; New-Item -ItemType Directory -Force $d | Out-Null; Copy-Item -Force "$env:TEMP\rada-unpacked\$n\rada.exe" $d
 [Environment]::SetEnvironmentVariable("Path", ([Environment]::GetEnvironmentVariable("Path", "User") + ";$d"), "User")   # then open a new terminal; rada --version

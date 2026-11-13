@@ -2353,7 +2353,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rada"
-version = "0.6.1"
+version = "0.7.0-rc.1"
 dependencies = [
  "anstream",
  "anyhow",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "rada-core"
-version = "0.6.1"
+version = "0.7.0-rc.1"
 dependencies = [
  "bzip2",
  "chardetng",
@@ -2428,7 +2428,7 @@ dependencies = [
 
 [[package]]
 name = "rada-lua"
-version = "0.6.1"
+version = "0.7.0-rc.1"
 dependencies = [
  "crossbeam-channel",
  "mlua",
@@ -2440,7 +2440,7 @@ dependencies = [
 
 [[package]]
 name = "rada-tui"
-version = "0.6.1"
+version = "0.7.0-rc.1"
 dependencies = [
  "crossbeam-channel",
  "crossterm",

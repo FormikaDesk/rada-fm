@@ -4,7 +4,7 @@ rada looks for a newer version **at most once a day**, in a background worker th
 
 When one exists you see it twice: a pill in the accent colour in the tab bar, **↑ Update to X**, and the status bar, **New version X available — press Alt+U to update** (click either). `U` is the history of operations in the vim keys, so the update has `Alt+U`. A window shows the release notes first; `Enter` updates, `Esc` leaves it for later.
 
-The status bar always shows the version that is running, **v0.6.1 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
+The status bar always shows the version that is running, **v0.7.0-rc.1 ⟳**: a click asks the network right away (whatever the day's check said) and answers *rada is up to date* or opens the notes. The **Help ▾** button of the tab bar is a menu with the keys, *Check for updates* and *About rada* (the version, the channel it follows, how it would be updated and where the program is). From the command line:
 
 ```sh
 rada update --check     # only say whether a newer version exists, and what is in it
