@@ -20,6 +20,7 @@ pub mod ops;
 pub mod pathcodec;
 pub mod places;
 pub mod platform;
+pub mod plugin;
 pub mod preview;
 pub mod recents;
 pub mod schema;

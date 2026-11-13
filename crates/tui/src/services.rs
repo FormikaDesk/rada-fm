@@ -10,6 +10,7 @@ use rada_core::events::CoreEvent;
 use rada_core::foldersize::{SizeMode, SizeSettings, SizeWorker};
 use rada_core::fs::FsEngine;
 use rada_core::git::Git;
+use rada_core::i18n::{Key, tf};
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
 use rada_core::meta::{MetaLimits, MetaReader, MetaTools, MetaWorker};
@@ -35,6 +36,11 @@ pub struct Services {
     /// Makes the preview of a bulk rename, reading the files through the same cache as
     /// [`meta`](Services::meta) and the plans.
     pub renames: RenamePreviewer,
+    /// The reader behind [`meta`](Services::meta) and [`renames`](Services::renames), for
+    /// whatever else reads metadata through the same cache (the recipes' `rada.meta`).
+    pub meta_reader: MetaReader,
+    /// The recipes: none until [`with_plugins`](Services::with_plugins) gives a host.
+    pub plugins: Option<Arc<dyn rada_core::plugin::PluginHost>>,
     /// Whether and how far folders are counted (off until [`with_folder_sizes`] says).
     ///
     /// [`with_folder_sizes`]: Services::with_folder_sizes
@@ -130,7 +136,9 @@ impl Services {
             previewer: PreviewWorker::spawn_with(fs.clone(), Some(platform.clone()), tx.clone()),
             sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
             meta: MetaWorker::spawn_with(reader.clone(), tx.clone()),
-            renames: RenamePreviewer::spawn(reader, tx.clone()),
+            renames: RenamePreviewer::spawn(reader.clone(), tx.clone()),
+            meta_reader: reader,
+            plugins: None,
             size_settings: SizeSettings {
                 mode: SizeMode::Off,
                 ..SizeSettings::default()
@@ -190,7 +198,33 @@ impl Services {
         let reader = MetaReader::new(tools, MetaLimits::default());
         self.jobs = self.jobs.with_meta(reader.clone());
         self.meta = MetaWorker::spawn_with(reader.clone(), self.notes.clone());
-        self.renames = RenamePreviewer::spawn(reader, self.notes.clone());
+        self.renames = RenamePreviewer::spawn(reader.clone(), self.notes.clone());
+        self.meta_reader = reader;
+        self
+    }
+
+    /// The recipes, and what could not be read of them: each problem is a notice with its
+    /// file and line once the interface is up, and rada goes on without that file.
+    pub fn with_plugins(
+        mut self,
+        host: Arc<dyn rada_core::plugin::PluginHost>,
+        problems: &[rada_core::plugin::LoadProblem],
+    ) -> Services {
+        for problem in problems {
+            tracing::warn!("recipe not loaded: {problem}");
+        }
+        let notice = match problems {
+            [] => None,
+            [one] => Some(tf(Key::RecipeNotLoaded, &[&one.to_string()])),
+            many => Some(tf(
+                Key::RecipesNotLoaded,
+                &[&many.len().to_string(), &many[0].to_string()],
+            )),
+        };
+        if let Some(text) = notice {
+            let _ = self.notes.send(CoreEvent::Note { text, error: true });
+        }
+        self.plugins = Some(host);
         self
     }
 
@@ -205,5 +239,81 @@ impl Services {
     pub fn with_updates(mut self, ctx: rada_core::update::Ctx) -> Services {
         self.updater = Some(rada_core::update::Updater::spawn(ctx, self.notes.clone()));
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rada_core::i18n::{Lang, with_lang};
+    use rada_core::plugin::{
+        ArgValues, Cancel, LoadProblem, PluginHost, RecipeContext, RecipeError, RecipeInfo,
+    };
+
+    /// A host with no recipes: the interface only knows the trait.
+    struct Empty;
+
+    impl PluginHost for Empty {
+        fn load(&self) -> Vec<LoadProblem> {
+            Vec::new()
+        }
+        fn recipes(&self, _: &RecipeContext) -> Vec<RecipeInfo> {
+            Vec::new()
+        }
+        fn run(
+            &self,
+            name: &str,
+            _: &RecipeContext,
+            _: &ArgValues,
+            _: &Cancel,
+        ) -> Result<rada_core::ops::RecipePlan, RecipeError> {
+            Err(RecipeError::Unknown(name.to_string()))
+        }
+    }
+
+    fn note(svc: &Services) -> String {
+        loop {
+            match svc.events.recv_timeout(Duration::from_secs(10)) {
+                Ok(CoreEvent::Note { text, error: true }) => return text,
+                Ok(_) => continue,
+                Err(e) => panic!("no notice: {e}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_recipe_that_could_not_be_read_is_a_notice_with_its_file_and_line() {
+        let sb = rada_core::testutil::Sandbox::new();
+        let problem = |n: u32| LoadProblem {
+            file: sb.path(format!("recipes/bad{n}.lua")),
+            line: Some(3),
+            message: "attempt to call a nil value".into(),
+        };
+        let start = || {
+            let fs: Arc<dyn FsEngine> = Arc::new(rada_core::fs::LocalFs);
+            Services::start_for(
+                fs,
+                sb.platform(),
+                None,
+                ArchiveLimits::default(),
+                Default::default(),
+            )
+        };
+        with_lang(Lang::En, || {
+            let svc = start().with_plugins(Arc::new(Empty), &[problem(1)]);
+            assert!(svc.plugins.is_some());
+            let text = note(&svc);
+            assert!(text.starts_with("Recipe not loaded: "), "{text}");
+            assert!(
+                text.contains("bad1.lua:3: attempt to call a nil value"),
+                "{text}"
+            );
+        });
+        with_lang(Lang::It, || {
+            let svc = start().with_plugins(Arc::new(Empty), &[problem(1), problem(2)]);
+            let text = note(&svc);
+            assert!(text.starts_with("2 problemi nelle ricette"), "{text}");
+            assert!(text.contains("bad1.lua:3:"), "{text}");
+        });
     }
 }

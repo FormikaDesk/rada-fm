@@ -3,12 +3,13 @@
 A map of the code for someone opening the repository for the first time. For build and test
 commands see [development.md](development.md); for the safety rules see [SAFETY.md](SAFETY.md).
 
-## The three crates
+## The four crates
 
 | Crate | What it does |
 |---|---|
 | `crates/core` (`rada-core`) | Everything that is not a screen. The file model, the plan → execute → journal → undo engine, the background workers, the platform layer. Depends on no interface. |
 | `crates/tui` (`rada-tui`) | The terminal interface (ratatui + crossterm). `App` holds the state, `ui/` draws it, `run.rs` is the event loop. Never changes a file itself: it asks `rada-core`. |
+| `crates/lua` (`rada-lua`) | The recipes: Lua 5.4 (mlua, built in), in a fresh closed state for each task, with limits on instructions, memory and time. A recipe can only look (`rada.list`, `rada.stat`, `rada.meta`, `rada.has`) and ask: its requests become a `RecipePlan`, planned like any other request. Implements `rada_core::plugin::PluginHost`; `rada-tui` never depends on it. |
 | `crates/rada` (`rada`) | The binary. Parses the command line and `config.toml`, detects the terminal, builds `Config` and `Services`, calls `rada_tui::run::run`. Also the installers: desktop entry, shell hook, fonts, `Rada.app`, Windows folder setup. |
 
 ## Main flow

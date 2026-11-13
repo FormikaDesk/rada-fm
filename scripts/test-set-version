@@ -11,12 +11,12 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-mkdir -p "$tmp/scripts" "$tmp/docs" "$tmp/crates/rada" "$tmp/crates/core" "$tmp/crates/tui"
+mkdir -p "$tmp/scripts" "$tmp/docs" "$tmp/crates/rada" "$tmp/crates/core" "$tmp/crates/tui" "$tmp/crates/lua"
 cp "$root/scripts/set-version.sh" "$tmp/scripts/"
 cp "$root/Cargo.toml" "$root/Cargo.lock" "$root/README.md" "$tmp/"
 cp "$root/docs/install.md" "$root/docs/platforms.md" "$root/docs/updates.md" "$root/docs/verify.md" "$tmp/docs/"
 cp "$root/crates/rada/README.md" "$tmp/crates/rada/"
-for c in rada core tui; do cp "$root/crates/$c/Cargo.toml" "$tmp/crates/$c/"; done
+for c in rada core tui lua; do cp "$root/crates/$c/Cargo.toml" "$tmp/crates/$c/"; done
 set_version="$tmp/scripts/set-version.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -38,7 +38,7 @@ expect_untouched_and_moved_to() {
     for c in not-ours rada-lookalike; do
         [[ "$(locked "$c")" == "$current" ]] || fail "$c was changed in Cargo.lock: $(locked "$c")"
     done
-    for c in rada rada-core rada-tui; do
+    for c in rada rada-core rada-tui rada-lua; do
         [[ "$(locked "$c")" == "$1" ]] || fail "$c is not at $1 in Cargo.lock: $(locked "$c")"
     done
     grep -qF "thirdparty = { version = \"=$current\" }" "$tmp/Cargo.toml" || fail "a dependency of Cargo.toml was changed"

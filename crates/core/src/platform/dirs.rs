@@ -76,6 +76,11 @@ impl Dirs {
         self.config.join("rada")
     }
 
+    /// The person's recipes, `*.lua` files read at startup.
+    pub fn recipes_dir(&self) -> PathBuf {
+        self.rada_config().join("recipes")
+    }
+
     pub fn rada_cache(&self) -> PathBuf {
         self.cache.join("rada")
     }

@@ -171,6 +171,10 @@ struct Cli {
     #[arg(long)]
     no_mouse: bool,
 
+    /// Start without recipes: no Lua runs, built in or from the recipes folder.
+    #[arg(long)]
+    no_lua: bool,
+
     /// Key bindings: `vim+classic` (default), `vim` or `classic`.
     #[arg(long, value_name = "PRESET")]
     keymap: Option<String>,
@@ -746,8 +750,10 @@ fn start_services(
     let programs = rada_core::ops::Programs::new(cfg_file.recipe_programs.clone());
     let limits = cfg_file.archive_limits;
     let meta = rada_core::meta::MetaTools::with_programs(programs.clone());
-    let services = Services::start_for(fs, platform, journal, limits, programs)
-        .with_meta(meta)
+    let services =
+        Services::start_for(fs, platform, journal, limits, programs.clone()).with_meta(meta);
+    let lua_on = cfg_file.lua && !cli.no_lua && cli.demo.is_none();
+    let services = with_recipes(services, lua_on, programs, dirs)
         .with_folder_sizes(cfg_file.folder_size_settings()?)
         // A demo scene must not depend on, or change, the folders the person goes to.
         .with_zoxide(rada_core::zoxide::Zoxide::new(
@@ -774,6 +780,37 @@ fn start_services(
             }
         }
     })
+}
+
+/// The recipes, when rada was built with Lua and they are not turned off.
+#[cfg(feature = "lua")]
+fn with_recipes(
+    services: Services,
+    on: bool,
+    programs: rada_core::ops::Programs,
+    dirs: &Dirs,
+) -> Services {
+    use rada_core::plugin::PluginHost;
+    if !on {
+        return services;
+    }
+    let tools = rada_lua::Tools {
+        programs,
+        meta: Some(services.meta_reader.clone()),
+    };
+    let host = rada_lua::LuaHost::new(tools).with_user_dir(dirs.recipes_dir());
+    let problems = host.load();
+    services.with_plugins(Arc::new(host), &problems)
+}
+
+#[cfg(not(feature = "lua"))]
+fn with_recipes(
+    services: Services,
+    _on: bool,
+    _programs: rada_core::ops::Programs,
+    _dirs: &Dirs,
+) -> Services {
+    services
 }
 
 struct ViewPrefs {

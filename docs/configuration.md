@@ -61,6 +61,10 @@ programs = { qpdf = "/opt/qpdf/bin/qpdf" }   # the file an action runs for a pro
                       # is not on the PATH or is not one rada knows; a whole path. Shells and
                       # interpreters are refused (see SAFETY.md, "Actions that run another program")
 
+[lua]
+enabled = true        # false: no recipes, neither those built in nor the *.lua files of the recipes
+                      # folder (`recipes/` next to this file). `--no-lua` does the same for one start
+
 [devices]
 hide = ["tmpfs", "fuse.*", "/boot", "/boot/*"]   # replaces the built-in list of mounts kept out of the
                       # disks: a name is a filesystem type (`fuse.*` a prefix), `/path` a mount point,

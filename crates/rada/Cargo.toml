@@ -16,9 +16,15 @@ include = ["/src/**", "/assets/**", "/build.rs", "/Cargo.toml", "/README.md", "/
 [lints]
 workspace = true
 
+[features]
+default = ["lua"]
+# Recipes written in Lua (the rada-lua crate). Without it rada has no recipes and no Lua at all.
+lua = ["dep:rada-lua"]
+
 [dependencies]
 rada-core = { workspace = true }
 rada-tui = { workspace = true }
+rada-lua = { workspace = true, optional = true }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 # What clap itself prints with: colours only where the terminal takes them.

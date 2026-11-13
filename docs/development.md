@@ -6,6 +6,7 @@ A Cargo workspace:
 
 - `crates/core` — filesystem model, the plan/execute/undo engine, journal, watcher, workers, platform layer. No dependency on any interface.
 - `crates/tui` — the interface (ratatui + crossterm).
+- `crates/lua` — the recipes: a closed Lua 5.4 that can only look at files and ask for a plan. The interface knows it only through the `PluginHost` trait of `rada-core`; `cargo build -p rada --no-default-features` builds rada without it.
 - `crates/rada` — the `rada` binary.
 
 Every operation is expressed as a list of atomic **steps** (`MakeDir`, `CopyFile`, `CopySymlink`, `ExtractFile`, `Compress`, `Rename`, `TrashItem`, `RemoveFile`, …). A step knows its own inverse, so the same machinery plans, executes, journals and undoes. Everything that depends on the operating system sits behind one `Platform` trait (trash, volumes, file attributes, opening files, path rules); the engine never branches on the OS. The trait models what Windows needs (drive letters, NTFS junctions and reparse points, hidden/system attributes, the Recycle Bin). Linux is complete; Windows and macOS are a pre-release: trash, volumes, standard folders and opening files are implemented and tested in CI, and carrying attributes over (ACLs, alternate data streams, resource forks) is not done. See [platforms.md](platforms.md).

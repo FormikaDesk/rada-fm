@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/tui", "crates/rada"]
+members = ["crates/core", "crates/tui", "crates/lua", "crates/rada"]
 # The fuzz targets have a workspace of their own (cargo-fuzz, rust nightly).
 exclude = ["fuzz"]
 
@@ -19,6 +19,7 @@ homepage = "https://github.com/formikadesk/rada-fm"
 [workspace.dependencies]
 rada-core = { path = "crates/core", version = "=0.6.1" }
 rada-tui = { path = "crates/tui", version = "=0.6.1" }
+rada-lua = { path = "crates/lua", version = "=0.6.1" }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

@@ -80,6 +80,11 @@
 //!                            # name, when it is not on the PATH or is not one rada knows.
 //!                            # A whole path; shells and interpreters are refused
 //!
+//! [lua]
+//! enabled = true             # false: no recipes, built in or the person's (`--no-lua` does the
+//!                            # same for one start). The person's are the *.lua files of the
+//!                            # recipes folder next to this file
+//!
 //! [devices]
 //! hide = ["tmpfs", "/boot"]   # replaces the built-in list of mounts kept out of the disks
 //!                               # (a name is a filesystem type, `fuse.*` a prefix of types;
@@ -120,6 +125,8 @@ pub struct FileConfig {
     pub archive_limits: ArchiveLimits,
     /// `[recipes] programs`: the file to run for a program's name.
     pub recipe_programs: std::collections::BTreeMap<String, std::path::PathBuf>,
+    /// `[lua] enabled`: recipes are read and offered (when rada was built with them).
+    pub lua: bool,
     pub archive_preview_entries: usize,
     pub archive_preview_seconds: f32,
     pub mouse: bool,
@@ -251,6 +258,11 @@ struct RecipesRaw {
 }
 
 #[derive(Deserialize, Default)]
+struct LuaRaw {
+    enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
 struct DevicesRaw {
     hide: Option<Vec<String>>,
 }
@@ -296,6 +308,7 @@ struct Raw {
     git_path: Option<String>,
     devices: Option<DevicesRaw>,
     recipes: Option<RecipesRaw>,
+    lua: Option<LuaRaw>,
     archives: Option<ArchivesRaw>,
     update: Option<UpdateRaw>,
     keymap: Option<String>,
@@ -337,6 +350,7 @@ pub fn load(dirs: &Dirs) -> FileConfig {
             source_dir: update.source_dir,
         },
         recipe_programs: raw.recipes.and_then(|r| r.programs).unwrap_or_default(),
+        lua: raw.lua.and_then(|l| l.enabled).unwrap_or(true),
         archive_limits: ArchiveLimits {
             max_total_bytes: archives
                 .max_extract_gb
@@ -428,6 +442,13 @@ pub fn load(dirs: &Dirs) -> FileConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recipes_are_on_unless_the_lua_section_says_no() {
+        assert!(with_config("").lua);
+        assert!(with_config("[lua]\nenabled = true\n").lua);
+        assert!(!with_config("[lua]\nenabled = false\n").lua);
+    }
 
     fn with_config(text: &str) -> FileConfig {
         let root = tempfile::tempdir().unwrap();

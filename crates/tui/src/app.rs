@@ -512,6 +512,8 @@ impl App {
                 always,
             } => self.on_open_choices(path, kind, apps, always),
             CoreEvent::Note { text, error } => self.on_note(text, error),
+            // Nothing in the interface starts a recipe yet.
+            CoreEvent::Recipe(r) => tracing::debug!("recipe {} done", r.recipe),
         }
     }
 

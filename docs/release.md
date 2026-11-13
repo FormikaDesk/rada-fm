@@ -62,17 +62,18 @@ Nothing is published by the workflow. A release that stays a draft is invisible 
    not check signatures: that one step is covered by the hash only. From `rc.9` on, every update
    is checked.)
 
-7. Publish the crates on crates.io, after the release is signed and checked. The three crates
+7. Publish the crates on crates.io, after the release is signed and checked. The four crates
    depend on each other by exact version (`=x.y.z`, in `[workspace.dependencies]`), so the order
-   matters: `rada-core`, then `rada-tui`, then `rada`. Each one is looked for in the index when
+   matters: `rada-core`, then `rada-tui` and `rada-lua`, then `rada`. Each one is looked for in the index when
    the next is verified, so wait until the previous one shows up (a minute or two).
 
    ```sh
    cargo login                              # once, with a token that can publish; never in the repository
-   cargo package --workspace --locked       # dry run of all three, with each other's packages
+   cargo package --workspace --locked       # dry run of all four, with each other's packages
    cargo publish --locked -p rada-core
    cargo publish --locked -p rada-tui       # when `cargo info rada-core` shows the new version
-   cargo publish --locked -p rada           # likewise for rada-tui
+   cargo publish --locked -p rada-lua       # likewise
+   cargo publish --locked -p rada           # when rada-tui and rada-lua show it
    ```
 
    A published version cannot be replaced or deleted, only yanked (`cargo yank --version x.y.z

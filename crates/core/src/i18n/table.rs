@@ -125,6 +125,11 @@ strings! {
     TitleChecksum => "Write the checksum of {0}", "Scrivi il checksum di {0}";
     TitleProduce => "Make {0} with {1}", "Crea {0} con {1}";
     TitleRecipe => "Run the recipe {0}", "Esegui la ricetta {0}";
+    RecipeNeedsAtLeast => "choose at least {0} items", "scegli almeno {0} elementi";
+    RecipeNeedsOne => "for one file at a time", "per un file alla volta";
+    RecipeNeedsAtMost => "for at most {0} items", "per al massimo {0} elementi";
+    RecipeNotLoaded => "Recipe not loaded: {0}", "Ricetta non caricata: {0}";
+    RecipesNotLoaded => "{0} recipe problems (see the log); the first: {1}", "{0} problemi nelle ricette (vedi il log); il primo: {1}";
     TitleExtract => "Extract {0}", "Estrai {0}";
     TitleExtractTo => "Extract {0} to {1}", "Estrai {0} in {1}";
     TitleExtractFrom => "Extract {0} from {1} to {2}", "Estrai {0} da {1} in {2}";

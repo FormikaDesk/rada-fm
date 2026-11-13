@@ -1,0 +1,28 @@
+[package]
+name = "rada-lua"
+description = "Lua recipes for rada, a terminal file manager: a closed Lua 5.4 that can only ask for plans (no stable API)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["lua", "file-manager", "recipes", "sandbox"]
+categories = ["filesystem"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE"]
+
+[lints]
+workspace = true
+
+[dependencies]
+rada-core = { workspace = true }
+mlua = { version = "0.12", default-features = false, features = ["lua54", "vendored"] }
+regex = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+rada-core = { workspace = true, features = ["testutil"] }
+tempfile = "3"
+crossbeam-channel = "0.5"
