@@ -13,6 +13,7 @@ pub mod health;
 pub mod i18n;
 pub mod jobs;
 pub mod journal;
+pub mod meta;
 pub mod model;
 pub mod oplock;
 pub mod ops;
@@ -36,6 +37,8 @@ pub mod zoxide;
 pub use error::{Error, Result};
 pub use view::ViewKind;
 
+#[cfg(any(test, feature = "testutil"))]
+pub mod testmedia;
 #[cfg(any(test, feature = "testutil"))]
 pub mod testplatform;
 #[cfg(any(test, feature = "testutil"))]

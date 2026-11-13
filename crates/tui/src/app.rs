@@ -269,6 +269,8 @@ mod listing;
 mod load;
 mod menus;
 mod menuview;
+mod meta;
+pub(crate) use meta::rows as meta_rows;
 mod mount;
 mod mouse;
 mod navigate;
@@ -493,6 +495,7 @@ impl App {
             CoreEvent::Tree { dir, hidden, kids } => self.on_tree(dir, hidden, kids),
             CoreEvent::Zoxide { query, dirs } => self.on_zoxide(query, dirs),
             CoreEvent::Size(s) => self.on_size_event(s),
+            CoreEvent::Meta(m) => self.on_meta_event(m),
             CoreEvent::Update(u) => self.on_update_event(u),
             CoreEvent::Ejected {
                 mount,

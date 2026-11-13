@@ -1,0 +1,9 @@
+---
+source: crates/tui/tests/file_meta.rs
+expression: section(&screen)
+---
+ Metadata
+ Taken       2024-05-01 14:30:05
+ Camera      Canon EOS R6
+ Place       Roma, Italia
+ GPS         41.90278, 12.48389

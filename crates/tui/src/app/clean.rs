@@ -7,6 +7,7 @@
 
 use rada_core::display::{block, text};
 use rada_core::events::{CoreEvent, FailureInfo, JobEvent, PreviewEvent, WatchEvent};
+use rada_core::meta::MetaEvent;
 use rada_core::ops::{ExecReport, FailedStep, Recovered};
 use rada_core::platform::{OpenApp, Unmounted, Volume};
 use rada_core::preview::{ImagePreview, ImageState, Preview};
@@ -42,8 +43,29 @@ pub(super) fn clean(ev: CoreEvent) -> CoreEvent {
             p.names.values_mut().for_each(|n| *n = text(n));
             CoreEvent::Paths(p)
         }
+        CoreEvent::Meta(m) => CoreEvent::Meta(meta(m)),
         other => devices(other),
     }
+}
+
+/// What a file says about itself: the reader cleaned it already, and cleaning twice changes
+/// nothing; done here too so that no text of a worker reaches a window uncleaned.
+fn meta(mut ev: MetaEvent) -> MetaEvent {
+    let mut m = (*ev.meta).clone();
+    let fields = [
+        &mut m.exif.camera,
+        &mut m.exif.place,
+        &mut m.audio.artist,
+        &mut m.audio.title,
+        &mut m.audio.album,
+        &mut m.pdf.title,
+        &mut m.pdf.author,
+    ];
+    for s in fields.into_iter().flatten() {
+        *s = text(s);
+    }
+    ev.meta = std::sync::Arc::new(m);
+    ev
 }
 
 /// The disks, the phones and the programs that open a file.

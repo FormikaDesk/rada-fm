@@ -205,6 +205,8 @@ pub enum CoreEvent {
     },
     /// The size of a folder on screen, counted in the background.
     Size(crate::foldersize::SizeEvent),
+    /// What a file says about itself (EXIF, tags, a PDF's title…), read in the background.
+    Meta(crate::meta::MetaEvent),
     /// The update worker: a newer version, progress, the end.
     Update(crate::update::UpdateEvent),
     /// The font offered at the first start was installed (a sentence to show), or why not.

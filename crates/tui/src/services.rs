@@ -12,6 +12,7 @@ use rada_core::fs::FsEngine;
 use rada_core::git::Git;
 use rada_core::jobs::Jobs;
 use rada_core::journal::Journal;
+use rada_core::meta::{MetaLimits, MetaTools, MetaWorker};
 use rada_core::ops::Engine;
 use rada_core::places::{PlacesStore, standard_places, with_extra_places};
 use rada_core::platform::Platform;
@@ -28,6 +29,9 @@ pub struct Services {
     pub previewer: PreviewWorker,
     /// Counts the size of the folders on screen.
     pub sizes: SizeWorker,
+    /// Reads what the file under the cursor says about itself (EXIF, tags, a video's length).
+    /// It runs no program until [`with_meta`](Services::with_meta) says which.
+    pub meta: MetaWorker,
     /// Whether and how far folders are counted (off until [`with_folder_sizes`] says).
     ///
     /// [`with_folder_sizes`]: Services::with_folder_sizes
@@ -121,6 +125,7 @@ impl Services {
             parent_loader: DirLoader::spawn(fs.clone(), platform.clone(), tx.clone()),
             previewer: PreviewWorker::spawn_with(fs.clone(), Some(platform.clone()), tx.clone()),
             sizes: SizeWorker::spawn(fs.clone(), tx.clone()),
+            meta: MetaWorker::spawn(MetaTools::none(), MetaLimits::default(), tx.clone()),
             size_settings: SizeSettings {
                 mode: SizeMode::Off,
                 ..SizeSettings::default()
@@ -172,6 +177,12 @@ impl Services {
     /// Use zoxide as the configuration says.
     pub fn with_zoxide(mut self, zoxide: Zoxide) -> Services {
         self.zoxide = zoxide;
+        self
+    }
+
+    /// Read metadata with these programs (`ffprobe`, for videos).
+    pub fn with_meta(mut self, tools: MetaTools) -> Services {
+        self.meta = MetaWorker::spawn(tools, MetaLimits::default(), self.notes.clone());
         self
     }
 

@@ -118,6 +118,10 @@ fn properties(app: &App) -> Vec<(Key, String)> {
             },
         ));
     }
+    if let Some(m) = app.meta_of(e) {
+        let has_dimensions = rows.iter().any(|(k, _)| *k == Key::PropDimensions);
+        rows.extend(crate::app::meta_rows(m, has_dimensions));
+    }
     rows
 }
 
@@ -246,6 +250,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Below the header: the preview, the buttons, then the properties, with a blank row
     // between each and one more under the last property, before the status bar.
+    app.want_meta(&e);
     let mut props = properties(app);
     let quick_look = app.quick_look_available();
     let fixed_top = HEADER_ROWS;
@@ -272,6 +277,13 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         (n, preview_h) = fit(buttons_h);
     }
     props.truncate(n);
+    // A heading with nothing under it says nothing.
+    if props
+        .last()
+        .is_some_and(|(k, _)| *k == Key::PropMetaHeading)
+    {
+        props.pop();
+    }
     let props_h = props.len() as u16;
 
     if preview_h >= 3 {
@@ -361,6 +373,13 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|(k, v)| {
             let room = w.saturating_sub(KEY_W);
+            if *k == Key::PropMetaHeading {
+                let heading = display::truncate(k.tr(), w);
+                return Line::from(Span::styled(
+                    heading,
+                    th.base().add_modifier(Modifier::BOLD),
+                ));
+            }
             let mut spans = vec![Span::styled(format!("{:<KEY_W$}", k.tr()), th.dim())];
             if *k == Key::PropTags {
                 // A dot in each tag's colour, then its name; what does not fit is cut.

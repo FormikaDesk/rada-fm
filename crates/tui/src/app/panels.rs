@@ -27,6 +27,8 @@ pub struct FolderInfo {
     pub(super) git_busy: Option<Instant>,
     /// What is known of the size of folders (see `sizes.rs`).
     pub(crate) sizes: super::sizes::Sizes,
+    /// What the file under the cursor says about itself (see `meta.rs`).
+    pub(crate) meta: super::meta::FileMeta,
     /// Date strings of the visible rows, worked out once and kept until the folder, the
     /// clock's hour or the style changes.
     pub(super) date_cache: Vec<Option<String>>,

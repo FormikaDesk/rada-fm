@@ -35,6 +35,8 @@ macro_rules! strings {
 /// test lets stay a copy.
 #[cfg(test)]
 pub(super) const SAME_IN_BOTH: &[Key] = &[
+    Key::PropGps,
+    Key::PropAlbum,
     Key::Markdown,
     Key::FileOne,
     Key::TagViewTitle,
@@ -374,6 +376,16 @@ strings! {
     PropLocation => "Location", "Posizione";
     PropPermissions => "Permissions", "Permessi";
     PropAttributes => "Attributes", "Attributi";
+    PropMetaHeading => "Metadata", "Metadati";
+    PropTaken => "Taken", "Scattata";
+    PropCamera => "Camera", "Fotocamera";
+    PropPlace => "Place", "Luogo";
+    PropGps => "GPS", "GPS";
+    PropArtist => "Artist", "Artista";
+    PropAlbum => "Album", "Album";
+    PropTrack => "Track", "Traccia";
+    PropYear => "Year", "Anno";
+    PropDuration => "Duration", "Durata";
     PageOne => "1 page", "1 pagina";
     PageMany => "{0} pages", "{0} pagine";
     PagesUnknown => "unknown", "sconosciute";
