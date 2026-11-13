@@ -457,6 +457,19 @@
           "const": "out"
         },
         {
+          "description": "This text with the file this program is to write right after it, as one argument: for\na program that takes its output as `-sOutputFile=<file>` (Ghostscript).",
+          "type": "object",
+          "properties": {
+            "out_after": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "out_after"
+          ]
+        },
+        {
           "description": "The folder the programs work in, for one that names its output by itself.",
           "type": "string",
           "const": "out_dir"

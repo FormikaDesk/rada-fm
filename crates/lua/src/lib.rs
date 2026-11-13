@@ -85,6 +85,15 @@ impl Default for Limits {
     }
 }
 
+macro_rules! builtin {
+    ($file:literal) => {
+        Builtin {
+            file: $file,
+            text: include_str!(concat!("../recipes/", $file)),
+        }
+    };
+}
+
 /// A recipe file built into rada.
 #[derive(Clone, Copy, Debug)]
 pub struct Builtin {
@@ -92,6 +101,19 @@ pub struct Builtin {
     pub file: &'static str,
     pub text: &'static str,
 }
+
+/// The recipes built into rada, written with the same API as the person's.
+pub const BUILTINS: &[Builtin] = &[
+    builtin!("merge-pdf.lua"),
+    builtin!("extract-pages.lua"),
+    builtin!("rotate-pages.lua"),
+    builtin!("compress-pdf.lua"),
+    builtin!("convert-image.lua"),
+    builtin!("resize-image.lua"),
+    builtin!("extract-audio.lua"),
+    builtin!("document-to-pdf.lua"),
+    builtin!("sha256.lua"),
+];
 
 /// The text of a file, as it was read when the recipes were loaded: a run uses that text,
 /// not what the file says by then.
@@ -264,23 +286,37 @@ impl LuaHost {
         ctx: &RecipeContext,
     ) -> Option<Availability> {
         let fits = defs::fits(&def.when, ctx)?;
-        if fits != Availability::Available || !def.asks {
+        if !def.asks {
             return Some(fits);
         }
+        // Asked even when too few files are chosen: a recipe whose program is missing must
+        // not be offered as one that only needs another file.
+        match (self.ask_available(source, def, ctx)?, fits) {
+            (Availability::Available, fits) => Some(fits),
+            (disabled, _) => Some(disabled),
+        }
+    }
+
+    /// What `available` answers; `None` hides the recipe.
+    fn ask_available(
+        &self,
+        source: &Source,
+        def: &RecipeDef,
+        ctx: &RecipeContext,
+    ) -> Option<Availability> {
         let s = match self.session(source, Mode::Check, &Cancel::new()) {
             Ok(s) => s,
             Err((e, stopped)) => {
-                return Some(Availability::Disabled(
-                    errors::recipe_error(&e, stopped, &source.name).to_string(),
-                ));
+                let why = errors::recipe_error(&e, stopped, &source.name).to_string();
+                return Some(Availability::Disabled(why));
             }
         };
-        let answer = call_available(&s, def, ctx);
-        match answer {
+        match call_available(&s, def, ctx) {
             Ok(a) => a,
-            Err(e) => Some(Availability::Disabled(
-                errors::recipe_error(&e, s.guard.stopped(), &source.name).to_string(),
-            )),
+            Err(e) => {
+                let why = errors::recipe_error(&e, s.guard.stopped(), &source.name).to_string();
+                Some(Availability::Disabled(why))
+            }
         }
     }
 

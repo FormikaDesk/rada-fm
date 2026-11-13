@@ -11,7 +11,7 @@ homepage.workspace = true
 readme = "README.md"
 keywords = ["lua", "file-manager", "recipes", "sandbox"]
 categories = ["filesystem"]
-include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE"]
+include = ["/src/**", "/recipes/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [lints]
 workspace = true
@@ -26,3 +26,9 @@ tracing = "0.1"
 rada-core = { workspace = true, features = ["testutil"] }
 tempfile = "3"
 crossbeam-channel = "0.5"
+
+# The built-in recipes run to the end: the test binary is also the stand-in for the programs
+# they call, so it has a main of its own.
+[[test]]
+name = "builtins"
+harness = false

@@ -74,6 +74,11 @@ impl Layout<'_> {
                         .into(),
                 ),
                 Arg::Out => args.push(out.into()),
+                Arg::OutAfter(text) => {
+                    let mut joined = OsString::from(text);
+                    joined.push(out);
+                    args.push(joined);
+                }
                 Arg::OutDir => args.push(self.work.into()),
                 Arg::ProfileUrl => args.push(profile_option(self.work).into()),
             }

@@ -51,7 +51,14 @@ fn tokens(lua: &Lua, rada: &Table) -> mlua::Result<()> {
         t.raw_set("n", n)?;
         Ok(t)
     })?;
-    rada.raw_set("input", input)
+    rada.raw_set("input", input)?;
+    let out_after = lua.create_function(|lua, text: mlua::LuaString| {
+        let t = lua.create_table()?;
+        t.raw_set("rada_arg", "out_after")?;
+        t.raw_set("text", text)?;
+        Ok(t)
+    })?;
+    rada.raw_set("out_after", out_after)
 }
 
 /// Add `request` to the plan, if this is a run and there is room.
@@ -307,6 +314,13 @@ fn token(lua: &Lua, t: &Table) -> mlua::Result<Arg> {
         Some("outdir") => Arg::OutDir,
         Some("prev") => Arg::Prev,
         Some("profile") => Arg::ProfileUrl,
+        Some("out_after") => {
+            let text: mlua::LuaString = t.raw_get("text")?;
+            let text = text
+                .to_str()
+                .map_err(|_| fail(lua, "rada.out_after takes Unicode text"))?;
+            Arg::OutAfter(text.to_string())
+        }
         Some("input") => {
             let n: i64 = t.raw_get("n")?;
             Arg::Input(usize::try_from(n - 1).map_err(|_| fail(lua, "rada.input counts from 1"))?)

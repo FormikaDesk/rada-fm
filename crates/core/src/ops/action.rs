@@ -78,6 +78,9 @@ pub enum Arg {
     Prev,
     /// The file this program is to write.
     Out,
+    /// This text with the file this program is to write right after it, as one argument: for
+    /// a program that takes its output as `-sOutputFile=<file>` (Ghostscript).
+    OutAfter(String),
     /// The folder the programs work in, for one that names its output by itself.
     OutDir,
     /// LibreOffice's option for a profile of its own inside the work folder, so that it
@@ -147,6 +150,10 @@ fn check_command(
 ) -> Result<(), String> {
     let name = &command.program.name;
     let has = |arg: &Arg| command.args.contains(arg);
+    let writes = command
+        .args
+        .iter()
+        .any(|a| matches!(a, Arg::Out | Arg::OutAfter(_)));
     if let Some(n) = command.args.iter().find_map(|a| match a {
         Arg::Input(n) if *n >= inputs => Some(*n),
         _ => None,
@@ -160,7 +167,7 @@ fn check_command(
     if by_itself && !has(&Arg::OutDir) {
         return Err(format!("{name} is not told the folder to write in"));
     }
-    if !by_itself && !has(&Arg::Out) {
+    if !by_itself && !writes {
         return Err(format!("{name} is not told the file to write"));
     }
     Ok(())
@@ -192,6 +199,8 @@ mod tests {
         assert!(check_chain(&no_out, &Collect::Exact, 1).is_err());
         let single = Collect::Single { ext: "pdf".into() };
         assert!(check_chain(&no_out, &single, 1).is_err());
+        let after = [command(vec![Arg::OutAfter("-o=".into()), Arg::Input(0)])];
+        assert!(check_chain(&after, &Collect::Exact, 1).is_ok());
         let dir = [command(vec![Arg::OutDir, Arg::Input(0)])];
         assert!(check_chain(&dir, &single, 1).is_ok());
     }

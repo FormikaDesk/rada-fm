@@ -177,16 +177,31 @@ fn fixed_places(name: &str, os: Os) -> Vec<PathBuf> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Programs {
     overrides: BTreeMap<String, PathBuf>,
+    /// Looked in instead of the process's `PATH`.
+    path: Option<std::ffi::OsString>,
 }
 
 impl Programs {
     pub fn new(overrides: BTreeMap<String, PathBuf>) -> Programs {
-        Programs { overrides }
+        Programs {
+            overrides,
+            path: None,
+        }
+    }
+
+    /// Look for programs in these folders instead of the process's `PATH`: for tests, which
+    /// must not find what the machine has installed.
+    pub fn with_path(mut self, path: impl Into<std::ffi::OsString>) -> Programs {
+        self.path = Some(path.into());
+        self
     }
 
     /// The file `name` stands for now, looked up in the process's `PATH`.
     pub fn resolve(&self, name: &str) -> Result<ResolvedProgram, Unresolved> {
-        let path = std::env::var_os("PATH").unwrap_or_default();
+        let path = match &self.path {
+            Some(p) => p.clone(),
+            None => std::env::var_os("PATH").unwrap_or_default(),
+        };
         self.resolve_in(name, &path, Os::current())
     }
 

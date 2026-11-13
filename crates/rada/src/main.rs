@@ -798,7 +798,9 @@ fn with_recipes(
         programs,
         meta: Some(services.meta_reader.clone()),
     };
-    let host = rada_lua::LuaHost::new(tools).with_user_dir(dirs.recipes_dir());
+    let host = rada_lua::LuaHost::new(tools)
+        .with_builtins(rada_lua::BUILTINS)
+        .with_user_dir(dirs.recipes_dir());
     let problems = host.load();
     services.with_plugins(Arc::new(host), &problems)
 }
