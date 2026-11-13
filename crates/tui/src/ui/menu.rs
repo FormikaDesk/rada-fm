@@ -63,6 +63,9 @@ fn icon_of(ctx: &Ctx, it: &MenuItem) -> Option<(String, Color)> {
 
 /// What is written on the right of an entry.
 fn right_of(ctx: &Ctx, km: &Keymap, it: &MenuItem) -> String {
+    if let Some(note) = &it.note {
+        return note.clone();
+    }
     match &it.cmd {
         MenuCmd::Sub(_) | MenuCmd::OpenWithList => "›".to_string(),
         _ if it.checked == Some(true) => icons::ui(ctx.set, Glyph::Done).to_string(),

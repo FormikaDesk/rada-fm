@@ -42,6 +42,8 @@ pub enum BarMode {
 pub enum BarItem {
     /// Run an action, as its key would.
     Command(Action),
+    /// Start a recipe: its name and its title.
+    Recipe { name: String, title: String },
     /// Go to a folder.
     Place(PaletteItem),
     /// Go to a folder zoxide knows.
@@ -107,6 +109,9 @@ pub struct AddressEdit {
     pub(super) zoxide: Vec<PathBuf>,
     /// The text zoxide was last asked about, so that typing does not ask again and again.
     pub(super) zoxide_asked: String,
+    /// The recipes that can run on what is selected, by name and title: asked once, when
+    /// the bar opens.
+    pub(super) recipes: Vec<(String, String)>,
 }
 
 impl AddressEdit {
@@ -134,6 +139,7 @@ impl AddressEdit {
             filtering: false,
             zoxide: Vec::new(),
             zoxide_asked: String::new(),
+            recipes: Vec::new(),
         }
     }
 

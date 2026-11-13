@@ -40,6 +40,8 @@ pub enum MenuCmd {
     CheckUpdates,
     /// The version, channel and way of updating.
     About,
+    /// Go on with a recipe: ask its next setting, or run it.
+    Recipe(Box<super::RecipeAsk>),
 }
 
 /// What a choice in the Tags menu does.
@@ -76,6 +78,8 @@ pub struct MenuItem {
     pub icon: MenuIcon,
     /// Takes something away for good or to the trash: drawn in the colour of errors.
     pub danger: bool,
+    /// Said on the right, quiet: why an entry is greyed.
+    pub note: Option<String>,
 }
 
 impl MenuItem {
@@ -88,6 +92,15 @@ impl MenuItem {
             checked: None,
             icon: MenuIcon::None,
             danger: false,
+            note: None,
+        }
+    }
+
+    /// A recipe: greyed, with why, when it cannot run on what is selected.
+    pub fn recipe(ask: Box<super::RecipeAsk>, label: &str, why: Option<String>) -> MenuItem {
+        MenuItem {
+            note: why.clone(),
+            ..MenuItem::plain(MenuCmd::Recipe(ask), label, why.is_none(), false)
         }
     }
 
@@ -149,6 +162,7 @@ impl MenuItem {
             MenuKind::Tags => Glyph::Tag,
             MenuKind::More => Glyph::More,
             MenuKind::Help => Glyph::Help,
+            MenuKind::Actions => Glyph::More,
         };
         MenuItem {
             icon: MenuIcon::Glyph(glyph),

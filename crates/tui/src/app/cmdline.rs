@@ -106,7 +106,7 @@ impl App {
         let line = line_of(&a.text).trim().to_string();
         let parsed = match registry::parse(&line, &self.svc.home) {
             Err(e) => return self.line_problem(e.at, &e.message),
-            Ok(None) => return self.run_best_hit(),
+            Ok(None) => return self.run_recipe_line(line),
             Ok(Some(parsed)) => parsed,
         };
         // The bar closes first: what the command opens (a window, another bar) comes after.
@@ -168,6 +168,22 @@ impl App {
             },
         );
         a.hit_selected = None;
+    }
+
+    /// The line is not a command: a recipe by its name, or else the words of the bar.
+    fn run_recipe_line(&mut self, line: String) {
+        let bar = self.windows.address.take();
+        match self.recipe_line(&line) {
+            None => {
+                self.windows.address = bar;
+                self.run_best_hit();
+            }
+            Some(Ok(())) => self.remember_line(line),
+            Some(Err(why)) => {
+                self.windows.address = bar;
+                self.line_problem(0, &why);
+            }
+        }
     }
 
     /// The line is not a command: its words found commands and places, and the first one runs.

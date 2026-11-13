@@ -285,6 +285,7 @@ mod panels;
 mod preview;
 mod prompt;
 mod props;
+mod recipes;
 mod selection;
 mod settings;
 mod side;
@@ -310,6 +311,7 @@ pub use panels::GitView;
 pub use preview::{ImageStatus, ImageView, PreviewPane};
 pub use prompt::{InputKind, InputView};
 pub use props::PropsView;
+pub use recipes::RecipeAsk;
 pub use tabs::{TabState, ViewRun};
 pub use update::{UpdateStatus, UpdateView, Updates};
 
@@ -512,7 +514,7 @@ impl App {
                 always,
             } => self.on_open_choices(path, kind, apps, always),
             CoreEvent::Note { text, error } => self.on_note(text, error),
-            // Nothing in the interface starts a recipe yet.
+            // The interface runs recipes through a job (`Jobs::plan_recipe`), never this way.
             CoreEvent::Recipe(r) => tracing::debug!("recipe {} done", r.recipe),
         }
     }

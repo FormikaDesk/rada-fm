@@ -22,6 +22,8 @@ pub enum MenuKind {
     More,
     Tags,
     Help,
+    /// The recipes for what is selected.
+    Actions,
 }
 
 impl App {
@@ -45,6 +47,7 @@ impl App {
                 MenuItem::command(MenuCmd::About, Key::MenuAbout.tr(), false),
             ],
             MenuKind::More => self.more_menu_items(),
+            MenuKind::Actions => self.recipe_menu_items(),
         }
     }
 
@@ -239,6 +242,15 @@ impl App {
 
     fn item_menu_items(&self) -> Vec<MenuItem> {
         let mut items = self.item_opening_items();
+        // Only when some recipe is for what is selected: without recipes the menu is as it was.
+        if !self.recipe_list().is_empty() {
+            items.push(MenuItem::sub(
+                MenuKind::Actions,
+                Key::MenuActions.tr(),
+                true,
+                true,
+            ));
+        }
         items.extend(self.item_edit_items());
         items.extend(self.item_about_items());
         items
@@ -374,6 +386,7 @@ impl App {
             MenuCmd::Tag(cmd) => self.run_tag_cmd(cmd),
             MenuCmd::CheckUpdates => self.check_updates_now(),
             MenuCmd::About => self.open_about(),
+            MenuCmd::Recipe(ask) => self.continue_recipe(*ask),
         }
     }
 }

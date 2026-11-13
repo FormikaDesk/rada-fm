@@ -36,6 +36,7 @@ macro_rules! strings {
 #[cfg(test)]
 pub(super) const SAME_IN_BOTH: &[Key] = &[
     Key::PropGps,
+    Key::BtnNo,
     Key::PropAlbum,
     Key::Markdown,
     Key::FileOne,
@@ -128,6 +129,25 @@ strings! {
     RecipeNeedsAtLeast => "choose at least {0} items", "scegli almeno {0} elementi";
     RecipeNeedsOne => "for one file at a time", "per un file alla volta";
     RecipeNeedsAtMost => "for at most {0} items", "per al massimo {0} elementi";
+    RecipeUnknown => "There is no action called {0}", "Non c'è un'azione che si chiama {0}";
+    RecipeNotForThese => "{0} is not for what is selected", "{0} non è per ciò che è selezionato";
+    RecipeArgMissing => "no value given", "manca il valore";
+    RecipeArgWrong => "not one of the values it takes", "non è uno dei valori ammessi";
+    RecipeArgUnknown => "the action has no such setting", "l'azione non ha questa impostazione";
+    RecipeTooLong => "The action ran too long and was stopped", "L'azione è andata avanti troppo ed è stata fermata";
+    RecipeTooBig => "The action used too much memory and was stopped", "L'azione ha usato troppa memoria ed è stata fermata";
+    RecipeTooSlow => "The action took too long and was stopped", "L'azione ci ha messo troppo ed è stata fermata";
+    RecipeStopped => "Stopped", "Fermata";
+    RecipeNoneHere => "No action called {0} for what is selected", "Nessuna azione {0} per ciò che è selezionato";
+    RecipeWhich => "which action? :recipe name", "quale azione? :recipe nome";
+    RecipeSetting => "{0}: a setting is name=value", "{0}: un'impostazione si scrive nome=valore";
+    PreparingRecipe => "Preparing {0}…", "Preparazione di {0}…";
+    MenuActions => "Actions", "Azioni";
+    BarAction => "action", "azione";
+    VRecipe => "Action", "Azione";
+    CmdRecipe => "Run an action by its name, with its settings (name=value)", "Esegui un'azione per nome, con le sue impostazioni (nome=valore)";
+    BtnYes => "Yes", "Sì";
+    BtnNo => "No", "No";
     RecipeNotLoaded => "Recipe not loaded: {0}", "Ricetta non caricata: {0}";
     RecipesNotLoaded => "{0} recipe problems (see the log); the first: {1}", "{0} problemi nelle ricette (vedi il log); il primo: {1}";
     TitleExtract => "Extract {0}", "Estrai {0}";

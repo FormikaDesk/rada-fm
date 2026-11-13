@@ -405,6 +405,7 @@ const SORT_ARGS: [ArgSpec; 2] = [
 ];
 const FIND_ARGS: [ArgSpec; 1] = [ArgSpec::new("text", ArgType::Rest, true)];
 const CD_ARGS: [ArgSpec; 1] = [ArgSpec::new("folder", ArgType::Path, true)];
+const RECIPE_ARGS: [ArgSpec; 1] = [ArgSpec::new("recipe", ArgType::Rest, true)];
 
 fn group_word(group: Group) -> &'static str {
     match group {
@@ -476,6 +477,13 @@ fn named_only() -> Vec<CommandSpec> {
             App::find_below,
         ),
         named("cd", Key::CmdCd, Group::Move, &CD_ARGS, App::go_to_typed),
+        named(
+            "recipe",
+            Key::CmdRecipe,
+            Group::Files,
+            &RECIPE_ARGS,
+            App::recipe_command,
+        ),
     ]
 }
 

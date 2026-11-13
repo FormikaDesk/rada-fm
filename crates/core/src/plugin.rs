@@ -175,32 +175,34 @@ pub enum RecipeError {
 
 impl std::fmt::Display for RecipeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::i18n::{Key, tf};
         match self {
-            RecipeError::Unknown(n) => write!(f, "there is no recipe called {n}"),
+            RecipeError::Unknown(n) => f.write_str(&tf(Key::RecipeUnknown, &[n])),
             RecipeError::NotAvailable(why) => f.write_str(why),
             RecipeError::BadArgument { name, message } => write!(f, "{name}: {message}"),
+            // A recipe built in says what is wrong in words: its file and line would mean
+            // nothing to the person.
+            RecipeError::Script {
+                file,
+                line: None,
+                message,
+            } if file.to_string_lossy().starts_with("rada:") => f.write_str(message),
             RecipeError::Script {
                 file,
                 line,
                 message,
-            } => {
-                let problem = LoadProblem {
-                    file: file.clone(),
-                    line: *line,
-                    message: message.clone(),
-                };
-                problem.fmt(f)
+            } => LoadProblem {
+                file: file.clone(),
+                line: *line,
+                message: message.clone(),
             }
-            RecipeError::Limit(Limit::Instructions) => {
-                f.write_str("the recipe ran too long and was stopped")
-            }
-            RecipeError::Limit(Limit::Memory) => {
-                f.write_str("the recipe used too much memory and was stopped")
-            }
-            RecipeError::Limit(Limit::Time) => {
-                f.write_str("the recipe took too long and was stopped")
-            }
-            RecipeError::Cancelled => f.write_str("stopped"),
+            .fmt(f),
+            RecipeError::Limit(limit) => f.write_str(match limit {
+                Limit::Instructions => Key::RecipeTooLong.tr(),
+                Limit::Memory => Key::RecipeTooBig.tr(),
+                Limit::Time => Key::RecipeTooSlow.tr(),
+            }),
+            RecipeError::Cancelled => f.write_str(Key::RecipeStopped.tr()),
         }
     }
 }

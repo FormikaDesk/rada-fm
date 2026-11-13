@@ -26,6 +26,40 @@ pub struct JobHandle {
 enum PlanSource {
     Request(OpRequest),
     Redo,
+    /// A recipe, run first: what it asks for is the request.
+    Recipe(Box<RecipeRun>),
+}
+
+/// A recipe to run on a job's thread.
+struct RecipeRun {
+    host: Arc<dyn crate::plugin::PluginHost>,
+    name: String,
+    ctx: crate::plugin::RecipeContext,
+    args: crate::plugin::ArgValues,
+    lang: crate::i18n::Lang,
+}
+
+/// The request a recipe asks for, or `None` when it gave none (the reason is sent, unless it
+/// was stopped by the person).
+fn recipe_request(
+    run: RecipeRun,
+    id: JobId,
+    cancel: &Cancel,
+    out: &Sender<CoreEvent>,
+) -> Option<OpRequest> {
+    let lang = run.lang;
+    let result = crate::i18n::with_lang(lang, || {
+        run.host.run(&run.name, &run.ctx, &run.args, cancel)
+    });
+    match result {
+        Ok(plan) => Some(OpRequest::Recipe(plan)),
+        Err(_) if cancel.is_cancelled() => None,
+        Err(e) => {
+            let message = crate::i18n::with_lang(lang, || e.to_string());
+            let _ = out.send(CoreEvent::Job(JobEvent::PlanFailed { job: id, message }));
+            None
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -123,11 +157,34 @@ impl Jobs {
         self.plan_job(PlanSource::Request(req))
     }
 
+    /// Run the recipe `name` and plan what it asks for, on a worker: the answer is a
+    /// `Planned` event, or `PlanFailed` with the recipe's reason. Cancelling the job stops
+    /// the recipe too.
+    pub fn plan_recipe(
+        &self,
+        host: Arc<dyn crate::plugin::PluginHost>,
+        name: String,
+        ctx: crate::plugin::RecipeContext,
+        args: crate::plugin::ArgValues,
+    ) -> JobHandle {
+        self.plan_job(PlanSource::Recipe(Box::new(RecipeRun {
+            host,
+            name,
+            ctx,
+            args,
+            lang: crate::i18n::lang(),
+        })))
+    }
+
     fn plan_job(&self, source: PlanSource) -> JobHandle {
         let journal = self.journal.clone();
         self.spawn(move |id, cancel, engine, out| {
             let (req, redo_of) = match source {
                 PlanSource::Request(r) => (r, None),
+                PlanSource::Recipe(run) => match recipe_request(*run, id, &cancel, out) {
+                    Some(r) => (r, None),
+                    None => return,
+                },
                 PlanSource::Redo => match journal.as_ref().map(|j| j.last_redoable()) {
                     Some(Ok(Some(entry))) => match entry.request.clone() {
                         Some(r) => (r, Some(entry.id)),

@@ -537,6 +537,12 @@ fn hit_row(app: &App, h: &BarHit) -> HitRow {
             Key::BarCommand.tr().to_string(),
             h.label_pos.clone(),
         ),
+        BarItem::Recipe { name, title } => (
+            title.clone(),
+            format!(":{name}"),
+            Key::BarAction.tr().to_string(),
+            h.label_pos.clone(),
+        ),
         BarItem::Zoxide(path) => (
             display::name(path.file_name().unwrap_or(path.as_os_str())),
             fmt::short_path(path, app.home()),

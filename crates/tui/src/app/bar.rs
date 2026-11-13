@@ -46,6 +46,7 @@ impl App {
         )));
         // A filter already on the folder is the bar's to take off.
         edit.filtering = keep_filter && self.tab.filter.is_some();
+        edit.recipes = self.bar_recipes();
         self.windows.address = Some(edit);
         self.filter_editing_off();
         self.bar_changed();
@@ -132,6 +133,7 @@ impl App {
             .iter()
             .any(|e| e.name == q_text.as_str());
         let mut hits = command_hits(&q, &offered);
+        hits.extend(recipe_hits(&q, &a.recipes));
         if let Some(p) = &mut a.palette {
             p.query = q;
             p.cursor = p.query.chars().count();
@@ -190,6 +192,11 @@ impl App {
         }
         match hit.item {
             BarItem::Command(action) => self.dispatch(action),
+            BarItem::Recipe { name, .. } => {
+                if let Err(why) = self.start_recipe(&name, Default::default()) {
+                    self.toast(ToastKind::Warn, &why, 4);
+                }
+            }
             BarItem::Place(item) => self.open_dir(item.path),
             BarItem::Zoxide(path) => self.open_dir(path),
             BarItem::Search(words) => self.search_below(&words),
@@ -427,6 +434,36 @@ fn command_hits(q: &str, offered: &[Action]) -> Vec<BarHit> {
     }
     commands.sort_by_key(|c| std::cmp::Reverse(c.0));
     commands
+        .into_iter()
+        .take(MAX_COMMANDS)
+        .map(|(_, h)| h)
+        .collect()
+}
+
+/// The recipes whose titles (or names) match what is typed, best first. Nothing is offered
+/// for an empty text: the bar lists actions only when asked.
+fn recipe_hits(q: &str, recipes: &[(String, String)]) -> Vec<BarHit> {
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let mut found: Vec<(i64, BarHit)> = Vec::new();
+    for (name, title) in recipes {
+        let best = match (fuzzy::score(q, title), fuzzy::score(q, name)) {
+            (Some((a, pos)), Some((b, _))) if a >= b => Some((a, pos)),
+            (_, Some((b, _))) => Some((b, Vec::new())),
+            (Some((a, pos)), None) => Some((a, pos)),
+            (None, None) => None,
+        };
+        if let Some((score, label_pos)) = best {
+            let item = BarItem::Recipe {
+                name: name.clone(),
+                title: title.clone(),
+            };
+            found.push((score, BarHit { item, label_pos }));
+        }
+    }
+    found.sort_by_key(|c| std::cmp::Reverse(c.0));
+    found
         .into_iter()
         .take(MAX_COMMANDS)
         .map(|(_, h)| h)

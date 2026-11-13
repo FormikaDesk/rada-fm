@@ -50,6 +50,11 @@ pub enum InputKind {
     NewTag {
         items: Vec<PathBuf>,
     },
+    /// A setting of a recipe: a text or a number.
+    RecipeArg {
+        ask: Box<super::RecipeAsk>,
+        arg: rada_core::plugin::RecipeArg,
+    },
 }
 
 pub struct InputView {
@@ -224,6 +229,10 @@ impl App {
                     self.open_with_program(path, program);
                 }
             }
+            InputKind::RecipeArg { ask, arg } => {
+                let (ask, arg) = ((**ask).clone(), arg.clone());
+                self.submit_recipe_text(ask, arg, iv);
+            }
             InputKind::BulkRename { items, .. } => {
                 // The plan reads what it needs itself, through the same cache.
                 self.svc.renames.stop();
@@ -235,7 +244,7 @@ impl App {
     }
 
     /// The question stays open, with what is wrong with the answer under it.
-    fn reject_input(&mut self, mut iv: InputView, error: String) {
+    pub(super) fn reject_input(&mut self, mut iv: InputView, error: String) {
         iv.error = Some(error);
         self.windows.modal = Some(Modal::Input(iv));
     }

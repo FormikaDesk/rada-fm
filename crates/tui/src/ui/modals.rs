@@ -665,6 +665,9 @@ fn input_texts(kind: &InputKind) -> (&'static str, String) {
             (Key::VCompress.tr(), tf(Key::InArchiveHint, &[&formats]))
         }
         InputKind::BulkRename { .. } => (Key::VerbBulkRename.tr(), Key::InBulkHint.tr().into()),
+        InputKind::RecipeArg { ask, arg } => {
+            (Key::VRecipe.tr(), format!("{} · {}", ask.title, arg.label))
+        }
     }
 }
 

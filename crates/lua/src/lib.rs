@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use mlua::{Lua, Table, Value};
+use rada_core::i18n::{Key, tf};
 use rada_core::meta::MetaReader;
 use rada_core::ops::{FailurePolicy, Programs, RecipePlan};
 use rada_core::plugin::{
@@ -398,10 +399,10 @@ fn arg_table(lua: &Lua, def: &RecipeDef, given: &ArgValues) -> Result<Table, Rec
     for arg in &def.args {
         let value = given.get(&arg.name).or(arg.default.as_ref());
         let Some(value) = value else {
-            return Err(bad(&arg.name, "missing"));
+            return Err(bad(&arg.name, Key::RecipeArgMissing.tr()));
         };
         if !arg.public().accepts(value) {
-            return Err(bad(&arg.name, "not a value it takes"));
+            return Err(bad(&arg.name, Key::RecipeArgWrong.tr()));
         }
         let lua_value = match value {
             rada_core::plugin::ArgValue::Text(s) => lua.create_string(s).map(Value::String),
@@ -416,7 +417,7 @@ fn arg_table(lua: &Lua, def: &RecipeDef, given: &ArgValues) -> Result<Table, Rec
         .keys()
         .find(|k| !def.args.iter().any(|a| &a.name == *k))
     {
-        return Err(bad(unknown, "the recipe has no such argument"));
+        return Err(bad(unknown, Key::RecipeArgUnknown.tr()));
     }
     Ok(t)
 }
@@ -517,10 +518,8 @@ impl PluginHost for LuaHost {
             Some(Availability::Available) => {}
             Some(Availability::Disabled(why)) => return Err(RecipeError::NotAvailable(why)),
             None => {
-                return Err(RecipeError::NotAvailable(format!(
-                    "{} is not for the files chosen",
-                    def.title.get()
-                )));
+                let why = tf(Key::RecipeNotForThese, &[&def.title.get()]);
+                return Err(RecipeError::NotAvailable(why));
             }
         }
         let s = self
